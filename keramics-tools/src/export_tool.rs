@@ -22,7 +22,7 @@ use keramics_core::ErrorTrace;
 use keramics_formats::{Path, PathComponent};
 use keramics_vfs::{
     VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanOptions,
-    VfsScanner, new_os_vfs_location,
+    VfsScanner,
 };
 
 #[cfg(feature = "debug-trace")]
@@ -40,6 +40,10 @@ struct CommandLineArguments {
     /// Enable debug output
     debug: bool,
 
+    #[arg(long, default_value_t = 0)]
+    /// Layer within the storage media image, where 1 represents the first layer
+    image_layer: usize,
+
     #[arg(short, long, default_value_t = 0, value_parser=maybe_hex::<u64>)]
     /// Offset within the storage media
     offset: u64,
@@ -53,7 +57,7 @@ struct CommandLineArguments {
 
     #[arg(short, long)]
     /// Target (or destination) path of a directory where the extracted data stream should
-    /// be written.
+    /// be written
     target: Option<PathBuf>,
 
     #[command(subcommand)]
@@ -62,7 +66,7 @@ struct CommandLineArguments {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Path of the data stream to extract.
+    /// Path of the data stream to extract
     Path(PathCommandArguments),
 }
 
@@ -72,27 +76,34 @@ struct PathCommandArguments {
     path: String,
 
     #[arg(long)]
-    /// Name of the data stream to extract.
+    /// Name of the data stream to extract
     name: Option<String>,
 }
 
 /// Tool for extracting data streams from a storage media image.
-struct ExportTool {}
+struct ExportTool {
+    /// Data stream writer.
+    data_stream_writer: DataStreamWriter,
+
+    /// Output path.
+    output_path: PathBuf,
+}
 
 impl ExportTool {
     /// Creates a new tool.
-    fn new() -> Self {
-        Self {}
+    fn new(output_path: PathBuf) -> Self {
+        Self {
+            data_stream_writer: DataStreamWriter::new(),
+            output_path,
+        }
     }
 
     /// Export data stream from a scan node.
-    fn export_data_stream_from_scan_node(
-        &self,
-        data_stream_writer: &mut DataStreamWriter,
+    fn export_data_stream_from_scan_node_with_path(
+        &mut self,
         vfs_scan_node: &VfsScanNode,
         path: &Path,
         name: Option<&PathComponent>,
-        output_path: &mut PathBuf,
     ) -> Result<(), ErrorTrace> {
         if vfs_scan_node.is_empty() {
             let vfs_resolver: VfsResolverReference = VfsResolver::current();
@@ -102,7 +113,7 @@ impl ExportTool {
             match vfs_resolver.get_data_stream_by_location_and_name(&vfs_location, name) {
                 Ok(Some(data_stream)) => {
                     // TODO: sanitize output path, file name and data stream name.
-                    match create_dir_all(&output_path) {
+                    match create_dir_all(&self.output_path) {
                         Ok(_) => {}
                         Err(error) => {
                             return Err(keramics_core::error_trace_new_with_error!(
@@ -120,9 +131,14 @@ impl ExportTool {
                         }
                     };
                     // TODO: include data stream name in output file name.
+                    let mut output_path: PathBuf = self.output_path.clone();
+
                     output_path.push(file_name.as_str());
 
-                    match data_stream_writer.write_data_stream(&data_stream, output_path) {
+                    match self
+                        .data_stream_writer
+                        .write_data_stream(&data_stream, &output_path)
+                    {
                         Ok(result) => result,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -141,13 +157,7 @@ impl ExportTool {
             };
         } else {
             for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
-                match self.export_data_stream_from_scan_node(
-                    data_stream_writer,
-                    sub_scan_node,
-                    path,
-                    name,
-                    output_path,
-                ) {
+                match self.export_data_stream_from_scan_node_with_path(sub_scan_node, path, name) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -161,68 +171,67 @@ impl ExportTool {
         }
         Ok(())
     }
+
+    /// Retrieves the number of data streams written.
+    fn get_number_of_streams_written(&self) -> usize {
+        self.data_stream_writer.number_of_streams_written
+    }
+
+    /// Scans the source for file systems.
+    fn scan_for_file_systems<'a>(
+        &self,
+        vfs_location: &'a VfsLocation,
+        image_layer: usize,
+        partitions: Option<&String>,
+        vfs_scan_context: &mut VfsScanContext<'a>,
+    ) -> Result<(), ErrorTrace> {
+        let mut vfs_scanner: VfsScanner = VfsScanner::new();
+
+        match vfs_scanner.build() {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
+        }
+        let mut vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
+
+        vfs_scan_options.image_layer = image_layer;
+
+        if let Some(partitions_string) = partitions {
+            match vfs_scan_options.parse_partitions(partitions_string.as_str()) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to parse partitions");
+                    return Err(error);
+                }
+            }
+        }
+        // TODO: add scanner mediator.
+
+        match vfs_scanner.scan(&vfs_scan_options, vfs_scan_context, vfs_location) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to scan for file systems");
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
 }
 
 fn main() -> ExitCode {
     let arguments = CommandLineArguments::parse();
 
-    let source: &str = match arguments.source.to_str() {
+    let source_string: &str = match arguments.source.to_str() {
         Some(value) => value,
         None => {
             println!("Missing source");
             return ExitCode::FAILURE;
         }
     };
-    // TODO: add scanner mediator.
-
-    let mut vfs_scanner: VfsScanner = VfsScanner::new();
-
-    match vfs_scanner.build() {
-        Ok(_) => {}
-        Err(error) => {
-            println!("{}", error);
-            return ExitCode::FAILURE;
-        }
-    };
-    let mut vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
-
-    if let Some(partitions_string) = arguments.partitions {
-        match vfs_scan_options.parse_partitions(partitions_string.as_str()) {
-            Ok(_) => {}
-            Err(error) => {
-                println!("Unable to parse partitions: {}\n{}", source, error);
-                return ExitCode::FAILURE;
-            }
-        }
-    }
-    let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
-    let vfs_location: VfsLocation = new_os_vfs_location(source);
-
-    match vfs_scanner.scan(&vfs_scan_options, &mut vfs_scan_context, &vfs_location) {
-        Ok(_) => {}
-        Err(error) => {
-            println!("Unable to scan: {} with error:\n{}", source, error);
-            return ExitCode::FAILURE;
-        }
-    };
-    let root_scan_node: &VfsScanNode = match vfs_scan_context.root_node.as_ref() {
-        Some(scan_node) => scan_node,
-        None => {
-            println!("Unable to scan: {} missing root scan node", source);
-            return ExitCode::FAILURE;
-        }
-    };
-    if root_scan_node.is_empty() {
-        println!("No file system found in source");
-        return ExitCode::FAILURE;
-    }
-    #[cfg(feature = "debug-trace")]
-    {
-        Mediator {
-            debug_output: arguments.debug,
-        }
-        .make_current();
-    }
     let source_file_name: &str = match arguments.source.file_name() {
         Some(os_str) => match os_str.to_str() {
             Some(value) => value,
@@ -242,10 +251,44 @@ fn main() -> ExitCode {
     };
     target.push(format!("{}.export", source_file_name));
 
-    let mut data_stream_writer: DataStreamWriter = DataStreamWriter::new();
+    let mut export_tool: ExportTool = ExportTool::new(target);
 
-    let export_tool: ExportTool = ExportTool::new();
+    let vfs_location: VfsLocation = VfsLocation::from(&arguments.source);
+    let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
 
+    match export_tool.scan_for_file_systems(
+        &vfs_location,
+        arguments.image_layer,
+        arguments.partitions.as_ref(),
+        &mut vfs_scan_context,
+    ) {
+        Ok(_) => {}
+        Err(error) => {
+            println!(
+                "Unable to scan: {} for file systems\n{}",
+                source_string, error
+            );
+            return ExitCode::FAILURE;
+        }
+    }
+    let root_scan_node: &VfsScanNode = match vfs_scan_context.root_node.as_ref() {
+        Some(scan_node) => scan_node,
+        None => {
+            println!("Unable to scan: {} missing root scan node", source_string);
+            return ExitCode::FAILURE;
+        }
+    };
+    if root_scan_node.is_empty() {
+        println!("No file system found in source");
+        return ExitCode::FAILURE;
+    }
+    #[cfg(feature = "debug-trace")]
+    {
+        Mediator {
+            debug_output: arguments.debug,
+        }
+        .make_current();
+    }
     match arguments.command {
         Commands::Path(command_arguments) => {
             let name: Option<PathComponent> = match command_arguments.name {
@@ -254,25 +297,23 @@ fn main() -> ExitCode {
             };
             let path: Path = Path::from(&command_arguments.path);
 
-            match export_tool.export_data_stream_from_scan_node(
-                &mut data_stream_writer,
+            match export_tool.export_data_stream_from_scan_node_with_path(
                 root_scan_node,
                 &path,
                 name.as_ref(),
-                &mut target,
             ) {
                 Ok(_) => {}
                 Err(error) => {
                     println!(
                         "Unable to export data stream from: {} with error:\n{}",
-                        source, error
+                        source_string, error
                     );
                     return ExitCode::FAILURE;
                 }
-            };
+            }
         }
-    };
-    if data_stream_writer.number_of_streams_written == 0 {
+    }
+    if export_tool.get_number_of_streams_written() == 0 {
         println!("No data streams exported");
     }
     ExitCode::SUCCESS

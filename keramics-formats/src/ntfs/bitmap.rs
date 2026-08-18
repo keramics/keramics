@@ -178,9 +178,7 @@ impl NtfsBitmap {
                 let mut block_offset: u64 =
                     block_range.cluster_block_number * (self.cluster_block_size as u64);
 
-                for range_block_index in
-                    (0..block_range.size).step_by(self.cluster_block_size as usize)
-                {
+                for _ in (0..block_range.size).step_by(self.cluster_block_size as usize) {
                     match self.read_at_position(
                         data_stream,
                         SeekFrom::Start(block_offset),
@@ -254,7 +252,7 @@ impl NtfsBitmap {
         let mut data: Vec<u8> = vec![0; self.cluster_block_size as usize];
 
         let offset: u64 =
-            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position,);
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
 
         keramics_core::debug_trace_data!("NtfsBitmapBlock", offset, &data, self.cluster_block_size);
 

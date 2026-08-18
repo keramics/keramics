@@ -160,7 +160,7 @@ impl FatFileEntry {
     pub fn get_sub_file_entry_by_name(
         &mut self,
         sub_file_entry_name: &PathComponent,
-    ) -> Result<Option<FatFileEntry>, ErrorTrace> {
+    ) -> Result<Option<Self>, ErrorTrace> {
         if self.is_directory() && !self.sub_directory_entries.is_read() {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
@@ -177,7 +177,7 @@ impl FatFileEntry {
             .sub_directory_entries
             .get_entry_by_name(sub_file_entry_name)
         {
-            Ok(Some(directory_entry)) => Ok(Some(FatFileEntry::new(
+            Ok(Some(directory_entry)) => Ok(Some(Self::new(
                 &self.data_stream,
                 &self.block_allocation_table,
                 directory_entry.identifier,
@@ -262,7 +262,7 @@ impl FileEntryIterator for FatFileEntry {
     fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> Result<FatFileEntry, ErrorTrace> {
+    ) -> Result<Self, ErrorTrace> {
         if self.is_directory() && !self.sub_directory_entries.is_read() {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
@@ -279,7 +279,7 @@ impl FileEntryIterator for FatFileEntry {
             .sub_directory_entries
             .get_entry_by_index(sub_file_entry_index)
         {
-            Some(directory_entry) => Ok(FatFileEntry::new(
+            Some(directory_entry) => Ok(Self::new(
                 &self.data_stream,
                 &self.block_allocation_table,
                 directory_entry.identifier,

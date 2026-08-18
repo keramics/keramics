@@ -67,6 +67,9 @@ pub struct VfsScanOptions {
 
     /// Sector size.
     pub(super) sector_size: u32,
+
+    /// Volumes to include in scan.
+    pub(super) volumes: VfsScanOptionGroup,
 }
 
 impl VfsScanOptions {
@@ -76,6 +79,7 @@ impl VfsScanOptions {
             image_layer: 0,
             partitions: VfsScanOptionGroup::NotSet,
             sector_size: 512,
+            volumes: VfsScanOptionGroup::NotSet,
         }
     }
 

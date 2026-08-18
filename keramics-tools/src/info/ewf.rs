@@ -255,8 +255,6 @@ impl EwfInfo {
                 return Err(error);
             }
         };
-        let mut ewf_image: EwfImage = EwfImage::new();
-
         let file_name: PathComponent = match path_buf.file_name() {
             Some(file_name) => match file_name.to_str() {
                 Some(file_name) => PathComponent::from(file_name),
@@ -268,6 +266,8 @@ impl EwfInfo {
                 return Err(keramics_core::error_trace_new!("Missing file name"));
             }
         };
+        let mut ewf_image: EwfImage = EwfImage::new();
+
         match ewf_image.open(&file_resolver, &file_name) {
             Ok(_) => {}
             Err(mut error) => {
@@ -299,7 +299,7 @@ impl EwfInfo {
 mod tests {
     use super::*;
 
-    use crate::info::tests::assert_lines_eq;
+    use crate::assert_lines_eq;
 
     #[test]
     fn test_image_information_fmt() -> Result<(), ErrorTrace> {
@@ -331,7 +331,8 @@ mod tests {
             "        Software version used\t\t\t: 20140817\n",
             "\n"
         );
-        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
 
         Ok(())
     }

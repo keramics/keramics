@@ -127,7 +127,7 @@ impl PdiFileSystem {
                     }
                 };
                 Ok(Some(PdiFileEntry::Layer {
-                    index: layer_index,
+                    name_index: layer_index,
                     layer: image_layer.clone(),
                     size: media_size,
                     identifier,
@@ -223,7 +223,6 @@ mod tests {
 
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
-    use crate::location::new_os_vfs_location;
 
     use crate::tests::get_test_data_path;
 
@@ -233,7 +232,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("pdi/hfsplus.hdd/DiskDescriptor.xml");
-        let parent_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let parent_vfs_location: VfsLocation = VfsLocation::from(&path_string);
         pdi_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         Ok(pdi_file_system)
@@ -324,7 +323,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("pdi/hfsplus.hdd/DiskDescriptor.xml");
-        let parent_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let parent_vfs_location: VfsLocation = VfsLocation::from(&path_string);
         pdi_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(pdi_file_system.number_of_layers, 1);

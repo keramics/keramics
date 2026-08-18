@@ -85,7 +85,7 @@ impl ApfsFileSystem {
                 return Err(error);
             }
         };
-        let mut file_entry: ApfsFileEntry = ApfsFileEntry::new(
+        match ApfsFileEntry::new_with_initialize(
             data_stream,
             self.block_size,
             &self.object_map_tree,
@@ -94,22 +94,13 @@ impl ApfsFileSystem {
             self.transaction_identifier,
             inode,
             None,
-        );
-        match file_entry.read_attributes() {
-            Ok(_) => {}
+        ) {
+            Ok(file_entry) => Ok(Some(file_entry)),
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
-                return Err(error);
+                keramics_core::error_trace_add_frame!(error, "Unable to create file entry");
+                Err(error)
             }
         }
-        match file_entry.read_extents() {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read extents");
-                return Err(error);
-            }
-        }
-        Ok(Some(file_entry))
     }
 
     /// Retrieves the file entry for a specific path.

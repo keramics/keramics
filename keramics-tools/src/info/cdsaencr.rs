@@ -137,7 +137,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    use crate::info::tests::assert_lines_eq;
+    use crate::assert_lines_eq;
 
     #[test]
     fn test_container_information_fmt() -> Result<(), ErrorTrace> {
@@ -156,7 +156,8 @@ mod tests {
             "        Encryption method\t\t\t: AES-256-CBC-IV8\n",
             "\n"
         );
-        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
 
         Ok(())
     }

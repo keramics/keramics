@@ -1,0 +1,116 @@
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may
+ * obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+
+// Linux Logical Volume Manager (LVM) metadata grammar.
+
+// Built-in pest rule to ignore comments.
+COMMENT = _{
+    ("#" | "//") ~ (!"\n" ~ ANY)* ~ "\n"
+}
+
+// Built-in pest rule to ignore white space.
+WHITESPACE = _{
+    ("\u{0020}" | "\u{0009}" | "\u{000a}" | "\u{000d}")+
+}
+
+identifier = @{
+    (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")*
+}
+
+integer = @{
+    "-"? ~ ASCII_DIGIT+
+}
+
+string = @{
+    "\"" ~ (!"\"" ~ ANY)* ~ "\""
+}
+
+list_of_strings = {
+    "[" ~ (string ~ ("," ~ string)*)? ~ ","? ~ "]"
+}
+
+property_value = {
+    integer | string | list_of_strings
+}
+
+value = {
+    string | integer
+}
+
+list_of_values = {
+    "[" ~ (value ~ ("," ~ value)*)? ~ ","? ~ "]"
+}
+
+metadata = {
+    SOI ~ global_property* ~ volume_group ~ global_property* ~ EOI
+}
+
+global_property = {
+    identifier ~ "=" ~ property_value
+}
+
+volume_group = {
+    identifier ~ "{" ~ (volume_group_property | physical_volumes | logical_volumes)* ~ "}"
+}
+
+volume_group_property = {
+    identifier ~ "=" ~ property_value
+}
+
+physical_volumes = {
+    "physical_volumes" ~ "{" ~ physical_volume* ~ "}"
+}
+
+physical_volume_identifier = @{
+    "pv" ~ ASCII_DIGIT+
+}
+
+physical_volume = {
+    physical_volume_identifier ~ "{" ~ physical_volume_property* ~ "}"
+}
+
+physical_volume_property = {
+    identifier ~ "=" ~ property_value
+}
+
+logical_volumes = {
+     "logical_volumes" ~ "{" ~ logical_volume* ~ "}"
+}
+
+logical_volume = {
+    identifier ~ "{" ~ (logical_volume_property | segment)* ~ "}"
+}
+
+logical_volume_property = {
+    identifier ~ "=" ~ property_value
+}
+
+segment_identifier = @{
+    "segment" ~ ASCII_DIGIT+
+}
+
+segment = {
+    segment_identifier ~ "{" ~ (segment_property | stripes)* ~ "}"
+}
+
+segment_property = {
+    identifier ~ "=" ~ property_value
+}
+
+stripes = {
+    "stripes" ~ "=" ~ "[" ~ (stripe ~ ("," ~ stripe)*)? ~ ","? ~ "]"
+}
+
+stripe = {
+    "\"" ~ physical_volume_identifier ~ "\"" ~ "," ~ integer
+}

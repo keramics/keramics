@@ -106,11 +106,11 @@ impl GptFileSystem {
                             return Err(error);
                         }
                     };
-                let partition_size: u64 = gpt_partition.size;
+                let partition_size: u64 = gpt_partition.get_partition_size();
                 let identifier: Uuid = gpt_partition.get_identifier().clone();
 
                 Ok(Some(GptFileEntry::Partition {
-                    index: partition_index,
+                    name_index: partition_index,
                     partition: Arc::new(RwLock::new(gpt_partition)),
                     size: partition_size,
                     identifier,
@@ -209,7 +209,6 @@ mod tests {
 
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
-    use crate::location::new_os_vfs_location;
 
     use crate::tests::get_test_data_path;
 
@@ -219,7 +218,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("gpt/gpt.raw");
-        let parent_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let parent_vfs_location: VfsLocation = VfsLocation::from(&path_string);
         gpt_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         Ok(gpt_file_system)
@@ -308,7 +307,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("gpt/gpt.raw");
-        let parent_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let parent_vfs_location: VfsLocation = VfsLocation::from(&path_string);
         gpt_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(gpt_file_system.number_of_partitions, 2);

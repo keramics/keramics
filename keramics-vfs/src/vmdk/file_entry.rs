@@ -23,8 +23,8 @@ use crate::enums::VfsFileType;
 pub enum VmdkFileEntry {
     /// Layer file entry.
     Layer {
-        /// Layer index.
-        index: usize,
+        /// File name index.
+        name_index: usize,
 
         /// Layer.
         layer: Arc<RwLock<VmdkImageLayer>>,
@@ -102,7 +102,7 @@ impl VmdkFileEntry {
                         }
                     };
                     Ok(VmdkFileEntry::Layer {
-                        index: sub_file_entry_index,
+                        name_index: sub_file_entry_index,
                         layer: image_layer.clone(),
                         size: media_size,
                     })
@@ -153,7 +153,7 @@ mod tests {
         let image_layer: Arc<RwLock<VmdkImageLayer>> = image.get_layer_by_index(0)?;
 
         Ok(VmdkFileEntry::Layer {
-            index: 0,
+            name_index: 0,
             layer: image_layer,
             size: image.media_size,
         })

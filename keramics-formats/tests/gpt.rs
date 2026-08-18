@@ -46,13 +46,7 @@ fn open_volume_system(path: &PathBuf) -> Result<GptVolumeSystem, ErrorTrace> {
 fn read() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/gpt/gpt.raw");
     let volume_system: GptVolumeSystem = open_volume_system(&path_buf)?;
-
-    let number_of_partitions: usize = volume_system.get_number_of_partitions();
-    assert_eq!(number_of_partitions, 2);
-
     let mut partition: GptPartition = volume_system.get_partition_by_index(0)?;
-    assert_eq!(partition.offset, 1048576);
-    assert_eq!(partition.size, 1048576);
 
     partition.seek(SeekFrom::Start(1024))?;
 

@@ -42,13 +42,28 @@ use super::constants::*;
 )]
 /// GUID Partition Table (GPT) partition table header.
 pub struct GptPartitionTableHeader {
+    /// Backup header block number.
     pub backup_header_block_number: u64,
+
+    /// Area start block number.
     pub area_start_block_number: u64,
+
+    /// Area end block number.
     pub area_end_block_number: u64,
+
+    /// Disk identifier.
     pub disk_identifier: Uuid,
+
+    /// Entries start block number.
     pub entries_start_block_number: u64,
+
+    /// Number of entries.
     pub number_of_entries: u32,
+
+    /// Entries data size.
     pub entry_data_size: u32,
+
+    /// Entries data checksum.
     pub entries_data_checksum: u32,
 }
 
@@ -69,7 +84,7 @@ impl GptPartitionTableHeader {
 
     /// Reads the partition table header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() != 92 {
+        if data.len() < 92 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..8] != GPT_PARTITION_TABLE_SIGNATURE {
@@ -95,18 +110,21 @@ impl GptPartitionTableHeader {
         }
         let stored_checksum: u32 = bytes_to_u32_le!(data, 16);
 
-        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
-        crc32_context.update(&data[0..16]);
-        crc32_context.update(&[0; 4]);
-        crc32_context.update(&data[20..header_data_size as usize]);
+        if stored_checksum != 0 {
+            let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
 
-        let calculated_checksum: u32 = crc32_context.finalize();
+            crc32_context.update(&data[0..16]);
+            crc32_context.update(&[0; 4]);
+            crc32_context.update(&data[20..header_data_size as usize]);
 
-        if stored_checksum != 0 && stored_checksum != calculated_checksum {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
-                stored_checksum, calculated_checksum
-            )));
+            let calculated_checksum: u32 = crc32_context.finalize();
+
+            if stored_checksum != calculated_checksum {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                    stored_checksum, calculated_checksum
+                )));
+            }
         }
         self.backup_header_block_number = bytes_to_u64_le!(data, 32);
         self.area_start_block_number = bytes_to_u64_le!(data, 40);

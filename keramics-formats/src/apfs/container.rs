@@ -445,6 +445,16 @@ mod tests {
     }
 
     #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let container: ApfsContainer = get_container()?;
+
+        let bytes_per_sector: u16 = container.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_feature_flags() -> Result<(), ErrorTrace> {
         let container: ApfsContainer = get_container()?;
 

@@ -106,6 +106,7 @@ impl QcowFileHeader {
         match self.format_version {
             1 => {
                 keramics_core::debug_trace_structure!(QcowFileHeaderV1::debug_read_data(&data));
+
                 match QcowFileHeaderV1::read_data(self, &data) {
                     Ok(_) => {}
                     Err(mut error) => {
@@ -120,6 +121,7 @@ impl QcowFileHeader {
             }
             2 => {
                 keramics_core::debug_trace_structure!(QcowFileHeaderV2::debug_read_data(&data));
+
                 match QcowFileHeaderV2::read_data(self, &data) {
                     Ok(_) => {}
                     Err(mut error) => {
@@ -135,6 +137,7 @@ impl QcowFileHeader {
             }
             3 => {
                 keramics_core::debug_trace_structure!(QcowFileHeaderV3::debug_read_data(&data));
+
                 match QcowFileHeaderV3::read_data(self, &data) {
                     Ok(_) => {}
                     Err(mut error) => {

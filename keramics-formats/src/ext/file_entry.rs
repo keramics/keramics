@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::cmp::max;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
@@ -109,24 +108,12 @@ impl ExtFileEntry {
         &self,
         block_ranges: &Vec<ExtBlockRange>,
     ) -> Result<ExtBlockStream, ErrorTrace> {
-        let number_of_blocks: u64 = max(
-            self.inode
-                .data_size
-                .div_ceil(self.inode_table.block_size as u64),
-            self.inode.number_of_blocks,
-        );
-        let mut block_reader: ExtBlockReader = ExtBlockReader::new(
+        let block_reader: ExtBlockReader = ExtBlockReader::new(
             &self.data_stream,
             self.inode_table.block_size,
+            block_ranges,
             self.inode.data_size,
         );
-        match block_reader.open(number_of_blocks, block_ranges) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
-                return Err(error);
-            }
-        }
         Ok(ExtBlockStream::new(block_reader))
     }
 
@@ -482,7 +469,7 @@ impl ExtFileEntry {
     pub fn get_sub_file_entry_by_name(
         &mut self,
         sub_file_entry_name: &PathComponent,
-    ) -> Result<Option<ExtFileEntry>, ErrorTrace> {
+    ) -> Result<Option<Self>, ErrorTrace> {
         if self.is_directory() && !self.sub_directory_entries_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
@@ -524,7 +511,7 @@ impl ExtFileEntry {
                         return Err(error);
                     }
                 };
-                Ok(Some(ExtFileEntry::new(
+                Ok(Some(Self::new(
                     &self.data_stream,
                     &self.inode_table,
                     directory_entry.inode_number,
@@ -659,7 +646,7 @@ impl FileEntryIterator for ExtFileEntry {
     fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> Result<ExtFileEntry, ErrorTrace> {
+    ) -> Result<Self, ErrorTrace> {
         if self.is_directory() && !self.sub_directory_entries_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
@@ -690,7 +677,7 @@ impl FileEntryIterator for ExtFileEntry {
                         return Err(error);
                     }
                 };
-                Ok(ExtFileEntry::new(
+                Ok(Self::new(
                     &self.data_stream,
                     &self.inode_table,
                     directory_entry.inode_number,

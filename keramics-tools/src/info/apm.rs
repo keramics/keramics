@@ -20,41 +20,22 @@ use keramics_types::ByteString;
 use crate::formatters::ByteSize;
 
 /// Apple Partition Map (APM) partition information.
-struct ApmPartitionInfo {
+struct ApmPartitionInfo<'a> {
     /// The partition index.
-    pub index: usize,
+    index: usize,
 
-    /// The partition type identifier.
-    pub type_identifier: ByteString,
-
-    /// The name.
-    pub name: ByteString,
-
-    /// The offset of the partition relative to start of the volume system.
-    pub offset: u64,
-
-    /// The size of the partition.
-    pub size: u64,
-
-    /// The status flags.
-    pub status_flags: u32,
+    /// The partition.
+    partition: &'a ApmPartition,
 }
 
-impl ApmPartitionInfo {
+impl<'a> ApmPartitionInfo<'a> {
     /// Creates new partition information.
-    fn new() -> Self {
-        Self {
-            index: 0,
-            type_identifier: ByteString::new(),
-            name: ByteString::new(),
-            offset: 0,
-            size: 0,
-            status_flags: 0,
-        }
+    fn new(index: usize, partition: &'a ApmPartition) -> Self {
+        Self { index, partition }
     }
 }
 
-impl fmt::Display for ApmPartitionInfo {
+impl<'a> fmt::Display for ApmPartitionInfo<'a> {
     /// Formats partition information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Partition: {}", self.index + 1)?;
@@ -62,27 +43,33 @@ impl fmt::Display for ApmPartitionInfo {
         writeln!(
             formatter,
             "    Type identifier\t\t\t\t: {}",
-            self.type_identifier
+            self.partition.get_type_identifier()
         )?;
-        if !self.name.is_empty() {
-            writeln!(formatter, "    Name\t\t\t\t\t: {}", self.name)?;
+        let name: &ByteString = self.partition.get_name();
+
+        if !name.is_empty() {
+            writeln!(formatter, "    Name\t\t\t\t\t: {}", name,)?;
         }
+        let partition_offset: u64 = self.partition.get_partition_offset();
+
         writeln!(
             formatter,
             "    Offset\t\t\t\t\t: {} (0x{:08x})",
-            self.offset, self.offset
+            partition_offset, partition_offset,
         )?;
-        let byte_size: ByteSize = ByteSize::new(self.size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.partition.get_partition_size(), 1024);
 
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
+
+        let status_flags: u32 = self.partition.get_status_flags();
 
         writeln!(
             formatter,
             "    Status flags\t\t\t\t: 0x{:08x}",
-            self.status_flags
+            status_flags,
         )?;
         let flags_info: ApmPartitionStatusFlagsInfo =
-            ApmPartitionStatusFlagsInfo::new(self.status_flags);
+            ApmPartitionStatusFlagsInfo::new(status_flags);
 
         flags_info.fmt(formatter)?;
 
@@ -196,28 +183,11 @@ impl fmt::Display for ApmVolumeSystemInfo {
 pub struct ApmInfo {}
 
 impl ApmInfo {
-    /// Retrieves the partition information.
-    fn get_partition_information(
-        partition_index: usize,
-        apm_partition: &ApmPartition,
-    ) -> ApmPartitionInfo {
-        let mut partition_information: ApmPartitionInfo = ApmPartitionInfo::new();
-
-        partition_information.index = partition_index;
-        partition_information.type_identifier = apm_partition.type_identifier.clone();
-        partition_information.name = apm_partition.name.clone();
-        partition_information.offset = apm_partition.offset;
-        partition_information.size = apm_partition.size;
-        partition_information.status_flags = apm_partition.status_flags;
-
-        partition_information
-    }
-
     /// Retrieves the volume system information.
     fn get_volume_system_information(apm_volume_system: &ApmVolumeSystem) -> ApmVolumeSystemInfo {
         let mut volume_system_information: ApmVolumeSystemInfo = ApmVolumeSystemInfo::new();
 
-        volume_system_information.bytes_per_sector = apm_volume_system.bytes_per_sector;
+        volume_system_information.bytes_per_sector = apm_volume_system.get_bytes_per_sector();
         volume_system_information.number_of_partitions =
             apm_volume_system.get_number_of_partitions();
 
@@ -266,7 +236,7 @@ impl ApmInfo {
                 }
             };
             let partition_info: ApmPartitionInfo =
-                Self::get_partition_information(partition_index, &apm_partition);
+                ApmPartitionInfo::new(partition_index, &apm_partition);
 
             print!("{}", partition_info);
         }
@@ -282,7 +252,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    use crate::info::tests::assert_lines_eq;
+    use crate::assert_lines_eq;
 
     #[test]
     fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
@@ -291,7 +261,7 @@ mod tests {
         let apm_volume_system: ApmVolumeSystem = ApmInfo::open_volume_system(&data_stream)?;
 
         let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
-        let test_struct: ApmPartitionInfo = ApmInfo::get_partition_information(0, &apm_partition);
+        let test_struct: ApmPartitionInfo = ApmPartitionInfo::new(0, &apm_partition);
 
         let expected_string: &str = concat!(
             "Partition: 1\n",
@@ -307,7 +277,8 @@ mod tests {
             "        0x40000000: Automatic mount at startup\n",
             "\n"
         );
-        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
 
         Ok(())
     }
@@ -330,26 +301,8 @@ mod tests {
             "        0x40000000: Automatic mount at startup\n",
             "        0x80000000: Is startup partition\n",
         );
-        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_partition_information() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let apm_volume_system: ApmVolumeSystem = ApmInfo::open_volume_system(&data_stream)?;
-
-        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
-        let test_struct: ApmPartitionInfo = ApmInfo::get_partition_information(0, &apm_partition);
-
-        assert_eq!(test_struct.index, 0);
-        assert_eq!(test_struct.type_identifier, ByteString::from("Apple_HFS"));
-        assert_eq!(test_struct.name, ByteString::from("disk image"));
-        assert_eq!(test_struct.offset, 32768);
-        assert_eq!(test_struct.size, 4153344);
-        assert_eq!(test_struct.status_flags, 0x40000033);
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
 
         Ok(())
     }

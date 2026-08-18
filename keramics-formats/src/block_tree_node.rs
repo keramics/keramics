@@ -33,6 +33,7 @@ pub(crate) enum BlockTreeNodeElements<T> {
 
 impl<T> BlockTreeNodeElements<T> {
     /// Retrieves the number of elements.
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         match self {
             BlockTreeNodeElements::Branch(sub_nodes) => sub_nodes.len(),
@@ -43,9 +44,6 @@ impl<T> BlockTreeNodeElements<T> {
 
 /// Block tree node.
 pub(crate) struct BlockTreeNode<T> {
-    /// Node type.
-    pub node_type: BlockTreeNodeType,
-
     /// Offset of the block.
     pub offset: u64,
 
@@ -77,7 +75,6 @@ impl<T> BlockTreeNode<T> {
             ),
         };
         BlockTreeNode {
-            node_type: node_type.clone(),
             offset,
             element_size,
             elements,

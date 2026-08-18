@@ -26,6 +26,7 @@ use super::ewf::{EwfFileEntry, EwfFileSystem};
 use super::fake::FakeFileSystem;
 use super::file_entry::VfsFileEntry;
 use super::gpt::{GptFileEntry, GptFileSystem};
+use super::linuxlvm::{LinuxLvmFileEntry, LinuxLvmFileSystem};
 use super::location::VfsLocation;
 use super::mbr::{MbrFileEntry, MbrFileSystem};
 use super::os::OsFileSystem;
@@ -51,6 +52,7 @@ pub enum VfsFileSystem {
     Fat(FatFileSystem),
     Gpt(GptFileSystem),
     Hfs(HfsFileSystem),
+    LinuxLvm(LinuxLvmFileSystem),
     Mbr(MbrFileSystem),
     Ntfs(NtfsFileSystem),
     Os,
@@ -78,6 +80,7 @@ impl VfsFileSystem {
             VfsType::Fat => VfsFileSystem::Fat(FatFileSystem::new()),
             VfsType::Gpt => VfsFileSystem::Gpt(GptFileSystem::new()),
             VfsType::Hfs => VfsFileSystem::Hfs(HfsFileSystem::new()),
+            VfsType::LinuxLvm => VfsFileSystem::LinuxLvm(LinuxLvmFileSystem::new()),
             VfsType::Mbr => VfsFileSystem::Mbr(MbrFileSystem::new()),
             VfsType::Ntfs => VfsFileSystem::Ntfs(NtfsFileSystem::new()),
             VfsType::Os => VfsFileSystem::Os,
@@ -106,6 +109,7 @@ impl VfsFileSystem {
             VfsFileSystem::Fat(_) => VfsType::Fat,
             VfsFileSystem::Gpt(_) => VfsType::Gpt,
             VfsFileSystem::Hfs(_) => VfsType::Hfs,
+            VfsFileSystem::LinuxLvm(_) => VfsType::LinuxLvm,
             VfsFileSystem::Mbr(_) => VfsType::Mbr,
             VfsFileSystem::Ntfs(_) => VfsType::Ntfs,
             VfsFileSystem::Os => VfsType::Os,
@@ -197,6 +201,7 @@ impl VfsFileSystem {
                     }
                 }
             }
+            VfsFileSystem::LinuxLvm(lvm_file_system) => Ok(lvm_file_system.file_entry_exists(path)),
             VfsFileSystem::Mbr(mbr_file_system) => Ok(mbr_file_system.file_entry_exists(path)),
             VfsFileSystem::Ntfs(ntfs_file_system) => {
                 match ntfs_file_system.get_file_entry_by_path(path) {
@@ -343,6 +348,12 @@ impl VfsFileSystem {
             VfsFileSystem::Hfs(hfs_file_system) => {
                 match hfs_file_system.get_file_entry_by_path(path)? {
                     Some(file_entry) => Ok(Some(VfsFileEntry::Hfs(file_entry))),
+                    None => Ok(None),
+                }
+            }
+            VfsFileSystem::LinuxLvm(lvm_file_system) => {
+                match lvm_file_system.get_file_entry_by_path(path)? {
+                    Some(lvm_file_entry) => Ok(Some(VfsFileEntry::LinuxLvm(lvm_file_entry))),
                     None => Ok(None),
                 }
             }
@@ -513,6 +524,11 @@ impl VfsFileSystem {
                     Err(error)
                 }
             },
+            VfsFileSystem::LinuxLvm(lvm_file_system) => {
+                let lvm_file_entry: LinuxLvmFileEntry = lvm_file_system.get_root_file_entry();
+
+                Ok(Some(VfsFileEntry::LinuxLvm(lvm_file_entry)))
+            }
             VfsFileSystem::Mbr(mbr_file_system) => {
                 let mbr_file_entry: MbrFileEntry = mbr_file_system.get_root_file_entry();
 
@@ -634,6 +650,9 @@ impl VfsFileSystem {
             }
             VfsFileSystem::Hfs(hfs_file_system) => {
                 Self::open_hfs_file_system(hfs_file_system, parent_file_system, vfs_location)
+            }
+            VfsFileSystem::LinuxLvm(lvm_file_system) => {
+                lvm_file_system.open(parent_file_system, vfs_location)
             }
             VfsFileSystem::Mbr(mbr_file_system) => {
                 mbr_file_system.open(parent_file_system, vfs_location)
@@ -902,7 +921,6 @@ mod tests {
 
     use crate::enums::VfsFileType;
     use crate::fake::FakeFileEntry;
-    use crate::location::new_os_vfs_location;
 
     use crate::tests::get_test_data_path;
 
@@ -914,14 +932,15 @@ mod tests {
 
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::ApfsContainer);
         let path_string: String = get_test_data_path("apfs/apfs.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         let container_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(vfs_file_system);
 
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Apfs);
-        let vfs_location: VfsLocation = new_os_vfs_location("/apfs1");
+        let vfs_location: VfsLocation =
+            vfs_location.new_with_layer(&VfsType::ApfsContainer, Path::from("/apfs1"));
         vfs_file_system.open(Some(&container_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -986,7 +1005,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("apfs/apfs.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1051,7 +1070,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("apm/apm.dmg");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1116,7 +1135,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("ewf/ext2.E01");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1181,7 +1200,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("ext/ext2.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1315,7 +1334,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("fat/fat12.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1380,7 +1399,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("gpt/gpt.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1445,7 +1464,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("hfs/hfsplus.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1502,6 +1521,71 @@ mod tests {
         Ok(())
     }
 
+    // Tests with Linux LVM.
+
+    fn get_linuxlvm_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::LinuxLvm);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("linuxlvm/lvm2.raw");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_linuxlvm_file_system()?;
+
+        let path: Path = Path::from("/lvm1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
+
+        let path: Path = Path::from("/bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_linuxlvm_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_linuxlvm_file_system()?;
+
+        let path: Path = Path::from("/bogus");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_linuxlvm_layer() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_linuxlvm_file_system()?;
+
+        let path: Path = Path::from("/lvm1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_linuxlvm_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_linuxlvm_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        Ok(())
+    }
+
     // Tests with MBR.
 
     fn get_mbr_file_system() -> Result<VfsFileSystem, ErrorTrace> {
@@ -1510,7 +1594,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("mbr/mbr.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1575,7 +1659,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("ntfs/ntfs.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1657,7 +1741,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("pdi/hfsplus.hdd/DiskDescriptor.xml");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1722,7 +1806,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("qcow/ext2.qcow2");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1787,7 +1871,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1852,7 +1936,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("sparseimage/hfsplus.sparseimage");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1917,7 +2001,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("splitraw/ext2.raw.000");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1982,7 +2066,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("udif/hfsplus_zlib.dmg");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -2047,7 +2131,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("vhd/ntfs-differential.vhd");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -2112,7 +2196,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("vhdx/ntfs-differential.vhdx");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -2177,7 +2261,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("vmdk/ext2.vmdk");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)

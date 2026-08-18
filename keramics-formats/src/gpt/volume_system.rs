@@ -32,10 +32,10 @@ pub struct GptVolumeSystem {
     data_stream: Option<DataStreamReference>,
 
     /// Disk identifier.
-    pub disk_identifier: Uuid,
+    disk_identifier: Uuid,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u16,
+    bytes_per_sector: u16,
 
     /// Partition entries.
     // TODO: use a HashMap for lookup by identifier.
@@ -54,6 +54,16 @@ impl GptVolumeSystem {
             bytes_per_sector: 0,
             partition_entries: Vec::new(),
         }
+    }
+
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u16 {
+        self.bytes_per_sector
+    }
+
+    /// Retrieves the disk identifier.
+    pub fn get_disk_identifier(&self) -> &Uuid {
+        &self.disk_identifier
     }
 
     /// Retrieves the number of partitions.
@@ -322,10 +332,33 @@ mod tests {
     }
 
     #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let volume_system: GptVolumeSystem = get_volume_system()?;
+
+        let bytes_per_sector: u16 = volume_system.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_disk_identifier() -> Result<(), ErrorTrace> {
+        let volume_system: GptVolumeSystem = get_volume_system()?;
+
+        let disk_identifier: &Uuid = volume_system.get_disk_identifier();
+        assert_eq!(
+            disk_identifier.to_string(),
+            "b182deb3-9c86-4892-9e88-9297a4909855"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_partitions() -> Result<(), ErrorTrace> {
         let volume_system: GptVolumeSystem = get_volume_system()?;
 
-        assert_eq!(volume_system.get_number_of_partitions(), 2);
+        let number_of_partitions: usize = volume_system.get_number_of_partitions();
+        assert_eq!(number_of_partitions, 2);
 
         Ok(())
     }

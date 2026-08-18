@@ -36,9 +36,9 @@ mod storage_media_image;
 
 use crate::enums::{DisplayPathType, EncodingType};
 use crate::info::{
-    ApfsInfo, ApmInfo, CdsaEncrInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, HfsInfo, MbrInfo,
-    NtfsInfo, PdiInfo, QcowInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo,
-    VmdkInfo,
+    ApfsInfo, ApmInfo, CdsaEncrInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, HfsInfo, LinuxLvmInfo,
+    MbrInfo, NtfsInfo, PdiInfo, QcowInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo,
+    VhdxInfo, VmdkInfo,
 };
 use crate::range_stream::RangeDataStream;
 use crate::storage_media_image::StorageMediaImage;
@@ -304,6 +304,7 @@ impl InfoTool {
         format_scanner.add_fat_signatures();
         format_scanner.add_hfs_signatures();
         format_scanner.add_gpt_signatures();
+        format_scanner.add_linuxlvm_signatures();
         format_scanner.add_ntfs_signatures();
 
         match format_scanner.build() {
@@ -575,6 +576,7 @@ fn main() -> ExitCode {
             FormatIdentifier::Fat => FatInfo::print_file_system(&data_stream),
             FormatIdentifier::Hfs => HfsInfo::print_file_system(&data_stream),
             FormatIdentifier::Gpt => GptInfo::print_volume_system(&data_stream),
+            FormatIdentifier::LinuxLvm => LinuxLvmInfo::print_volume_system(&arguments.source),
             FormatIdentifier::Mbr => MbrInfo::print_volume_system(&data_stream),
             FormatIdentifier::Ntfs => NtfsInfo::print_file_system(&data_stream),
             // TODO: add support for individual sparse Pdi file.

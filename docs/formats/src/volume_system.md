@@ -8,6 +8,8 @@ Although related, a volume is a different concept as a partition.
 
 ## Formats
 
+* [Apple File System (APFS)](apfs.md)
 * [Apple Partition Map (APM)](apm.md)
 * [GUID Partition Table (GPT)](gpt.md)
+* [Linux Logical Volume Manager (LVM)](linuxlvm.md)
 * [Master Boot Record (MBR)](mbr.md)

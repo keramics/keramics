@@ -229,7 +229,7 @@ impl UdifInfo {
 mod tests {
     use super::*;
 
-    use crate::info::tests::assert_lines_eq;
+    use crate::assert_lines_eq;
 
     #[test]
     fn test_image_information_fmt() -> Result<(), ErrorTrace> {
@@ -248,7 +248,8 @@ mod tests {
             "        Bytes per sector\t\t\t: 512\n",
             "\n"
         );
-        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
 
         Ok(())
     }

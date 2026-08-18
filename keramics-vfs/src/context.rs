@@ -18,7 +18,7 @@ use keramics_formats::{Path, PathComponent};
 use super::enums::VfsType;
 use super::file_entry::VfsFileEntry;
 use super::file_system::VfsFileSystem;
-use super::location::{VfsLocation, new_os_vfs_location};
+use super::location::VfsLocation;
 use super::types::VfsFileSystemReference;
 
 /// Virtual File System (VFS) context.
@@ -35,7 +35,7 @@ impl VfsContext {
     pub fn new() -> Self {
         Self {
             file_systems_cache: LruCache::new(8),
-            os_vfs_location: new_os_vfs_location("/"),
+            os_vfs_location: VfsLocation::from("/"),
         }
     }
 
@@ -145,8 +145,6 @@ impl VfsContext {
 mod tests {
     use super::*;
 
-    use crate::location::new_os_vfs_location;
-
     use crate::tests::get_test_data_path;
 
     #[test]
@@ -154,13 +152,13 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let path_string: String = get_test_data_path("directory/file.txt");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let result: Option<DataStreamReference> =
             vfs_context.get_data_stream_by_location_and_name(&vfs_location, None)?;
         assert!(result.is_some());
 
         let path_string: String = get_test_data_path("directory/bogus.txt");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let result: Option<DataStreamReference> =
             vfs_context.get_data_stream_by_location_and_name(&vfs_location, None)?;
         assert!(result.is_none());
@@ -173,12 +171,12 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let path_string: String = get_test_data_path("directory/file.txt");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let result: Option<VfsFileEntry> = vfs_context.get_file_entry_by_location(&vfs_location)?;
         assert!(result.is_some());
 
         let path_string: String = get_test_data_path("directory/bogus.txt");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let result: Option<VfsFileEntry> = vfs_context.get_file_entry_by_location(&vfs_location)?;
         assert!(result.is_none());
 
@@ -189,7 +187,7 @@ mod tests {
     fn test_open_file_system() -> Result<(), ErrorTrace> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_location: VfsLocation = new_os_vfs_location("/");
+        let vfs_location: VfsLocation = VfsLocation::from("/");
         let vfs_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&vfs_location)?;
 

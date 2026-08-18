@@ -249,7 +249,7 @@ impl DisplayPath {
             VfsLocation::Layer {
                 parent, vfs_type, ..
             } => match vfs_type {
-                VfsType::ApfsContainer | VfsType::Gpt => {
+                VfsType::ApfsContainer | VfsType::Gpt | VfsType::LinuxLvm => {
                     match self.vfs_resolver.get_file_entry_by_location(vfs_location) {
                         Ok(vfs_file_entry) => match vfs_file_entry {
                             Some(VfsFileEntry::ApfsContainer(apfs_container_file_entry)) => {
@@ -278,6 +278,12 @@ impl DisplayPath {
                             Some(VfsFileEntry::Gpt(gpt_file_entry)) => {
                                 match gpt_file_entry.get_identifier() {
                                     Some(identifier) => Some(format!("/gpt{{{}}}", identifier)),
+                                    None => None,
+                                }
+                            }
+                            Some(VfsFileEntry::LinuxLvm(lvm_file_entry)) => {
+                                match lvm_file_entry.get_identifier() {
+                                    Some(identifier) => Some(format!("/lvm{{{}}}", identifier)),
                                     None => None,
                                 }
                             }
@@ -318,6 +324,7 @@ impl DisplayPath {
                     | VfsType::Ext
                     | VfsType::Fat
                     | VfsType::Hfs
+                    | VfsType::LinuxLvm
                     | VfsType::Ntfs => match self.get_path(parent) {
                         Ok(parent_display_path) => {
                             Some(format!("{}{}", parent_display_path, path_string))
@@ -394,7 +401,6 @@ mod tests {
 
     use keramics_formats::Path;
     use keramics_types::Ucs2String;
-    use keramics_vfs::new_os_vfs_location;
 
     // TODO: add tests for escape_path
 
@@ -451,7 +457,7 @@ mod tests {
     fn test_get_identifier_display_path() -> Result<(), ErrorTrace> {
         let display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Identifier);
 
-        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/gpt/gpt.raw");
+        let os_vfs_location: VfsLocation = VfsLocation::from("../test_data/gpt/gpt.raw");
 
         let test_path: String = display_path.get_identifier_display_path(&os_vfs_location)?;
         assert_eq!(test_path, String::from(""));
@@ -465,7 +471,7 @@ mod tests {
             String::from("/gpt{0b119671-75ff-4e2a-a31a-0bc83f857fdd}")
         );
 
-        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/mbr/mbr.raw");
+        let os_vfs_location: VfsLocation = VfsLocation::from("../test_data/mbr/mbr.raw");
 
         let test_path: String = display_path.get_identifier_display_path(&os_vfs_location)?;
         assert_eq!(test_path, String::from(""));
@@ -483,7 +489,7 @@ mod tests {
     fn test_get_index_display_path() -> Result<(), ErrorTrace> {
         let display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Index);
 
-        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/gpt/gpt.raw");
+        let os_vfs_location: VfsLocation = VfsLocation::from("../test_data/gpt/gpt.raw");
 
         let test_path: String = display_path.get_index_display_path(&os_vfs_location)?;
         assert_eq!(test_path, String::from(""));
@@ -494,7 +500,7 @@ mod tests {
         let test_path: String = display_path.get_index_display_path(&gpt_vfs_location)?;
         assert_eq!(test_path, String::from("/p1"));
 
-        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/mbr/mbr.raw");
+        let os_vfs_location: VfsLocation = VfsLocation::from("../test_data/mbr/mbr.raw");
 
         let test_path: String = display_path.get_index_display_path(&os_vfs_location)?;
         assert_eq!(test_path, String::from(""));
@@ -512,7 +518,7 @@ mod tests {
     fn test_get_path() -> Result<(), ErrorTrace> {
         let mut display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Identifier);
 
-        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/gpt/gpt.raw");
+        let os_vfs_location: VfsLocation = VfsLocation::from("../test_data/gpt/gpt.raw");
         let path: Path = Path::from("/gpt1");
         let gpt_vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
 

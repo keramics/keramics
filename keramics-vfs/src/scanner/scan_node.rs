@@ -54,6 +54,7 @@ impl VfsScanNode {
             | VfsType::Ewf
             | VfsType::Fake
             | VfsType::Gpt
+            | VfsType::LinuxLvm
             | VfsType::Mbr
             | VfsType::Os
             | VfsType::Pdi

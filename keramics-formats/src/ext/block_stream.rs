@@ -36,8 +36,6 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
-        let mut block_reader = ExtBlockReader::new(&data_stream, 1024, 11358);
-
         let block_ranges: Vec<ExtBlockRange> = vec![
             ExtBlockRange {
                 logical_block_number: 0,
@@ -52,9 +50,12 @@ mod tests {
                 range_type: ExtBlockRangeType::Sparse,
             },
         ];
-        block_reader.open(26, &block_ranges)?;
-
-        Ok(ExtBlockStream::new(block_reader))
+        Ok(ExtBlockStream::new(ExtBlockReader::new(
+            &data_stream,
+            1024,
+            &block_ranges,
+            11358,
+        )))
     }
 
     // TODO: add tests for get_offset.

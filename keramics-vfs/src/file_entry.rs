@@ -37,6 +37,7 @@ use super::extended_attributes::VfsExtendedAttributesIterator;
 use super::fake::FakeFileEntry;
 use super::file_entries::VfsFileEntriesIterator;
 use super::gpt::GptFileEntry;
+use super::linuxlvm::LinuxLvmFileEntry;
 use super::mbr::MbrFileEntry;
 use super::os::OsFileEntry;
 use super::pdi::PdiFileEntry;
@@ -60,6 +61,7 @@ pub enum VfsFileEntry {
     Fat(FatFileEntry),
     Gpt(GptFileEntry),
     Hfs(HfsFileEntry),
+    LinuxLvm(LinuxLvmFileEntry),
     Mbr(MbrFileEntry),
     Ntfs(NtfsFileEntry),
     Os(OsFileEntry),
@@ -87,6 +89,7 @@ impl VfsFileEntry {
             VfsFileEntry::Fat(_) => VfsType::Fat,
             VfsFileEntry::Gpt(_) => VfsType::Gpt,
             VfsFileEntry::Hfs(_) => VfsType::Hfs,
+            VfsFileEntry::LinuxLvm(_) => VfsType::LinuxLvm,
             VfsFileEntry::Mbr(_) => VfsType::Mbr,
             VfsFileEntry::Ntfs(_) => VfsType::Ntfs,
             VfsFileEntry::Os(_) => VfsType::Os,
@@ -109,6 +112,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
@@ -137,6 +141,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
@@ -163,6 +168,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
@@ -196,6 +202,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
             | VfsFileEntry::Hfs(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
@@ -231,6 +238,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
@@ -316,6 +324,7 @@ impl VfsFileEntry {
                     None => VfsFileType::Unknown(0),
                 }
             }
+            VfsFileEntry::LinuxLvm(lvm_file_entry) => lvm_file_entry.get_file_type(),
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_file_type(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
                 if ntfs_file_entry.is_symbolic_link() {
@@ -350,6 +359,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
@@ -379,6 +389,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
@@ -407,6 +418,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
@@ -459,6 +471,7 @@ impl VfsFileEntry {
                 }
                 None => None,
             },
+            VfsFileEntry::LinuxLvm(lvm_file_entry) => Some(lvm_file_entry.get_name()),
             VfsFileEntry::Mbr(mbr_file_entry) => Some(mbr_file_entry.get_name()),
             VfsFileEntry::Ntfs(ntfs_file_entry) => match ntfs_file_entry.get_name() {
                 Some(name) => Some(PathComponent::from(name)),
@@ -493,6 +506,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
@@ -522,6 +536,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
@@ -554,6 +569,7 @@ impl VfsFileEntry {
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_size(),
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_size(),
             VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_size(),
+            VfsFileEntry::LinuxLvm(lvm_file_entry) => lvm_file_entry.get_size(),
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_size(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_size(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_size(),
@@ -580,6 +596,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
@@ -718,6 +735,10 @@ impl VfsFileEntry {
                     0
                 }
             }
+            VfsFileEntry::LinuxLvm(lvm_file_entry) => match lvm_file_entry {
+                LinuxLvmFileEntry::Root { .. } => 0,
+                LinuxLvmFileEntry::Volume { .. } => 1,
+            },
             VfsFileEntry::Mbr(mbr_file_entry) => match mbr_file_entry {
                 MbrFileEntry::Partition { .. } => 1,
                 MbrFileEntry::Root { .. } => 0,
@@ -797,6 +818,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Pdi(_)
@@ -883,6 +905,7 @@ impl VfsFileEntry {
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_data_stream(),
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_data_stream(),
             VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_data_stream(),
+            VfsFileEntry::LinuxLvm(lvm_file_entry) => lvm_file_entry.get_data_stream(),
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_data_stream(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_data_stream(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_data_stream(),
@@ -924,6 +947,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
             | VfsFileEntry::Hfs(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Pdi(_)
@@ -958,6 +982,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Os(_)
@@ -1000,6 +1025,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Os(_)
@@ -1053,6 +1079,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Os(_)
@@ -1128,6 +1155,7 @@ impl VfsFileEntry {
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.is_root_directory(),
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.is_root_file_entry(),
             VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.is_root_directory(),
+            VfsFileEntry::LinuxLvm(lvm_file_entry) => lvm_file_entry.is_root_file_entry(),
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.is_root_file_entry(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.is_root_directory(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.is_root_file_entry(),
@@ -1183,6 +1211,9 @@ impl FileEntryIterator for VfsFileEntry {
             )),
             VfsFileEntry::Hfs(hfs_file_entry) => Ok(VfsFileEntry::Hfs(
                 hfs_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::LinuxLvm(lvm_file_entry) => Ok(VfsFileEntry::LinuxLvm(
+                lvm_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
             VfsFileEntry::Mbr(mbr_file_entry) => Ok(VfsFileEntry::Mbr(
                 mbr_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
@@ -1258,6 +1289,9 @@ impl FileEntryIterator for VfsFileEntry {
                 Ok(gpt_file_entry.get_number_of_sub_file_entries())
             }
             VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_number_of_sub_file_entries(),
+            VfsFileEntry::LinuxLvm(lvm_file_entry) => {
+                Ok(lvm_file_entry.get_number_of_sub_file_entries())
+            }
             VfsFileEntry::Mbr(mbr_file_entry) => {
                 Ok(mbr_file_entry.get_number_of_sub_file_entries())
             }
@@ -1325,7 +1359,7 @@ mod tests {
 
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
-    use crate::location::{VfsLocation, new_os_vfs_location};
+    use crate::location::VfsLocation;
     use crate::types::VfsFileSystemReference;
 
     use crate::tests::get_test_data_path;
@@ -1732,7 +1766,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("apfs/apfs.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -2061,7 +2095,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("apm/apm.dmg");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -2394,7 +2428,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("ewf/ext2.E01");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -3636,7 +3670,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("gpt/gpt.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -4354,6 +4388,339 @@ mod tests {
         Ok(())
     }
 
+    // Tests with Linux LVM.
+
+    fn get_linuxlvm_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::LinuxLvm);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let path_string: String = get_test_data_path("linuxlvm/lvm2.raw");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_linuxlvm_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_linuxlvm_file_system()?;
+
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("lvm1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add test for get_data_fork_by_index
+
+    #[test]
+    fn test_data_forks_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let mut vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_name_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let name: Option<PathComponent> = None;
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_some());
+
+        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extended_attributes_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let mut extended_attributes_iterator: VfsExtendedAttributesIterator =
+            vfs_file_entry.extended_attributes();
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 2);
+
+        let mut vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/lvm1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+
+        let name: Option<PathComponent> = sub_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("lvm1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_linuxlvm_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
     // Tests with MBR.
 
     fn get_mbr_file_system() -> Result<VfsFileSystem, ErrorTrace> {
@@ -4361,7 +4728,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("mbr/mbr.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -5417,7 +5784,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("pdi/hfsplus.hdd/DiskDescriptor.xml");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -5749,7 +6116,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("qcow/ext2.qcow2");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -6081,7 +6448,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -6417,7 +6784,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("sparseimage/hfsplus.sparseimage");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -6753,7 +7120,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("splitraw/ext2.raw.000");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -7085,7 +7452,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("udif/hfsplus_zlib.dmg");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -7417,7 +7784,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("vhd/ntfs-differential.vhd");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -7750,7 +8117,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("vhdx/ntfs-differential.vhdx");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -8083,7 +8450,7 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
         let path_string: String = get_test_data_path("vmdk/ext2.vmdk");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)

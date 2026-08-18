@@ -31,7 +31,7 @@ use keramics_types::Ucs2String;
 use keramics_vfs::{
     VfsCredentialStore, VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsFinder,
     VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanOptions,
-    VfsScanner, VfsType, new_os_vfs_location,
+    VfsScanner, VfsType,
 };
 
 #[cfg(feature = "debug-trace")]
@@ -197,7 +197,7 @@ impl ImageTool {
     /// Output file entries in bodyfile format.
     fn generate_bodyfile(
         &self,
-        source: &str,
+        source: &PathBuf,
         calculate_md5: bool,
         image_layer: usize,
     ) -> Result<(), ErrorTrace> {
@@ -218,12 +218,12 @@ impl ImageTool {
         vfs_scan_options.image_layer = image_layer;
 
         let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
-        let vfs_location: VfsLocation = new_os_vfs_location(source);
+        let vfs_location: VfsLocation = VfsLocation::from(source);
 
         match vfs_scanner.scan(&vfs_scan_options, &mut vfs_scan_context, &vfs_location) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to scan file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to scan for file systems");
                 return Err(error);
             }
         }
@@ -732,6 +732,20 @@ impl ImageTool {
                         _ => path_string,
                     }
                 }
+                VfsFileEntry::LinuxLvm(lvm_file_entry) => {
+                    let path_string: String = match lvm_file_entry.get_volume_number() {
+                        Some(volume_number) => format!("/lvm{}", volume_number),
+                        _ => path.to_string(),
+                    };
+                    match lvm_file_entry.get_identifier() {
+                        Some(identifier) => format!(
+                            "{} (alias: /lvm{{{}}})",
+                            path_string,
+                            identifier.to_string()
+                        ),
+                        _ => path_string,
+                    }
+                }
                 VfsFileEntry::Mbr(mbr_file_entry) => match mbr_file_entry.get_partition_number() {
                     Some(partition_number) => format!("/p{}", partition_number),
                     None => path.to_string(),
@@ -878,7 +892,7 @@ impl ImageTool {
     }
 
     /// Scans and prints the hierarchy of volumes, partitions and file systems.
-    fn scan_for_hierarchy(&self, source: &str, image_layer: usize) -> Result<(), ErrorTrace> {
+    fn scan_for_hierarchy(&self, source: &PathBuf, image_layer: usize) -> Result<(), ErrorTrace> {
         let mut vfs_scanner: VfsScanner = VfsScanner::new();
 
         match vfs_scanner.build() {
@@ -896,12 +910,12 @@ impl ImageTool {
         vfs_scan_options.image_layer = image_layer;
 
         let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
-        let vfs_location: VfsLocation = new_os_vfs_location(source);
+        let vfs_location: VfsLocation = VfsLocation::from(source);
 
         match vfs_scanner.scan(&vfs_scan_options, &mut vfs_scan_context, &vfs_location) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to scan file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to scan for file systems");
                 return Err(error);
             }
         }
@@ -931,7 +945,7 @@ impl ImageTool {
 fn main() -> ExitCode {
     let arguments = CommandLineArguments::parse();
 
-    let source: &str = match arguments.source.to_str() {
+    let source_string: &str = match arguments.source.to_str() {
         Some(value) => value,
         None => {
             println!("Missing source");
@@ -966,13 +980,16 @@ fn main() -> ExitCode {
             image_tool.set_volume_path_type(&command_arguments.volume_path_type);
 
             match image_tool.generate_bodyfile(
-                source,
+                &arguments.source,
                 command_arguments.calculate_md5,
                 arguments.image_layer,
             ) {
                 Ok(_) => {}
                 Err(error) => {
-                    println!("Unable to generate bodyfile of: {}\n{}", source, error);
+                    println!(
+                        "Unable to generate bodyfile of: {}\n{}",
+                        source_string, error
+                    );
                     return ExitCode::FAILURE;
                 }
             }
@@ -984,7 +1001,7 @@ fn main() -> ExitCode {
                     Err(error) => {
                         println!(
                             "Unable to open storage media image: {} with error:\n{}",
-                            source, error
+                            source_string, error
                         );
                         return ExitCode::FAILURE;
                     }
@@ -1234,10 +1251,13 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         }
-        _ => match image_tool.scan_for_hierarchy(source, arguments.image_layer) {
+        _ => match image_tool.scan_for_hierarchy(&arguments.source, arguments.image_layer) {
             Ok(_) => {}
             Err(error) => {
-                println!("Unable to determine hierarchy of: {}\n{}", source, error);
+                println!(
+                    "Unable to determine hierarchy of: {}\n{}",
+                    source_string, error
+                );
                 return ExitCode::FAILURE;
             }
         },

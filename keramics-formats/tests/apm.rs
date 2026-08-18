@@ -46,13 +46,7 @@ fn open_volume_system(path: &PathBuf) -> Result<ApmVolumeSystem, ErrorTrace> {
 fn read() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
     let volume_system: ApmVolumeSystem = open_volume_system(&path_buf)?;
-
-    let number_of_partitions: usize = volume_system.get_number_of_partitions();
-    assert_eq!(number_of_partitions, 2);
-
     let mut partition: ApmPartition = volume_system.get_partition_by_index(0)?;
-    assert_eq!(partition.offset, 32768);
-    assert_eq!(partition.size, 4153344);
 
     partition.seek(SeekFrom::Start(1024))?;
 

@@ -18,6 +18,7 @@ source ./scripts/shared_linux.sh
 
 assert_availability_binary dd
 assert_availability_binary fallocate
+assert_availability_binary hostname
 assert_availability_binary losetup
 assert_availability_binary lvcreate
 assert_availability_binary mke2fs
@@ -27,16 +28,29 @@ assert_availability_binary truncate
 assert_availability_binary vgchange
 assert_availability_binary vgcreate
 
+ORIGINAL_HOSTNAME=$(hostname)
+
 set -e
+
+cleanup() {
+    if test -n "${ORIGINAL_HOSTNAME}"
+    then
+        sudo hostname "${ORIGINAL_HOSTNAME}"
+    fi
+}
+
+trap cleanup EXIT
+
+sudo hostname keramics
 
 sudo mkdir -p ${MOUNT_POINT}
 
-mkdir -p test_data/lvm
+mkdir -p test_data/linuxlvm
 
 # Create a LVM volume system with 2 volumes.
 # * the first volume with an ext2 file system.
-IMAGE_FILE="test_data/lvm/lvm.raw"
-IMAGE_SIZE=$(( 16 * 1024 * 1024 ))
+IMAGE_FILE="/tmp/lvm.raw"
+IMAGE_SIZE=$(( 9 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
 dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
@@ -64,5 +78,7 @@ sudo lvcreate --name test_logical_volume2 -q --size 4m --type linear test_volume
 sudo vgchange --activate n -q test_volume_group 2>&1 | sed '/is using an old PV header, modify the VG to update/ d;/open failed: No medium found/ d'
 
 sudo losetup -d /dev/loop99
+
+mv ${IMAGE_FILE} test_data/linuxlvm/lvm2.raw
 
 exit ${EXIT_SUCCESS}

@@ -13,6 +13,7 @@
 
 use std::fmt;
 
+/// Byte size.
 pub struct ByteSize {
     /// The value.
     pub value: u64,

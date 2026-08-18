@@ -37,24 +37,18 @@ pub struct ExtBlockReader {
 
 impl ExtBlockReader {
     /// Creates a new block reader.
-    pub(super) fn new(data_stream: &DataStreamReference, block_size: u32, size: u64) -> Self {
+    pub(super) fn new(
+        data_stream: &DataStreamReference,
+        block_size: u32,
+        block_ranges: &[ExtBlockRange],
+        size: u64,
+    ) -> Self {
         Self {
             data_stream: data_stream.clone(),
             block_size,
-            block_ranges: Vec::new(),
+            block_ranges: block_ranges.to_vec(),
             size,
         }
-    }
-
-    /// Opens a block stream.
-    pub(super) fn open(
-        &mut self,
-        number_of_blocks: u64,
-        block_ranges: &[ExtBlockRange],
-    ) -> Result<(), ErrorTrace> {
-        self.block_ranges = block_ranges.to_vec();
-
-        Ok(())
     }
 }
 
@@ -134,43 +128,5 @@ impl BlockReader for ExtBlockReader {
             range_index += 1;
         }
         Ok(data_offset)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use std::path::PathBuf;
-
-    use keramics_core::open_os_data_stream;
-
-    use crate::tests::get_test_data_path;
-
-    #[test]
-    fn test_open() -> Result<(), ErrorTrace> {
-        let path_string: String = get_test_data_path("ext/ext2.raw");
-        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-
-        let mut block_reader = ExtBlockReader::new(&data_stream, 1024, 11358);
-
-        let block_ranges: Vec<ExtBlockRange> = vec![
-            ExtBlockRange {
-                logical_block_number: 0,
-                physical_block_number: 3073,
-                number_of_blocks: 12,
-                range_type: ExtBlockRangeType::InFile,
-            },
-            ExtBlockRange {
-                logical_block_number: 12,
-                physical_block_number: 0,
-                number_of_blocks: 14,
-                range_type: ExtBlockRangeType::Sparse,
-            },
-        ];
-        block_reader.open(26, &block_ranges)?;
-
-        Ok(())
     }
 }

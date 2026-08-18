@@ -1307,13 +1307,13 @@ impl ApfsFileSystemTree {
         match self.node_cache.get(&block_number) {
             Ok(Some(node)) => Ok(node),
             Ok(None) => Err(keramics_core::error_trace_new!(format!(
-                "Unable to retrieve node: {} from cache",
+                "Missing node: {}",
                 block_number
             ))),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    format!("Failed to retrieve node: {} from cache", block_number)
+                    format!("Unable to retrieve node: {} from cache", block_number)
                 );
                 Err(error)
             }

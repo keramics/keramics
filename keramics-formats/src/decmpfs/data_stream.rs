@@ -334,8 +334,6 @@ impl DecmpfsBlockReader {
                 let mut last_block_offset: u32 = 8;
 
                 for entry_index in 0..number_of_blocks {
-                    let data_end_offset: usize = data_offset + 32;
-
                     keramics_core::debug_trace_structure!(
                         DecmpfsZlibBlockDescriptor::debug_read_data(
                             &block_descriptor_data[data_offset..]
@@ -354,7 +352,7 @@ impl DecmpfsBlockReader {
                             return Err(error);
                         }
                     }
-                    data_offset = data_end_offset;
+                    data_offset += 8;
 
                     if zlib_block_descriptor.offset < last_block_offset {
                         return Err(keramics_core::error_trace_new!(format!(
