@@ -49,10 +49,13 @@ pub mod vmdk;
 // Volume system formats
 pub mod apm;
 pub mod gpt;
+pub mod linuxlvm;
 pub mod mbr;
 
-// File system formats
+// Hybrid volume and file system formats
 pub mod apfs;
+
+// File system formats
 pub mod ext;
 pub mod fat;
 pub mod hfs;

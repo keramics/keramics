@@ -24,8 +24,8 @@ use crate::enums::VfsFileType;
 pub enum GptFileEntry {
     /// Partition file entry.
     Partition {
-        /// Partition index.
-        index: usize,
+        /// File name index.
+        name_index: usize,
 
         /// Partition.
         partition: Arc<RwLock<GptPartition>>,
@@ -72,8 +72,8 @@ impl GptFileEntry {
     /// Retrieves the name.
     pub fn get_name(&self) -> PathComponent {
         match self {
-            GptFileEntry::Partition { index, .. } => {
-                PathComponent::from(format!("gpt{}", index + 1))
+            GptFileEntry::Partition { name_index, .. } => {
+                PathComponent::from(format!("gpt{}", name_index + 1))
             }
             GptFileEntry::Root { .. } => PathComponent::Root,
         }
@@ -118,11 +118,11 @@ impl GptFileEntry {
             GptFileEntry::Root { volume_system } => {
                 match volume_system.get_partition_by_index(sub_file_entry_index) {
                     Ok(gpt_partition) => {
-                        let partition_size: u64 = gpt_partition.size;
+                        let partition_size: u64 = gpt_partition.get_partition_size();
                         let identifier: Uuid = gpt_partition.get_identifier().clone();
 
                         Ok(GptFileEntry::Partition {
-                            index: sub_file_entry_index,
+                            name_index: sub_file_entry_index,
                             partition: Arc::new(RwLock::new(gpt_partition)),
                             size: partition_size,
                             identifier,
@@ -175,11 +175,11 @@ mod tests {
     ) -> Result<GptFileEntry, ErrorTrace> {
         let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
 
-        let partition_size: u64 = gpt_partition.size;
+        let partition_size: u64 = gpt_partition.get_partition_size();
         let identifier: Uuid = gpt_partition.get_identifier().clone();
 
         Ok(GptFileEntry::Partition {
-            index: 0,
+            name_index: 0,
             partition: Arc::new(RwLock::new(gpt_partition)),
             size: partition_size,
             identifier,

@@ -103,8 +103,8 @@ impl GptInfo {
         partition_information.partition_index = gpt_partition.get_partition_index();
         partition_information.identifier = gpt_partition.get_identifier().clone();
         partition_information.type_identifier = gpt_partition.get_type_identifier().clone();
-        partition_information.offset = gpt_partition.offset;
-        partition_information.size = gpt_partition.size;
+        partition_information.offset = gpt_partition.get_partition_offset();
+        partition_information.size = gpt_partition.get_partition_size();
 
         partition_information
     }
@@ -138,11 +138,11 @@ impl GptInfo {
 
         println!(
             "    Disk identifier\t\t\t\t: {}",
-            gpt_volume_system.disk_identifier
+            gpt_volume_system.get_disk_identifier()
         );
         println!(
             "    Bytes per sector\t\t\t\t: {}",
-            gpt_volume_system.bytes_per_sector
+            gpt_volume_system.get_bytes_per_sector()
         );
         let number_of_partitions: usize = gpt_volume_system.get_number_of_partitions();
         println!("    Number of partitions\t\t\t: {}", number_of_partitions);
@@ -176,7 +176,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    use crate::info::tests::assert_lines_eq;
+    use crate::assert_lines_eq;
 
     #[test]
     fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
@@ -195,7 +195,8 @@ mod tests {
             "    Size\t\t\t\t\t: 1.0 MiB (1048576 bytes)\n",
             "\n"
         );
-        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
 
         Ok(())
     }

@@ -24,8 +24,8 @@ use crate::enums::VfsFileType;
 pub enum VhdFileEntry {
     /// Layer file entry.
     Layer {
-        /// Layer index.
-        index: usize,
+        /// File name index.
+        name_index: usize,
 
         /// Layer.
         layer: VhdImageLayer,
@@ -72,7 +72,7 @@ impl VhdFileEntry {
     /// Retrieves the (image) layer number.
     pub fn get_layer_number(&self) -> Option<usize> {
         match self {
-            VhdFileEntry::Layer { index, .. } => Some(index + 1),
+            VhdFileEntry::Layer { name_index, .. } => Some(name_index + 1),
             VhdFileEntry::Root { .. } => None,
         }
     }
@@ -80,7 +80,9 @@ impl VhdFileEntry {
     /// Retrieves the name.
     pub fn get_name(&self) -> PathComponent {
         match self {
-            VhdFileEntry::Layer { index, .. } => PathComponent::from(format!("vhd{}", index + 1)),
+            VhdFileEntry::Layer { name_index, .. } => {
+                PathComponent::from(format!("vhd{}", name_index + 1))
+            }
             VhdFileEntry::Root { .. } => PathComponent::Root,
         }
     }
@@ -131,7 +133,7 @@ impl VhdFileEntry {
                         }
                     }
                     Ok(VhdFileEntry::Layer {
-                        index: sub_file_entry_index,
+                        name_index: sub_file_entry_index,
                         layer: image_layer.clone(),
                         size: media_size,
                         identifier,
@@ -198,7 +200,7 @@ mod tests {
             }
         }
         Ok(VhdFileEntry::Layer {
-            index: 0,
+            name_index: 0,
             layer: image_layer.clone(),
             size: media_size,
             identifier,

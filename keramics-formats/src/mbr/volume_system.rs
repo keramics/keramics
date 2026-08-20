@@ -29,17 +29,17 @@ pub struct MbrVolumeSystem {
     data_stream: Option<DataStreamReference>,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u32,
+    bytes_per_sector: u16,
 
     /// Disk identity.
-    pub disk_identity: u32,
+    disk_identity: u32,
 
     /// Partition entries.
     partition_entries: Vec<MbrPartitionEntry>,
 }
 
 impl MbrVolumeSystem {
-    const SUPPORTED_BYTES_PER_SECTOR: [u32; 4] = [512, 1024, 2048, 4096];
+    const SUPPORTED_BYTES_PER_SECTOR: [u16; 4] = [512, 1024, 2048, 4096];
 
     /// Creates a volume system.
     pub fn new() -> Self {
@@ -49,6 +49,16 @@ impl MbrVolumeSystem {
             disk_identity: 0,
             partition_entries: Vec::new(),
         }
+    }
+
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u16 {
+        self.bytes_per_sector
+    }
+
+    /// Retrieves the disk identity.
+    pub fn get_disk_identity(&self) -> u32 {
+        self.disk_identity
     }
 
     /// Retrieves the number of partitions.
@@ -232,7 +242,7 @@ impl MbrVolumeSystem {
             }
         }
         if self.bytes_per_sector == 0 {
-            let mut largest_bytes_per_sector: u32 = 0;
+            let mut largest_bytes_per_sector: u16 = 0;
 
             if let Some(last_partition_entry) = partition_entries.last() {
                 let start_address_lba: u64 = last_partition_entry.start_address_lba;
@@ -361,7 +371,7 @@ impl MbrVolumeSystem {
     }
 
     /// Sets the number of bytes per sector.
-    pub fn set_bytes_per_sector(&mut self, bytes_per_sector: u32) -> Result<(), ErrorTrace> {
+    pub fn set_bytes_per_sector(&mut self, bytes_per_sector: u16) -> Result<(), ErrorTrace> {
         if !Self::SUPPORTED_BYTES_PER_SECTOR.contains(&bytes_per_sector) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported bytes per sector: {}",
@@ -396,10 +406,31 @@ mod tests {
     }
 
     #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let volume_system: MbrVolumeSystem = get_volume_system()?;
+
+        let bytes_per_sector: u16 = volume_system.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_disk_identity() -> Result<(), ErrorTrace> {
+        let volume_system: MbrVolumeSystem = get_volume_system()?;
+
+        let disk_identity: u32 = volume_system.get_disk_identity();
+        assert_eq!(disk_identity, 0x5f91b271);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_number_of_partitions() -> Result<(), ErrorTrace> {
         let volume_system: MbrVolumeSystem = get_volume_system()?;
 
-        assert_eq!(volume_system.get_number_of_partitions(), 2);
+        let number_of_partitions: usize = volume_system.get_number_of_partitions();
+        assert_eq!(number_of_partitions, 2);
 
         Ok(())
     }

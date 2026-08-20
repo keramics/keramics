@@ -25,6 +25,7 @@ use super::ewf::constants::*;
 use super::ext::constants::*;
 use super::gpt::constants::*;
 use super::hfs::constants::*;
+use super::linuxlvm::constants::*;
 use super::mbr::constants::*;
 use super::ntfs::constants::*;
 use super::sparseimage::constants::*;
@@ -204,6 +205,16 @@ impl FormatScanner {
             PatternType::BoundToStart,
             1024,
             HFSX_VOLUME_HEADER_SIGNATURE,
+        ));
+    }
+
+    /// Linux Logical Volume Manager (LVM) signatures.
+    pub fn add_linuxlvm_signatures(&mut self) {
+        self.signature_scanner.add_signature(Signature::new(
+            "linuxlvm1",
+            PatternType::BoundToStart,
+            512,
+            LINUX_LVM_PHYSICAL_VOLUME_SIGNATURE,
         ));
     }
 
@@ -400,6 +411,7 @@ impl FormatScanner {
                 "fat1" | "fat2" | "fat3" => FormatIdentifier::Fat,
                 "gpt1" | "gpt2" | "gpt3" | "gpt4" => FormatIdentifier::Gpt,
                 "hfs1" | "hfs2" | "hfs3" => FormatIdentifier::Hfs,
+                "linuxlvm1" => FormatIdentifier::LinuxLvm,
                 "mbr1" => FormatIdentifier::Mbr,
                 "ntfs1" => FormatIdentifier::Ntfs,
                 "pdi1" => FormatIdentifier::Pdi,
@@ -438,6 +450,7 @@ mod tests {
         format_scanner.add_fat_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_hfs_signatures();
+        format_scanner.add_linuxlvm_signatures();
         format_scanner.add_ntfs_signatures();
         format_scanner.add_pdi_signatures();
         format_scanner.add_qcow_signatures();
@@ -461,6 +474,7 @@ mod tests {
         format_scanner.add_fat_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_hfs_signatures();
+        format_scanner.add_linuxlvm_signatures();
         format_scanner.add_ntfs_signatures();
         format_scanner.add_pdi_signatures();
         format_scanner.add_qcow_signatures();

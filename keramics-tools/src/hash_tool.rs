@@ -15,7 +15,7 @@ use std::io::{BufReader, Read, Stdin};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::Parser;
+use clap::{Args, Parser, Subcommand};
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
@@ -27,7 +27,6 @@ use keramics_types::Ucs2String;
 use keramics_vfs::{
     VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFinder, VfsLocation, VfsResolver,
     VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanOptions, VfsScanner,
-    new_os_vfs_location,
 };
 
 #[cfg(feature = "debug-trace")]
@@ -51,7 +50,11 @@ struct CommandLineArguments {
     #[arg(short, long, default_value_t = DigestHashType::Md5, value_enum)]
     digest_hash_type: DigestHashType,
 
-    /// Comma seperated list of partitions to include.
+    #[arg(long, default_value_t = 0)]
+    /// Layer within the storage media image, where 1 represents the first layer
+    image_layer: usize,
+
+    /// Comma seperated list of partitions to include
     #[arg(long)]
     partitions: Option<String>,
 
@@ -65,6 +68,28 @@ struct CommandLineArguments {
     /// Volume or partition path type
     #[arg(long, default_value_t = DisplayPathType::Index, value_enum)]
     volume_path_type: DisplayPathType,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Debug, Subcommand)]
+enum Commands {
+    /// Path of the data stream to hash
+    Path(PathCommandArguments),
+
+    /// Hash data streams within the in-format hierarchy
+    Hierarchy,
+}
+
+#[derive(Args, Debug)]
+struct PathCommandArguments {
+    /// Format specific path
+    path: String,
+
+    #[arg(long)]
+    /// Name of the data stream to hash
+    name: Option<String>,
 }
 
 /// Tool for calculating digest hashes of data streams.
@@ -76,7 +101,7 @@ struct HashTool {
     digest_hash_type: DigestHashType,
 
     /// Value to indicate to stop on error.
-    pub stop_on_error: bool,
+    stop_on_error: bool,
 }
 
 impl HashTool {
@@ -154,7 +179,7 @@ impl HashTool {
                     error
                 ));
             }
-        };
+        }
         let hash: Vec<u8> = hash_context.finalize();
 
         Ok(format_as_string(&hash))
@@ -343,7 +368,7 @@ impl HashTool {
                         }
                         println!("N/A (error)\t{}{}", display_path, path);
                     }
-                };
+                }
             }
         } else {
             for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
@@ -357,6 +382,132 @@ impl HashTool {
                         return Err(error);
                     }
                 }
+            }
+        }
+        Ok(())
+    }
+
+    /// Calculates a digest hash from a scan node.
+    fn calculate_hash_from_scan_node_with_path(
+        &self,
+        vfs_scan_node: &VfsScanNode,
+        path: &Path,
+        name: Option<&PathComponent>,
+    ) -> Result<(), ErrorTrace> {
+        if vfs_scan_node.is_empty() {
+            let file_system_display_path: String = match vfs_scan_node.location.get_parent() {
+                Some(parent_path) => match self.display_path.get_path(parent_path) {
+                    Ok(path) => path,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve parent display path"
+                        );
+                        return Err(error);
+                    }
+                },
+                None => String::new(),
+            };
+            let vfs_resolver: VfsResolverReference = VfsResolver::current();
+            let vfs_location: VfsLocation = vfs_scan_node.location.new_with_parent(path.clone());
+
+            match vfs_resolver.get_data_stream_by_location_and_name(&vfs_location, name) {
+                Ok(Some(data_stream)) => {
+                    let display_path: String = self.display_path.escape_path(path);
+
+                    let display_path_and_name: String = match name.as_ref() {
+                        Some(name) => {
+                            let escaped_name: String =
+                                self.display_path.escape_path_component(name);
+
+                            format!("{}:{}", display_path, escaped_name)
+                        }
+                        None => display_path.clone(),
+                    };
+                    let hash_string: String =
+                        match self.calculate_hash_from_data_stream(&data_stream) {
+                            Ok(hash_string) => hash_string,
+                            Err(mut error) => {
+                                if self.stop_on_error {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        format!(
+                                            "Unable to calculate hash of data stream: {}",
+                                            display_path_and_name
+                                        )
+                                    );
+                                    return Err(error);
+                                }
+                                String::from("N/A (error)")
+                            }
+                        };
+                    println!(
+                        "{}\t{}{}",
+                        hash_string, file_system_display_path, display_path_and_name
+                    );
+                }
+                Ok(None) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                    return Err(error);
+                }
+            };
+        } else {
+            for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
+                match self.calculate_hash_from_scan_node_with_path(sub_scan_node, path, name) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to calculate hash from sub scan node"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Scans the source for file systems.
+    fn scan_for_file_systems<'a>(
+        &self,
+        vfs_location: &'a VfsLocation,
+        image_layer: usize,
+        partitions: Option<&String>,
+        vfs_scan_context: &mut VfsScanContext<'a>,
+    ) -> Result<(), ErrorTrace> {
+        let mut vfs_scanner: VfsScanner = VfsScanner::new();
+
+        match vfs_scanner.build() {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
+        }
+        let mut vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
+
+        vfs_scan_options.image_layer = image_layer;
+
+        if let Some(partitions_string) = partitions {
+            match vfs_scan_options.parse_partitions(partitions_string.as_str()) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to parse partitions");
+                    return Err(error);
+                }
+            }
+        }
+        // TODO: add scanner mediator.
+
+        match vfs_scanner.scan(&vfs_scan_options, vfs_scan_context, vfs_location) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to scan for file systems");
+                return Err(error);
             }
         }
         Ok(())
@@ -391,86 +542,98 @@ fn main() -> ExitCode {
             }
         }
         Some(source_argument) => {
-            let source: &str = match source_argument.to_str() {
+            let source_string: &str = match source_argument.to_str() {
                 Some(value) => value,
                 None => {
                     println!("Missing source");
                     return ExitCode::FAILURE;
                 }
             };
-            // TODO: add scanner mediator.
+            let vfs_location: VfsLocation = VfsLocation::from(&source_argument);
+            let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
 
-            let mut vfs_scanner: VfsScanner = VfsScanner::new();
-
-            match vfs_scanner.build() {
+            match hash_tool.scan_for_file_systems(
+                &vfs_location,
+                arguments.image_layer,
+                arguments.partitions.as_ref(),
+                &mut vfs_scan_context,
+            ) {
                 Ok(_) => {}
                 Err(error) => {
-                    println!("{}", error);
+                    println!(
+                        "Unable to scan: {} for file systems\n{}",
+                        source_string, error
+                    );
                     return ExitCode::FAILURE;
-                }
-            };
-            let mut vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
-
-            if let Some(partitions_string) = arguments.partitions {
-                match vfs_scan_options.parse_partitions(partitions_string.as_str()) {
-                    Ok(_) => {}
-                    Err(error) => {
-                        println!("Unable to parse partitions: {}\n{}", source, error);
-                        return ExitCode::FAILURE;
-                    }
                 }
             }
-            let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
-            let vfs_location: VfsLocation = new_os_vfs_location(source);
-
-            match vfs_scanner.scan(&vfs_scan_options, &mut vfs_scan_context, &vfs_location) {
-                Ok(_) => {}
-                Err(error) => {
-                    println!("Unable to scan: {}\n{}", source, error);
-                    return ExitCode::FAILURE;
-                }
-            };
             let root_scan_node: &VfsScanNode = match vfs_scan_context.root_node.as_ref() {
                 Some(scan_node) => scan_node,
                 None => {
-                    println!("Unable to scan: {} missing root scan node", source);
+                    println!("Unable to scan: {} missing root scan node", source_string);
                     return ExitCode::FAILURE;
                 }
             };
-            if root_scan_node.is_empty() {
-                let data_stream: DataStreamReference = match open_os_data_stream(&source_argument) {
-                    Ok(data_stream) => data_stream,
-                    Err(error) => {
-                        println!("Unable to open file: {}\n{}", source, error);
+            match arguments.command {
+                Some(Commands::Path(command_arguments)) => {
+                    if root_scan_node.is_empty() {
+                        println!("No file system found in source");
                         return ExitCode::FAILURE;
                     }
-                };
-                let hash_string: String =
-                    match hash_tool.calculate_hash_from_data_stream(&data_stream) {
-                        Ok(hash) => hash,
+                    let name: Option<PathComponent> = match command_arguments.name {
+                        Some(ref name) => Some(PathComponent::from(name)),
+                        None => None,
+                    };
+                    let path: Path = Path::from(&command_arguments.path);
+
+                    match hash_tool.calculate_hash_from_scan_node_with_path(
+                        root_scan_node,
+                        &path,
+                        name.as_ref(),
+                    ) {
+                        Ok(_) => {}
                         Err(error) => {
-                            if hash_tool.stop_on_error {
-                                println!("Unable to calculate hash of: {}\n{}", source, error);
+                            println!("Unable to calculate hash of data streams\n{}", error);
+                            return ExitCode::FAILURE;
+                        }
+                    }
+                }
+                _ => {
+                    if root_scan_node.is_empty() {
+                        let data_stream: DataStreamReference =
+                            match open_os_data_stream(&source_argument) {
+                                Ok(data_stream) => data_stream,
+                                Err(error) => {
+                                    println!("Unable to open data stream\n{}", error);
+                                    return ExitCode::FAILURE;
+                                }
+                            };
+                        let hash_string: String = match hash_tool
+                            .calculate_hash_from_data_stream(&data_stream)
+                        {
+                            Ok(hash) => hash,
+                            Err(error) => {
+                                if hash_tool.stop_on_error {
+                                    println!("Unable to calculate hash of data stream\n{}", error);
+                                    return ExitCode::FAILURE;
+                                }
+                                String::from("N/A (error)")
+                            }
+                        };
+                        println!("{}  {}", hash_string, source_string);
+                    } else {
+                        match hash_tool.calculate_hash_from_scan_node(root_scan_node) {
+                            Ok(_) => {}
+                            Err(error) => {
+                                println!("Unable to calculate hash of data streams\n{}", error);
                                 return ExitCode::FAILURE;
                             }
-                            String::from("N/A (error)")
                         }
-                    };
-                println!("{}  {}", hash_string, source);
-            } else {
-                match hash_tool.calculate_hash_from_scan_node(root_scan_node) {
-                    Ok(_) => {}
-                    Err(error) => {
-                        println!(
-                            "Unable to calculate hash of file entry in: {}\n{}",
-                            source, error
-                        );
-                        return ExitCode::FAILURE;
                     }
-                };
+                }
             }
         }
-    };
+    }
     ExitCode::SUCCESS
 }
 

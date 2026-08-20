@@ -114,6 +114,44 @@ impl ApfsFileEntry {
         }
     }
 
+    /// Creates a new file entry.
+    pub(super) fn new_with_initialize(
+        data_stream: &DataStreamReference,
+        block_size: u32,
+        object_map_tree: &Arc<ApfsObjectMapTree>,
+        file_system_tree: &Arc<ApfsFileSystemTree>,
+        identifier: u64,
+        transaction_identifier: u64,
+        inode: ApfsInode,
+        directory_entry: Option<ApfsDirectoryEntry>,
+    ) -> Result<Self, ErrorTrace> {
+        let mut file_entry: Self = Self::new(
+            data_stream,
+            block_size,
+            object_map_tree,
+            file_system_tree,
+            identifier,
+            transaction_identifier,
+            inode,
+            directory_entry,
+        );
+        match file_entry.read_attributes() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                return Err(error);
+            }
+        }
+        match file_entry.read_extents() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read extents");
+                return Err(error);
+            }
+        }
+        Ok(file_entry)
+    }
+
     /// Retrieves the access time.
     pub fn get_access_time(&self) -> &DateTime {
         &self.inode.access_time
@@ -469,7 +507,7 @@ impl ApfsFileEntry {
     pub fn get_sub_file_entry_by_name(
         &mut self,
         sub_file_entry_name: &PathComponent,
-    ) -> Result<Option<ApfsFileEntry>, ErrorTrace> {
+    ) -> Result<Option<Self>, ErrorTrace> {
         let directory_entry: ApfsDirectoryEntry =
             match self.file_system_tree.get_directory_entry_by_name(
                 &self.data_stream,
@@ -506,7 +544,7 @@ impl ApfsFileEntry {
                 return Err(error);
             }
         };
-        let mut file_entry: ApfsFileEntry = ApfsFileEntry::new(
+        match Self::new_with_initialize(
             &self.data_stream,
             self.block_size,
             &self.object_map_tree,
@@ -515,22 +553,13 @@ impl ApfsFileEntry {
             self.transaction_identifier,
             inode,
             Some(directory_entry),
-        );
-        match file_entry.read_attributes() {
-            Ok(_) => {}
+        ) {
+            Ok(file_entry) => Ok(Some(file_entry)),
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
-                return Err(error);
+                keramics_core::error_trace_add_frame!(error, "Unable to create file entry");
+                Err(error)
             }
         }
-        match file_entry.read_extents() {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read extents");
-                return Err(error);
-            }
-        }
-        Ok(Some(file_entry))
     }
 
     /// Reads the attributes.
@@ -655,7 +684,7 @@ impl FileEntryIterator for ApfsFileEntry {
     fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> Result<ApfsFileEntry, ErrorTrace> {
+    ) -> Result<Self, ErrorTrace> {
         if self.is_directory() && !self.sub_directory_entries_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
@@ -702,7 +731,7 @@ impl FileEntryIterator for ApfsFileEntry {
                 let mut sub_directory_entry: ApfsDirectoryEntry = directory_entry.clone();
                 sub_directory_entry.name = Some(name.clone());
 
-                let mut file_entry: ApfsFileEntry = ApfsFileEntry::new(
+                match Self::new_with_initialize(
                     &self.data_stream,
                     self.block_size,
                     &self.object_map_tree,
@@ -711,22 +740,13 @@ impl FileEntryIterator for ApfsFileEntry {
                     self.transaction_identifier,
                     inode,
                     Some(sub_directory_entry),
-                );
-                match file_entry.read_attributes() {
-                    Ok(_) => {}
+                ) {
+                    Ok(file_entry) => Ok(file_entry),
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
-                        return Err(error);
+                        keramics_core::error_trace_add_frame!(error, "Unable to create file entry");
+                        Err(error)
                     }
                 }
-                match file_entry.read_extents() {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to read extents");
-                        return Err(error);
-                    }
-                }
-                Ok(file_entry)
             }
             None => Err(keramics_core::error_trace_new!(format!(
                 "Missing directory entry: {}",

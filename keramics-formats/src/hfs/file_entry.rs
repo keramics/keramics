@@ -115,6 +115,42 @@ impl HfsFileEntry {
         }
     }
 
+    /// Creates a new file entry.
+    pub(super) fn new_with_initialize(
+        data_stream: &DataStreamReference,
+        block_size: u32,
+        data_area_block_number: u16,
+        catalog_file: &Arc<HfsCatalogFile>,
+        extents_overflow_file: &Arc<HfsExtentsOverflowFile>,
+        attributes_file: &Arc<HfsAttributesFile>,
+        directory_entry: HfsDirectoryEntry,
+    ) -> Result<Self, ErrorTrace> {
+        let mut file_entry: Self = Self::new(
+            data_stream,
+            block_size,
+            data_area_block_number,
+            catalog_file,
+            extents_overflow_file,
+            attributes_file,
+            directory_entry,
+        );
+        match file_entry.read_indirect_node() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read indirect node");
+                return Err(error);
+            }
+        }
+        match file_entry.read_attributes() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                return Err(error);
+            }
+        }
+        Ok(file_entry)
+    }
+
     /// Retrieves the access time.
     pub fn get_access_time(&self) -> Option<&DateTime> {
         match &self.indirect_node {
@@ -390,17 +426,13 @@ impl HfsFileEntry {
         if !self.has_data_fork() {
             return Ok(None);
         }
-        let fork_descriptor: &HfsForkDescriptor = match self.get_data_fork_descriptor() {
-            Some(fork_descriptor) => fork_descriptor,
-            None => return Ok(None),
-        };
-        match self.get_block_stream(&fork_descriptor) {
-            Ok(block_stream) => Ok(Some(HfsFork::new(
-                HfsForkType::Data,
-                Arc::new(RwLock::new(block_stream)),
-            ))),
+        match self.get_data_stream() {
+            Ok(Some(data_stream)) => Ok(Some(HfsFork::new(HfsForkType::Data, data_stream))),
+            Ok(None) => {
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
+            }
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve block stream");
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
                 Err(error)
             }
         }
@@ -416,6 +448,9 @@ impl HfsFileEntry {
 
     /// Retrieves the resource fork.
     pub fn get_resource_fork(&mut self) -> Result<Option<HfsFork>, ErrorTrace> {
+        if self.compressed_data_header.is_some() {
+            return Ok(None);
+        }
         let fork_descriptor: &HfsForkDescriptor = match self.get_resource_fork_descriptor() {
             Some(fork_descriptor) => fork_descriptor,
             None => return Ok(None),
@@ -446,7 +481,7 @@ impl HfsFileEntry {
         attribute_record: &HfsAttributeRecord,
     ) -> Result<DataStreamReference, ErrorTrace> {
         match attribute_record {
-            HfsAttributeRecord::Extents(extents_attribute_record) => {
+            HfsAttributeRecord::Extents(_) => {
                 // TODO: implement
                 todo!();
             }
@@ -550,7 +585,7 @@ impl HfsFileEntry {
     pub fn get_sub_file_entry_by_name(
         &mut self,
         sub_file_entry_name: &PathComponent,
-    ) -> Result<Option<HfsFileEntry>, ErrorTrace> {
+    ) -> Result<Option<Self>, ErrorTrace> {
         let directory_entry: HfsDirectoryEntry = match self
             .catalog_file
             .get_directory_entry_by_name(&self.data_stream, self.identifier, sub_file_entry_name)
@@ -565,7 +600,7 @@ impl HfsFileEntry {
                 return Err(error);
             }
         };
-        let mut file_entry: HfsFileEntry = HfsFileEntry::new(
+        match Self::new_with_initialize(
             &self.data_stream,
             self.block_size,
             self.data_area_block_number,
@@ -573,22 +608,13 @@ impl HfsFileEntry {
             &self.extents_overflow_file,
             &self.attributes_file,
             directory_entry,
-        );
-        match file_entry.read_indirect_node() {
-            Ok(_) => {}
+        ) {
+            Ok(file_entry) => Ok(Some(file_entry)),
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read indirect node");
-                return Err(error);
+                keramics_core::error_trace_add_frame!(error, "Unable to create file entry");
+                Err(error)
             }
         }
-        match file_entry.read_attributes() {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
-                return Err(error);
-            }
-        }
-        Ok(Some(file_entry))
     }
 
     /// Retrieves a sub file entries iterator.
@@ -598,6 +624,9 @@ impl HfsFileEntry {
 
     /// Determines if the file entry has a data fork.
     pub fn has_data_fork(&self) -> bool {
+        if self.compressed_data_header.is_some() {
+            return true;
+        }
         match self.get_file_mode() {
             Some(file_mode) => *file_mode & 0xf000 == HFS_FILE_MODE_TYPE_REGULAR_FILE,
             None => self.directory_entry.is_file(),
@@ -606,6 +635,9 @@ impl HfsFileEntry {
 
     /// Determines if the file entry has a resource fork.
     pub fn has_resource_fork(&self) -> bool {
+        if self.compressed_data_header.is_some() {
+            return false;
+        }
         match self.get_resource_fork_descriptor() {
             Some(fork_descriptor) => fork_descriptor.size > 0,
             None => false,
@@ -718,7 +750,7 @@ impl HfsFileEntry {
                         );
                         return Err(error);
                     }
-                };
+                }
             }
         }
         Ok(())
@@ -768,7 +800,7 @@ impl FileEntryIterator for HfsFileEntry {
     fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> Result<HfsFileEntry, ErrorTrace> {
+    ) -> Result<Self, ErrorTrace> {
         if self.is_directory() && !self.sub_directory_entries_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
@@ -789,7 +821,7 @@ impl FileEntryIterator for HfsFileEntry {
                 let mut sub_directory_entry: HfsDirectoryEntry = directory_entry.clone();
                 sub_directory_entry.name = Some(name.clone());
 
-                let mut file_entry: HfsFileEntry = HfsFileEntry::new(
+                match Self::new_with_initialize(
                     &self.data_stream,
                     self.block_size,
                     self.data_area_block_number,
@@ -797,25 +829,13 @@ impl FileEntryIterator for HfsFileEntry {
                     &self.extents_overflow_file,
                     &self.attributes_file,
                     sub_directory_entry,
-                );
-                match file_entry.read_indirect_node() {
-                    Ok(_) => {}
+                ) {
+                    Ok(file_entry) => Ok(file_entry),
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read indirect node"
-                        );
-                        return Err(error);
+                        keramics_core::error_trace_add_frame!(error, "Unable to create file entry");
+                        Err(error)
                     }
                 }
-                match file_entry.read_attributes() {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
-                        return Err(error);
-                    }
-                }
-                Ok(file_entry)
             }
             None => Err(keramics_core::error_trace_new!(format!(
                 "Missing directory entry: {}",

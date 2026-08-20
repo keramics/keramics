@@ -99,7 +99,6 @@ mod tests {
     use super::*;
 
     use crate::file_system::VfsFileSystem;
-    use crate::location::new_os_vfs_location;
 
     use crate::tests::get_test_data_path;
 
@@ -108,13 +107,13 @@ mod tests {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let path_string: String = get_test_data_path("directory/file.txt");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let result: Option<DataStreamReference> =
             vfs_resolver.get_data_stream_by_location_and_name(&vfs_location, None)?;
         assert!(result.is_some());
 
         let path_string: String = get_test_data_path("directory/bogus.txt");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let result: Option<DataStreamReference> =
             vfs_resolver.get_data_stream_by_location_and_name(&vfs_location, None)?;
         assert!(result.is_none());
@@ -127,13 +126,13 @@ mod tests {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let path_string: String = get_test_data_path("directory/file.txt");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let result: Option<VfsFileEntry> =
             vfs_resolver.get_file_entry_by_location(&vfs_location)?;
         assert!(result.is_some());
 
         let path_string: String = get_test_data_path("directory/bogus.txt");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let result: Option<VfsFileEntry> =
             vfs_resolver.get_file_entry_by_location(&vfs_location)?;
         assert!(result.is_none());
@@ -145,7 +144,7 @@ mod tests {
     fn test_open_file_system() -> Result<(), ErrorTrace> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let vfs_location: VfsLocation = new_os_vfs_location("/");
+        let vfs_location: VfsLocation = VfsLocation::from("/");
         let vfs_file_system: VfsFileSystemReference =
             vfs_resolver.open_file_system(&vfs_location)?;
 

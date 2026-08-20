@@ -121,7 +121,7 @@ impl HfsFileSystem {
                 return Err(error);
             }
         };
-        let mut file_entry: HfsFileEntry = HfsFileEntry::new(
+        match HfsFileEntry::new_with_initialize(
             data_stream,
             self.block_size,
             self.data_area_block_number,
@@ -129,22 +129,13 @@ impl HfsFileSystem {
             &self.extents_overflow_file,
             &self.attributes_file,
             directory_entry,
-        );
-        match file_entry.read_indirect_node() {
-            Ok(_) => {}
+        ) {
+            Ok(file_entry) => Ok(Some(file_entry)),
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read indirect node");
-                return Err(error);
+                keramics_core::error_trace_add_frame!(error, "Unable to create file entry");
+                Err(error)
             }
         }
-        match file_entry.read_attributes() {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
-                return Err(error);
-            }
-        }
-        Ok(Some(file_entry))
     }
 
     /// Retrieves the file entry for a specific path.

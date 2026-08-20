@@ -21,6 +21,7 @@ use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::fat::FatFileSystem;
 use keramics_formats::gpt::GptVolumeSystem;
+use keramics_formats::linuxlvm::LinuxLvmVolumeSystem;
 use keramics_formats::mbr::MbrVolumeSystem;
 use keramics_formats::pdi::PdiImage;
 use keramics_formats::qcow::QcowImage;
@@ -41,6 +42,7 @@ use crate::enums::{VfsFileType, VfsType};
 use crate::ewf::EwfFileSystem;
 use crate::file_entry::VfsFileEntry;
 use crate::gpt::GptFileSystem;
+use crate::linuxlvm::LinuxLvmFileSystem;
 use crate::location::VfsLocation;
 use crate::mbr::MbrFileSystem;
 use crate::pdi::PdiFileSystem;
@@ -134,6 +136,7 @@ impl VfsScanner {
         self.phase1_volume_system_scanner.add_apfs_signatures();
         self.phase1_volume_system_scanner.add_apm_signatures();
         self.phase1_volume_system_scanner.add_gpt_signatures();
+        self.phase1_volume_system_scanner.add_linuxlvm_signatures();
 
         match self.phase1_volume_system_scanner.build() {
             Ok(_) => {}
@@ -171,6 +174,7 @@ impl VfsScanner {
             }
         }
         self.sub_volume_system_scanner.add_apfs_signatures();
+        self.sub_volume_system_scanner.add_linuxlvm_signatures();
 
         match self.sub_volume_system_scanner.build() {
             Ok(_) => {}
@@ -346,7 +350,7 @@ impl VfsScanner {
             | VfsType::Ntfs => Err(keramics_core::error_trace_new!(
                 "Unsupported VFS location type"
             )),
-            VfsType::Apm | VfsType::Gpt | VfsType::Mbr => {
+            VfsType::Apm | VfsType::Gpt | VfsType::LinuxLvm | VfsType::Mbr => {
                 let mut result: Option<VfsType> = match self
                     .scan_for_sub_volume_system_format_vfs(&data_stream)
                 {
@@ -750,6 +754,11 @@ impl VfsScanner {
 
                 // TODO: invoke mediator to ask which volumes to include.
                 for volume_index in 0..number_of_volumes {
+                    if scan_options.volumes != VfsScanOptionGroup::NotSet
+                        && !scan_options.volumes.contains_index(volume_index + 1)
+                    {
+                        continue;
+                    }
                     let volume_path: String = format!(
                         "{}{}",
                         ApfsContainerFileSystem::PATH_PREFIX,
@@ -859,6 +868,42 @@ impl VfsScanner {
                         keramics_core::error_trace_add_frame!(
                             error,
                             "Unable to scan GPT volume system"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            VfsType::LinuxLvm => {
+                let mut lvm_volume_system: LinuxLvmVolumeSystem = LinuxLvmVolumeSystem::new();
+
+                match LinuxLvmFileSystem::open_volume_system(
+                    &mut lvm_volume_system,
+                    file_system,
+                    path,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open Linux LVM volume system"
+                        );
+                        return Err(error);
+                    }
+                }
+                let number_of_volumes: usize = lvm_volume_system.get_number_of_volumes();
+
+                match self.scan_for_volume_system_sub_nodes(
+                    scan_options,
+                    vfs_location,
+                    scan_node,
+                    LinuxLvmFileSystem::PATH_PREFIX,
+                    number_of_volumes,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan Linux LVM volume system"
                         );
                         return Err(error);
                     }
@@ -1199,6 +1244,7 @@ impl VfsScanner {
     ) -> Result<Option<VfsType>, ErrorTrace> {
         match self.scan_for_sub_volume_system_format(&data_stream) {
             Ok(Some(FormatIdentifier::Apfs)) => Ok(Some(VfsType::ApfsContainer)),
+            Ok(Some(FormatIdentifier::LinuxLvm)) => Ok(Some(VfsType::LinuxLvm)),
             Ok(Some(format_identifier)) => Err(keramics_core::error_trace_new!(format!(
                 "Found unsupported volume-system-in-volume-system format signature: {}",
                 format_identifier
@@ -1243,11 +1289,12 @@ impl VfsScanner {
             Some(FormatIdentifier::Apfs) => return Ok(Some(FormatIdentifier::Apfs)),
             Some(FormatIdentifier::Apm) => return Ok(Some(FormatIdentifier::Apm)),
             Some(FormatIdentifier::Gpt) => return Ok(Some(FormatIdentifier::Gpt)),
+            Some(FormatIdentifier::LinuxLvm) => return Ok(Some(FormatIdentifier::LinuxLvm)),
             Some(format_identifier) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Found unsupported non-overlapping volume system format signature: {}",
                     format_identifier
-                ),));
+                )));
             }
             None => {}
         }
@@ -1331,6 +1378,7 @@ impl VfsScanner {
             Ok(Some(FormatIdentifier::Apm)) => Ok(Some(VfsType::Apm)),
             Ok(Some(FormatIdentifier::Fat)) => Ok(Some(VfsType::Fat)),
             Ok(Some(FormatIdentifier::Gpt)) => Ok(Some(VfsType::Gpt)),
+            Ok(Some(FormatIdentifier::LinuxLvm)) => Ok(Some(VfsType::LinuxLvm)),
             Ok(Some(FormatIdentifier::Mbr)) => Ok(Some(VfsType::Mbr)),
             Ok(Some(format_identifier)) => Err(keramics_core::error_trace_new!(format!(
                 "Found unsupported volume system format signature: {}",
@@ -1369,14 +1417,34 @@ impl VfsScanner {
                 }
             };
 
+        match vfs_type {
+            VfsType::Apm | VfsType::Gpt | VfsType::Mbr => {
+                if scan_options.partitions == VfsScanOptionGroup::NotSet {
+                    // TODO: invoke mediator to ask which partitions to include.
+                }
+            }
+            VfsType::LinuxLvm => {
+                if scan_options.volumes == VfsScanOptionGroup::NotSet {
+                    // TODO: invoke mediator to ask which volumes to include.
+                }
+            }
+            _ => {}
+        };
         for volume_index in 0..number_of_volumes {
             let vfs_type: &VfsType = scan_node.get_type();
 
             match vfs_type {
                 VfsType::Apm | VfsType::Gpt | VfsType::Mbr => {
-                    if scan_options.partitions == VfsScanOptionGroup::NotSet {
-                        // TODO: invoke mediator to ask which partitions to include.
-                    } else if !scan_options.partitions.contains_index(volume_index + 1) {
+                    if scan_options.partitions != VfsScanOptionGroup::NotSet
+                        && !scan_options.partitions.contains_index(volume_index + 1)
+                    {
+                        continue;
+                    }
+                }
+                VfsType::LinuxLvm => {
+                    if scan_options.volumes != VfsScanOptionGroup::NotSet
+                        && !scan_options.volumes.contains_index(volume_index + 1)
+                    {
                         continue;
                     }
                 }
@@ -1427,14 +1495,13 @@ mod tests {
     use super::*;
 
     use crate::context::VfsContext;
-    use crate::location::new_os_vfs_location;
 
     use crate::tests::get_test_data_path;
 
     fn get_data_stream(path: &str) -> Result<DataStreamReference, ErrorTrace> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_location: VfsLocation = new_os_vfs_location(path);
+        let vfs_location: VfsLocation = VfsLocation::from(path);
         match vfs_context.get_data_stream_by_location_and_name(&vfs_location, None)? {
             Some(data_stream) => Ok(data_stream),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -1447,7 +1514,7 @@ mod tests {
     fn get_file_system() -> Result<VfsFileSystemReference, ErrorTrace> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsLocation = new_os_vfs_location("/");
+        let vfs_file_system_path: VfsLocation = VfsLocation::from("/");
         vfs_context.open_file_system(&vfs_file_system_path)
     }
 
@@ -1477,7 +1544,7 @@ mod tests {
 
         let mut scan_context: VfsScanContext = VfsScanContext::new();
         let path_string: String = get_test_data_path("gpt/gpt.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
 
         let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
@@ -1512,7 +1579,7 @@ mod tests {
 
         let mut scan_context: VfsScanContext = VfsScanContext::new();
         let path_string: String = get_test_data_path("gpt/gpt.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
 
         let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
@@ -1547,7 +1614,7 @@ mod tests {
 
         let mut scan_context: VfsScanContext = VfsScanContext::new();
         let path_string: String = get_test_data_path("apfs/apfs.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
 
         let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
@@ -1582,7 +1649,7 @@ mod tests {
 
         let mut scan_context: VfsScanContext = VfsScanContext::new();
         let path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
 
         let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
@@ -1604,7 +1671,7 @@ mod tests {
         let vfs_file_system: VfsFileSystemReference = get_file_system()?;
 
         let path_string: String = get_test_data_path("pdi/hfsplus.hdd/DiskDescriptor.xml");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let vfs_type: VfsType = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
@@ -1620,7 +1687,7 @@ mod tests {
         let vfs_file_system: VfsFileSystemReference = get_file_system()?;
 
         let path_string: String = get_test_data_path("qcow/ext2.qcow2");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let vfs_type: VfsType = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
@@ -1636,7 +1703,7 @@ mod tests {
         let vfs_file_system: VfsFileSystemReference = get_file_system()?;
 
         let path_string: String = get_test_data_path("splitraw/ext2.raw.000");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let vfs_type: VfsType = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
@@ -1652,7 +1719,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let path_string: String = get_test_data_path("qcow/ext2.qcow2");
-        let os_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let os_vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let path: Path = Path::from("/");
         let vfs_file_system_path: VfsLocation =
             os_vfs_location.new_with_layer(&VfsType::Qcow, path);
@@ -1676,7 +1743,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let path_string: String = get_test_data_path("gpt/gpt.raw");
-        let os_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let os_vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let path: Path = Path::from("/");
         let vfs_file_system_path: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
         let vfs_file_system: VfsFileSystemReference =
@@ -1919,6 +1986,21 @@ mod tests {
             .unwrap();
 
         assert_eq!(vfs_type, VfsType::Gpt);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_volume_system_format_vfs_with_linuxlvm() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        let path_string: String = get_test_data_path("linuxlvm/lvm2.raw");
+        let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
+        let vfs_type: VfsType = format_scanner
+            .scan_for_volume_system_format_vfs(&data_stream)?
+            .unwrap();
+
+        assert_eq!(vfs_type, VfsType::LinuxLvm);
 
         Ok(())
     }

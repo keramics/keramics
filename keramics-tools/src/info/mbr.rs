@@ -135,7 +135,7 @@ impl MbrInfo {
                 return Err(error);
             }
         };
-        if mbr_volume_system.bytes_per_sector == 0 {
+        if mbr_volume_system.get_bytes_per_sector() == 0 {
             // TODO: allow to specify bytes per sector as an argument
             match mbr_volume_system.set_bytes_per_sector(512) {
                 Ok(_) => {}
@@ -152,11 +152,11 @@ impl MbrInfo {
 
         println!(
             "    Disk identity\t\t\t\t: 0x{:x}",
-            mbr_volume_system.disk_identity
+            mbr_volume_system.get_disk_identity()
         );
         println!(
             "    Bytes per sector\t\t\t\t: {}",
-            mbr_volume_system.bytes_per_sector
+            mbr_volume_system.get_bytes_per_sector()
         );
         let number_of_partitions: usize = mbr_volume_system.get_number_of_partitions();
         println!("    Number of partitions\t\t\t: {}", number_of_partitions);
@@ -190,7 +190,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    use crate::info::tests::assert_lines_eq;
+    use crate::assert_lines_eq;
 
     #[test]
     fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
@@ -209,7 +209,8 @@ mod tests {
             "    Flags\t\t\t\t\t: 0x00\n",
             "\n"
         );
-        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
 
         Ok(())
     }

@@ -66,19 +66,19 @@ impl XmlPlist {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
+                Rule::EOI | Rule::miscellaneous | Rule::plist_prolog => {}
                 Rule::plist_element => {
                     self.root_object = match self.parse_plist_element(token_pair.into_inner()) {
                         Ok(element) => element,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                "Unable to parse XML plist document"
+                                "Unable to parse XML plist element"
                             );
                             return Err(error);
                         }
                     }
                 }
-                Rule::EOI | Rule::miscellaneous | Rule::plist_prolog => {}
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Unsupported XML plist document rule: {:?}",

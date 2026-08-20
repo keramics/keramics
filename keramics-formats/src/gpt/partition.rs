@@ -28,10 +28,10 @@ pub struct GptPartition {
     partition_index: usize,
 
     /// The offset of the partition relative to start of the volume system.
-    pub offset: u64,
+    pub(super) offset: u64,
 
     /// The size of the partition.
-    pub size: u64,
+    pub(super) size: u64,
 
     /// The partition type identifier.
     type_identifier: Uuid,
@@ -68,6 +68,16 @@ impl GptPartition {
     /// Retrieves the partition (table entry) index.
     pub fn get_partition_index(&self) -> usize {
         self.partition_index
+    }
+
+    /// Retrieves the partition offset.
+    pub fn get_partition_offset(&self) -> u64 {
+        self.offset
+    }
+
+    /// Retrieves the partition size.
+    pub fn get_partition_size(&self) -> u64 {
+        self.size
     }
 
     /// Retrieves the type identifier.
@@ -160,7 +170,7 @@ mod tests {
 
     fn get_partition() -> Result<GptPartition, ErrorTrace> {
         let identifier: Uuid = Uuid::from_string("0b119671-75ff-4e2a-a31a-0bc83f857fdd")?;
-        let type_identifier: Uuid = Uuid::new();
+        let type_identifier: Uuid = Uuid::from_string("ebd0a0a2-b9e5-4433-87c0-68b6b72699c7")?;
         let mut partition = GptPartition::new(0, 1048576, 65536, &type_identifier, &identifier);
 
         let path_string: String = get_test_data_path("gpt/gpt.raw");
@@ -183,8 +193,37 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_partition_index
-    // TODO: add tests for get_type_identifier
+    #[test]
+    fn test_get_partition_index() -> Result<(), ErrorTrace> {
+        let partition: GptPartition = get_partition()?;
+
+        let partition_index: usize = partition.get_partition_index();
+        assert_eq!(partition_index, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_partition_size() -> Result<(), ErrorTrace> {
+        let partition: GptPartition = get_partition()?;
+
+        let partition_size: u64 = partition.get_partition_size();
+        assert_eq!(partition_size, 65536);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_type_identifier() -> Result<(), ErrorTrace> {
+        let partition: GptPartition = get_partition()?;
+
+        let type_identifier: &Uuid = partition.get_type_identifier();
+        assert_eq!(
+            type_identifier.to_string(),
+            "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7"
+        );
+        Ok(())
+    }
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {

@@ -173,7 +173,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    use crate::info::tests::assert_lines_eq;
+    use crate::assert_lines_eq;
 
     #[test]
     fn test_file_information_fmt() -> Result<(), ErrorTrace> {
@@ -191,7 +191,8 @@ mod tests {
             "        Media size\t\t\t\t: 4.0 MiB (4194304 bytes)\n",
             "\n"
         );
-        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
 
         Ok(())
     }

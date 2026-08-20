@@ -23,8 +23,8 @@ use crate::enums::VfsFileType;
 pub enum QcowFileEntry {
     /// Layer file entry.
     Layer {
-        /// Layer index.
-        index: usize,
+        /// File name index.
+        name_index: usize,
 
         /// Layer.
         layer: QcowImageLayer,
@@ -60,7 +60,9 @@ impl QcowFileEntry {
     /// Retrieves the name.
     pub fn get_name(&self) -> PathComponent {
         match self {
-            QcowFileEntry::Layer { index, .. } => PathComponent::from(format!("qcow{}", index + 1)),
+            QcowFileEntry::Layer { name_index, .. } => {
+                PathComponent::from(format!("qcow{}", name_index + 1))
+            }
             QcowFileEntry::Root { .. } => PathComponent::Root,
         }
     }
@@ -68,7 +70,7 @@ impl QcowFileEntry {
     /// Retrieves the (image) layer number.
     pub fn get_layer_number(&self) -> Option<usize> {
         match self {
-            QcowFileEntry::Layer { index, .. } => Some(index + 1),
+            QcowFileEntry::Layer { name_index, .. } => Some(name_index + 1),
             QcowFileEntry::Root { .. } => None,
         }
     }
@@ -115,7 +117,7 @@ impl QcowFileEntry {
                         }
                     }
                     Ok(QcowFileEntry::Layer {
-                        index: sub_file_entry_index,
+                        name_index: sub_file_entry_index,
                         layer: image_layer.clone(),
                         size: media_size,
                     })
@@ -179,7 +181,7 @@ mod tests {
             }
         }
         Ok(QcowFileEntry::Layer {
-            index: 0,
+            name_index: 0,
             layer: image_layer.clone(),
             size: media_size,
         })

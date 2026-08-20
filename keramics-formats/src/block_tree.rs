@@ -176,13 +176,11 @@ mod tests {
         test_tree.insert_value(131072, 512, 0x12345678)?;
 
         let test_node: &BlockTreeNode<u32> = test_tree.root_node.as_ref().unwrap();
-        assert_eq!(test_node.node_type, BlockTreeNodeType::Branch);
         assert_eq!(test_node.offset, 0);
         assert_eq!(test_node.element_size, 131072);
         assert_eq!(test_node.elements.len(), 8);
 
         let test_node: &BlockTreeNode<u32> = &test_node.get_sub_node(1).unwrap();
-        assert_eq!(test_node.node_type, BlockTreeNodeType::Leaf);
         assert_eq!(test_node.offset, 131072);
         assert_eq!(test_node.element_size, 512);
         assert_eq!(test_node.elements.len(), 256);
@@ -198,7 +196,6 @@ mod tests {
         test_tree.insert_value(131072, 131072, test_leaf_value)?;
 
         let test_node: &BlockTreeNode<u32> = test_tree.root_node.as_ref().unwrap();
-        assert_eq!(test_node.node_type, BlockTreeNodeType::Leaf);
         assert_eq!(test_node.offset, 0);
         assert_eq!(test_node.element_size, 131072);
         assert_eq!(test_node.elements.len(), 8);

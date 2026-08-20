@@ -23,8 +23,8 @@ use crate::enums::VfsFileType;
 pub enum MbrFileEntry {
     /// Partition file entry.
     Partition {
-        /// Partition index.
-        index: usize,
+        /// File name index.
+        name_index: usize,
 
         /// Partition.
         partition: Arc<RwLock<MbrPartition>>,
@@ -60,8 +60,8 @@ impl MbrFileEntry {
     /// Retrieves the name.
     pub fn get_name(&self) -> PathComponent {
         match self {
-            MbrFileEntry::Partition { index, .. } => {
-                PathComponent::from(format!("mbr{}", index + 1))
+            MbrFileEntry::Partition { name_index, .. } => {
+                PathComponent::from(format!("mbr{}", name_index + 1))
             }
             MbrFileEntry::Root { .. } => PathComponent::Root,
         }
@@ -109,7 +109,7 @@ impl MbrFileEntry {
                         let partition_size: u64 = mbr_partition.size;
 
                         Ok(MbrFileEntry::Partition {
-                            index: sub_file_entry_index,
+                            name_index: sub_file_entry_index,
                             partition: Arc::new(RwLock::new(mbr_partition)),
                             size: partition_size,
                         })
@@ -156,24 +156,36 @@ mod tests {
         Ok(volume_system)
     }
 
+    fn get_partition_file_entry(
+        mbr_volume_system: &Arc<MbrVolumeSystem>,
+    ) -> Result<MbrFileEntry, ErrorTrace> {
+        let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
+
+        let partition_size: u64 = mbr_partition.size;
+
+        Ok(MbrFileEntry::Partition {
+            name_index: 0,
+            partition: Arc::new(RwLock::new(mbr_partition)),
+            size: partition_size,
+        })
+    }
+
+    fn get_root_file_entry(mbr_volume_system: &Arc<MbrVolumeSystem>) -> MbrFileEntry {
+        MbrFileEntry::Root {
+            volume_system: mbr_volume_system.clone(),
+        }
+    }
+
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let mbr_volume_system: Arc<MbrVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = MbrFileEntry::Root {
-            volume_system: mbr_volume_system.clone(),
-        };
+        let file_entry: MbrFileEntry = get_root_file_entry(&mbr_volume_system);
 
         let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
         assert!(data_stream.is_none());
 
-        let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
-        let partition_size: u64 = mbr_partition.size;
-        let file_entry = MbrFileEntry::Partition {
-            index: 0,
-            partition: Arc::new(RwLock::new(mbr_partition)),
-            size: partition_size,
-        };
+        let file_entry: MbrFileEntry = get_partition_file_entry(&mbr_volume_system)?;
 
         let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
         assert!(data_stream.is_some());
@@ -185,20 +197,12 @@ mod tests {
     fn test_get_file_type() -> Result<(), ErrorTrace> {
         let mbr_volume_system: Arc<MbrVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = MbrFileEntry::Root {
-            volume_system: mbr_volume_system.clone(),
-        };
+        let file_entry: MbrFileEntry = get_root_file_entry(&mbr_volume_system);
 
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
 
-        let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
-        let partition_size: u64 = mbr_partition.size;
-        let file_entry = MbrFileEntry::Partition {
-            index: 0,
-            partition: Arc::new(RwLock::new(mbr_partition)),
-            size: partition_size,
-        };
+        let file_entry: MbrFileEntry = get_partition_file_entry(&mbr_volume_system)?;
 
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::File);
@@ -210,20 +214,12 @@ mod tests {
     fn test_get_name() -> Result<(), ErrorTrace> {
         let mbr_volume_system: Arc<MbrVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = MbrFileEntry::Root {
-            volume_system: mbr_volume_system.clone(),
-        };
+        let file_entry: MbrFileEntry = get_root_file_entry(&mbr_volume_system);
 
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::Root);
 
-        let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
-        let partition_size: u64 = mbr_partition.size;
-        let file_entry = MbrFileEntry::Partition {
-            index: 0,
-            partition: Arc::new(RwLock::new(mbr_partition)),
-            size: partition_size,
-        };
+        let file_entry: MbrFileEntry = get_partition_file_entry(&mbr_volume_system)?;
 
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::from("mbr1"));
@@ -235,20 +231,12 @@ mod tests {
     fn test_get_partition_number() -> Result<(), ErrorTrace> {
         let mbr_volume_system: Arc<MbrVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = MbrFileEntry::Root {
-            volume_system: mbr_volume_system.clone(),
-        };
+        let file_entry: MbrFileEntry = get_root_file_entry(&mbr_volume_system);
 
         let partition_number: Option<usize> = file_entry.get_partition_number();
         assert_eq!(partition_number, None);
 
-        let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
-        let partition_size: u64 = mbr_partition.size;
-        let file_entry = MbrFileEntry::Partition {
-            index: 0,
-            partition: Arc::new(RwLock::new(mbr_partition)),
-            size: partition_size,
-        };
+        let file_entry: MbrFileEntry = get_partition_file_entry(&mbr_volume_system)?;
 
         let partition_number: Option<usize> = file_entry.get_partition_number();
         assert_eq!(partition_number, Some(1));
@@ -260,20 +248,12 @@ mod tests {
     fn test_get_size() -> Result<(), ErrorTrace> {
         let mbr_volume_system: Arc<MbrVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = MbrFileEntry::Root {
-            volume_system: mbr_volume_system.clone(),
-        };
+        let file_entry: MbrFileEntry = get_root_file_entry(&mbr_volume_system);
 
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 0);
 
-        let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
-        let partition_size: u64 = mbr_partition.size;
-        let file_entry = MbrFileEntry::Partition {
-            index: 0,
-            partition: Arc::new(RwLock::new(mbr_partition)),
-            size: partition_size,
-        };
+        let file_entry: MbrFileEntry = get_partition_file_entry(&mbr_volume_system)?;
 
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 1049088);
@@ -285,20 +265,12 @@ mod tests {
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let mbr_volume_system: Arc<MbrVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = MbrFileEntry::Root {
-            volume_system: mbr_volume_system.clone(),
-        };
+        let file_entry: MbrFileEntry = get_root_file_entry(&mbr_volume_system);
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 2);
 
-        let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
-        let partition_size: u64 = mbr_partition.size;
-        let file_entry = MbrFileEntry::Partition {
-            index: 0,
-            partition: Arc::new(RwLock::new(mbr_partition)),
-            size: partition_size,
-        };
+        let file_entry: MbrFileEntry = get_partition_file_entry(&mbr_volume_system)?;
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 0);
@@ -310,9 +282,7 @@ mod tests {
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
         let mbr_volume_system: Arc<MbrVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = MbrFileEntry::Root {
-            volume_system: mbr_volume_system.clone(),
-        };
+        let file_entry: MbrFileEntry = get_root_file_entry(&mbr_volume_system);
 
         let sub_file_entry: MbrFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
 
@@ -329,20 +299,10 @@ mod tests {
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
         let mbr_volume_system: Arc<MbrVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = MbrFileEntry::Root {
-            volume_system: mbr_volume_system.clone(),
-        };
-
+        let file_entry: MbrFileEntry = get_root_file_entry(&mbr_volume_system);
         assert_eq!(file_entry.is_root_file_entry(), true);
 
-        let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
-        let partition_size: u64 = mbr_partition.size;
-        let file_entry = MbrFileEntry::Partition {
-            index: 0,
-            partition: Arc::new(RwLock::new(mbr_partition)),
-            size: partition_size,
-        };
-
+        let file_entry: MbrFileEntry = get_partition_file_entry(&mbr_volume_system)?;
         assert_eq!(file_entry.is_root_file_entry(), false);
 
         Ok(())

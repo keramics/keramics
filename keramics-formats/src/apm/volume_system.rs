@@ -26,7 +26,7 @@ pub struct ApmVolumeSystem {
     data_stream: Option<DataStreamReference>,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u16,
+    bytes_per_sector: u16,
 
     /// Partition map entries.
     partition_map_entries: Vec<ApmPartitionMapEntry>,
@@ -42,6 +42,11 @@ impl ApmVolumeSystem {
             bytes_per_sector: 0,
             partition_map_entries: Vec::new(),
         }
+    }
+
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u16 {
+        self.bytes_per_sector
     }
 
     /// Retrieves the number of partitions.
@@ -62,36 +67,24 @@ impl ApmVolumeSystem {
                         return Err(keramics_core::error_trace_new!("Missing data stream"));
                     }
                 };
-                let partition_offset: u64 =
-                    partition_entry.start_sector as u64 * self.bytes_per_sector as u64;
-                let partition_size: u64 =
-                    partition_entry.number_of_sectors as u64 * self.bytes_per_sector as u64;
+                let mut partition: ApmPartition =
+                    ApmPartition::new(&data_stream, self.bytes_per_sector);
 
-                let mut partition: ApmPartition = ApmPartition::new(
-                    partition_offset,
-                    partition_size,
-                    &partition_entry.type_identifier,
-                    &partition_entry.name,
-                    partition_entry.status_flags,
-                );
-                match partition.open(data_stream) {
-                    Ok(_) => {}
+                match partition.open(partition_entry) {
+                    Ok(_) => Ok(partition),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
                             format!("Unable to open partition: {}", partition_index)
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
-                Ok(partition)
             }
-            None => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "No partition with index: {}",
-                    partition_index
-                )));
-            }
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No partition with index: {}",
+                partition_index
+            ))),
         }
     }
 
@@ -209,10 +202,21 @@ mod tests {
     }
 
     #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let volume_system: ApmVolumeSystem = get_volume_system()?;
+
+        let bytes_per_sector: u16 = volume_system.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_partitions() -> Result<(), ErrorTrace> {
         let volume_system: ApmVolumeSystem = get_volume_system()?;
 
-        assert_eq!(volume_system.get_number_of_partitions(), 2);
+        let number_of_partitions: usize = volume_system.get_number_of_partitions();
+        assert_eq!(number_of_partitions, 2);
 
         Ok(())
     }

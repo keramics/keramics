@@ -23,8 +23,8 @@ use crate::enums::VfsFileType;
 pub enum ApmFileEntry {
     /// Partition file entry.
     Partition {
-        /// Partition index.
-        index: usize,
+        /// File name index.
+        name_index: usize,
 
         /// Partition.
         partition: Arc<RwLock<ApmPartition>>,
@@ -60,8 +60,8 @@ impl ApmFileEntry {
     /// Retrieves the name.
     pub fn get_name(&self) -> PathComponent {
         match self {
-            ApmFileEntry::Partition { index, .. } => {
-                PathComponent::from(format!("apm{}", index + 1))
+            ApmFileEntry::Partition { name_index, .. } => {
+                PathComponent::from(format!("apm{}", name_index + 1))
             }
             ApmFileEntry::Root { .. } => PathComponent::Root,
         }
@@ -95,10 +95,10 @@ impl ApmFileEntry {
             ApmFileEntry::Root { volume_system } => {
                 match volume_system.get_partition_by_index(sub_file_entry_index) {
                     Ok(apm_partition) => {
-                        let partition_size: u64 = apm_partition.size;
+                        let partition_size: u64 = apm_partition.get_partition_size();
 
                         Ok(ApmFileEntry::Partition {
-                            index: sub_file_entry_index,
+                            name_index: sub_file_entry_index,
                             partition: Arc::new(RwLock::new(apm_partition)),
                             size: partition_size,
                         })
@@ -145,24 +145,36 @@ mod tests {
         Ok(volume_system)
     }
 
+    fn get_partition_file_entry(
+        apm_volume_system: &Arc<ApmVolumeSystem>,
+    ) -> Result<ApmFileEntry, ErrorTrace> {
+        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
+
+        let partition_size: u64 = apm_partition.get_partition_size();
+
+        Ok(ApmFileEntry::Partition {
+            name_index: 0,
+            partition: Arc::new(RwLock::new(apm_partition)),
+            size: partition_size,
+        })
+    }
+
+    fn get_root_file_entry(apm_volume_system: &Arc<ApmVolumeSystem>) -> ApmFileEntry {
+        ApmFileEntry::Root {
+            volume_system: apm_volume_system.clone(),
+        }
+    }
+
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = ApmFileEntry::Root {
-            volume_system: apm_volume_system.clone(),
-        };
+        let file_entry: ApmFileEntry = get_root_file_entry(&apm_volume_system);
 
         let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
         assert!(data_stream.is_none());
 
-        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
-        let partition_size: u64 = apm_partition.size;
-        let file_entry = ApmFileEntry::Partition {
-            index: 0,
-            partition: Arc::new(RwLock::new(apm_partition)),
-            size: partition_size,
-        };
+        let file_entry: ApmFileEntry = get_partition_file_entry(&apm_volume_system)?;
 
         let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
         assert!(data_stream.is_some());
@@ -174,20 +186,12 @@ mod tests {
     fn test_get_file_type() -> Result<(), ErrorTrace> {
         let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = ApmFileEntry::Root {
-            volume_system: apm_volume_system.clone(),
-        };
+        let file_entry: ApmFileEntry = get_root_file_entry(&apm_volume_system);
 
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
 
-        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
-        let partition_size: u64 = apm_partition.size;
-        let file_entry = ApmFileEntry::Partition {
-            index: 0,
-            partition: Arc::new(RwLock::new(apm_partition)),
-            size: partition_size,
-        };
+        let file_entry: ApmFileEntry = get_partition_file_entry(&apm_volume_system)?;
 
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::File);
@@ -199,20 +203,12 @@ mod tests {
     fn test_get_name() -> Result<(), ErrorTrace> {
         let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = ApmFileEntry::Root {
-            volume_system: apm_volume_system.clone(),
-        };
+        let file_entry: ApmFileEntry = get_root_file_entry(&apm_volume_system);
 
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::Root);
 
-        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
-        let partition_size: u64 = apm_partition.size;
-        let file_entry = ApmFileEntry::Partition {
-            index: 0,
-            partition: Arc::new(RwLock::new(apm_partition)),
-            size: partition_size,
-        };
+        let file_entry: ApmFileEntry = get_partition_file_entry(&apm_volume_system)?;
 
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::from("apm1"));
@@ -224,20 +220,12 @@ mod tests {
     fn test_get_size() -> Result<(), ErrorTrace> {
         let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = ApmFileEntry::Root {
-            volume_system: apm_volume_system.clone(),
-        };
+        let file_entry: ApmFileEntry = get_root_file_entry(&apm_volume_system);
 
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 0);
 
-        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
-        let partition_size: u64 = apm_partition.size;
-        let file_entry = ApmFileEntry::Partition {
-            index: 0,
-            partition: Arc::new(RwLock::new(apm_partition)),
-            size: partition_size,
-        };
+        let file_entry: ApmFileEntry = get_partition_file_entry(&apm_volume_system)?;
 
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 4153344);
@@ -249,20 +237,12 @@ mod tests {
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = ApmFileEntry::Root {
-            volume_system: apm_volume_system.clone(),
-        };
+        let file_entry: ApmFileEntry = get_root_file_entry(&apm_volume_system);
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 2);
 
-        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
-        let partition_size: u64 = apm_partition.size;
-        let file_entry = ApmFileEntry::Partition {
-            index: 0,
-            partition: Arc::new(RwLock::new(apm_partition)),
-            size: partition_size,
-        };
+        let file_entry: ApmFileEntry = get_partition_file_entry(&apm_volume_system)?;
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 0);
@@ -274,9 +254,7 @@ mod tests {
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
         let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = ApmFileEntry::Root {
-            volume_system: apm_volume_system.clone(),
-        };
+        let file_entry: ApmFileEntry = get_root_file_entry(&apm_volume_system);
 
         let sub_file_entry: ApmFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
 
@@ -293,20 +271,10 @@ mod tests {
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
         let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
 
-        let file_entry = ApmFileEntry::Root {
-            volume_system: apm_volume_system.clone(),
-        };
-
+        let file_entry: ApmFileEntry = get_root_file_entry(&apm_volume_system);
         assert_eq!(file_entry.is_root_file_entry(), true);
 
-        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
-        let partition_size: u64 = apm_partition.size;
-        let file_entry = ApmFileEntry::Partition {
-            index: 0,
-            partition: Arc::new(RwLock::new(apm_partition)),
-            size: partition_size,
-        };
-
+        let file_entry: ApmFileEntry = get_partition_file_entry(&apm_volume_system)?;
         assert_eq!(file_entry.is_root_file_entry(), false);
 
         Ok(())

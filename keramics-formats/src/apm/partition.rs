@@ -16,53 +16,85 @@ use std::io::SeekFrom;
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::ByteString;
 
+use super::partition_map_entry::ApmPartitionMapEntry;
+
 /// Apple Partition Map (APM) partition.
 pub struct ApmPartition {
     /// The data stream.
-    data_stream: Option<DataStreamReference>,
+    data_stream: DataStreamReference,
+
+    /// Bytes per sector.
+    bytes_per_sector: u16,
 
     /// The current offset.
     current_offset: u64,
 
     /// The offset of the partition relative to start of the volume system.
-    pub offset: u64,
+    pub(super) offset: u64,
 
     /// The size of the partition.
-    pub size: u64,
+    pub(super) size: u64,
 
     /// The partition type identifier.
-    pub type_identifier: ByteString,
+    type_identifier: ByteString,
 
     /// The name.
-    pub name: ByteString,
+    name: ByteString,
 
     /// The status flags.
-    pub status_flags: u32,
+    status_flags: u32,
 }
 
 impl ApmPartition {
     /// Creates a new partition.
-    pub(super) fn new(
-        offset: u64,
-        size: u64,
-        type_identifier: &ByteString,
-        name: &ByteString,
-        status_flags: u32,
-    ) -> Self {
+    pub(super) fn new(data_stream: &DataStreamReference, bytes_per_sector: u16) -> Self {
         Self {
-            data_stream: None,
+            data_stream: data_stream.clone(),
+            bytes_per_sector,
             current_offset: 0,
-            offset,
-            size,
-            type_identifier: type_identifier.clone(),
-            name: name.clone(),
-            status_flags,
+            offset: 0,
+            size: 0,
+            type_identifier: ByteString::new(),
+            name: ByteString::new(),
+            status_flags: 0,
         }
     }
 
+    /// Retrieves the name.
+    pub fn get_name(&self) -> &ByteString {
+        &self.name
+    }
+
+    /// Retrieves the partition offset.
+    pub fn get_partition_offset(&self) -> u64 {
+        self.offset
+    }
+
+    /// Retrieves the partition size.
+    pub fn get_partition_size(&self) -> u64 {
+        self.size
+    }
+
+    /// Retrieves the status flags.
+    pub fn get_status_flags(&self) -> u32 {
+        self.status_flags
+    }
+
+    /// Retrieves the type identifier.
+    pub fn get_type_identifier(&self) -> &ByteString {
+        &self.type_identifier
+    }
+
     /// Opens a partition.
-    pub(super) fn open(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
-        self.data_stream = Some(data_stream.clone());
+    pub(super) fn open(
+        &mut self,
+        partition_entry: &ApmPartitionMapEntry,
+    ) -> Result<(), ErrorTrace> {
+        self.offset = (partition_entry.start_sector as u64) * (self.bytes_per_sector as u64);
+        self.size = (partition_entry.number_of_sectors as u64) * (self.bytes_per_sector as u64);
+        self.type_identifier = partition_entry.type_identifier.clone();
+        self.name = partition_entry.name.clone();
+        self.status_flags = partition_entry.status_flags;
 
         Ok(())
     }
@@ -81,12 +113,6 @@ impl DataStream for ApmPartition {
 
     /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
-        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-        };
         if self.current_offset >= self.size {
             return Ok(0);
         }
@@ -97,7 +123,7 @@ impl DataStream for ApmPartition {
             read_size = remaining_size as usize;
         }
         let read_count: usize = keramics_core::data_stream_read_at_position!(
-            data_stream,
+            &self.data_stream,
             &mut buf[0..read_size],
             SeekFrom::Start(self.offset + self.current_offset)
         );
@@ -144,28 +170,38 @@ mod tests {
     use crate::tests::get_test_data_path;
 
     fn get_partition() -> Result<ApmPartition, ErrorTrace> {
-        let name: ByteString = ByteString::from("identifier");
-        let type_identifier: ByteString = ByteString::from("type_identifier");
-        let mut partition = ApmPartition::new(32768, 4153344, &type_identifier, &name, 0x40000033);
-
         let path_string: String = get_test_data_path("apm/apm.dmg");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        partition.open(&data_stream)?;
+
+        let mut partition_entry: ApmPartitionMapEntry = ApmPartitionMapEntry::new();
+        partition_entry.start_sector = 64;
+        partition_entry.number_of_sectors = 8112;
+        partition_entry.name = ByteString::from("identifier");
+        partition_entry.type_identifier = ByteString::from("type_identifier");
+        partition_entry.status_flags = 0x40000033;
+
+        let mut partition = ApmPartition::new(&data_stream, 512);
+        partition.open(&partition_entry)?;
 
         Ok(partition)
     }
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {
-        let name: ByteString = ByteString::from("identifier");
-        let type_identifier: ByteString = ByteString::from("type_identifier");
-        let mut partition = ApmPartition::new(32768, 4153344, &type_identifier, &name, 0x40000033);
-
         let path_string: String = get_test_data_path("apm/apm.dmg");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        partition.open(&data_stream)?;
+
+        let mut partition_entry: ApmPartitionMapEntry = ApmPartitionMapEntry::new();
+        partition_entry.start_sector = 64;
+        partition_entry.number_of_sectors = 8112;
+        partition_entry.name = ByteString::from("identifier");
+        partition_entry.type_identifier = ByteString::from("type_identifier");
+        partition_entry.status_flags = 0x40000033;
+
+        let mut partition = ApmPartition::new(&data_stream, 512);
+        partition.open(&partition_entry)?;
 
         Ok(())
     }

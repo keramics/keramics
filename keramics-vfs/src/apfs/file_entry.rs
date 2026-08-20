@@ -30,14 +30,11 @@ pub enum ApfsContainerFileEntry {
 
     /// Volume file entry.
     Volume {
-        /// Volume index.
-        index: usize,
+        /// File name index.
+        name_index: usize,
 
         /// Volume.
-        volume: Arc<ApfsVolume>,
-
-        /// Size.
-        size: u64,
+        volume: ApfsVolume,
     },
 }
 
@@ -87,8 +84,8 @@ impl ApfsContainerFileEntry {
     pub fn get_name(&self) -> PathComponent {
         match self {
             ApfsContainerFileEntry::Root { .. } => PathComponent::Root,
-            ApfsContainerFileEntry::Volume { index, .. } => {
-                PathComponent::from(format!("apfs{}", index + 1))
+            ApfsContainerFileEntry::Volume { name_index, .. } => {
+                PathComponent::from(format!("apfs{}", name_index + 1))
             }
         }
     }
@@ -105,7 +102,7 @@ impl ApfsContainerFileEntry {
     pub fn get_size(&self) -> u64 {
         match self {
             ApfsContainerFileEntry::Root { .. } => 0,
-            ApfsContainerFileEntry::Volume { size, .. } => *size,
+            ApfsContainerFileEntry::Volume { volume, .. } => volume.get_size(),
         }
     }
 
@@ -125,15 +122,10 @@ impl ApfsContainerFileEntry {
         match self {
             ApfsContainerFileEntry::Root { container } => {
                 match container.get_volume_by_index(sub_file_entry_index) {
-                    Ok(apfs_volume) => {
-                        let volume_size: u64 = apfs_volume.get_size();
-
-                        Ok(ApfsContainerFileEntry::Volume {
-                            index: sub_file_entry_index,
-                            volume: Arc::new(apfs_volume),
-                            size: volume_size,
-                        })
-                    }
+                    Ok(apfs_volume) => Ok(ApfsContainerFileEntry::Volume {
+                        name_index: sub_file_entry_index,
+                        volume: apfs_volume,
+                    }),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
@@ -179,25 +171,36 @@ mod tests {
         Ok(container)
     }
 
+    fn get_root_file_entry(apfs_container: &Arc<ApfsContainer>) -> ApfsContainerFileEntry {
+        ApfsContainerFileEntry::Root {
+            container: apfs_container.clone(),
+        }
+    }
+
+    fn get_volume_file_entry(
+        apfs_container: &Arc<ApfsContainer>,
+    ) -> Result<ApfsContainerFileEntry, ErrorTrace> {
+        let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
+
+        Ok(ApfsContainerFileEntry::Volume {
+            name_index: 0,
+            volume: apfs_volume,
+        })
+    }
+
     // TODO: add tests for get_apfs_file_system
 
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let apfs_container: Arc<ApfsContainer> = Arc::new(get_container()?);
 
-        let file_entry = ApfsContainerFileEntry::Root {
-            container: apfs_container.clone(),
-        };
+        let file_entry: ApfsContainerFileEntry = get_root_file_entry(&apfs_container);
+
         let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
         assert!(data_stream.is_none());
 
-        let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
-        let volume_size: u64 = apfs_volume.get_size();
-        let file_entry = ApfsContainerFileEntry::Volume {
-            index: 0,
-            volume: Arc::new(apfs_volume),
-            size: volume_size,
-        };
+        let file_entry: ApfsContainerFileEntry = get_volume_file_entry(&apfs_container)?;
+
         let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
         assert!(data_stream.is_none());
 
@@ -208,19 +211,13 @@ mod tests {
     fn test_get_file_type() -> Result<(), ErrorTrace> {
         let apfs_container: Arc<ApfsContainer> = Arc::new(get_container()?);
 
-        let file_entry = ApfsContainerFileEntry::Root {
-            container: apfs_container.clone(),
-        };
+        let file_entry: ApfsContainerFileEntry = get_root_file_entry(&apfs_container);
+
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
 
-        let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
-        let volume_size: u64 = apfs_volume.get_size();
-        let file_entry = ApfsContainerFileEntry::Volume {
-            index: 0,
-            volume: Arc::new(apfs_volume),
-            size: volume_size,
-        };
+        let file_entry: ApfsContainerFileEntry = get_volume_file_entry(&apfs_container)?;
+
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::File);
 
@@ -231,30 +228,17 @@ mod tests {
     fn test_get_identifier() -> Result<(), ErrorTrace> {
         let apfs_container: Arc<ApfsContainer> = Arc::new(get_container()?);
 
-        let file_entry = ApfsContainerFileEntry::Root {
-            container: apfs_container.clone(),
-        };
-        let identifier: Option<&Uuid> = file_entry.get_identifier();
-        assert_eq!(identifier, None);
+        let file_entry: ApfsContainerFileEntry = get_root_file_entry(&apfs_container);
 
-        let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
-        let volume_size: u64 = apfs_volume.get_size();
-        let file_entry = ApfsContainerFileEntry::Volume {
-            index: 0,
-            volume: Arc::new(apfs_volume),
-            size: volume_size,
-        };
-        let identifier: Option<&Uuid> = file_entry.get_identifier();
+        let result: Option<&Uuid> = file_entry.get_identifier();
+        assert!(result.is_none());
+
+        let file_entry: ApfsContainerFileEntry = get_volume_file_entry(&apfs_container)?;
+
+        let identifier: &Uuid = file_entry.get_identifier().unwrap();
         assert_eq!(
-            identifier,
-            Some(Uuid {
-                part1: 0x33d13da9,
-                part2: 0xf1c8,
-                part3: 0x4d2a,
-                part4: 0xb9c7,
-                part5: 0x71ab9dbe5fe2,
-            })
-            .as_ref()
+            identifier.to_string(),
+            "33d13da9-f1c8-4d2a-b9c7-71ab9dbe5fe2"
         );
         Ok(())
     }
@@ -263,19 +247,13 @@ mod tests {
     fn test_get_name() -> Result<(), ErrorTrace> {
         let apfs_container: Arc<ApfsContainer> = Arc::new(get_container()?);
 
-        let file_entry = ApfsContainerFileEntry::Root {
-            container: apfs_container.clone(),
-        };
+        let file_entry: ApfsContainerFileEntry = get_root_file_entry(&apfs_container);
+
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::Root);
 
-        let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
-        let volume_size: u64 = apfs_volume.get_size();
-        let file_entry = ApfsContainerFileEntry::Volume {
-            index: 0,
-            volume: Arc::new(apfs_volume),
-            size: volume_size,
-        };
+        let file_entry: ApfsContainerFileEntry = get_volume_file_entry(&apfs_container)?;
+
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::from("apfs1"));
 
@@ -286,19 +264,13 @@ mod tests {
     fn test_get_volume_number() -> Result<(), ErrorTrace> {
         let apfs_container: Arc<ApfsContainer> = Arc::new(get_container()?);
 
-        let file_entry = ApfsContainerFileEntry::Root {
-            container: apfs_container.clone(),
-        };
+        let file_entry: ApfsContainerFileEntry = get_root_file_entry(&apfs_container);
+
         let volume_number: Option<usize> = file_entry.get_volume_number();
         assert_eq!(volume_number, None);
 
-        let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
-        let volume_size: u64 = apfs_volume.get_size();
-        let file_entry = ApfsContainerFileEntry::Volume {
-            index: 0,
-            volume: Arc::new(apfs_volume),
-            size: volume_size,
-        };
+        let file_entry: ApfsContainerFileEntry = get_volume_file_entry(&apfs_container)?;
+
         let volume_number: Option<usize> = file_entry.get_volume_number();
         assert_eq!(volume_number, Some(1));
         Ok(())
@@ -308,19 +280,13 @@ mod tests {
     fn test_get_size() -> Result<(), ErrorTrace> {
         let apfs_container: Arc<ApfsContainer> = Arc::new(get_container()?);
 
-        let file_entry = ApfsContainerFileEntry::Root {
-            container: apfs_container.clone(),
-        };
+        let file_entry: ApfsContainerFileEntry = get_root_file_entry(&apfs_container);
+
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 0);
 
-        let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
-        let volume_size: u64 = apfs_volume.get_size();
-        let file_entry = ApfsContainerFileEntry::Volume {
-            index: 0,
-            volume: Arc::new(apfs_volume),
-            size: volume_size,
-        };
+        let file_entry: ApfsContainerFileEntry = get_volume_file_entry(&apfs_container)?;
+
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 77824);
 
@@ -331,19 +297,13 @@ mod tests {
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let apfs_container: Arc<ApfsContainer> = Arc::new(get_container()?);
 
-        let file_entry = ApfsContainerFileEntry::Root {
-            container: apfs_container.clone(),
-        };
+        let file_entry: ApfsContainerFileEntry = get_root_file_entry(&apfs_container);
+
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 1);
 
-        let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
-        let volume_size: u64 = apfs_volume.get_size();
-        let file_entry = ApfsContainerFileEntry::Volume {
-            index: 0,
-            volume: Arc::new(apfs_volume),
-            size: volume_size,
-        };
+        let file_entry: ApfsContainerFileEntry = get_volume_file_entry(&apfs_container)?;
+
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 0);
 
@@ -354,9 +314,8 @@ mod tests {
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
         let apfs_container: Arc<ApfsContainer> = Arc::new(get_container()?);
 
-        let file_entry = ApfsContainerFileEntry::Root {
-            container: apfs_container.clone(),
-        };
+        let file_entry: ApfsContainerFileEntry = get_root_file_entry(&apfs_container);
+
         let sub_file_entry: ApfsContainerFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
 
         let name: PathComponent = sub_file_entry.get_name();
@@ -373,18 +332,10 @@ mod tests {
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
         let apfs_container: Arc<ApfsContainer> = Arc::new(get_container()?);
 
-        let file_entry = ApfsContainerFileEntry::Root {
-            container: apfs_container.clone(),
-        };
+        let file_entry: ApfsContainerFileEntry = get_root_file_entry(&apfs_container);
         assert_eq!(file_entry.is_root_file_entry(), true);
 
-        let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
-        let volume_size: u64 = apfs_volume.get_size();
-        let file_entry = ApfsContainerFileEntry::Volume {
-            index: 0,
-            volume: Arc::new(apfs_volume),
-            size: volume_size,
-        };
+        let file_entry: ApfsContainerFileEntry = get_volume_file_entry(&apfs_container)?;
         assert_eq!(file_entry.is_root_file_entry(), false);
 
         Ok(())

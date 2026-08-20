@@ -109,7 +109,7 @@ impl MbrFileSystem {
                 let partition_size: u64 = mbr_partition.size;
 
                 Ok(Some(MbrFileEntry::Partition {
-                    index: partition_index,
+                    name_index: partition_index,
                     partition: Arc::new(RwLock::new(mbr_partition)),
                     size: partition_size,
                 }))
@@ -217,7 +217,12 @@ impl MbrFileSystem {
         };
         match result {
             Ok(Some(bytes_per_sector)) => {
-                match volume_system.set_bytes_per_sector(bytes_per_sector) {
+                if bytes_per_sector > u16::MAX as u32 {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid bytes per sector value out of bounds"
+                    ));
+                }
+                match volume_system.set_bytes_per_sector(bytes_per_sector as u16) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -259,7 +264,6 @@ mod tests {
 
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
-    use crate::location::new_os_vfs_location;
 
     use crate::tests::get_test_data_path;
 
@@ -269,7 +273,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("mbr/mbr.raw");
-        let parent_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let parent_vfs_location: VfsLocation = VfsLocation::from(&path_string);
         mbr_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         Ok(mbr_file_system)
@@ -358,7 +362,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path_string: String = get_test_data_path("mbr/mbr.raw");
-        let parent_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let parent_vfs_location: VfsLocation = VfsLocation::from(&path_string);
         mbr_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(mbr_file_system.number_of_partitions, 2);

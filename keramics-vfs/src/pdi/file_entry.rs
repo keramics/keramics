@@ -24,8 +24,8 @@ use crate::enums::VfsFileType;
 pub enum PdiFileEntry {
     /// Layer file entry.
     Layer {
-        /// Layer index.
-        index: usize,
+        /// File name index.
+        name_index: usize,
 
         /// Layer.
         layer: Arc<RwLock<PdiImageLayer>>,
@@ -72,7 +72,7 @@ impl PdiFileEntry {
     /// Retrieves the (image) layer number.
     pub fn get_layer_number(&self) -> Option<usize> {
         match self {
-            PdiFileEntry::Layer { index, .. } => Some(index + 1),
+            PdiFileEntry::Layer { name_index, .. } => Some(name_index + 1),
             PdiFileEntry::Root { .. } => None,
         }
     }
@@ -80,7 +80,9 @@ impl PdiFileEntry {
     /// Retrieves the name.
     pub fn get_name(&self) -> PathComponent {
         match self {
-            PdiFileEntry::Layer { index, .. } => PathComponent::from(format!("pdi{}", index + 1)),
+            PdiFileEntry::Layer { name_index, .. } => {
+                PathComponent::from(format!("pdi{}", name_index + 1))
+            }
             PdiFileEntry::Root { .. } => PathComponent::Root,
         }
     }
@@ -131,7 +133,7 @@ impl PdiFileEntry {
                         }
                     }
                     Ok(PdiFileEntry::Layer {
-                        index: sub_file_entry_index,
+                        name_index: sub_file_entry_index,
                         layer: image_layer.clone(),
                         size: media_size,
                         identifier,
@@ -197,7 +199,7 @@ mod tests {
             }
         }
         Ok(PdiFileEntry::Layer {
-            index: 0,
+            name_index: 0,
             layer: image_layer,
             size: media_size,
             identifier,

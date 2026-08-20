@@ -343,14 +343,14 @@ impl FatInfo {
                 Ok(Some(file_entry)) => file_entry,
                 Ok(None) => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unable to retrieve file entry for path: {}",
+                        "Missing file entry for path: {}",
                         path
                     )));
                 }
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        format!("Failed to retrieve file entry for path: {}", path)
+                        format!("Unable to retrieve file entry for path: {}", path)
                     );
                     return Err(error);
                 }
@@ -449,7 +449,7 @@ mod tests {
     use keramics_datetime::{FatDate, FatTimeDate, FatTimeDate10Ms};
     use keramics_types::Ucs2String;
 
-    use crate::info::tests::assert_lines_eq;
+    use crate::assert_lines_eq;
 
     #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
@@ -472,7 +472,8 @@ mod tests {
             "        0x0020: Should be archived (FILE_ATTRIBUTE_ARCHIVE)\n",
             "\n"
         );
-        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
 
         Ok(())
     }

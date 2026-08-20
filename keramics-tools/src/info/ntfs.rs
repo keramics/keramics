@@ -777,14 +777,14 @@ impl NtfsInfo {
                 Ok(Some(file_entry)) => file_entry,
                 Ok(None) => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unable to retrieve file entry for path: {}",
+                        "Missing file entry for path: {}",
                         path
                     )));
                 }
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        format!("Failed to retrieve file entry for path: {}", path)
+                        format!("Unable to retrieve file entry for path: {}", path)
                     );
                     return Err(error);
                 }

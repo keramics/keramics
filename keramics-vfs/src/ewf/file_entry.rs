@@ -142,6 +142,9 @@ mod tests {
         Ok(image)
     }
 
+    // TODO: implement get_layer_file_entry
+    // TODO: implement get_root_file_entry
+
     // TODO: add tests for get_data_stream
 
     #[test]
@@ -265,14 +268,12 @@ mod tests {
         let file_entry = EwfFileEntry::Root {
             image: test_image.clone(),
         };
-
         assert_eq!(file_entry.is_root_file_entry(), true);
 
         let file_entry = EwfFileEntry::Layer {
             image: test_image.clone(),
             size: media_size,
         };
-
         assert_eq!(file_entry.is_root_file_entry(), false);
 
         Ok(())
