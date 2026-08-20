@@ -204,10 +204,12 @@ impl InfoTool {
         if self.offset == 0 {
             Ok(data_stream)
         } else {
+            let size: u64 = keramics_core::data_stream_get_size!(data_stream);
+
             Ok(Arc::new(RwLock::new(RangeStream::new(
                 &data_stream,
                 self.offset,
-                0,
+                size - self.offset,
             ))))
         }
     }
