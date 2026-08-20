@@ -22,69 +22,63 @@ use crate::formatters::ByteSize;
 use super::constants::*;
 
 /// GUID Partition Table (GPT) partition information.
-struct GptPartitionInfo {
+struct GptPartitionInfo<'a> {
     /// The index of the corresponding partition table entry.
-    pub partition_index: usize,
+    partition_index: usize,
 
-    /// The partition identifier.
-    pub identifier: Uuid,
-
-    /// The partition type identifier.
-    pub type_identifier: Uuid,
-
-    /// The offset of the partition relative to start of the volume system.
-    pub offset: u64,
-
-    /// The size of the partition.
-    pub size: u64,
+    /// Partition.
+    partition: &'a GptPartition,
 }
 
-impl GptPartitionInfo {
+impl<'a> GptPartitionInfo<'a> {
     /// Creates new partition information.
-    fn new() -> Self {
+    fn new(partition_index: usize, partition: &'a GptPartition) -> Self {
         Self {
-            partition_index: 0,
-            identifier: Uuid::new(),
-            type_identifier: Uuid::new(),
-            offset: 0,
-            size: 0,
+            partition_index,
+            partition,
         }
     }
 
     /// Retrieves the type identifier as a string.
-    pub fn get_type_identifier_string(&self) -> Option<&str> {
-        let lookup_key: String = self.type_identifier.to_string();
+    pub fn get_type_identifier_string(&self, type_identifier: &Uuid) -> Option<&str> {
+        let lookup_key: String = type_identifier.to_string();
         GTP_TYPE_IDENTIFIERS
             .binary_search_by(|(key, _)| key.cmp(&lookup_key.as_str()))
             .map_or_else(|_| None, |index| Some(GTP_TYPE_IDENTIFIERS[index].1))
     }
 }
 
-impl fmt::Display for GptPartitionInfo {
+impl<'a> fmt::Display for GptPartitionInfo<'a> {
     /// Formats partition information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Partition: {}", self.partition_index + 1)?;
 
-        writeln!(formatter, "    Identifier\t\t\t\t\t: {}", self.identifier)?;
+        writeln!(
+            formatter,
+            "    Identifier\t\t\t\t\t: {}",
+            self.partition.get_identifier()
+        )?;
 
-        match self.get_type_identifier_string() {
+        let type_identifier: &Uuid = self.partition.get_type_identifier();
+        match self.get_type_identifier_string(&type_identifier) {
             Some(type_identifier_string) => {
                 writeln!(
                     formatter,
                     "    Type\t\t\t\t\t: {} ({})",
-                    self.type_identifier, type_identifier_string
+                    type_identifier, type_identifier_string
                 )?;
             }
             None => {
-                writeln!(formatter, "    Type\t\t\t\t\t: {}", self.type_identifier)?;
+                writeln!(formatter, "    Type\t\t\t\t\t: {}", type_identifier)?;
             }
         };
+        let partition_offset: u64 = self.partition.get_partition_offset();
         writeln!(
             formatter,
             "    Offset\t\t\t\t\t: {} (0x{:08x})",
-            self.offset, self.offset
+            partition_offset, partition_offset
         )?;
-        let byte_size: ByteSize = ByteSize::new(self.size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.partition.get_partition_size(), 1024);
 
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
@@ -96,19 +90,6 @@ impl fmt::Display for GptPartitionInfo {
 pub struct GptInfo {}
 
 impl GptInfo {
-    /// Retrieves the partition information.
-    fn get_partition_information(gpt_partition: &GptPartition) -> GptPartitionInfo {
-        let mut partition_information: GptPartitionInfo = GptPartitionInfo::new();
-
-        partition_information.partition_index = gpt_partition.get_partition_index();
-        partition_information.identifier = gpt_partition.get_identifier().clone();
-        partition_information.type_identifier = gpt_partition.get_type_identifier().clone();
-        partition_information.offset = gpt_partition.get_partition_offset();
-        partition_information.size = gpt_partition.get_partition_size();
-
-        partition_information
-    }
-
     /// Opens a volume system.
     pub fn open_volume_system(
         data_stream: &DataStreamReference,
@@ -160,7 +141,8 @@ impl GptInfo {
                     return Err(error);
                 }
             };
-            let partition_info: GptPartitionInfo = Self::get_partition_information(&gpt_partition);
+            let partition_info: GptPartitionInfo =
+                GptPartitionInfo::new(partition_index, &gpt_partition);
 
             print!("{}", partition_info);
         }
@@ -185,7 +167,7 @@ mod tests {
         let gpt_volume_system: GptVolumeSystem = GptInfo::open_volume_system(&data_stream)?;
 
         let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
-        let test_struct: GptPartitionInfo = GptInfo::get_partition_information(&gpt_partition);
+        let test_struct: GptPartitionInfo = GptPartitionInfo::new(0, &gpt_partition);
 
         let expected_string: &str = concat!(
             "Partition: 1\n",
@@ -197,30 +179,6 @@ mod tests {
         );
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_partition_information() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/gpt/gpt.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let gpt_volume_system: GptVolumeSystem = GptInfo::open_volume_system(&data_stream)?;
-
-        let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
-        let test_struct: GptPartitionInfo = GptInfo::get_partition_information(&gpt_partition);
-
-        assert_eq!(test_struct.partition_index, 0);
-        assert_eq!(
-            test_struct.identifier,
-            Uuid::from_string("0b119671-75ff-4e2a-a31a-0bc83f857fdd")?
-        );
-        assert_eq!(
-            test_struct.type_identifier,
-            Uuid::from_string("0fc63daf-8483-4772-8e79-3d69d8477de4")?
-        );
-        assert_eq!(test_struct.offset, 1048576);
-        assert_eq!(test_struct.size, 1048576);
 
         Ok(())
     }

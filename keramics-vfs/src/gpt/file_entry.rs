@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
@@ -28,13 +28,7 @@ pub enum GptFileEntry {
         name_index: usize,
 
         /// Partition.
-        partition: Arc<RwLock<GptPartition>>,
-
-        /// Size.
-        size: u64,
-
-        /// Identifier.
-        identifier: Uuid,
+        partition: GptPartition,
     },
 
     /// Root file entry.
@@ -48,7 +42,7 @@ impl GptFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
-            GptFileEntry::Partition { partition, .. } => Ok(Some(partition.clone())),
+            GptFileEntry::Partition { partition, .. } => Ok(Some(partition.get_data_stream())),
             GptFileEntry::Root { .. } => Ok(None),
         }
     }
@@ -64,7 +58,7 @@ impl GptFileEntry {
     /// Retrieves the identifier.
     pub fn get_identifier(&self) -> Option<&Uuid> {
         match self {
-            GptFileEntry::Partition { identifier, .. } => Some(&identifier),
+            GptFileEntry::Partition { partition, .. } => Some(partition.get_identifier()),
             GptFileEntry::Root { .. } => None,
         }
     }
@@ -82,10 +76,7 @@ impl GptFileEntry {
     /// Retrieves the partition number.
     pub fn get_partition_number(&self) -> Option<usize> {
         match self {
-            GptFileEntry::Partition { partition, .. } => match partition.read() {
-                Ok(gpt_partition) => Some(gpt_partition.get_partition_index() + 1),
-                Err(_) => None,
-            },
+            GptFileEntry::Partition { partition, .. } => Some(partition.get_partition_index() + 1),
             GptFileEntry::Root { .. } => None,
         }
     }
@@ -93,7 +84,7 @@ impl GptFileEntry {
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
-            GptFileEntry::Partition { size, .. } => *size,
+            GptFileEntry::Partition { partition, .. } => partition.get_partition_size(),
             GptFileEntry::Root { .. } => 0,
         }
     }
@@ -117,17 +108,10 @@ impl GptFileEntry {
             }
             GptFileEntry::Root { volume_system } => {
                 match volume_system.get_partition_by_index(sub_file_entry_index) {
-                    Ok(gpt_partition) => {
-                        let partition_size: u64 = gpt_partition.get_partition_size();
-                        let identifier: Uuid = gpt_partition.get_identifier().clone();
-
-                        Ok(GptFileEntry::Partition {
-                            name_index: sub_file_entry_index,
-                            partition: Arc::new(RwLock::new(gpt_partition)),
-                            size: partition_size,
-                            identifier,
-                        })
-                    }
+                    Ok(gpt_partition) => Ok(GptFileEntry::Partition {
+                        name_index: sub_file_entry_index,
+                        partition: gpt_partition,
+                    }),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
@@ -175,14 +159,9 @@ mod tests {
     ) -> Result<GptFileEntry, ErrorTrace> {
         let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
 
-        let partition_size: u64 = gpt_partition.get_partition_size();
-        let identifier: Uuid = gpt_partition.get_identifier().clone();
-
         Ok(GptFileEntry::Partition {
             name_index: 0,
-            partition: Arc::new(RwLock::new(gpt_partition)),
-            size: partition_size,
-            identifier,
+            partition: gpt_partition,
         })
     }
 

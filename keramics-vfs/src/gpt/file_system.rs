@@ -11,12 +11,11 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
 use keramics_formats::gpt::{GptPartition, GptVolumeSystem};
-use keramics_types::Uuid;
 
 use crate::location::VfsLocation;
 use crate::path::VfsPath;
@@ -106,14 +105,9 @@ impl GptFileSystem {
                             return Err(error);
                         }
                     };
-                let partition_size: u64 = gpt_partition.get_partition_size();
-                let identifier: Uuid = gpt_partition.get_identifier().clone();
-
                 Ok(Some(GptFileEntry::Partition {
                     name_index: partition_index,
-                    partition: Arc::new(RwLock::new(gpt_partition)),
-                    size: partition_size,
-                    identifier,
+                    partition: gpt_partition,
                 }))
             }
             None => {

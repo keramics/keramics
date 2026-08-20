@@ -22,7 +22,7 @@ use clap_num::maybe_hex;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_encodings::CharacterEncoding;
 use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
-use keramics_formats::{FormatIdentifier, FormatScanner, Path};
+use keramics_formats::{FormatIdentifier, FormatScanner, Path, RangeStream};
 use keramics_vfs::{VfsCredential, VfsCredentialStore};
 
 #[cfg(feature = "debug-trace")]
@@ -31,7 +31,6 @@ use keramics_core::mediator::Mediator;
 mod enums;
 mod formatters;
 mod info;
-mod range_stream;
 mod storage_media_image;
 
 use crate::enums::{DisplayPathType, EncodingType};
@@ -40,7 +39,6 @@ use crate::info::{
     MbrInfo, NtfsInfo, PdiInfo, QcowInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo,
     VhdxInfo, VmdkInfo,
 };
-use crate::range_stream::RangeDataStream;
 use crate::storage_media_image::StorageMediaImage;
 
 #[derive(Parser)]
@@ -204,18 +202,14 @@ impl InfoTool {
             }
         };
         if self.offset == 0 {
-            return Ok(data_stream);
+            Ok(data_stream)
+        } else {
+            Ok(Arc::new(RwLock::new(RangeStream::new(
+                &data_stream,
+                self.offset,
+                0,
+            ))))
         }
-        let mut range_data_stream: RangeDataStream = RangeDataStream::new(data_stream, self.offset);
-
-        match range_data_stream.open() {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open range data stream");
-                return Err(error);
-            }
-        }
-        Ok(Arc::new(RwLock::new(range_data_stream)))
     }
 
     /// Checks the scan results.

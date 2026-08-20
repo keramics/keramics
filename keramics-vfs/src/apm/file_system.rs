@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
@@ -105,12 +105,9 @@ impl ApmFileSystem {
                             return Err(error);
                         }
                     };
-                let partition_size: u64 = apm_partition.get_partition_size();
-
                 Ok(Some(ApmFileEntry::Partition {
                     name_index: partition_index,
-                    partition: Arc::new(RwLock::new(apm_partition)),
-                    size: partition_size,
+                    partition: apm_partition,
                 }))
             }
             None => {

@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
@@ -27,10 +27,7 @@ pub enum MbrFileEntry {
         name_index: usize,
 
         /// Partition.
-        partition: Arc<RwLock<MbrPartition>>,
-
-        /// Size.
-        size: u64,
+        partition: MbrPartition,
     },
 
     /// Root file entry.
@@ -44,7 +41,7 @@ impl MbrFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
-            MbrFileEntry::Partition { partition, .. } => Ok(Some(partition.clone())),
+            MbrFileEntry::Partition { partition, .. } => Ok(Some(partition.get_data_stream())),
             MbrFileEntry::Root { .. } => Ok(None),
         }
     }
@@ -70,10 +67,7 @@ impl MbrFileEntry {
     /// Retrieves the partition number.
     pub fn get_partition_number(&self) -> Option<usize> {
         match self {
-            MbrFileEntry::Partition { partition, .. } => match partition.read() {
-                Ok(mbr_partition) => Some(mbr_partition.get_partition_index() + 1),
-                Err(_) => None,
-            },
+            MbrFileEntry::Partition { partition, .. } => Some(partition.get_partition_index() + 1),
             MbrFileEntry::Root { .. } => None,
         }
     }
@@ -81,7 +75,7 @@ impl MbrFileEntry {
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
-            MbrFileEntry::Partition { size, .. } => *size,
+            MbrFileEntry::Partition { partition, .. } => partition.get_partition_size(),
             MbrFileEntry::Root { .. } => 0,
         }
     }
@@ -105,15 +99,10 @@ impl MbrFileEntry {
             }
             MbrFileEntry::Root { volume_system } => {
                 match volume_system.get_partition_by_index(sub_file_entry_index) {
-                    Ok(mbr_partition) => {
-                        let partition_size: u64 = mbr_partition.size;
-
-                        Ok(MbrFileEntry::Partition {
-                            name_index: sub_file_entry_index,
-                            partition: Arc::new(RwLock::new(mbr_partition)),
-                            size: partition_size,
-                        })
-                    }
+                    Ok(mbr_partition) => Ok(MbrFileEntry::Partition {
+                        name_index: sub_file_entry_index,
+                        partition: mbr_partition,
+                    }),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
@@ -161,12 +150,9 @@ mod tests {
     ) -> Result<MbrFileEntry, ErrorTrace> {
         let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
 
-        let partition_size: u64 = mbr_partition.size;
-
         Ok(MbrFileEntry::Partition {
             name_index: 0,
-            partition: Arc::new(RwLock::new(mbr_partition)),
-            size: partition_size,
+            partition: mbr_partition,
         })
     }
 

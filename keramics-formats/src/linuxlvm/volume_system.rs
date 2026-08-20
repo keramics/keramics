@@ -125,11 +125,12 @@ impl LinuxLvmVolumeSystem {
                     )));
                 }
             };
-        let mut volume: LinuxLvmVolume = LinuxLvmVolume::new(&self.file_resolver);
-
-        volume.open(&self.data_file_descriptors, volume_index, logical_volume);
-
-        Ok(volume)
+        Ok(LinuxLvmVolume::new(
+            &self.file_resolver,
+            &self.data_file_descriptors,
+            volume_index,
+            logical_volume,
+        ))
     }
 
     /// Opens a storage media image.

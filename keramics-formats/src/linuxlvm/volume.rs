@@ -49,15 +49,20 @@ pub struct LinuxLvmVolume {
 
 impl LinuxLvmVolume {
     /// Creates a new volume.
-    pub(super) fn new(file_resolver: &FileResolverReference) -> Self {
+    pub(super) fn new(
+        file_resolver: &FileResolverReference,
+        data_file_descriptors: &[LinuxLvmDataFileDescriptor],
+        index: usize,
+        logical_volume: &LinuxLvmLogicalVolume,
+    ) -> Self {
         Self {
             file_resolver: file_resolver.clone(),
-            data_file_descriptors: Vec::new(),
-            index: 0,
-            identifier: String::new(),
-            name: String::new(),
-            extents: Vec::new(),
-            size: 0,
+            data_file_descriptors: data_file_descriptors.to_vec(),
+            index,
+            identifier: logical_volume.identifier.clone(),
+            name: logical_volume.name.clone(),
+            extents: logical_volume.extents.clone(),
+            size: logical_volume.size,
         }
     }
 
@@ -93,19 +98,54 @@ impl LinuxLvmVolume {
     pub fn get_volume_size(&self) -> u64 {
         self.size
     }
+}
 
-    /// Opens a volume.
-    pub(super) fn open(
-        &mut self,
-        data_file_descriptors: &Vec<LinuxLvmDataFileDescriptor>,
-        index: usize,
-        logical_volume: &LinuxLvmLogicalVolume,
-    ) {
-        self.index = index;
-        self.data_file_descriptors = data_file_descriptors.to_vec();
-        self.identifier = logical_volume.identifier.clone();
-        self.name = logical_volume.name.clone();
-        self.extents = logical_volume.extents.clone();
-        self.size = logical_volume.size;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::path::PathBuf;
+
+    use keramics_core::ErrorTrace;
+
+    use crate::os_file_resolver::open_os_file_resolver;
+    use crate::path_component::PathComponent;
+    use crate::tests::get_test_data_path;
+
+    fn get_volume() -> Result<LinuxLvmVolume, ErrorTrace> {
+        let path_string: String = get_test_data_path("linuxlvm/lvm2.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+
+        let data_file_descriptors: [LinuxLvmDataFileDescriptor; 1] =
+            [LinuxLvmDataFileDescriptor::new(
+                PathComponent::from("lvm2.raw"),
+                0,
+            )];
+
+        let mut logical_volume: LinuxLvmLogicalVolume = LinuxLvmLogicalVolume::new();
+        logical_volume.size = 4194304;
+
+        Ok(LinuxLvmVolume::new(
+            &file_resolver,
+            &data_file_descriptors,
+            512,
+            &logical_volume,
+        ))
+    }
+
+    // TODO: add tests for get_data_stream
+    // TODO: add tests for get_identifier
+    // TODO: add tests for get_name
+    // TODO: add tests for get_volume_index
+
+    #[test]
+    fn test_get_volume_size() -> Result<(), ErrorTrace> {
+        let volume: LinuxLvmVolume = get_volume()?;
+
+        let volume_size: u64 = volume.get_volume_size();
+        assert_eq!(volume_size, 4194304);
+
+        Ok(())
     }
 }

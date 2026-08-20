@@ -82,6 +82,7 @@ impl<T> BlockTreeNode<T> {
     }
 
     /// Retrieves a specific sub node.
+    #[allow(dead_code)]
     pub(super) fn get_sub_node(&self, index: usize) -> Option<&BlockTreeNode<T>> {
         match &self.elements {
             BlockTreeNodeElements::Branch(sub_nodes) => match sub_nodes.get(index) {
