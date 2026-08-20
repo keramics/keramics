@@ -1,8 +1,7 @@
 # Virtual Hard Disk (VHD) image format
 
-The Virtual Hard Disk (VHD) format is used by Microsoft vitualization products
-as one of its image formats. It is both used the store hard disk images and
-snapshots.
+The Virtual Hard Disk (VHD) format is used by Microsoft vitualization products as one of its image
+formats. It is both used the store hard disk images and snapshots.
 
 ## Overview
 
@@ -19,8 +18,8 @@ A fixed-size VHD image consists of:
 * data
 * file footer
 
-> Note that a fixed-size VHD image is equivalent to a raw storage media image
-> with an additional footer.
+> Note that a fixed-size VHD image is equivalent to a raw storage media image with an additional
+> footer.
 
 ### Dynamic-size (or sparse) hard disk image
 
@@ -54,15 +53,15 @@ The number of bytes per sector is 512.
 
 ### Undo disk image
 
-Virtual PC has a feature to create "Undo Disks". This undo disk feature stores
-a differential hard disk image in files named something similar like:
+Virtual PC has a feature to create "Undo Disks". This undo disk feature stores a differential hard
+disk image in files named something similar like:
 
 ```text
 VirtualPCUndo_<name>_0_0_hhmmssMMDDYYYY.vud
 ```
 
-Where the date and time seems to be stored in UTC and &lt;name&gt; represents the
-name of the parent image.
+Where the date and time seems to be stored in UTC and &lt;name&gt; represents the name of the
+parent image.
 
 ## File footer
 
@@ -156,11 +155,11 @@ The dynamic disk header is 1024 bytes in size and consists of:
 | 576 | 8 x 24 = 192 | | Array of parent locator entries. Only used by differential hard disk images |
 | 768 | 256 | 0 | Unknown (Reserved should contain 0-byte values) |
 
-The maximum number of block allocation table entries should match the maximum
-possible number of blocks in the disk.
+The maximum number of block allocation table entries should match the maximum possible number of
+blocks in the disk.
 
-> Note that the parent name can also contain a full path, e.g. in .avhd files.
-> The part segments are separated by the \ character.
+> Note that the parent name can also contain a full path, e.g. in .avhd files. The part segments
+are separated by the \ character.
 
 ### Parent locator entry
 
@@ -192,9 +191,9 @@ The parent locator entry is 24 bytes in size and consists of:
 
 The block allocation table is only used in dynamic and differential disk images.
 
-The block allocation table consists of 32-bit entries. An entry contains the
-sector number where the data block starts or is set to 0xffffffff (-1) if the
-block is sparse or stored in the parent disk image.
+The block allocation table consists of 32-bit entries. An entry contains the sector number where
+the data block starts or is set to 0xffffffff (-1) if the block is sparse or stored in the parent
+disk image.
 
 ```python
 if block_allocation_table_entry == 0xffffffff:
@@ -203,8 +202,8 @@ else:
     file_offset = (block_allocation_table_entry * 512 ) + sector_bitmap_size
 ```
 
-Unused block in a dynamic disk are sparse and should be filled with zero byte
-values. In a differential disk the block is stored in the parent disk image.
+Unused block in a dynamic disk are sparse and should be filled with zero byte values. In a
+differential disk the block is stored in the parent disk image.
 
 ## Data blocks
 
@@ -223,16 +222,15 @@ The size of the bitmap is rounded up to the next multitude of the sector size.
 
 ### Sector bitmap
 
-In dynamic disk images the sector bitmap indicates which sectors contain data
-(bit set to 1) or are sparse (bit set to 0).
+In dynamic disk images the sector bitmap indicates which sectors contain data (bit set to 1) or are
+sparse (bit set to 0).
 
-In differential disk images the sector bitmap indicates which sectors are stored
-within the image (bit set to 1) or in the parent (bit set to 0).
+In differential disk images the sector bitmap indicates which sectors are stored within the image
+(bit set to 1) or in the parent (bit set to 0).
 
 The bitmap is padded to a 512-byte sector boundary.
 
-The bitmap is stored on a per-byte basis with the MSB represents the first bit
-in the bitmap.
+The bitmap is stored on a per-byte basis with the MSB represents the first bit in the bitmap.
 
 ## References
 

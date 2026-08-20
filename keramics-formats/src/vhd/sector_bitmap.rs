@@ -63,10 +63,9 @@ impl VhdSectorBitmap {
         let mut range_bit_value: u8 = data[0] >> 7;
 
         for byte_value in data.iter() {
-            let mut bit_values: u8 = *byte_value;
-            for _ in (0..8).rev() {
-                let bit_value: u8 = bit_values & 0x01;
-                bit_values >>= 1;
+            let bit_values: u8 = *byte_value;
+            for bit_index in 0..8 {
+                let bit_value: u8 = bit_values >> (7 - bit_index);
 
                 if bit_value != range_bit_value {
                     self.ranges.push(VhdSectorBitmapRange::new(
@@ -142,8 +141,8 @@ mod tests {
         let mut test_struct = VhdSectorBitmap::new(32, 512);
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
-        assert_eq!(test_struct.ranges.len(), 4);
-        assert_eq!(test_struct.ranges[2].size, 32768);
+        assert_eq!(test_struct.ranges.len(), 130);
+        assert_eq!(test_struct.ranges[2].size, 512);
         assert_eq!(test_struct.ranges[2].is_set, true);
 
         Ok(())
