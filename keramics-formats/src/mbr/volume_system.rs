@@ -71,49 +71,24 @@ impl MbrVolumeSystem {
         &self,
         partition_index: usize,
     ) -> Result<MbrPartition, ErrorTrace> {
+        if self.bytes_per_sector == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported bytes per sector: 0"
+            ));
+        }
         match self.partition_entries.get(partition_index) {
-            Some(partition_entry) => {
-                let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        return Err(keramics_core::error_trace_new!("Missing data stream"));
-                    }
-                };
-                if self.bytes_per_sector == 0 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unsupported bytes per sector: 0"
-                    ));
-                }
-                let partition_offset: u64 =
-                    partition_entry.start_address_lba * (self.bytes_per_sector as u64);
-                let partition_size: u64 =
-                    (partition_entry.number_of_sectors as u64) * (self.bytes_per_sector as u64);
-
-                let mut partition: MbrPartition = MbrPartition::new(
-                    partition_entry.index,
-                    partition_offset,
-                    partition_size,
-                    partition_entry.partition_type,
-                    partition_entry.flags,
-                );
-                match partition.open(data_stream) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to open partition: {}", partition_index)
-                        );
-                        return Err(error);
-                    }
-                }
-                Ok(partition)
-            }
-            None => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "No partition with index: {}",
-                    partition_index
-                )));
-            }
+            Some(partition_entry) => match self.data_stream.as_ref() {
+                Some(data_stream) => Ok(MbrPartition::new(
+                    data_stream,
+                    self.bytes_per_sector,
+                    partition_entry,
+                )),
+                None => Err(keramics_core::error_trace_new!("Missing data stream")),
+            },
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No partition with index: {}",
+                partition_index
+            ))),
         }
     }
 

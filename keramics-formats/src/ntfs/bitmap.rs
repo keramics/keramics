@@ -109,7 +109,7 @@ impl NtfsBitmap {
                 "NtfsBitmapData",
                 0,
                 &bitmap_attribute.resident_data,
-                &bitmap_attribute.data_size
+                bitmap_attribute.data_size
             );
             match self.read_data(&bitmap_attribute.resident_data, &mut bitmap_offset) {
                 Ok(_) => {}

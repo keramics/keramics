@@ -105,7 +105,7 @@ impl LinuxLvmMetadata {
     }
 
     /// Parses a global property.
-    fn parse_global_property(&self, mut inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
+    fn parse_global_property(&self, inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
         _ = inner_pairs;
 
         // contents - string

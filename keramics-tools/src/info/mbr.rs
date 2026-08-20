@@ -21,74 +21,61 @@ use crate::formatters::ByteSize;
 use super::constants::*;
 
 /// Master Boot Record (MBR) partition information.
-struct MbrPartitionInfo {
-    /// The index of the corresponding partition table entry.
-    pub partition_index: usize,
-
-    /// The partition type.
-    pub partition_type: u8,
-
-    /// The offset of the partition relative to start of the volume system.
-    pub offset: u64,
-
-    /// The size of the partition.
-    pub size: u64,
-
-    /// The flags.
-    pub flags: u8,
+struct MbrPartitionInfo<'a> {
+    /// The partition.
+    partition: &'a MbrPartition,
 }
 
-impl MbrPartitionInfo {
+impl<'a> MbrPartitionInfo<'a> {
     /// Creates new partition information.
-    fn new() -> Self {
-        Self {
-            partition_index: 0,
-            partition_type: 0,
-            offset: 0,
-            size: 0,
-            flags: 0,
-        }
+    fn new(partition: &'a MbrPartition) -> Self {
+        Self { partition }
     }
 
     /// Retrieves the partition type as a string.
-    pub fn get_partition_type_string(&self) -> Option<&str> {
+    pub fn get_partition_type_string(&self, partition_type: &u8) -> Option<&str> {
         MBR_PARTITION_TYPES
-            .binary_search_by(|(key, _)| key.cmp(&self.partition_type))
+            .binary_search_by(|(key, _)| key.cmp(partition_type))
             .map_or_else(|_| None, |index| Some(MBR_PARTITION_TYPES[index].1))
     }
 }
 
-impl fmt::Display for MbrPartitionInfo {
+impl<'a> fmt::Display for MbrPartitionInfo<'a> {
     /// Formats partition information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(formatter, "Partition: {}", self.partition_index + 1)?;
+        writeln!(
+            formatter,
+            "Partition: {}",
+            self.partition.get_partition_index() + 1
+        )?;
 
-        match self.get_partition_type_string() {
+        let partition_type: u8 = self.partition.get_partition_type();
+        match self.get_partition_type_string(&partition_type) {
             Some(partition_type_string) => {
                 writeln!(
                     formatter,
                     "    Type\t\t\t\t\t: 0x{:02x} ({})",
-                    self.partition_type, partition_type_string
+                    partition_type, partition_type_string
                 )?;
             }
             None => {
-                writeln!(
-                    formatter,
-                    "    Type\t\t\t\t\t: 0x{:02x}",
-                    self.partition_type
-                )?;
+                writeln!(formatter, "    Type\t\t\t\t\t: 0x{:02x}", partition_type)?;
             }
         };
+        let partition_offset: u64 = self.partition.get_partition_offset();
         writeln!(
             formatter,
             "    Offset\t\t\t\t\t: {} (0x{:08x})",
-            self.offset, self.offset
+            partition_offset, partition_offset
         )?;
-        let byte_size: ByteSize = ByteSize::new(self.size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.partition.get_partition_size(), 1024);
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
-        writeln!(formatter, "    Flags\t\t\t\t\t: 0x{:02x}", self.flags)?;
-
+        writeln!(
+            formatter,
+            "    Flags\t\t\t\t\t: 0x{:02x}",
+            self.partition.get_flags()
+        )?;
         writeln!(formatter)
     }
 }
@@ -97,19 +84,6 @@ impl fmt::Display for MbrPartitionInfo {
 pub struct MbrInfo {}
 
 impl MbrInfo {
-    /// Retrieves the partition information.
-    fn get_partition_information(mbr_partition: &MbrPartition) -> MbrPartitionInfo {
-        let mut partition_information: MbrPartitionInfo = MbrPartitionInfo::new();
-
-        partition_information.partition_index = mbr_partition.get_partition_index();
-        partition_information.partition_type = mbr_partition.get_partition_type();
-        partition_information.offset = mbr_partition.offset;
-        partition_information.size = mbr_partition.size;
-        partition_information.flags = mbr_partition.get_flags();
-
-        partition_information
-    }
-
     /// Opens a volume system.
     pub fn open_volume_system(
         data_stream: &DataStreamReference,
@@ -174,7 +148,7 @@ impl MbrInfo {
                     return Err(error);
                 }
             };
-            let partition_info: MbrPartitionInfo = Self::get_partition_information(&mbr_partition);
+            let partition_info: MbrPartitionInfo = MbrPartitionInfo::new(&mbr_partition);
 
             print!("{}", partition_info);
         }
@@ -199,7 +173,7 @@ mod tests {
         let mbr_volume_system: MbrVolumeSystem = MbrInfo::open_volume_system(&data_stream)?;
 
         let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
-        let test_struct: MbrPartitionInfo = MbrInfo::get_partition_information(&mbr_partition);
+        let test_struct: MbrPartitionInfo = MbrPartitionInfo::new(&mbr_partition);
 
         let expected_string: &str = concat!(
             "Partition: 1\n",
@@ -211,23 +185,6 @@ mod tests {
         );
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_partition_information() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/mbr/mbr.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let mbr_volume_system: MbrVolumeSystem = MbrInfo::open_volume_system(&data_stream)?;
-
-        let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
-        let test_struct: MbrPartitionInfo = MbrInfo::get_partition_information(&mbr_partition);
-
-        assert_eq!(test_struct.partition_index, 0);
-        assert_eq!(test_struct.partition_type, 0x83);
-        assert_eq!(test_struct.offset, 512);
-        assert_eq!(test_struct.size, 1049088);
 
         Ok(())
     }

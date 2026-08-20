@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
@@ -27,10 +27,7 @@ pub enum ApmFileEntry {
         name_index: usize,
 
         /// Partition.
-        partition: Arc<RwLock<ApmPartition>>,
-
-        /// Size.
-        size: u64,
+        partition: ApmPartition,
     },
 
     /// Root file entry.
@@ -44,7 +41,7 @@ impl ApmFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
-            ApmFileEntry::Partition { partition, .. } => Ok(Some(partition.clone())),
+            ApmFileEntry::Partition { partition, .. } => Ok(Some(partition.get_data_stream())),
             ApmFileEntry::Root { .. } => Ok(None),
         }
     }
@@ -70,7 +67,7 @@ impl ApmFileEntry {
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
-            ApmFileEntry::Partition { size, .. } => *size,
+            ApmFileEntry::Partition { partition, .. } => partition.get_partition_size(),
             ApmFileEntry::Root { .. } => 0,
         }
     }
@@ -94,15 +91,10 @@ impl ApmFileEntry {
             }
             ApmFileEntry::Root { volume_system } => {
                 match volume_system.get_partition_by_index(sub_file_entry_index) {
-                    Ok(apm_partition) => {
-                        let partition_size: u64 = apm_partition.get_partition_size();
-
-                        Ok(ApmFileEntry::Partition {
-                            name_index: sub_file_entry_index,
-                            partition: Arc::new(RwLock::new(apm_partition)),
-                            size: partition_size,
-                        })
-                    }
+                    Ok(apm_partition) => Ok(ApmFileEntry::Partition {
+                        name_index: sub_file_entry_index,
+                        partition: apm_partition,
+                    }),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
@@ -150,12 +142,9 @@ mod tests {
     ) -> Result<ApmFileEntry, ErrorTrace> {
         let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
 
-        let partition_size: u64 = apm_partition.get_partition_size();
-
         Ok(ApmFileEntry::Partition {
             name_index: 0,
-            partition: Arc::new(RwLock::new(apm_partition)),
-            size: partition_size,
+            partition: apm_partition,
         })
     }
 

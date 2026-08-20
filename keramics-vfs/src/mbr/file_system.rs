@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
@@ -106,12 +106,9 @@ impl MbrFileSystem {
                             return Err(error);
                         }
                     };
-                let partition_size: u64 = mbr_partition.size;
-
                 Ok(Some(MbrFileEntry::Partition {
                     name_index: partition_index,
-                    partition: Arc::new(RwLock::new(mbr_partition)),
-                    size: partition_size,
+                    partition: mbr_partition,
                 }))
             }
             None => {

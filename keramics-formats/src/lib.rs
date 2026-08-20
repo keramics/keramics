@@ -24,6 +24,7 @@ mod macros;
 mod os_file_resolver;
 mod path;
 mod path_component;
+mod range_stream;
 mod scanner;
 mod traits;
 mod util;
@@ -67,6 +68,7 @@ pub use file_resolver::{FileResolver, FileResolverReference};
 pub use os_file_resolver::{OsFileResolver, open_os_file_resolver};
 pub use path::Path;
 pub use path_component::PathComponent;
+pub use range_stream::RangeStream;
 pub use scanner::FormatScanner;
 pub use traits::FileEntryIterator;
 

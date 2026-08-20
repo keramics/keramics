@@ -214,7 +214,7 @@ impl VhdFile {
                 self.parent_name = Some(dynamic_disk_header.parent_name);
             }
             let sectors_ber_block: u32 = dynamic_disk_header.block_size / 512;
-            self.sector_bitmap_size = (sectors_ber_block / 8).div_ceil(512) * 512;
+            self.sector_bitmap_size = (sectors_ber_block / 8).next_multiple_of(512);
 
             self.block_allocation_table = Some(VhdBlockAllocationTable::new(
                 dynamic_disk_header.block_table_offset,
@@ -369,12 +369,12 @@ impl VhdFile {
         let mut data_offset: usize = 0;
         let mut current_offset: u64 = offset;
 
-        let mut block_number: u64 = current_offset / (self.block_size as u64);
-
         while data_offset < read_size {
             if current_offset >= self.media_size {
                 break;
             }
+            let block_number: u64 = current_offset / (self.block_size as u64);
+
             let mut result: Result<Option<&VhdBlockRange>, ErrorTrace> =
                 self.block_tree.get_value(current_offset);
 
@@ -412,6 +412,7 @@ impl VhdFile {
             };
             let range_relative_offset: u64 = current_offset - block_range.media_offset;
             let range_remainder_size: u64 = block_range.size - range_relative_offset;
+
             let range_read_size: usize =
                 min(read_size - data_offset, range_remainder_size as usize);
             let data_end_offset: usize = data_offset + range_read_size;
@@ -452,8 +453,6 @@ impl VhdFile {
             }
             data_offset += range_read_count;
             current_offset += range_read_count as u64;
-
-            block_number += 1;
         }
         Ok(data_offset)
     }
@@ -506,13 +505,10 @@ impl DataStream for VhdFile {
             return Ok(0);
         }
         let remaining_media_size: u64 = self.media_size - self.current_offset;
-        let mut read_size: usize = buf.len();
+        let read_size: usize = min(buf.len(), remaining_media_size as usize);
 
-        if (read_size as u64) > remaining_media_size {
-            read_size = remaining_media_size as usize;
-        }
         let read_count: usize = if self.disk_type != VhdDiskType::Fixed {
-            match self.read_data_from_blocks(&mut buf[..read_size], self.current_offset) {
+            match self.read_data_from_blocks(&mut buf[0..read_size], self.current_offset) {
                 Ok(read_count) => read_count,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
@@ -520,18 +516,18 @@ impl DataStream for VhdFile {
                 }
             }
         } else {
-            let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-                Some(data_stream) => data_stream,
+            match self.data_stream.as_ref() {
+                Some(data_stream) => {
+                    keramics_core::data_stream_read_at_position!(
+                        data_stream,
+                        &mut buf[0..read_size],
+                        SeekFrom::Start(self.current_offset)
+                    )
+                }
                 None => {
                     return Err(keramics_core::error_trace_new!("Missing data stream"));
                 }
-            };
-            let read_count: usize = keramics_core::data_stream_read_at_position!(
-                data_stream,
-                &mut buf[0..read_size],
-                SeekFrom::Start(self.current_offset)
-            );
-            read_count
+            }
         };
         self.current_offset += read_count as u64;
 

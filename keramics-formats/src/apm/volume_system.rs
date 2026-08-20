@@ -60,27 +60,14 @@ impl ApmVolumeSystem {
         partition_index: usize,
     ) -> Result<ApmPartition, ErrorTrace> {
         match self.partition_map_entries.get(partition_index) {
-            Some(partition_entry) => {
-                let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        return Err(keramics_core::error_trace_new!("Missing data stream"));
-                    }
-                };
-                let mut partition: ApmPartition =
-                    ApmPartition::new(&data_stream, self.bytes_per_sector);
-
-                match partition.open(partition_entry) {
-                    Ok(_) => Ok(partition),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to open partition: {}", partition_index)
-                        );
-                        Err(error)
-                    }
-                }
-            }
+            Some(partition_entry) => match self.data_stream.as_ref() {
+                Some(data_stream) => Ok(ApmPartition::new(
+                    &data_stream,
+                    self.bytes_per_sector,
+                    partition_entry,
+                )),
+                None => Err(keramics_core::error_trace_new!("Missing data stream")),
+            },
             None => Err(keramics_core::error_trace_new!(format!(
                 "No partition with index: {}",
                 partition_index

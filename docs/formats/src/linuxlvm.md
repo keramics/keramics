@@ -80,8 +80,8 @@ The physical volume header (struct pv_header) is of variable size and consist of
 | ... | ... | | List of [metadata area descriptors](#data_area_descriptor), where the last descriptor in the list is terminator and consists of 0-byte values |
 
 The physical volume identifier can be used to uniquely identify a physical volume. The physical
-volume identifier is stored as `9LBcEB7PQTGIlLI0KxrtzrynjuSL983W` but is equivalent to its
-formatted variant `9LBcEB-7PQT-GIlL-I0Kx-rtzr-ynju-SL983W`, which is used in the metadata.
+volume identifier is stored as "9LBcEB7PQTGIlLI0KxrtzrynjuSL983W" but is equivalent to its
+formatted variant "9LBcEB-7PQT-GIlL-I0Kx-rtzr-ynju-SL983W", which is used in the metadata.
 
 > Note that the data area size can be 0.
 
@@ -318,7 +318,7 @@ pv# {
 
 Where:
 
-* # is a place holder for a the physical volume number e.g. pv0
+* \# is a place holder for a the physical volume number e.g. pv0
 * `<properties>` contains one of the following properties:
 
 | Value | Description |
@@ -398,7 +398,7 @@ segment# {
 
 Where:
 
-* # is a place holder for the segment number e.g. segment1
+* \# is a place holder for the segment number e.g. segment1
 * `<properties>` contains one of the following properties:
 
 | Value | Description |

@@ -30,12 +30,25 @@ use keramics_types::{Utf16String, Uuid, bytes_to_u64_le};
 )]
 /// GUID Partition Table (GPT) partition entry.
 pub struct GptPartitionEntry {
+    /// Index.
     pub index: usize,
+
+    /// Type identifier.
     pub type_identifier: Uuid,
+
+    /// Identifier.
     pub identifier: Uuid,
+
+    /// Start block number.
     pub start_block_number: u64,
+
+    /// End block number.
     pub end_block_number: u64,
+
+    /// Attribute flags.
     pub attribute_flags: u64,
+
+    /// Name.
     pub name: Utf16String,
 }
 
@@ -51,6 +64,11 @@ impl GptPartitionEntry {
             attribute_flags: 0,
             name: Utf16String::new(),
         }
+    }
+
+    /// Retrieves the number of blocks.
+    pub fn get_number_of_blocks(&self) -> u64 {
+        self.end_block_number - self.start_block_number + 1
     }
 
     /// Reads the partition entry from a buffer.
@@ -87,6 +105,8 @@ mod tests {
             0x00, 0x00,
         ];
     }
+
+    // TODO: add tests for get_number_of_blocks
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
