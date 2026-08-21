@@ -125,10 +125,10 @@ impl<'a> fmt::Display for ExtDateTimeInfo<'a> {
         match self.date_time {
             DateTime::NotSet => write!(formatter, "{}", NOT_SET_VALUE),
             DateTime::PosixTime32(posix_time32) => {
-                write!(formatter, "{}", posix_time32.to_iso8601_string())
+                write!(formatter, "{}+00:00", posix_time32.to_iso8601_string())
             }
             DateTime::PosixTime64Ns(posix_time64ns) => {
-                write!(formatter, "{}", posix_time64ns.to_iso8601_string())
+                write!(formatter, "{}+00:00", posix_time64ns.to_iso8601_string())
             }
             _ => write!(formatter, "Unsupported date time"),
         }
@@ -689,7 +689,7 @@ impl ExtInfo {
             match Self::open_file_system(data_stream, character_encoding) {
                 Ok(ext_file_system) => ext_file_system,
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                    keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                     return Err(error);
                 }
             };
@@ -735,7 +735,7 @@ impl ExtInfo {
             match Self::open_file_system(data_stream, character_encoding) {
                 Ok(ext_file_system) => ext_file_system,
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                    keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                     return Err(error);
                 }
             };
@@ -772,7 +772,7 @@ impl ExtInfo {
             match Self::open_file_system(data_stream, character_encoding) {
                 Ok(ext_file_system) => ext_file_system,
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                    keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                     return Err(error);
                 }
             };
@@ -793,7 +793,7 @@ impl ExtInfo {
             match Self::open_file_system(data_stream, character_encoding) {
                 Ok(ext_file_system) => ext_file_system,
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                    keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                     return Err(error);
                 }
             };
@@ -936,13 +936,13 @@ mod tests {
         let date_time: DateTime = DateTime::PosixTime32(PosixTime32::new(1281643591));
         let test_struct: ExtDateTimeInfo = ExtDateTimeInfo::new(&date_time);
         let string: String = test_struct.to_string();
-        assert_eq!(string, "2010-08-12T20:06:31");
+        assert_eq!(string, "2010-08-12T20:06:31+00:00");
 
         let date_time: DateTime =
             DateTime::PosixTime64Ns(PosixTime64Ns::new(1281643591, 987654321));
         let test_struct: ExtDateTimeInfo = ExtDateTimeInfo::new(&date_time);
         let string: String = test_struct.to_string();
-        assert_eq!(string, "2010-08-12T20:06:31.987654321");
+        assert_eq!(string, "2010-08-12T20:06:31.987654321+00:00");
 
         let date_time: DateTime = DateTime::NotSet;
         let test_struct: ExtDateTimeInfo = ExtDateTimeInfo::new(&date_time);
@@ -972,9 +972,9 @@ mod tests {
             "    Inode number\t\t\t\t: 14\n",
             "    Name\t\t\t\t\t: testfile1\n",
             "    Size\t\t\t\t\t: 9 bytes\n",
-            "    Modification time\t\t\t\t: 2025-01-04T07:58:01\n",
-            "    Access time\t\t\t\t\t: 2025-01-04T07:58:02\n",
-            "    Inode change time\t\t\t\t: 2025-01-04T07:58:01\n",
+            "    Modification time\t\t\t\t: 2025-01-04T07:58:01+00:00\n",
+            "    Access time\t\t\t\t\t: 2025-01-04T07:58:02+00:00\n",
+            "    Inode change time\t\t\t\t: 2025-01-04T07:58:01+00:00\n",
             "    Deletion time\t\t\t\t: Not set (0)\n",
             "    Number of links\t\t\t\t: 2\n",
             "    Owner identifier\t\t\t\t: 1000\n",
@@ -1017,8 +1017,8 @@ mod tests {
             "    Inode size\t\t\t\t\t: 128 bytes\n",
             "    Number of inodes\t\t\t\t: 1024\n",
             "    Last mount path\t\t\t\t: /mnt/keramics\n",
-            "    Last mount time\t\t\t\t: 2025-01-04T07:58:02\n",
-            "    Last written time\t\t\t\t: 2025-01-04T07:58:02\n",
+            "    Last mount time\t\t\t\t: 2025-01-04T07:58:02+00:00\n",
+            "    Last written time\t\t\t\t: 2025-01-04T07:58:02+00:00\n",
             "\n"
         );
         let string: String = test_struct.to_string();

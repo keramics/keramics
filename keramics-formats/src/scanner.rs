@@ -119,6 +119,16 @@ impl FormatScanner {
         ));
     }
 
+    /// Extensible File Allocation Table (exFAT) signatures.
+    pub fn add_exfat_signatures(&mut self) {
+        self.signature_scanner.add_signature(Signature::new(
+            "exfat1",
+            PatternType::BoundToStart,
+            3,
+            b"EXFAT   ",
+        ));
+    }
+
     /// Adds Extended File System (ext) signatures.
     pub fn add_ext_signatures(&mut self) {
         self.signature_scanner.add_signature(Signature::new(
@@ -407,6 +417,7 @@ impl FormatScanner {
                 "apm1" | "apm2" => FormatIdentifier::Apm,
                 "cdsaencr1" | "cdsaencr2" => FormatIdentifier::CdsaEncr,
                 "ewf1" | "ewf2" => FormatIdentifier::Ewf,
+                "exfat1" => FormatIdentifier::ExFat,
                 "ext1" => FormatIdentifier::Ext,
                 "fat1" | "fat2" | "fat3" => FormatIdentifier::Fat,
                 "gpt1" | "gpt2" | "gpt3" | "gpt4" => FormatIdentifier::Gpt,
@@ -446,6 +457,7 @@ mod tests {
         format_scanner.add_apm_signatures();
         format_scanner.add_cdsaencr_signatures();
         format_scanner.add_ewf_signatures();
+        format_scanner.add_exfat_signatures();
         format_scanner.add_ext_signatures();
         format_scanner.add_fat_signatures();
         format_scanner.add_gpt_signatures();
@@ -471,6 +483,7 @@ mod tests {
         format_scanner.add_cdsaencr_signatures();
         format_scanner.add_ewf_signatures();
         format_scanner.add_ext_signatures();
+        format_scanner.add_exfat_signatures();
         format_scanner.add_fat_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_hfs_signatures();

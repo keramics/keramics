@@ -51,7 +51,7 @@ The backup master directory block (MDB), is stored in the last 2 sectors of the 
 | Characteristics | Description |
 | --- | --- |
 | Byte order | big-endian |
-| Date and time values | [HFS timestamp](#hfs_timestamp) in local time |
+| Date and time values | [HFS timestamp](#hfs_timestamp), in local time |
 | Character strings | Narrow character (Single Byte Character (SBC) or Multi Byte Character (MBC)) stored using a system defined codepage |
 
 ### HFS+ and HFSX
@@ -74,7 +74,7 @@ The backup volume header, is stored in the last 1024 bytes of the volume.
 | Characteristics | Description |
 | --- | --- |
 | Byte order | big-endian |
-| Date and time values | [HFS timestamp](#hfs_timestamp) in UTC |
+| Date and time values | [HFS timestamp](#hfs_timestamp), in UTC |
 | Character strings | UTF-16 big-endian |
 
 ### Terminology

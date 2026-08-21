@@ -172,6 +172,8 @@ impl ApfsFileSystemTree {
                 return Err(error);
             }
         };
+        read_node_block_numbers.insert(block_number);
+
         if node.object_header.object_type == 0x00000000 {
             return Ok(());
         }
@@ -265,12 +267,7 @@ impl ApfsFileSystemTree {
 
             entry_index += 1;
         }
-        if is_branch {
-            if entry_index == 0 {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid entry index value out of bounds"
-                ));
-            }
+        if is_branch && entry_index > 0 {
             match self.get_attributes_by_identifier_from_sub_node(
                 data_stream,
                 object_map_tree,
@@ -429,6 +426,8 @@ impl ApfsFileSystemTree {
                 return Err(error);
             }
         };
+        read_node_block_numbers.insert(block_number);
+
         if node.object_header.object_type == 0x00000000 {
             return Ok(());
         }
@@ -522,12 +521,7 @@ impl ApfsFileSystemTree {
 
             entry_index += 1;
         }
-        if is_branch {
-            if entry_index == 0 {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid entry index value out of bounds"
-                ));
-            }
+        if is_branch && entry_index > 0 {
             match self.get_directory_entries_by_identifier_from_sub_node(
                 data_stream,
                 object_map_tree,
@@ -722,6 +716,8 @@ impl ApfsFileSystemTree {
                 return Err(error);
             }
         };
+        read_node_block_numbers.insert(block_number);
+
         if node.object_header.object_type == 0x00000000 {
             return Ok(None);
         }
@@ -844,12 +840,7 @@ impl ApfsFileSystemTree {
 
             entry_index += 1;
         }
-        if is_branch {
-            if entry_index == 0 {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid entry index value out of bounds"
-                ));
-            }
+        if is_branch && entry_index > 0 {
             match self.get_directory_entry_by_name_from_sub_node(
                 data_stream,
                 object_map_tree,
@@ -1012,6 +1003,8 @@ impl ApfsFileSystemTree {
                 return Err(error);
             }
         };
+        read_node_block_numbers.insert(block_number);
+
         if node.object_header.object_type == 0x00000000 {
             return Ok(());
         }
@@ -1094,12 +1087,7 @@ impl ApfsFileSystemTree {
 
             entry_index += 1;
         }
-        if is_branch {
-            if entry_index == 0 {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid entry index value out of bounds"
-                ));
-            }
+        if is_branch && entry_index > 0 {
             match self.get_extents_by_identifier_from_sub_node(
                 data_stream,
                 object_map_tree,
@@ -1347,6 +1335,8 @@ impl ApfsFileSystemTree {
                 return Err(error);
             }
         };
+        read_node_block_numbers.insert(block_number);
+
         if node.object_header.object_type == 0x00000000 {
             return Ok(None);
         }

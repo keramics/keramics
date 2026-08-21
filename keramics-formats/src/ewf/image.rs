@@ -15,8 +15,7 @@ use std::cmp::{Ordering, min};
 use std::collections::HashMap;
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
+use keramics_core::{DataStream, DataStreamReference, DebugTrace, ErrorTrace};
 use keramics_types::Uuid;
 
 use crate::fake_file_resolver::FakeFileResolver;
@@ -42,9 +41,6 @@ use super::volume::{EwfE01Volume, EwfS01Volume};
 
 /// Expert Witness Compression Format (EWF) image.
 pub struct EwfImage {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// File resolver.
     file_resolver: FileResolverReference,
 
@@ -55,7 +51,7 @@ pub struct EwfImage {
     name: String,
 
     /// Segment file naming schema.
-    naming_schema: EwfNamingSchema,
+    naming_schema: Option<EwfNamingSchema>,
 
     /// Segment file cache.
     segment_file_cache: LruCache<u16, EwfFile>,
@@ -107,11 +103,10 @@ impl EwfImage {
     /// Creates a new storage media image.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             file_resolver: FileResolverReference::new(Box::new(FakeFileResolver::new())),
             segment_set_identifier: Uuid::new(),
             name: String::new(),
-            naming_schema: EwfNamingSchema::E01UpperCase,
+            naming_schema: None,
             segment_file_cache: LruCache::new(16),
             number_of_chunks: 0,
             sectors_per_chunk: 0,
@@ -246,34 +241,34 @@ impl EwfImage {
     fn get_segment_file_name(
         name: &String,
         segment_number: u16,
-        naming_schema: &EwfNamingSchema,
+        naming_schema: Option<&EwfNamingSchema>,
     ) -> Result<String, ErrorTrace> {
-        let segment_extension: String =
-            match Self::get_segment_file_extension(segment_number, naming_schema) {
-                Ok(extension) => extension,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to determine segment file extension"
-                    );
-                    return Err(error);
-                }
-            };
-        Ok(format!("{}.{}", name, segment_extension))
+        match naming_schema {
+            Some(naming_schema) => {
+                let segment_extension: String =
+                    match Self::get_segment_file_extension(segment_number, naming_schema) {
+                        Ok(extension) => extension,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to determine segment file extension"
+                            );
+                            return Err(error);
+                        }
+                    };
+                Ok(format!("{}.{}", name, segment_extension))
+            }
+            None => Ok(name.clone()),
+        }
     }
 
     /// Determines the segment file naming schema.
     fn get_segment_file_naming_schema(
         file_name: &PathComponent,
-    ) -> Result<EwfNamingSchema, ErrorTrace> {
+    ) -> Result<Option<EwfNamingSchema>, ErrorTrace> {
         let extension: String = match file_name.extension() {
             Ok(Some(extension)) => extension.to_string(),
-            Ok(None) => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Missing extension in segment file: {}",
-                    file_name,
-                )));
-            }
+            Ok(None) => return Ok(None),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
@@ -285,20 +280,16 @@ impl EwfImage {
                 return Err(error);
             }
         };
-        match extension.as_str() {
-            "E01" => Ok(EwfNamingSchema::E01UpperCase),
-            "L01" => Ok(EwfNamingSchema::L01UpperCase),
-            "S01" => Ok(EwfNamingSchema::S01UpperCase),
-            "e01" => Ok(EwfNamingSchema::E01LowerCase),
-            "l01" => Ok(EwfNamingSchema::L01LowerCase),
-            "s01" => Ok(EwfNamingSchema::S01LowerCase),
-            _ => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported extension in segment file: {}",
-                    file_name,
-                )));
-            }
-        }
+        let naming_schema: EwfNamingSchema = match extension.as_str() {
+            "E01" => EwfNamingSchema::E01UpperCase,
+            "L01" => EwfNamingSchema::L01UpperCase,
+            "S01" => EwfNamingSchema::S01UpperCase,
+            "e01" => EwfNamingSchema::E01LowerCase,
+            "l01" => EwfNamingSchema::L01LowerCase,
+            "s01" => EwfNamingSchema::S01LowerCase,
+            _ => return Ok(None),
+        };
+        Ok(Some(naming_schema))
     }
 
     /// Retrieves the segment set identifier.
@@ -410,7 +401,7 @@ impl EwfImage {
                 let segment_file_name: String = match Self::get_segment_file_name(
                     &self.name,
                     block_range.segment_number,
-                    &self.naming_schema,
+                    self.naming_schema.as_ref(),
                 ) {
                     Ok(name) => name,
                     Err(mut error) => {
@@ -498,6 +489,9 @@ impl EwfImage {
 
                     data[data_offset..data_end_offset]
                         .copy_from_slice(&range_data[range_data_offset..range_data_end_offset]);
+                }
+                EwfBlockRangeType::Corrupt => {
+                    data[data_offset..data_end_offset].fill(0);
                 }
                 EwfBlockRangeType::InFile => {
                     let chunk_data_offset: u64 = block_range.data_offset + range_relative_offset;
@@ -803,7 +797,7 @@ impl EwfImage {
             let segment_file_name: String = match Self::get_segment_file_name(
                 &self.name,
                 segment_number,
-                &self.naming_schema,
+                self.naming_schema.as_ref(),
             ) {
                 Ok(name) => name,
                 Err(mut error) => {
@@ -946,28 +940,32 @@ impl EwfImage {
             let chunk_data_size: u32 = if chunk_data_offset < next_chunk_data_offset {
                 next_chunk_data_offset - chunk_data_offset
             } else if chunk_data_offset < next_table_entry.chunk_data_offset {
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
+                #[cfg(feature = "debug-trace")]
+                DebugTrace::static_scope(|debug_trace| {
+                    debug_trace.print(format!(
                         "EwfImage table entry: {} current offset: {} larger than next offset: {}",
                         table_entry_index, chunk_data_offset, next_chunk_data_offset
                     ));
-                }
+                });
                 next_table_entry.chunk_data_offset - chunk_data_offset
             } else {
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
+                #[cfg(feature = "debug-trace")]
+                DebugTrace::static_scope(|debug_trace| {
+                    debug_trace.print(format!(
                         "EwfImage table entry: {} current offset: {} larger than next offset: {}",
                         table_entry_index, chunk_data_offset, next_chunk_data_offset
                     ));
-                }
-                // TODO: handle corrupted table entry
-                todo!();
+                });
+                0
             };
-            let block_range_type: EwfBlockRangeType = if chunk_is_compressed {
-                EwfBlockRangeType::Compressed
-            } else {
-                EwfBlockRangeType::InFile
-            };
+            let block_range_type: EwfBlockRangeType =
+                if chunk_data_size == 0 || chunk_data_size > (i32::MAX as u32) {
+                    EwfBlockRangeType::Corrupt
+                } else if chunk_is_compressed {
+                    EwfBlockRangeType::Compressed
+                } else {
+                    EwfBlockRangeType::InFile
+                };
             let block_range: EwfBlockRange = EwfBlockRange::new(
                 safe_block_media_offset,
                 segment_file.segment_number,
@@ -979,16 +977,17 @@ impl EwfImage {
 
             safe_block_media_offset += self.chunk_size as u64;
 
-            // handle > 2 GiB segment file solution in EnCase 6.7 (chunk data offset overflow)
+            // Handle > 2 GiB segment file solution in EnCase 6.7 (chunk data offset overflow)
             if !chunk_data_offset_overflow
                 && chunk_data_offset + chunk_data_size > (i32::MAX as u32)
             {
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
+                #[cfg(feature = "debug-trace")]
+                DebugTrace::static_scope(|debug_trace| {
+                    debug_trace.print(format!(
                         "EwfImage table entry: {} chunk data offset overflow at: {}",
                         table_entry_index, chunk_data_offset
                     ));
-                }
+                });
                 chunk_data_offset_overflow = true;
             }
             table_entry = next_table_entry;
@@ -1284,8 +1283,11 @@ mod tests {
         let base_name: String = String::from("image");
 
         let name: String =
-            EwfImage::get_segment_file_name(&base_name, 1, &EwfNamingSchema::E01UpperCase)?;
+            EwfImage::get_segment_file_name(&base_name, 1, Some(&EwfNamingSchema::E01UpperCase))?;
         assert_eq!(name, "image.E01");
+
+        let name: String = EwfImage::get_segment_file_name(&base_name, 1, None)?;
+        assert_eq!(name, "image");
 
         Ok(())
     }
@@ -1293,30 +1295,34 @@ mod tests {
     #[test]
     fn test_get_segment_file_naming_schema() -> Result<(), ErrorTrace> {
         let file_name: PathComponent = PathComponent::from("image.E01");
-        let naming_schema: EwfNamingSchema = EwfImage::get_segment_file_naming_schema(&file_name)?;
-        assert_eq!(naming_schema, EwfNamingSchema::E01UpperCase);
+        let naming_schema: Option<EwfNamingSchema> =
+            EwfImage::get_segment_file_naming_schema(&file_name)?;
+        assert_eq!(naming_schema, Some(EwfNamingSchema::E01UpperCase));
 
         let file_name: PathComponent = PathComponent::from("image.e01");
-        let naming_schema: EwfNamingSchema = EwfImage::get_segment_file_naming_schema(&file_name)?;
-        assert_eq!(naming_schema, EwfNamingSchema::E01LowerCase);
+        let naming_schema: Option<EwfNamingSchema> =
+            EwfImage::get_segment_file_naming_schema(&file_name)?;
+        assert_eq!(naming_schema, Some(EwfNamingSchema::E01LowerCase));
 
         let file_name: PathComponent = PathComponent::from("image.S01");
-        let naming_schema: EwfNamingSchema = EwfImage::get_segment_file_naming_schema(&file_name)?;
-        assert_eq!(naming_schema, EwfNamingSchema::S01UpperCase);
+        let naming_schema: Option<EwfNamingSchema> =
+            EwfImage::get_segment_file_naming_schema(&file_name)?;
+        assert_eq!(naming_schema, Some(EwfNamingSchema::S01UpperCase));
 
         let file_name: PathComponent = PathComponent::from("image.s01");
-        let naming_schema: EwfNamingSchema = EwfImage::get_segment_file_naming_schema(&file_name)?;
-        assert_eq!(naming_schema, EwfNamingSchema::S01LowerCase);
+        let naming_schema: Option<EwfNamingSchema> =
+            EwfImage::get_segment_file_naming_schema(&file_name)?;
+        assert_eq!(naming_schema, Some(EwfNamingSchema::S01LowerCase));
 
         let file_name: PathComponent = PathComponent::from("image");
-        let result: Result<EwfNamingSchema, ErrorTrace> =
-            EwfImage::get_segment_file_naming_schema(&file_name);
-        assert!(result.is_err());
+        let naming_schema: Option<EwfNamingSchema> =
+            EwfImage::get_segment_file_naming_schema(&file_name)?;
+        assert_eq!(naming_schema, None);
 
         let file_name: PathComponent = PathComponent::from("image.raw");
-        let result: Result<EwfNamingSchema, ErrorTrace> =
-            EwfImage::get_segment_file_naming_schema(&file_name);
-        assert!(result.is_err());
+        let naming_schema: Option<EwfNamingSchema> =
+            EwfImage::get_segment_file_naming_schema(&file_name)?;
+        assert_eq!(naming_schema, None);
 
         Ok(())
     }

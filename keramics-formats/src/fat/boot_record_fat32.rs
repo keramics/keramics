@@ -47,7 +47,7 @@ use super::constants::*;
         field(name = "drive_number", data_type = "u8"),
         field(name = "unknown2", data_type = "u8"),
         field(name = "extended_boot_signature", data_type = "u8"),
-        field(name = "volume_serial_number", data_type = "u32"),
+        field(name = "volume_serial_number", data_type = "u32", format = "hex"),
         field(name = "volume_label", data_type = "ByteString<11>"),
         field(name = "file_system_hint", data_type = "ByteString<8>"),
         field(name = "bootcode", data_type = "[u8; 420]", format = "hex"),
@@ -113,6 +113,13 @@ impl Fat32BootRecord {
         }
         boot_record.number_of_sectors = bytes_to_u32_le!(data, 32);
         boot_record.allocation_table_size = bytes_to_u32_le!(data, 36);
+
+        if boot_record.allocation_table_size == 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported allocation table size 32-bit: {}",
+                boot_record.allocation_table_size
+            )));
+        }
         boot_record.root_directory_cluster_block_number = bytes_to_u32_le!(data, 44);
 
         if boot_record.root_directory_cluster_block_number < 2 {
@@ -197,6 +204,7 @@ mod tests {
         assert_eq!(test_struct.number_of_allocation_tables, 2);
         assert_eq!(test_struct.number_of_sectors, 131072);
         assert_eq!(test_struct.allocation_table_size, 1009);
+        assert_eq!(test_struct.root_directory_cluster_block_number, 2);
         assert_eq!(test_struct.volume_serial_number, 0x56fcfdf8);
         assert_eq!(test_struct.volume_label, ByteString::from("FAT32_TEST"));
 

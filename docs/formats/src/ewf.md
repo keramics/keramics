@@ -1097,8 +1097,8 @@ section are:
 * Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and
   SMART (EWF-S01)
 
-> Note that the offsets within the section header are 8 bytes (64 bits) of
-> size while the offsets in the table entry array are 4 bytes (32 bits) in size.
+> Note that the offsets within the section header are 8 bytes (64 bits) of size while the offsets
+> in the table entry array are 4 bytes (32 bits) in size.
 
 In the next paragraphs the various versions of the table section are described.
 

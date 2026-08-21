@@ -110,6 +110,8 @@ impl HfsCatalogFile {
                 return Err(error);
             }
         };
+        read_node_numbers.insert(node_number);
+
         let is_branch: bool = match &node.node_type {
             HfsBtreeNodeType::HeaderNode | HfsBtreeNodeType::IndexNode => true,
             HfsBtreeNodeType::LeafNode => false,
@@ -152,98 +154,101 @@ impl HfsCatalogFile {
                     return Err(error);
                 }
             }
-            if key.parent_identifier > parent_identifier {
-                break;
-            }
-            if !is_branch {
-                if key.parent_identifier == parent_identifier {
-                    let mut data_offset: usize = key.size as usize;
-
-                    if self.btree_file.format == HfsFormat::Hfs {
-                        let alignment_padding: usize = calculate_alignment_padding(data_offset, 2);
-
-                        if alignment_padding > 0 {
-                            // TODO: debug print alignment padding.
-                            data_offset += alignment_padding;
-                        }
-                    }
-                    if data_offset + 2 > record_data.len() {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Invalid data size of record: {} value out of bounds",
-                            record_index
-                        )));
-                    }
-                    let record_type: u16 = bytes_to_u16_be!(record_data, data_offset);
-
-                    let process_record: bool = match record_type {
-                        0x0001 | 0x0002 => self.btree_file.format != HfsFormat::Hfs,
-                        0x0100 | 0x0200 => self.btree_file.format == HfsFormat::Hfs,
-                        _ => false,
-                    };
-                    if process_record {
-                        let name: HfsString = match key.read_name(
-                            &self.btree_file.format,
-                            &self.encoding,
-                            record_data,
-                        ) {
-                            Ok(name) => name,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    format!("Unable to read name of key: {}", record_index)
-                                );
-                                return Err(error);
-                            }
-                        };
-                        match self.read_directory_entry(&key, record_data) {
-                            Ok(directory_entry) => {
-                                directory_entries.insert(name, directory_entry);
-                            }
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    format!("Unable to read directory entry: {}", record_index)
-                                );
-                                return Err(error);
-                            }
-                        }
-                    }
+            if key.size >= 4 {
+                if key.parent_identifier > parent_identifier {
+                    break;
                 }
-            } else if record_index > 0 {
-                if key.parent_identifier == parent_identifier {
-                    let data_offset: usize = last_key.size as usize;
+                if !is_branch {
+                    if key.parent_identifier == parent_identifier {
+                        let mut data_offset: usize = key.size as usize;
 
-                    if data_offset + 4 > last_record_data.len() {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Invalid data size of record: {} value out of bounds",
-                            record_index
-                        )));
+                        if self.btree_file.format == HfsFormat::Hfs {
+                            let alignment_padding: usize =
+                                calculate_alignment_padding(data_offset, 2);
+
+                            if alignment_padding > 0 {
+                                // TODO: debug print alignment padding.
+                                data_offset += alignment_padding;
+                            }
+                        }
+                        if data_offset + 2 > record_data.len() {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Invalid data size of record: {} value out of bounds",
+                                record_index
+                            )));
+                        }
+                        let record_type: u16 = bytes_to_u16_be!(record_data, data_offset);
+
+                        let process_record: bool = match record_type {
+                            0x0001 | 0x0002 => self.btree_file.format != HfsFormat::Hfs,
+                            0x0100 | 0x0200 => self.btree_file.format == HfsFormat::Hfs,
+                            _ => false,
+                        };
+                        if process_record {
+                            let name: HfsString = match key.read_name(
+                                &self.btree_file.format,
+                                &self.encoding,
+                                record_data,
+                            ) {
+                                Ok(name) => name,
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        format!("Unable to read name of key: {}", record_index)
+                                    );
+                                    return Err(error);
+                                }
+                            };
+                            match self.read_directory_entry(&key, record_data) {
+                                Ok(directory_entry) => {
+                                    directory_entries.insert(name, directory_entry);
+                                }
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        format!("Unable to read directory entry: {}", record_index)
+                                    );
+                                    return Err(error);
+                                }
+                            }
+                        }
                     }
-                    keramics_core::debug_trace_data!(
-                        format!("HfsCatalogBranchNodeValue: {}", record_index),
-                        node.get_record_offset_by_index(record_index - 1),
-                        &last_record_data[data_offset..data_offset + 4],
-                        4
-                    );
-                    let sub_node_number: u32 = bytes_to_u32_be!(last_record_data, data_offset);
+                } else if record_index > 0 {
+                    if key.parent_identifier == parent_identifier {
+                        let data_offset: usize = last_key.size as usize;
 
-                    match self.get_directory_entries_by_identifier_from_node(
-                        data_stream,
-                        sub_node_number,
-                        parent_identifier,
-                        directory_entries,
-                        read_node_numbers,
-                    ) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to retrieve directory entries from node: {}",
-                                    sub_node_number
-                                )
-                            );
-                            return Err(error);
+                        if data_offset + 4 > last_record_data.len() {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Invalid data size of record: {} value out of bounds",
+                                record_index
+                            )));
+                        }
+                        keramics_core::debug_trace_data!(
+                            format!("HfsCatalogBranchNodeValue: {}", record_index),
+                            node.get_record_offset_by_index(record_index - 1),
+                            &last_record_data[data_offset..data_offset + 4],
+                            4
+                        );
+                        let sub_node_number: u32 = bytes_to_u32_be!(last_record_data, data_offset);
+
+                        match self.get_directory_entries_by_identifier_from_node(
+                            data_stream,
+                            sub_node_number,
+                            parent_identifier,
+                            directory_entries,
+                            read_node_numbers,
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable to retrieve directory entries from node: {}",
+                                        sub_node_number
+                                    )
+                                );
+                                return Err(error);
+                            }
                         }
                     }
                 }
@@ -253,12 +258,7 @@ impl HfsCatalogFile {
 
             record_index += 1;
         }
-        if is_branch {
-            if record_index == 0 {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid record index value out of bounds"
-                ));
-            }
+        if is_branch && record_index > 0 {
             let data_offset: usize = last_key.size as usize;
 
             if data_offset + 4 > last_record_data.len() {
@@ -442,6 +442,8 @@ impl HfsCatalogFile {
                 return Err(error);
             }
         };
+        read_node_numbers.insert(node_number);
+
         let is_branch: bool = match &node.node_type {
             HfsBtreeNodeType::HeaderNode | HfsBtreeNodeType::IndexNode => true,
             HfsBtreeNodeType::LeafNode => false,
@@ -484,42 +486,47 @@ impl HfsCatalogFile {
                     return Err(error);
                 }
             }
-            if key.parent_identifier > thread_record.parent_identifier {
-                break;
-            }
-            if key.parent_identifier == thread_record.parent_identifier {
-                let process_record: bool = if is_branch {
-                    true
-                } else if key.size == 0 {
-                    false
-                } else {
-                    let mut data_offset: usize = key.size as usize;
+            if key.size >= 4 {
+                if key.parent_identifier > thread_record.parent_identifier {
+                    break;
+                }
+                if key.parent_identifier == thread_record.parent_identifier {
+                    let process_record: bool = if is_branch {
+                        true
+                    } else if key.size == 0 {
+                        false
+                    } else {
+                        let mut data_offset: usize = key.size as usize;
 
-                    if self.btree_file.format == HfsFormat::Hfs {
-                        let alignment_padding: usize = calculate_alignment_padding(data_offset, 2);
+                        if self.btree_file.format == HfsFormat::Hfs {
+                            let alignment_padding: usize =
+                                calculate_alignment_padding(data_offset, 2);
 
-                        if alignment_padding > 0 {
-                            // TODO: debug print alignment padding.
-                            data_offset += alignment_padding;
+                            if alignment_padding > 0 {
+                                // TODO: debug print alignment padding.
+                                data_offset += alignment_padding;
+                            }
                         }
-                    }
-                    if data_offset + 2 > record_data.len() {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Invalid data size of record: {} value out of bounds",
-                            record_index
-                        )));
-                    }
-                    let record_type: u16 = bytes_to_u16_be!(record_data, data_offset);
+                        if data_offset + 2 > record_data.len() {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Invalid data size of record: {} value out of bounds",
+                                record_index
+                            )));
+                        }
+                        let record_type: u16 = bytes_to_u16_be!(record_data, data_offset);
 
-                    match record_type {
-                        0x0001 | 0x0002 => self.btree_file.format != HfsFormat::Hfs,
-                        0x0100 | 0x0200 => self.btree_file.format == HfsFormat::Hfs,
-                        _ => false,
-                    }
-                };
-                if process_record {
-                    let name: HfsString =
-                        match key.read_name(&self.btree_file.format, &self.encoding, record_data) {
+                        match record_type {
+                            0x0001 | 0x0002 => self.btree_file.format != HfsFormat::Hfs,
+                            0x0100 | 0x0200 => self.btree_file.format == HfsFormat::Hfs,
+                            _ => false,
+                        }
+                    };
+                    if process_record {
+                        let name: HfsString = match key.read_name(
+                            &self.btree_file.format,
+                            &self.encoding,
+                            record_data,
+                        ) {
                             Ok(name) => name,
                             Err(mut error) => {
                                 keramics_core::error_trace_add_frame!(
@@ -529,8 +536,9 @@ impl HfsCatalogFile {
                                 return Err(error);
                             }
                         };
-                    let result: Ordering =
-                        if self.btree_file.key_comparion_method == HfsKeyComparisonMethod::Binary {
+                        let result: Ordering = if self.btree_file.key_comparion_method
+                            == HfsKeyComparisonMethod::Binary
+                        {
                             name.cmp(&thread_record.name)
                         } else {
                             let case_folded_name: HfsString =
@@ -549,31 +557,35 @@ impl HfsCatalogFile {
                                 };
                             case_folded_name.cmp(&thread_record.name)
                         };
-                    if result == Ordering::Greater {
-                        break;
-                    }
-                    if result == Ordering::Equal {
-                        if is_branch {
-                            last_key = key;
-                            last_record_data = record_data;
-
-                            record_index += 1;
-
+                        if result == Ordering::Greater {
                             break;
-                        } else {
-                            match self.read_directory_entry(&key, record_data) {
-                                Ok(mut directory_entry) => {
-                                    if !name.is_empty() {
-                                        directory_entry.name = Some(name);
+                        }
+                        if result == Ordering::Equal {
+                            if is_branch {
+                                last_key = key;
+                                last_record_data = record_data;
+
+                                record_index += 1;
+
+                                break;
+                            } else {
+                                match self.read_directory_entry(&key, record_data) {
+                                    Ok(mut directory_entry) => {
+                                        if !name.is_empty() {
+                                            directory_entry.name = Some(name);
+                                        }
+                                        return Ok(Some(directory_entry));
                                     }
-                                    return Ok(Some(directory_entry));
-                                }
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        format!("Unable to read directory entry: {}", record_index)
-                                    );
-                                    return Err(error);
+                                    Err(mut error) => {
+                                        keramics_core::error_trace_add_frame!(
+                                            error,
+                                            format!(
+                                                "Unable to read directory entry: {}",
+                                                record_index
+                                            )
+                                        );
+                                        return Err(error);
+                                    }
                                 }
                             }
                         }
@@ -585,12 +597,7 @@ impl HfsCatalogFile {
 
             record_index += 1;
         }
-        if is_branch {
-            if record_index == 0 {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid record index value out of bounds"
-                ));
-            }
+        if is_branch && record_index > 0 {
             let data_offset: usize = last_key.size as usize;
 
             if data_offset + 4 > last_record_data.len() {
@@ -683,6 +690,8 @@ impl HfsCatalogFile {
                 return Err(error);
             }
         };
+        read_node_numbers.insert(node_number);
+
         let is_branch: bool = match &node.node_type {
             HfsBtreeNodeType::HeaderNode | HfsBtreeNodeType::IndexNode => true,
             HfsBtreeNodeType::LeafNode => false,
@@ -725,7 +734,7 @@ impl HfsCatalogFile {
                     return Err(error);
                 }
             }
-            if key.size > 0 {
+            if key.size >= 4 {
                 if key.parent_identifier > identifier {
                     break;
                 }
@@ -755,12 +764,7 @@ impl HfsCatalogFile {
 
             record_index += 1;
         }
-        if is_branch {
-            if record_index == 0 {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid record index value out of bounds"
-                ));
-            }
+        if is_branch && record_index > 0 {
             let data_offset: usize = last_key.size as usize;
 
             if data_offset + 4 > last_record_data.len() {

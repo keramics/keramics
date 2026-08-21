@@ -95,6 +95,11 @@ impl FatFileSystem {
         }
     }
 
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u16 {
+        self.bytes_per_sector
+    }
+
     /// Retrieves the format.
     pub fn get_format(&self) -> &FatFormat {
         &self.format
@@ -108,7 +113,7 @@ impl FatFileSystem {
         }
     }
 
-    /// Retrieves the file entry for a specific identifier (inode number).
+    /// Retrieves the file entry for a specific identifier (directory entry offset).
     pub fn get_file_entry_by_identifier(
         &self,
         file_entry_identifier: u32,
@@ -160,7 +165,6 @@ impl FatFileSystem {
                 return Err(error);
             }
         };
-        // TODO: cache file entries.
         for path_component in path.components[1..].iter() {
             file_entry = match file_entry.get_sub_file_entry_by_name(path_component) {
                 Ok(Some(file_entry)) => file_entry,
@@ -227,7 +231,7 @@ impl FatFileSystem {
         Ok(())
     }
 
-    /// Reads a directory entry for a specific identifier.
+    /// Reads a directory entry for a specific identifier (directory entry offset).
     fn read_directory_entry_by_identifier(
         &self,
         data_stream: &DataStreamReference,
@@ -259,21 +263,18 @@ impl FatFileSystem {
                 file_entry_identifier, file_entry_identifier
             )));
         }
-        let mut directory_entry_offset: u64 = (file_entry_identifier as u64) - 32;
-
-        let cluster_block_number: u32 = if directory_entry_offset < self.first_cluster_offset {
-            0
-        } else {
-            (2 + ((file_entry_identifier as u64) - self.first_cluster_offset)
-                / (self.cluster_block_size as u64)) as u32
-        };
         let first_directory_entry_offset: u64 =
-            if directory_entry_offset < self.first_cluster_offset {
+            if (file_entry_identifier as u64) < self.first_cluster_offset {
                 self.root_directory_offset
             } else {
+                let cluster_block_number: u32 =
+                    (2 + ((file_entry_identifier as u64) - self.first_cluster_offset)
+                        / (self.cluster_block_size as u64)) as u32;
+
                 self.first_cluster_offset
                     + (((cluster_block_number - 2) as u64) * (self.cluster_block_size as u64))
             };
+        let mut directory_entry_offset: u64 = (file_entry_identifier as u64) - 32;
         let mut last_vfat_sequence_number: u8 = 0;
         let mut long_name_entries: Vec<FatLongNameDirectoryEntry> = Vec::new();
         let mut last_entry: bool = false;
@@ -333,7 +334,7 @@ impl FatFileSystem {
             directory_entry_offset -= 32;
         }
         if !last_entry {
-            // TODO: determine previous cluster block.
+            // TODO: add support to scan previous cluster block.
         }
         let mut directory_entry: FatDirectoryEntry =
             FatDirectoryEntry::new(file_entry_identifier, short_name_entry);
@@ -433,7 +434,7 @@ impl FatFileSystem {
 
         if self.root_directory_size > 0 {
             match directory_entries.read_at_position(
-                &data_stream,
+                data_stream,
                 self.root_directory_size,
                 SeekFrom::Start(self.root_directory_offset as u64),
             ) {
@@ -451,7 +452,7 @@ impl FatFileSystem {
             }
         } else {
             match directory_entries.read_at_cluster_block(
-                &data_stream,
+                data_stream,
                 &block_allocation_table,
                 self.root_directory_cluster_block_number,
             ) {
@@ -497,6 +498,16 @@ mod tests {
     }
 
     #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let file_system: FatFileSystem = get_file_system()?;
+
+        let bytes_per_sector: u16 = file_system.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_volume_label() -> Result<(), ErrorTrace> {
         let file_system: FatFileSystem = get_file_system()?;
 
@@ -505,7 +516,7 @@ mod tests {
             volume_label,
             Some(ByteString {
                 encoding: CharacterEncoding::Ascii,
-                elements: vec![b'F', b'A', b'T', b'1', b'2', b'_', b'T', b'E', b'S', b'T']
+                elements: b"FAT12_TEST".to_vec(),
             })
             .as_ref()
         );
@@ -603,7 +614,6 @@ mod tests {
             file_system.volume_label,
             Some(ByteString::from("FAT12_TEST"))
         );
-
         Ok(())
     }
 
@@ -625,7 +635,6 @@ mod tests {
             file_system.volume_label,
             Some(ByteString::from("FAT12_TEST"))
         );
-
         Ok(())
     }
 

@@ -20,6 +20,7 @@ pub enum FormatIdentifier {
     Apm,
     CdsaEncr,
     Ewf,
+    ExFat,
     Ext,
     Fat,
     Gpt,
@@ -67,6 +68,7 @@ impl fmt::Display for FormatIdentifier {
             FormatIdentifier::Apm => "apm",
             FormatIdentifier::CdsaEncr => "cdsaencr",
             FormatIdentifier::Ewf => "ewf",
+            FormatIdentifier::ExFat => "exfat",
             FormatIdentifier::Ext => "ext",
             FormatIdentifier::Fat => "fat",
             FormatIdentifier::Gpt => "gpt",
@@ -110,6 +112,10 @@ mod tests {
         let format_identifier: FormatIdentifier = FormatIdentifier::Ewf;
         let string: String = format_identifier.to_string();
         assert_eq!(string, "ewf");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::ExFat;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "exfat");
 
         let format_identifier: FormatIdentifier = FormatIdentifier::Ext;
         let string: String = format_identifier.to_string();

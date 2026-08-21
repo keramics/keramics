@@ -39,7 +39,7 @@ use super::constants::*;
         field(name = "drive_number", data_type = "u8"),
         field(name = "unknown1", data_type = "u8"),
         field(name = "extended_boot_signature", data_type = "u8"),
-        field(name = "volume_serial_number", data_type = "u32"),
+        field(name = "volume_serial_number", data_type = "u32", format = "hex"),
         field(name = "volume_label", data_type = "ByteString<11>"),
         field(name = "file_system_hint", data_type = "ByteString<8>"),
         field(name = "bootcode", data_type = "[u8; 448]", format = "hex"),

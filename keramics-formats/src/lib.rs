@@ -57,6 +57,7 @@ pub mod mbr;
 pub mod apfs;
 
 // File system formats
+pub mod exfat;
 pub mod ext;
 pub mod fat;
 pub mod hfs;

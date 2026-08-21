@@ -30,10 +30,17 @@ path = "src/image_tool.rs"
 name = "keramicsinfo"
 path = "src/info_tool.rs"
 
+[[bin]]
+name = "keramicsutil"
+path = "src/util_tool.rs"
+install = false
+
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 clap-num = { version = "1.2.0" }
 indicatif = { version = "0.18" }
+keramics-checksums = { version = "0.0.1", path = "../keramics-checksums" }
+keramics-compression = { version = "0.0.1", path = "../keramics-compression" }
 keramics-core = { version = "0.0.1", path = "../keramics-core" }
 keramics-datetime = { version = "0.0.1", path = "../keramics-datetime" }
 keramics-encodings = { version = "0.0.1", path = "../keramics-encodings" }

@@ -1918,6 +1918,9 @@ extents. A sparse file extent has a physical block number of 0.
 The file content data and size are stored in the compressed data header of a "com.apple.decmpfs"
 [extended attribute](#extended_attribute).
 
+> Note it is currently assumed that the file entry either must not have a data fork or it the data
+> fork must be of size 0.
+
 Also see: [Apple File System Compression (decmpfs)](decmpfs.md).
 
 ### Compressed data extended attribute with resource fork
@@ -1927,6 +1930,9 @@ The file content size is stored in the compressed data header of a "com.apple.de
 
 The file content data is stored in a "com.apple.ResourceFork"
 [extended attribute](#extended_attribute).
+
+> Note it is currently assumed that the file entry either must not have a data fork or it the data
+> fork must be of size 0.
 
 Also see: [Apple File System Compression (decmpfs)](decmpfs.md).
 

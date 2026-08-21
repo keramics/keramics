@@ -11,14 +11,13 @@
  * under the License.
  */
 
-use std::cmp::min;
+use std::cmp::{Ordering, min};
 use std::collections::HashSet;
 use std::io::SeekFrom;
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
-use crate::block_tree::BlockTree;
 use crate::traits::BlockReader;
 
 use super::block_allocation_table::FatBlockAllocationTable;
@@ -32,8 +31,8 @@ pub struct FatBlockReader {
     /// Block size.
     block_size: u32,
 
-    /// Block tree.
-    block_tree: BlockTree<FatBlockRange>,
+    /// Block ranges.
+    block_ranges: Vec<FatBlockRange>,
 
     /// The size.
     size: u64,
@@ -45,7 +44,7 @@ impl FatBlockReader {
         Self {
             data_stream: data_stream.clone(),
             block_size,
-            block_tree: BlockTree::<FatBlockRange>::new(0, 0, 0),
+            block_ranges: Vec::new(),
             size: size as u64,
         }
     }
@@ -59,13 +58,12 @@ impl FatBlockReader {
         let largest_cluster_block_number: u32 =
             block_allocation_table.get_largest_cluster_block_number();
 
-        let block_tree_data_size: u64 =
-            self.size.div_ceil(self.block_size as u64) * (self.block_size as u64);
-        self.block_tree =
-            BlockTree::<FatBlockRange>::new(block_tree_data_size, 0, self.block_size as u64);
-
         let mut read_cluster_block_numbers: HashSet<u32> = HashSet::new();
         let mut logical_offset: u64 = 0;
+        let mut next_physical_offset: u64 = 0;
+        let mut range_logical_offset: u64 = 0;
+        let mut range_physical_offset: u64 = 0;
+        let mut range_size: u32 = 0;
 
         while cluster_block_number >= 2 && cluster_block_number < largest_cluster_block_number {
             if read_cluster_block_numbers.contains(&cluster_block_number) {
@@ -78,24 +76,22 @@ impl FatBlockReader {
                 + (((cluster_block_number - 2) as u64)
                     * (block_allocation_table.cluster_block_size as u64));
 
-            // TODO: merge successive blocks into a single range
-            let block_range: FatBlockRange =
-                FatBlockRange::new(logical_offset, physical_offset, self.block_size);
+            if logical_offset == 0 {
+                range_physical_offset = physical_offset;
+            } else if physical_offset != next_physical_offset {
+                let block_range: FatBlockRange =
+                    FatBlockRange::new(range_logical_offset, range_physical_offset, range_size);
 
-            match self
-                .block_tree
-                .insert_value(logical_offset, self.block_size as u64, block_range)
-            {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to insert block range into block tree"
-                    );
-                    return Err(error);
-                }
+                self.block_ranges.push(block_range);
+
+                range_logical_offset = logical_offset;
+                range_physical_offset = physical_offset;
+                range_size = 0;
             }
             logical_offset += self.block_size as u64;
+            range_size += self.block_size;
+
+            next_physical_offset = physical_offset + (self.block_size as u64);
 
             read_cluster_block_numbers.insert(cluster_block_number);
 
@@ -111,6 +107,11 @@ impl FatBlockReader {
                     }
                 };
         }
+        let block_range: FatBlockRange =
+            FatBlockRange::new(range_logical_offset, range_physical_offset, range_size);
+
+        self.block_ranges.push(block_range);
+
         Ok(())
     }
 }
@@ -127,27 +128,36 @@ impl BlockReader for FatBlockReader {
         let mut data_offset: usize = 0;
         let mut current_offset: u64 = offset;
 
+        let mut range_index: usize = match self.block_ranges.binary_search_by(|block_range| {
+            let range_end_offset: u64 = block_range.logical_offset + (block_range.size as u64);
+
+            if current_offset >= range_end_offset {
+                Ordering::Less
+            } else if current_offset < block_range.logical_offset {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        }) {
+            Ok(range_index) => range_index,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing block range for offset: {} (0x{:08x})",
+                    current_offset, current_offset
+                )));
+            }
+        };
         while data_offset < read_size {
             if current_offset >= self.size {
                 break;
             }
-            let block_range: &FatBlockRange = match self.block_tree.get_value(current_offset) {
-                Ok(Some(value)) => value,
-                Ok(None) => {
+            let block_range: &FatBlockRange = match self.block_ranges.get(range_index) {
+                Some(block_range) => block_range,
+                None => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Missing block range for offset: {} (0x{:08x})",
-                        current_offset, current_offset
+                        "Unable to retrieve block range: {} for offset: {} (0x{:08x})",
+                        range_index, current_offset, current_offset,
                     )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve block range for offset: {} (0x{:08x})",
-                            current_offset, current_offset
-                        )
-                    );
-                    return Err(error);
                 }
             };
             let range_relative_offset: u64 = current_offset - block_range.logical_offset;
@@ -165,6 +175,7 @@ impl BlockReader for FatBlockReader {
             );
             data_offset = data_end_offset;
             current_offset += range_read_size as u64;
+            range_index += 1;
         }
         Ok(data_offset)
     }

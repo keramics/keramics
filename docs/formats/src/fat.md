@@ -1,7 +1,7 @@
 # File Allocation Table (FAT) file system format
 
-The File Allocation Table (FAT) is widely used a file sytem and is
-the default file system for DOS and Windows.
+The File Allocation Table (FAT) is widely used a file sytem and is the default file system for DOS
+and Windows.
 
 There are multiple known variants or derivatives of FAT, such as:
 
@@ -22,15 +22,14 @@ A FAT file system consists of:
 * Root directory data for FAT-12 and FAT-16
 * File and directory data
 
-> Note that FAT-32 stores the root directory as part of the file and directory
-> data.
+> Note that FAT-32 stores the root directory as part of the file and directory data.
 
 ### Characteristics
 
 | Characteristics | Description |
 | --- | --- |
 | Byte order | little-endian |
-| Date and time values | FAT date and time |
+| Date and time values | FAT date and time, in local time |
 | Character strings | A narrow character Single Byte Character (SBC) ASCII string |
 
 ### Terminology
@@ -41,8 +40,7 @@ A FAT file system consists of:
 
 ### Determing the FAT format version
 
-To distinguish between FAT-12, FAT-16 and FAT-32, compute the number of clusters
-in the data area:
+To distinguish between FAT-12, FAT-16 and FAT-32, compute the number of clusters in the data area:
 
 ```python
 data_area_size = total_number_of_sectors - (number_of_reserved_sectors + (
@@ -78,7 +76,7 @@ The FAT-12 and FAT-16 boot record is at least 512 bytes in size and consists of:
 | 17 | 2 | | Number of root directory entries |
 | 19 | 2 | | Total number of sectors (16-bit) |
 | 21 | 1 | | [Media descriptor](#media_descriptors) |
-| 22 | 2 | | Cluster block allocation table size (16-bit) in number of sectors |
+| 22 | 2 | | Cluster block allocation table size (16-bit), in number of sectors |
 | 24 | 2 | | Number of sectors per track |
 | 26 | 2 | | Number of heads |
 | 28 | 4 | | Number of hidden sectors |
@@ -98,8 +96,8 @@ The FAT-12 and FAT-16 boot record is at least 512 bytes in size and consists of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-> Note that the sector signature must be set at offset 512 but in addition can
-> be set in the last 2 bytes of the sector.
+> Note that the sector signature must be set at offset 512 but in addition can be set in the last 2
+> bytes of the sector.
 
 ### FAT-32 boot record
 
@@ -118,13 +116,13 @@ The FAT-32 boot record is at least 512 bytes in size and consists of:
 | 17 | 2 | 0 | Number of root directory entries, which must be 0 for FAT-32 |
 | 19 | 2 | 0 | Total number of sectors (16-bit), which must be 0 for FAT-32 |
 | 21 | 1 | | [Media descriptor](#media_descriptors) |
-| 22 | 2 | 0 | Cluster block allocation table size (16-bit) in number of sectors, which must be 0 for FAT-32 |
+| 22 | 2 | 0 | Cluster block allocation table size (16-bit), in number of sectors, which must be 0 for FAT-32 |
 | 24 | 2 | | Number of sectors per track |
 | 26 | 2 | | Number of heads |
 | 28 | 4 | | Number of hidden sectors |
 | 32 | 4 | | Total number of sectors (32-bit) |
-| 36 | 4 | | Cluster block allocation table size (32-bit) in number of sectors, which must be non 0 for FAT-32 |
-| 40 | 2 | | Extended flags |
+| 36 | 4 | | Cluster block allocation table size (32-bit), in number of sectors, which must be non 0 for FAT-32 |
+| 40 | 2 | | [Extended flags](#fat32_extended_flags) |
 | 42 | 1 | 0 | Format revision minor number |
 | 43 | 1 | 0 | Format revision major number |
 | 44 | 4 | | Root directory start cluster |
@@ -146,8 +144,17 @@ The FAT-32 boot record is at least 512 bytes in size and consists of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-> Note that the sector signature must be set at offset 512 but in addition can
-> be set in the last 2 bytes of the sector.
+> Note that the sector signature must be set at offset 512 but in addition can be set in the last 2
+> bytes of the sector.
+
+#### FAT-32 extended flags {#fat32_extended_flags}
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0.0 | 4 bits | | Active FAT, where 0 represents the first FAT |
+| 0.4 | 3 bits | | Unknown (reserved) |
+| 0.7 | 1 bit | | FAT mirroring disabled |
+| 1.0 | 8 bits | | Unknown (reserved) |
 
 ### OEM names
 
@@ -187,8 +194,7 @@ A cluster block allocation table consists of:
 
 ### FAT 12 cluster block allocation table entry
 
-A FAT 12 cluster block allocation table entry is 12 bits in size and consists
-of:
+A FAT 12 cluster block allocation table entry is 12 bits in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -207,8 +213,7 @@ Where the data cluster number has the following meanings:
 
 ### FAT 16 cluster block allocation table entry
 
-A FAT 16 cluster block allocation table entry is 16 bits in size and consists
-of:
+A FAT 16 cluster block allocation table entry is 16 bits in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -227,8 +232,7 @@ Where the data cluster number has the following meanings:
 
 ### FAT 32 cluster block allocation table entry
 
-A FAT 32 cluster block allocation table entry is 32 bits in size and consists
-of:
+A FAT 32 cluster block allocation table entry is 32 bits in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -396,16 +400,16 @@ Valid FAT short file name characters are:
 
 ### VFAT long file name entry
 
-VFAT long file names entries are stored in directory entries. Multiple VFAT
-long file name entries can be used to store a single long file name, where
-the highest (last) sequence number is stored first. A maximum of 20 VFAT long
-file name entries can be used to store a long file name of 255 UCS-2 characters.
+VFAT long file names entries are stored in directory entries. Multiple VFAT long file name entries
+can be used to store a single long file name, where the highest (last) sequence number is stored
+first. A maximum of 20 VFAT long file name entries can be used to store a long file name of 255
+UCS-2 characters.
 
-VFAT long file names are stored using UCS-2 little-endian, which allows for
-unpaired Unicode surrogates such as "U+d800" and "U+dc00"
+VFAT long file names are stored using UCS-2 little-endian, which allows for unpaired Unicode
+surrogates such as "U+d800" and "U+dc00"
 
-VFAT long file name entries are stored before the directory entry containing
-the short file name and additional file entry information.
+VFAT long file name entries are stored before the directory entry containing the short file name
+and additional file entry information.
 
 A VFAT long file name entry is 32 bytes in size and consists of:
 
@@ -420,8 +424,8 @@ A VFAT long file name entry is 32 bytes in size and consists of:
 | 26 | 2 | 0 | Unknown (first cluster) |
 | 28 | 4 | | Third name segment string, which contains 2 UCS-2 string characters |
 
-> Note that unused characters in the VFAT long file segment strings after the
-> end-of-string character (0x0000) are padded with 0xffff.
+> Note that unused characters in the VFAT long file segment strings after the end-of-string
+> character (0x0000) are padded with 0xffff.
 
 #### VFAT long file name sequence number
 

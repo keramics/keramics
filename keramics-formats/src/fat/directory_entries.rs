@@ -252,19 +252,15 @@ impl FatDirectoryEntries {
                 + (((cluster_block_number - 2) as u64)
                     * (block_allocation_table.cluster_block_size as u64));
 
-            keramics_core::data_stream_read_exact_at_position!(
-                data_stream,
-                &mut data,
-                SeekFrom::Start(offset)
-            );
-            keramics_core::debug_trace_data!(
+            keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
                 format!(
                     "FatDirectoryEntries cluster block: {}",
                     cluster_block_number
                 ),
-                offset,
-                &data,
-                block_allocation_table.cluster_block_size
+                data_stream,
+                &mut data,
+                block_allocation_table.cluster_block_size,
+                SeekFrom::Start(offset)
             );
             match self.read_data(
                 &data,
@@ -479,14 +475,13 @@ mod tests {
             &mut last_vfat_sequence_number,
             &mut long_name_entries,
         )?;
-
         assert_eq!(test_struct.entries.len(), 2);
 
         assert_eq!(
             test_struct.volume_label,
             Some(ByteString {
                 encoding: CharacterEncoding::Ascii,
-                elements: vec![b'F', b'A', b'T', b'1', b'2', b'_', b'T', b'E', b'S', b'T'],
+                elements: b"FAT12_TEST".to_vec(),
             })
         );
         Ok(())
@@ -517,7 +512,7 @@ mod tests {
             test_struct.volume_label,
             Some(ByteString {
                 encoding: CharacterEncoding::Ascii,
-                elements: vec![b'F', b'A', b'T', b'1', b'2', b'_', b'T', b'E', b'S', b'T'],
+                elements: b"FAT12_TEST".to_vec(),
             })
         );
         Ok(())

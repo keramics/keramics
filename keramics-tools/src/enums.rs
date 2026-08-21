@@ -13,6 +13,53 @@
 
 use clap::ValueEnum;
 
+/// Checksum types.
+#[derive(Clone, Debug, ValueEnum)]
+pub enum ChecksumType {
+    /// Adler-32
+    Adler32,
+
+    /// CRC-32
+    Crc32,
+
+    /// Fletcher-64
+    Fletcher64,
+}
+
+/// Compression types.
+#[derive(Clone, Debug, ValueEnum)]
+pub enum CompressionType {
+    /// ADC
+    Adc,
+
+    /// Bzip2
+    Bzip2,
+
+    /// Deflate
+    Deflate,
+
+    /// LZFSE
+    Lzfse,
+
+    /// LZNT1
+    Lznt1,
+
+    /// LZVN
+    Lzvn,
+
+    /// LZX
+    Lzx,
+
+    /// LZXPRESS (LZ77 + DIRECT2)
+    Lzxpress,
+
+    /// LZXPRESS Huffman
+    LzxpressHuffman,
+
+    /// Zlib
+    Zlib,
+}
+
 /// Digest hash types.
 #[derive(Clone, ValueEnum)]
 pub enum DigestHashType {
@@ -169,6 +216,9 @@ pub enum FormatType {
 
     /// Expert Witness Compression Format (EWF)
     Ewf,
+
+    /// Extensible File Allocation Table (exFAT)
+    ExFat,
 
     /// Extended File System (ext)
     Ext,

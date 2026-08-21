@@ -156,7 +156,6 @@ impl NtfsFileSystem {
                 return Err(error);
             }
         };
-        // TODO: cache file entries.
         for path_component in path.components[1..].iter() {
             file_entry = match file_entry.get_sub_file_entry_by_name(path_component) {
                 Ok(Some(file_entry)) => file_entry,

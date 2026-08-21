@@ -33,3 +33,6 @@ version = "0.0.1"
 inherits = "release"
 debug = true
 force-frame-pointers = true
+
+[profile.staging]
+inherits = "release"
