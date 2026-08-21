@@ -64,7 +64,7 @@ pub struct EwfImage {
     number_of_chunks: u32,
 
     /// Sectors per chunk.
-    pub sectors_per_chunk: u32,
+    sectors_per_chunk: u32,
 
     /// Bytes per sector.
     bytes_per_sector: u32,
@@ -82,25 +82,25 @@ pub struct EwfImage {
     chunk_cache: LruCache<u64, Vec<u8>>,
 
     /// Error granularity.
-    pub error_granularity: u32,
+    error_granularity: u32,
 
     /// Media type.
-    pub media_type: EwfMediaType,
+    media_type: EwfMediaType,
 
     /// The current offset.
     current_offset: u64,
 
     /// Media size.
-    pub media_size: u64,
+    media_size: u64,
 
     /// Values stored in header and header2 sections.
     header_values: HashMap<EwfHeaderValueType, EwfHeaderValue>,
 
     /// MD5 hash.
-    pub md5_hash: [u8; 16],
+    md5_hash: [u8; 16],
 
     /// SHA1 hash.
-    pub sha1_hash: [u8; 20],
+    sha1_hash: [u8; 20],
 }
 
 impl EwfImage {
@@ -135,14 +135,39 @@ impl EwfImage {
         self.bytes_per_sector
     }
 
+    /// Retrieves the error granularity (in number of sectors).
+    pub fn get_error_granularity(&self) -> u32 {
+        self.error_granularity
+    }
+
     /// Retrieves a header value.
     pub fn get_header_value(&self, value_type: &EwfHeaderValueType) -> Option<&EwfHeaderValue> {
         self.header_values.get(value_type)
     }
 
+    /// Retrieves the MD51 hash.
+    pub fn get_md5_hash(&self) -> &[u8] {
+        &self.md5_hash
+    }
+
+    /// Retrieves the media size.
+    pub fn get_media_size(&self) -> u64 {
+        self.media_size
+    }
+
+    /// Retrieves the mediat type.
+    pub fn get_media_type(&self) -> &EwfMediaType {
+        &self.media_type
+    }
+
     /// Retrieves the number of sectors.
     pub fn get_number_of_sectors(&self) -> u32 {
         self.number_of_sectors
+    }
+
+    /// Retrieves the number of sectors per chunk.
+    pub fn get_sectors_per_chunk(&self) -> u32 {
+        self.sectors_per_chunk
     }
 
     /// Determines the segment file extension for a given segment number.
@@ -279,6 +304,11 @@ impl EwfImage {
     /// Retrieves the segment set identifier.
     pub fn get_segment_set_identifier(&self) -> &Uuid {
         &self.segment_set_identifier
+    }
+
+    /// Retrieves the SHA-1 hash.
+    pub fn get_sha1_hash(&self) -> &[u8] {
+        &self.sha1_hash
     }
 
     /// Opens a storage media image.

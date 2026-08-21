@@ -94,7 +94,7 @@ impl EwfFileSystem {
                     return Ok(None);
                 }
                 let media_size: u64 = match self.image.read() {
-                    Ok(ewf_image) => ewf_image.media_size,
+                    Ok(ewf_image) => ewf_image.get_media_size(),
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             "Unable to obtain read lock on EWF image",

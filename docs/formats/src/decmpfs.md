@@ -48,7 +48,7 @@ The decmpfs header is 16 bytes in size and consists of:
 | | | |
 | 3 | kAFSCTypeZLibChunk | zlib compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
 | 4 | kAFSCTypeZLib | 64k chunked zlib compressed resource fork, where the compressed data is stored in the resource fork |
-| 5 | | Unknown (sparse compressed extended attribute data), where the uncompressed data contains 0-byte values. According to [copyfile.c](https://github.com/apple-oss-distributions/copyfile/blob/main/copyfile.c) specifies de-dup within the generation store. |
+| 5 | | Unknown (sparse compressed extended attribute data), where the uncompressed data contains 0-byte values. According to [copyfile.c](https://github.com/apple-oss-distributions/copyfile/blob/main/copyfile.c) specifies de-dup within the generation store |
 | 6 | | Unknown (unused) |
 | <td colspan="3">*Added in Mac OS X Yosemite (10.10)*</td> |
 | 7 | kAFSCTypeLZVNChunk | LZVN compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |

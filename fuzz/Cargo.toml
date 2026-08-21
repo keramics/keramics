@@ -87,6 +87,13 @@ doc = false
 required-features = ["fuzzing"]
 
 [[bin]]
+name = "linuxlvm"
+path = "fuzz_targets/linuxlvm.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
 name = "lzfse"
 path = "fuzz_targets/lzfse.rs"
 test = false

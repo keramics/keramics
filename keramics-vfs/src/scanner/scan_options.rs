@@ -83,13 +83,14 @@ impl VfsScanOptions {
         }
     }
 
-    /// Parses the partitions scan option from a string.
-    pub fn parse_partitions(&mut self, string: &str) -> Result<(), ErrorTrace> {
+    /// Parses a scan options group.
+    fn parse_scan_options_group(&mut self, string: &str) -> Result<VfsScanOptionGroup, ErrorTrace> {
+        let mut scan_options_group: VfsScanOptionGroup = VfsScanOptionGroup::NotSet;
         let lowercase_string: String = string.to_lowercase();
 
         match lowercase_string.as_str() {
             "" => {}
-            "all" => self.partitions = VfsScanOptionGroup::All,
+            "all" => scan_options_group = VfsScanOptionGroup::All,
             "none" => {
                 return Err(keramics_core::error_trace_new!("Unsupported option: none"));
             }
@@ -130,9 +131,33 @@ impl VfsScanOptions {
                     };
                     elements.push(element);
                 }
-                self.partitions = VfsScanOptionGroup::Elements(elements);
+                scan_options_group = VfsScanOptionGroup::Elements(elements);
             }
         }
+        Ok(scan_options_group)
+    }
+
+    /// Parses the partitions scan option from a string.
+    pub fn parse_partitions(&mut self, string: &str) -> Result<(), ErrorTrace> {
+        self.partitions = match self.parse_scan_options_group(string) {
+            Ok(list) => list,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to parse partitions");
+                return Err(error);
+            }
+        };
+        Ok(())
+    }
+
+    /// Parses the volumes scan option from a string.
+    pub fn parse_volumes(&mut self, string: &str) -> Result<(), ErrorTrace> {
+        self.volumes = match self.parse_scan_options_group(string) {
+            Ok(list) => list,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to parse volumes");
+                return Err(error);
+            }
+        };
         Ok(())
     }
 }
@@ -142,17 +167,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_partitions() -> Result<(), ErrorTrace> {
+    fn test_parse_scan_options_group() -> Result<(), ErrorTrace> {
         let mut test_struct: VfsScanOptions = VfsScanOptions::new();
 
-        assert_eq!(test_struct.partitions, VfsScanOptionGroup::NotSet);
+        let scan_options_group: VfsScanOptionGroup = test_struct.parse_scan_options_group("all")?;
+        assert_eq!(scan_options_group, VfsScanOptionGroup::All);
 
-        test_struct.parse_partitions("all")?;
-        assert_eq!(test_struct.partitions, VfsScanOptionGroup::All);
-
-        test_struct.parse_partitions("1,5")?;
+        let scan_options_group: VfsScanOptionGroup = test_struct.parse_scan_options_group("1,5")?;
         assert_eq!(
-            test_struct.partitions,
+            scan_options_group,
             VfsScanOptionGroup::Elements(vec![
                 VfsScanOptionElement::Index(1),
                 VfsScanOptionElement::Index(5)
@@ -180,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    fn test_partitions_contains_index() -> Result<(), ErrorTrace> {
+    fn test_parse_partitions() -> Result<(), ErrorTrace> {
         let mut test_struct: VfsScanOptions = VfsScanOptions::new();
 
         test_struct.parse_partitions("all")?;
@@ -190,6 +213,21 @@ mod tests {
         test_struct.parse_partitions("1..5")?;
         assert_eq!(test_struct.partitions.contains_index(1), true);
         assert_eq!(test_struct.partitions.contains_index(9), false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_volumes() -> Result<(), ErrorTrace> {
+        let mut test_struct: VfsScanOptions = VfsScanOptions::new();
+
+        test_struct.parse_volumes("all")?;
+        assert_eq!(test_struct.volumes.contains_index(1), true);
+        assert_eq!(test_struct.volumes.contains_index(9), true);
+
+        test_struct.parse_volumes("1..5")?;
+        assert_eq!(test_struct.volumes.contains_index(1), true);
+        assert_eq!(test_struct.volumes.contains_index(9), false);
 
         Ok(())
     }

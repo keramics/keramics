@@ -83,9 +83,8 @@ The physical volume identifier can be used to uniquely identify a physical volum
 volume identifier is stored as "9LBcEB7PQTGIlLI0KxrtzrynjuSL983W" but is equivalent to its
 formatted variant "9LBcEB-7PQT-GIlL-I0Kx-rtzr-ynju-SL983W", which is used in the metadata.
 
-> Note that the data area size can be 0.
-
-TODO: Determine if this represent all remaining available space?
+> Note that the data area size can be 0, and currently it is assumed that this represents all
+> remaining (available) space within the physical volume.
 
 #### Data area descriptor {#data_area_descriptor}
 
@@ -235,8 +234,8 @@ A property is defined as:
 <identifier> = <value>
 ```
 
-Where `<identifier>` contains a unique name of the property and `<value>` is one of the following
-types:
+Where &lt;identifier&gt; contains a unique name of the property and &lt;value&gt; is one of the
+following types:
 
 | Value | Description |
 | --- | --- |
@@ -264,8 +263,8 @@ The volume group main section is defined as:
 
 Where:
 
-* `<name>` contains the name of the volume group;
-* `<properties>` contains one of the following properties.
+* &lt;name&gt; contains the [name](#names) of the volume group;
+* &lt;properties&gt; contains one of the following properties.
 
 TODO: Note can there be more than 1 volume group?
 
@@ -281,12 +280,19 @@ TODO: Note can there be more than 1 volume group?
 | seqno | Metadata sequence number |
 | status | The [status flags](#status_flags), which contains a list of strings |
 
-`<sub sections>` contains one of the following sub sections:
+&lt;sub sections&gt; contains one of the following sub sections:
 
 | Value | Description |
 | --- | --- |
 | physical_volumes | The physical volumes sub sections |
 | logical_volumes | The logical volumes sub sections |
+
+### Volume group and logical volume names {#names}
+
+* Allowed characters: "a-z", "A-Z", "0-9", "\_", "+", ".", and "-" (hypen)
+* A volume group name should not start with a hypen
+* A logical volume name can start with a hypen, but it is reserved for logical volumes that have
+  been removed but are stil being tracked by the format
 
 ### Physical volumes sub section
 
@@ -300,7 +306,7 @@ physical_volumes {
 
 Where:
 
-* `<sub sections>` contains one of the following sub sections:
+* &lt;sub sections&gt; contains one of the following sub sections:
 
 | Value | Description |
 | --- | --- |
@@ -319,7 +325,7 @@ pv# {
 Where:
 
 * \# is a place holder for a the physical volume number e.g. pv0
-* `<properties>` contains one of the following properties:
+* &lt;properties&gt; contains one of the following properties:
 
 | Value | Description |
 | --- | --- |
@@ -345,11 +351,11 @@ logical_volumes {
 
 Where:
 
-* `<sub sections>` contains one of the following sub sections:
+* &lt;sub sections&gt; contains one of the following sub sections:
 
 | Value | Description |
 | --- | --- |
-| `<name>` | Individual physical volume sub section, where `<name>` is a place holder for a the logical volume name |
+| &lt;name&gt; | Individual physical volume sub section, where &lt;name&gt; is a place holder for a the logical volume name |
 
 ### Logical volume sub section
 
@@ -364,12 +370,12 @@ Each logical volume sub section is defined as:
 
 Where:
 
-* `<name>` contains the name of the physical volume
+* &lt;name&gt; contains the [name](#names) of the physical volume
 
 Some implementations use lv_ as the prefix for a logical volume note that the format does not imply
 this convention.
 
-* `<properties>` contains one of the following properties:
+* &lt;properties&gt; contains one of the following properties:
 
 | Value | Description |
 | --- | --- |
@@ -380,7 +386,7 @@ this convention.
 | segment_count | The number of segment sub sections |
 | status | [Status flags](#status_flags), which contains a list of strings |
 
-* `<sub sections>` contains one of the following sub sections:
+* &lt;sub sections&gt; contains one of the following sub sections:
 
 | Value | Description |
 | --- | --- |
@@ -399,7 +405,7 @@ segment# {
 Where:
 
 * \# is a place holder for the segment number e.g. segment1
-* `<properties>` contains one of the following properties:
+* &lt;properties&gt; contains one of the following properties:
 
 | Value | Description |
 | --- | --- |
@@ -460,8 +466,9 @@ stripes = [
 
 Where:
 
-* `<physical volume name>` is a string containing the physical volume name e.g. "pv0".
-* `<start extent number>` the segment start extent number relative from the start of the data area.
+* &lt;physical volume name&gt; is a string containing the physical volume name e.g. "pv0".
+* &lt;start extent number&gt; the segment start extent number relative from the start of the data
+  area.
 
 ```python
 start_extent_offset = (

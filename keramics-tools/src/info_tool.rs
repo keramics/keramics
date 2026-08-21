@@ -33,7 +33,7 @@ mod formatters;
 mod info;
 mod storage_media_image;
 
-use crate::enums::{DisplayPathType, EncodingType};
+use crate::enums::{DisplayPathType, EncodingType, FormatType};
 use crate::info::{
     ApfsInfo, ApmInfo, CdsaEncrInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, HfsInfo, LinuxLvmInfo,
     MbrInfo, NtfsInfo, PdiInfo, QcowInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo,
@@ -53,11 +53,15 @@ struct CommandLineArguments {
     #[arg(long, value_enum)]
     encoding: Option<EncodingType>,
 
+    /// Data format
+    #[arg(long, value_enum)]
+    format: Option<FormatType>,
+
     #[arg(long, default_value_t = false)]
     /// Process storage media image contents
     image: bool,
 
-    #[arg(long, default_value_t = 0)]
+    #[arg(long, default_value_t = 0, requires = "image")]
     /// Layer within the storage media image, where 1 represents the first layer
     image_layer: usize,
 
@@ -457,24 +461,30 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         };
-    let format_identifier: FormatIdentifier = if !arguments.image
-        && arguments.source.is_dir()
-        && arguments.source.extension() == Some("sparsebundle".as_ref())
-    {
-        FormatIdentifier::SparseBundle
-    } else {
-        match info_tool.scan_for_formats(&data_stream) {
-            Ok(Some(format_identifier)) => format_identifier,
-            Ok(None) => {
-                println!("No format signatures found");
-                return ExitCode::FAILURE;
-            }
-            Err(error) => {
-                println!(
-                    "Unable to scan data stream for format signatures with error:\n{}",
-                    error
-                );
-                return ExitCode::FAILURE;
+    let format_identifier: FormatIdentifier = match &arguments.format {
+        Some(FormatType::Apm) => FormatIdentifier::Apm,
+        Some(FormatType::Apfs) => FormatIdentifier::Apfs,
+        None => {
+            if !arguments.image
+                && arguments.source.is_dir()
+                && arguments.source.extension() == Some("sparsebundle".as_ref())
+            {
+                FormatIdentifier::SparseBundle
+            } else {
+                match info_tool.scan_for_formats(&data_stream) {
+                    Ok(Some(format_identifier)) => format_identifier,
+                    Ok(None) => {
+                        println!("No format signatures found");
+                        return ExitCode::FAILURE;
+                    }
+                    Err(error) => {
+                        println!(
+                            "Unable to scan data stream for format signatures with error:\n{}",
+                            error
+                        );
+                        return ExitCode::FAILURE;
+                    }
+                }
             }
         }
     };

@@ -126,7 +126,7 @@ impl StorageMediaImage {
     pub fn get_md5_hash(&self) -> Result<Option<Vec<u8>>, ErrorTrace> {
         match self {
             Self::Ewf { ewf_image } => match ewf_image.read() {
-                Ok(image) => Ok(Some(image.md5_hash.to_vec())),
+                Ok(image) => Ok(Some(image.get_md5_hash().to_vec())),
                 Err(error) => Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain read lock on EWF image",
                     error
@@ -141,7 +141,7 @@ impl StorageMediaImage {
     pub fn get_sha1_hash(&self) -> Result<Option<Vec<u8>>, ErrorTrace> {
         match self {
             Self::Ewf { ewf_image } => match ewf_image.read() {
-                Ok(image) => Ok(Some(image.sha1_hash.to_vec())),
+                Ok(image) => Ok(Some(image.get_sha1_hash().to_vec())),
                 Err(error) => Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain read lock on EWF image",
                     error

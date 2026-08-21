@@ -120,6 +120,11 @@ impl ApmVolumeSystem {
                 }
             }
         }
+        if self.bytes_per_sector == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported bytes per sector: 0"
+            ));
+        }
         let mut partition_map_entry_offset: u64 = self.bytes_per_sector as u64;
 
         loop {

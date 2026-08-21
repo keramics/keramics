@@ -22,7 +22,7 @@ use super::enums::DecmpfsCompressionMethod;
 #[layout_map(
     structure(
         byte_order = "little",
-        field(name = "signature", data_type = "[u8; 4]"),
+        field(name = "signature", data_type = "ByteString<4>"),
         field(name = "compression_method", data_type = "u32"),
         field(name = "uncompressed_data_size", data_type = "u64"),
     ),

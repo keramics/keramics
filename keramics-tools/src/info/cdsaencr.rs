@@ -14,39 +14,24 @@
 use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrEncryptionType};
-use keramics_types::Uuid;
+use keramics_formats::cdsaencr::CdsaEncrContainer;
 
 use crate::formatters::ByteSize;
 
 /// Information about a Mac OS Encrypted Encoding container.
-struct CdsaEncrContainerInfo {
-    /// Container identifier.
-    pub container_identifier: Uuid,
-
-    /// Format version.
-    pub format_version: u32,
-
-    /// Block size.
-    pub block_size: u32,
-
-    /// Encryption type.
-    pub encryption_type: CdsaEncrEncryptionType,
+struct CdsaEncrContainerInfo<'a> {
+    /// Container.
+    container: &'a CdsaEncrContainer,
 }
 
-impl CdsaEncrContainerInfo {
+impl<'a> CdsaEncrContainerInfo<'a> {
     /// Creates new container information.
-    fn new() -> Self {
-        Self {
-            container_identifier: Uuid::new(),
-            format_version: 0,
-            block_size: 0,
-            encryption_type: CdsaEncrEncryptionType::new(),
-        }
+    fn new(container: &'a CdsaEncrContainer) -> Self {
+        Self { container }
     }
 }
 
-impl fmt::Display for CdsaEncrContainerInfo {
+impl<'a> fmt::Display for CdsaEncrContainerInfo<'a> {
     /// Formats container information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(
@@ -56,21 +41,21 @@ impl fmt::Display for CdsaEncrContainerInfo {
         writeln!(
             formatter,
             "    Format version\t\t\t\t: {}",
-            self.format_version
+            self.container.get_format_version()
         )?;
-        let byte_size: ByteSize = ByteSize::new(self.block_size as u64, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.container.get_block_size() as u64, 1024);
         writeln!(formatter, "    Block size\t\t\t\t\t: {}", byte_size)?;
 
         writeln!(
             formatter,
             "    Container identifier\t\t\t: {}",
-            self.container_identifier
+            self.container.get_container_identifier()
         )?;
         writeln!(formatter, "    Encryption information:")?;
         writeln!(
             formatter,
             "        Encryption method\t\t\t: {}",
-            self.encryption_type
+            self.container.get_encryption_type()
         )?;
         // TODO: print human readable encryption method
         // TODO: print key protectors
@@ -84,19 +69,6 @@ impl fmt::Display for CdsaEncrContainerInfo {
 pub struct CdsaEncrInfo {}
 
 impl CdsaEncrInfo {
-    /// Retrieves the container information.
-    fn get_container_information(cdsaencr_container: &CdsaEncrContainer) -> CdsaEncrContainerInfo {
-        let mut container_information: CdsaEncrContainerInfo = CdsaEncrContainerInfo::new();
-
-        container_information.format_version = cdsaencr_container.get_format_version();
-        container_information.block_size = cdsaencr_container.get_block_size();
-        container_information.container_identifier =
-            cdsaencr_container.get_container_identifier().clone();
-        container_information.encryption_type = cdsaencr_container.get_encryption_type().clone();
-
-        container_information
-    }
-
     /// Opens a container.
     fn open_container(data_stream: &DataStreamReference) -> Result<CdsaEncrContainer, ErrorTrace> {
         let mut cdsaencr_container: CdsaEncrContainer = CdsaEncrContainer::new();
@@ -121,7 +93,7 @@ impl CdsaEncrInfo {
             }
         };
         let container_information: CdsaEncrContainerInfo =
-            Self::get_container_information(&cdsaencr_container);
+            CdsaEncrContainerInfo::new(&cdsaencr_container);
 
         print!("{}", container_information);
 
@@ -144,8 +116,8 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_aes256.dmg");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let cdsaencr_container: CdsaEncrContainer = CdsaEncrInfo::open_container(&data_stream)?;
-        let test_struct: CdsaEncrContainerInfo =
-            CdsaEncrInfo::get_container_information(&cdsaencr_container);
+
+        let test_struct: CdsaEncrContainerInfo = CdsaEncrContainerInfo::new(&cdsaencr_container);
 
         let expected_string: &str = concat!(
             "Encrypted Encoding container (cdsaencr) information:\n",
@@ -158,27 +130,6 @@ mod tests {
         );
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_container_information() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_aes256.dmg");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let cdsaencr_container: CdsaEncrContainer = CdsaEncrInfo::open_container(&data_stream)?;
-        let test_struct: CdsaEncrContainerInfo =
-            CdsaEncrInfo::get_container_information(&cdsaencr_container);
-
-        assert_eq!(test_struct.format_version, 1);
-        assert_eq!(test_struct.block_size, 512);
-        assert_eq!(
-            test_struct.container_identifier.to_string(),
-            "6dde706c-61d2-45ff-9046-c86b3912bfeb"
-        );
-        assert_eq!(test_struct.encryption_type.method, 0x80000001);
-        assert_eq!(test_struct.encryption_type.mode, 5);
-        assert_eq!(test_struct.encryption_type.key_size, 32);
 
         Ok(())
     }

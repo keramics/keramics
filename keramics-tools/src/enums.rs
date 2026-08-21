@@ -154,3 +154,13 @@ pub enum EncodingType {
     /// Windows-1258 (Vietnamese)
     Windows1258,
 }
+
+/// Format types.
+#[derive(Clone, ValueEnum)]
+pub enum FormatType {
+    /// Apple Partition Map (APM)
+    Apm,
+
+    /// Apple File System (APFS)
+    Apfs,
+}

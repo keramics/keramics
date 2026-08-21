@@ -12,7 +12,7 @@
  */
 
 /// Apple File System (APFS) extent.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ApfsExtent {
     /// Logical offset.
     pub logical_offset: u64,

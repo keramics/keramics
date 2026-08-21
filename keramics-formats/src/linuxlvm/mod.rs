@@ -29,6 +29,7 @@ mod stripe;
 mod volume;
 mod volume_group;
 mod volume_system;
+mod volumes;
 
 pub use data_file_descriptor::LinuxLvmDataFileDescriptor;
 pub use physical_volume::LinuxLvmPhysicalVolume;

@@ -37,25 +37,25 @@ pub struct FatFileSystem {
     data_stream: Option<DataStreamReference>,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u16,
+    bytes_per_sector: u16,
 
     /// Cluster block size.
     cluster_block_size: u32,
 
     /// First cluster offset.
-    pub first_cluster_offset: u64,
+    first_cluster_offset: u64,
 
     /// Root directory offset.
-    pub root_directory_offset: u64,
+    root_directory_offset: u64,
 
     /// Root directory size.
-    pub root_directory_size: u32,
+    root_directory_size: u32,
 
     /// Root directory cluster block number.
-    pub root_directory_cluster_block_number: u32,
+    root_directory_cluster_block_number: u32,
 
     /// Format.
-    pub format: FatFormat,
+    format: FatFormat,
 
     /// Block allocation table.
     block_allocation_table: Option<Arc<FatBlockAllocationTable>>,
@@ -64,7 +64,7 @@ pub struct FatFileSystem {
     case_folding_mappings: Arc<Ucs2CharacterMappings>,
 
     /// Volume serial number.
-    pub volume_serial_number: u32,
+    volume_serial_number: u32,
 
     /// Volume label.
     volume_label: Option<ByteString>,
@@ -93,6 +93,11 @@ impl FatFileSystem {
             volume_label: None,
             root_directory_volume_label: None,
         }
+    }
+
+    /// Retrieves the format.
+    pub fn get_format(&self) -> &FatFormat {
+        &self.format
     }
 
     /// Retrieves the volume label.

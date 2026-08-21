@@ -95,6 +95,7 @@ impl ScanTree {
     }
 
     /// Scans a buffer for a matching scan object.
+    #[allow(dead_code)]
     pub(super) fn scan_buffer(
         &self,
         data_offset: u64,
