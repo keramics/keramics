@@ -60,6 +60,10 @@ struct CommandLineArguments {
     /// be written
     target: Option<PathBuf>,
 
+    /// Comma seperated list of volumes to include
+    #[arg(long)]
+    volumes: Option<String>,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -82,6 +86,9 @@ struct PathCommandArguments {
 
 /// Tool for extracting data streams from a storage media image.
 struct ExportTool {
+    /// VFS resolver.
+    vfs_resolver: VfsResolverReference,
+
     /// Data stream writer.
     data_stream_writer: DataStreamWriter,
 
@@ -93,6 +100,7 @@ impl ExportTool {
     /// Creates a new tool.
     fn new(output_path: PathBuf) -> Self {
         Self {
+            vfs_resolver: VfsResolver::current(),
             data_stream_writer: DataStreamWriter::new(),
             output_path,
         }
@@ -106,11 +114,12 @@ impl ExportTool {
         name: Option<&PathComponent>,
     ) -> Result<(), ErrorTrace> {
         if vfs_scan_node.is_empty() {
-            let vfs_resolver: VfsResolverReference = VfsResolver::current();
-
             let vfs_location: VfsLocation = vfs_scan_node.location.new_with_parent(path.clone());
 
-            match vfs_resolver.get_data_stream_by_location_and_name(&vfs_location, name) {
+            match self
+                .vfs_resolver
+                .get_data_stream_by_location_and_name(&vfs_location, name)
+            {
                 Ok(Some(data_stream)) => {
                     // TODO: sanitize output path, file name and data stream name.
                     match create_dir_all(&self.output_path) {
@@ -156,6 +165,11 @@ impl ExportTool {
                 }
             };
         } else {
+            // TODO: check if first path component matches prefix of the VFS type of the scan node
+            // if not iterate all sub nodes
+            // if so check which path component matches file name of scan node
+            // if no match fallback to all sub nodes
+
             for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
                 match self.export_data_stream_from_scan_node_with_path(sub_scan_node, path, name) {
                     Ok(_) => {}
@@ -183,19 +197,9 @@ impl ExportTool {
         vfs_location: &'a VfsLocation,
         image_layer: usize,
         partitions: Option<&String>,
+        volumes: Option<&String>,
         vfs_scan_context: &mut VfsScanContext<'a>,
     ) -> Result<(), ErrorTrace> {
-        let mut vfs_scanner: VfsScanner = VfsScanner::new();
-
-        match vfs_scanner.build() {
-            Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to build format scanner",
-                    error
-                ));
-            }
-        }
         let mut vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
 
         vfs_scan_options.image_layer = image_layer;
@@ -209,8 +213,28 @@ impl ExportTool {
                 }
             }
         }
+        if let Some(volumes_string) = volumes {
+            match vfs_scan_options.parse_volumes(volumes_string.as_str()) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to parse volumes");
+                    return Err(error);
+                }
+            }
+        }
         // TODO: add scanner mediator.
 
+        let mut vfs_scanner: VfsScanner = VfsScanner::new();
+
+        match vfs_scanner.build() {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
+        }
         match vfs_scanner.scan(&vfs_scan_options, vfs_scan_context, vfs_location) {
             Ok(_) => {}
             Err(mut error) => {
@@ -260,6 +284,7 @@ fn main() -> ExitCode {
         &vfs_location,
         arguments.image_layer,
         arguments.partitions.as_ref(),
+        arguments.volumes.as_ref(),
         &mut vfs_scan_context,
     ) {
         Ok(_) => {}

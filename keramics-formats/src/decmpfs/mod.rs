@@ -11,6 +11,7 @@
  * under the License.
  */
 
+mod block_reader;
 mod constants;
 mod data_stream;
 mod enums;
@@ -19,6 +20,7 @@ mod zlib_block_descriptor;
 mod zlib_footer;
 mod zlib_header;
 
-pub use data_stream::{DecmpfsBlockReader, DecmpfsDataStream};
+pub use block_reader::DecmpfsBlockReader;
+pub use data_stream::DecmpfsDataStream;
 pub use enums::DecmpfsCompressionMethod;
 pub use header::DecmpfsHeader;

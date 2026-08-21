@@ -23,40 +23,13 @@ use keramics_types::Uuid;
 use crate::formatters::ByteSize;
 
 /// Information about an Expert Witness Compression Format (EWF) image.
-struct EwfImageInfo {
-    /// Segment (file) set identifier.
-    pub segment_set_identifier: Uuid,
-
-    /// Sectors per chunk.
-    pub sectors_per_chunk: u32,
-
-    /// Error granularity.
-    pub error_granularity: u32,
-
-    /// Media type.
-    pub media_type: EwfMediaType,
-
-    /// Media size.
-    pub media_size: u64,
-
-    /// Number of sectors.
-    pub number_of_sectors: u32,
-
-    /// Bytes per sector.
-    pub bytes_per_sector: u32,
-
-    /// MD5 hash.
-    pub md5_hash: [u8; 16],
-
-    /// SHA1 hash.
-    pub sha1_hash: [u8; 20],
-
-    /// Header values.
-    pub header_values: Vec<(&'static str, String)>,
+struct EwfImageInfo<'a> {
+    /// Image.
+    image: &'a EwfImage,
 }
 
-impl EwfImageInfo {
-    const MEDIA_TYPES: &[(EwfMediaType, &'static str); 4] = &[
+impl<'a> EwfImageInfo<'a> {
+    const MEDIA_TYPES: &'static [(EwfMediaType, &'static str); 4] = &[
         (EwfMediaType::FixedDisk, "fixed disk"),
         (EwfMediaType::LogicalEvidence, "logical evidence"),
         (EwfMediaType::OpticalDisk, "optical disk (CD/DVD/BD)"),
@@ -64,30 +37,19 @@ impl EwfImageInfo {
     ];
 
     /// Create new image information.
-    pub fn new() -> Self {
-        Self {
-            segment_set_identifier: Uuid::new(),
-            sectors_per_chunk: 0,
-            error_granularity: 0,
-            media_type: EwfMediaType::Unknown,
-            media_size: 0,
-            number_of_sectors: 0,
-            bytes_per_sector: 0,
-            md5_hash: [0; 16],
-            sha1_hash: [0; 20],
-            header_values: Vec::new(),
-        }
+    pub fn new(image: &'a EwfImage) -> Self {
+        Self { image }
     }
 
     /// Retrieves the media type as a string.
-    pub fn get_media_type_string(&self) -> &str {
+    pub fn get_media_type_string(&self, media_type: &EwfMediaType) -> &str {
         Self::MEDIA_TYPES
-            .binary_search_by(|(key, _)| key.cmp(&self.media_type))
+            .binary_search_by(|(key, _)| key.cmp(media_type))
             .map_or_else(|_| "Unknown", |index| Self::MEDIA_TYPES[index].1)
     }
 }
 
-impl fmt::Display for EwfImageInfo {
+impl<'a> fmt::Display for EwfImageInfo<'a> {
     /// Formats image information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(
@@ -96,29 +58,33 @@ impl fmt::Display for EwfImageInfo {
         )?;
 
         // TODO: print file format
-        if !self.segment_set_identifier.is_nil() {
+
+        let segment_set_identifier: &Uuid = self.image.get_segment_set_identifier();
+        if !segment_set_identifier.is_nil() {
             writeln!(
                 formatter,
                 "    Segment set identifier\t\t\t: {}",
-                self.segment_set_identifier
+                segment_set_identifier
             )?;
         }
         writeln!(
             formatter,
             "    Sectors per chunk\t\t\t\t: {}",
-            self.sectors_per_chunk
+            self.image.get_sectors_per_chunk(),
         )?;
-        if self.error_granularity == 1 {
+        let error_granularity: u32 = self.image.get_error_granularity();
+
+        if error_granularity == 1 {
             writeln!(
                 formatter,
                 "    Error granularity\t\t\t\t: {} sector",
-                self.error_granularity
+                error_granularity
             )?;
         } else {
             writeln!(
                 formatter,
                 "    Error granularity\t\t\t\t: {} sectors",
-                self.error_granularity
+                error_granularity
             )?;
         }
         // TODO: print compression method
@@ -128,78 +94,43 @@ impl fmt::Display for EwfImageInfo {
         writeln!(formatter, "    Media information:")?;
 
         // TODO: print media type (combine with is physical)
-        let media_type_string: &str = self.get_media_type_string();
+        let media_type: &EwfMediaType = self.image.get_media_type();
+        let media_type_string: &str = self.get_media_type_string(media_type);
         writeln!(
             formatter,
             "        Media type\t\t\t\t: {}",
             media_type_string,
         )?;
-        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.image.get_media_size(), 1024);
         writeln!(formatter, "        Media size\t\t\t\t: {}", byte_size)?;
 
-        if self.media_type != EwfMediaType::LogicalEvidence {
+        if *media_type != EwfMediaType::LogicalEvidence {
             writeln!(
                 formatter,
                 "        Number of sectors\t\t\t: {}",
-                self.number_of_sectors
+                self.image.get_number_of_sectors()
             )?;
             writeln!(
                 formatter,
                 "        Bytes per sector\t\t\t: {}",
-                self.bytes_per_sector
+                self.image.get_bytes_per_sector()
             )?;
         }
-        if self.md5_hash != [0; 16] {
-            let hash_string: String = format_as_string(&self.md5_hash);
+        let md5_hash: &[u8] = self.image.get_md5_hash();
+
+        if md5_hash != &[0; 16] {
+            let hash_string: String = format_as_string(md5_hash);
             writeln!(formatter, "        MD5\t\t\t\t\t: {}", hash_string)?;
         }
-        if self.sha1_hash != [0; 20] {
-            let hash_string: String = format_as_string(&self.sha1_hash);
+        let sha1_hash: &[u8] = self.image.get_sha1_hash();
+
+        if sha1_hash != &[0; 20] {
+            let hash_string: String = format_as_string(sha1_hash);
             writeln!(formatter, "        SHA1\t\t\t\t\t: {}", hash_string)?;
         }
         writeln!(formatter)?;
 
         writeln!(formatter, "    Case information:")?;
-
-        for (description, value) in &self.header_values {
-            writeln!(
-                formatter,
-                "        {}{}: {}",
-                description,
-                "\t".repeat((40 - description.len()).div_ceil(8)),
-                value,
-            )?;
-        }
-        // TODO: print case information
-        //
-        // TODO: print optical disk session information
-        // TODO: print error information
-
-        writeln!(formatter)
-    }
-}
-
-/// Information about an Expert Witness Compression Format (EWF) image.
-pub struct EwfInfo {}
-
-impl EwfInfo {
-    /// Retrieves the image information.
-    fn get_image_information(ewf_image: &EwfImage) -> EwfImageInfo {
-        let mut image_information: EwfImageInfo = EwfImageInfo::new();
-
-        image_information.segment_set_identifier = ewf_image.get_segment_set_identifier().clone();
-        image_information.sectors_per_chunk = ewf_image.sectors_per_chunk;
-        image_information.error_granularity = ewf_image.error_granularity;
-        image_information.media_type = ewf_image.media_type.clone();
-        image_information.media_size = ewf_image.media_size;
-        image_information.number_of_sectors = ewf_image.get_number_of_sectors();
-        image_information.bytes_per_sector = ewf_image.get_bytes_per_sector();
-        image_information
-            .md5_hash
-            .copy_from_slice(&ewf_image.md5_hash);
-        image_information
-            .sha1_hash
-            .copy_from_slice(&ewf_image.sha1_hash);
 
         let header_values: [(EwfHeaderValueType, &str); 15] = [
             (EwfHeaderValueType::CaseNumber, "Case number"),
@@ -219,7 +150,7 @@ impl EwfInfo {
             (EwfHeaderValueType::ProcessIdentifier, "Process identifier"),
         ];
         for (header_value_type, description) in header_values {
-            if let Some(header_value) = ewf_image.get_header_value(&header_value_type) {
+            if let Some(header_value) = self.image.get_header_value(&header_value_type) {
                 let header_value_string: String = header_value.to_string();
 
                 if header_value_string.is_empty() {
@@ -235,14 +166,26 @@ impl EwfInfo {
                 {
                     continue;
                 }
-                image_information
-                    .header_values
-                    .push((description, header_value_string));
+                writeln!(
+                    formatter,
+                    "        {}{}: {}",
+                    description,
+                    "\t".repeat((40 - description.len()).div_ceil(8)),
+                    header_value_string,
+                )?;
             }
         }
-        image_information
-    }
+        // TODO: print optical disk session information
+        // TODO: print error information
 
+        writeln!(formatter)
+    }
+}
+
+/// Information about an Expert Witness Compression Format (EWF) image.
+pub struct EwfInfo {}
+
+impl EwfInfo {
     /// Opens an image.
     fn open_image(path_buf: &PathBuf) -> Result<EwfImage, ErrorTrace> {
         let mut base_path: PathBuf = path_buf.clone();
@@ -287,7 +230,7 @@ impl EwfInfo {
                 return Err(error);
             }
         };
-        let image_information: EwfImageInfo = Self::get_image_information(&ewf_image);
+        let image_information: EwfImageInfo = EwfImageInfo::new(&ewf_image);
 
         print!("{}", image_information);
 
@@ -305,7 +248,8 @@ mod tests {
     fn test_image_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/ewf/ext2.E01");
         let ewf_image: EwfImage = EwfInfo::open_image(&path_buf)?;
-        let test_struct: EwfImageInfo = EwfInfo::get_image_information(&ewf_image);
+
+        let test_struct: EwfImageInfo = EwfImageInfo::new(&ewf_image);
 
         let expected_string: &str = concat!(
             "Expert Witness Compression Format (EWF) information:\n",
@@ -334,43 +278,6 @@ mod tests {
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
 
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_image_information() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/ewf/ext2.E01");
-        let ewf_image: EwfImage = EwfInfo::open_image(&path_buf)?;
-        let test_struct: EwfImageInfo = EwfInfo::get_image_information(&ewf_image);
-
-        assert_eq!(test_struct.sectors_per_chunk, 64);
-        assert_eq!(test_struct.error_granularity, 64);
-        assert_eq!(test_struct.media_type, EwfMediaType::FixedDisk);
-        assert_eq!(test_struct.media_size, 4194304);
-        assert_eq!(test_struct.number_of_sectors, 8192);
-        assert_eq!(test_struct.bytes_per_sector, 512);
-        assert_eq!(
-            test_struct.md5_hash,
-            [
-                0xb1, 0x76, 0x0d, 0x0b, 0x35, 0xa5, 0x12, 0xef, 0x56, 0x97, 0x0d, 0xf4, 0xe6, 0xf8,
-                0xc5, 0xd6,
-            ]
-        );
-        assert_eq!(test_struct.sha1_hash, [0; 20]);
-        assert_eq!(
-            test_struct.header_values,
-            vec![
-                ("Case number", String::from("case")),
-                ("Description", String::from("description")),
-                ("Examiner name", String::from("examiner")),
-                ("Evidence number", String::from("evidence")),
-                ("Notes", String::from("notes")),
-                ("Acquisition date", String::from("2025-09-17T17:46:01")),
-                ("System date", String::from("2025-09-17T17:46:01")),
-                ("Operating system used", String::from("Linux")),
-                ("Software version used", String::from("20140817")),
-            ]
-        );
         Ok(())
     }
 

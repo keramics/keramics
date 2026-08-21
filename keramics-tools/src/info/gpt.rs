@@ -58,8 +58,8 @@ impl<'a> fmt::Display for GptPartitionInfo<'a> {
             "    Identifier\t\t\t\t\t: {}",
             self.partition.get_identifier()
         )?;
-
         let type_identifier: &Uuid = self.partition.get_type_identifier();
+
         match self.get_type_identifier_string(&type_identifier) {
             Some(type_identifier_string) => {
                 writeln!(
@@ -73,6 +73,7 @@ impl<'a> fmt::Display for GptPartitionInfo<'a> {
             }
         };
         let partition_offset: u64 = self.partition.get_partition_offset();
+
         writeln!(
             formatter,
             "    Offset\t\t\t\t\t: {} (0x{:08x})",
@@ -82,6 +83,43 @@ impl<'a> fmt::Display for GptPartitionInfo<'a> {
 
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
+        writeln!(formatter)
+    }
+}
+
+/// GUID Partition Table (GPT) volume system information.
+struct GptVolumeSystemInfo<'a> {
+    /// Volume system.
+    volume_system: &'a GptVolumeSystem,
+}
+
+impl<'a> GptVolumeSystemInfo<'a> {
+    /// Creates new volume system information.
+    fn new(volume_system: &'a GptVolumeSystem) -> Self {
+        Self { volume_system }
+    }
+}
+
+impl<'a> fmt::Display for GptVolumeSystemInfo<'a> {
+    /// Formats volume system information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(formatter, "GUID Partition Table (GPT) information:")?;
+
+        writeln!(
+            formatter,
+            "    Disk identifier\t\t\t\t: {}",
+            self.volume_system.get_disk_identifier()
+        )?;
+        writeln!(
+            formatter,
+            "    Bytes per sector\t\t\t\t: {}",
+            self.volume_system.get_bytes_per_sector()
+        )?;
+        writeln!(
+            formatter,
+            "    Number of partitions\t\t\t: {}",
+            self.volume_system.get_number_of_partitions()
+        )?;
         writeln!(formatter)
     }
 }
@@ -115,20 +153,10 @@ impl GptInfo {
                 return Err(error);
             }
         };
-        println!("GUID Partition Table (GPT) information:");
+        let volume_system_information: GptVolumeSystemInfo =
+            GptVolumeSystemInfo::new(&gpt_volume_system);
 
-        println!(
-            "    Disk identifier\t\t\t\t: {}",
-            gpt_volume_system.get_disk_identifier()
-        );
-        println!(
-            "    Bytes per sector\t\t\t\t: {}",
-            gpt_volume_system.get_bytes_per_sector()
-        );
-        let number_of_partitions: usize = gpt_volume_system.get_number_of_partitions();
-        println!("    Number of partitions\t\t\t: {}", number_of_partitions);
-
-        println!();
+        print!("{}", volume_system_information);
 
         for (partition_index, result) in gpt_volume_system.partitions().enumerate() {
             let gpt_partition: GptPartition = match result {
@@ -175,6 +203,27 @@ mod tests {
             "    Type\t\t\t\t\t: 0fc63daf-8483-4772-8e79-3d69d8477de4 (Linux filesystem data)\n",
             "    Offset\t\t\t\t\t: 1048576 (0x00100000)\n",
             "    Size\t\t\t\t\t: 1.0 MiB (1048576 bytes)\n",
+            "\n"
+        );
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_volume_system_information_fmt() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/gpt/gpt.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let gpt_volume_system: GptVolumeSystem = GptInfo::open_volume_system(&data_stream)?;
+
+        let test_struct: GptVolumeSystemInfo = GptVolumeSystemInfo::new(&gpt_volume_system);
+
+        let expected_string: &str = concat!(
+            "GUID Partition Table (GPT) information:\n",
+            "    Disk identifier\t\t\t\t: b182deb3-9c86-4892-9e88-9297a4909855\n",
+            "    Bytes per sector\t\t\t\t: 512\n",
+            "    Number of partitions\t\t\t: 2\n",
             "\n"
         );
         let string: String = test_struct.to_string();

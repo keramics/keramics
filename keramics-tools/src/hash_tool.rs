@@ -69,6 +69,10 @@ struct CommandLineArguments {
     #[arg(long, default_value_t = DisplayPathType::Index, value_enum)]
     volume_path_type: DisplayPathType,
 
+    /// Comma seperated list of volumes to include
+    #[arg(long)]
+    volumes: Option<String>,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -475,19 +479,9 @@ impl HashTool {
         vfs_location: &'a VfsLocation,
         image_layer: usize,
         partitions: Option<&String>,
+        volumes: Option<&String>,
         vfs_scan_context: &mut VfsScanContext<'a>,
     ) -> Result<(), ErrorTrace> {
-        let mut vfs_scanner: VfsScanner = VfsScanner::new();
-
-        match vfs_scanner.build() {
-            Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to build format scanner",
-                    error
-                ));
-            }
-        }
         let mut vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
 
         vfs_scan_options.image_layer = image_layer;
@@ -501,8 +495,28 @@ impl HashTool {
                 }
             }
         }
+        if let Some(volumes_string) = volumes {
+            match vfs_scan_options.parse_volumes(volumes_string.as_str()) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to parse volumes");
+                    return Err(error);
+                }
+            }
+        }
         // TODO: add scanner mediator.
 
+        let mut vfs_scanner: VfsScanner = VfsScanner::new();
+
+        match vfs_scanner.build() {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
+        }
         match vfs_scanner.scan(&vfs_scan_options, vfs_scan_context, vfs_location) {
             Ok(_) => {}
             Err(mut error) => {
@@ -556,6 +570,7 @@ fn main() -> ExitCode {
                 &vfs_location,
                 arguments.image_layer,
                 arguments.partitions.as_ref(),
+                arguments.volumes.as_ref(),
                 &mut vfs_scan_context,
             ) {
                 Ok(_) => {}

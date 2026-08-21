@@ -71,44 +71,41 @@ impl DataStream for FakeDataStream {
         if self.current_offset >= self.size {
             return Ok(0);
         }
-        let remaining_size: u64 = self.size - self.current_offset;
-        let mut read_size: usize = buf.len();
-
-        if (read_size as u64) > remaining_size {
-            read_size = remaining_size as usize;
-        }
+        let mut current_offset: u64 = self.current_offset;
         let mut buf_offset: usize = 0;
 
+        let remaining_size: u64 = self.size - current_offset;
+        let read_size: usize = min(buf.len(), remaining_size as usize);
         let data_end_offset: u64 = self.data_offset + (self.data_size as u64);
 
         while buf_offset < read_size {
             let read_remainder_size: usize = read_size - buf_offset;
 
-            let read_count: usize = if self.current_offset >= self.data_offset
-                && self.current_offset < data_end_offset
-            {
-                let data_offset: usize = (self.current_offset - self.data_offset) as usize;
+            let read_count: usize =
+                if current_offset >= self.data_offset && current_offset < data_end_offset {
+                    let data_offset: usize = (current_offset - self.data_offset) as usize;
 
-                let data_remainder_size: usize =
-                    min(read_remainder_size, self.data_size - data_offset);
+                    let data_remainder_size: usize =
+                        min(read_remainder_size, self.data_size - data_offset);
 
-                let data_end_offset: usize = data_offset + data_remainder_size;
-                let buf_end_offset: usize = buf_offset + data_remainder_size;
+                    let data_end_offset: usize = data_offset + data_remainder_size;
+                    let buf_end_offset: usize = buf_offset + data_remainder_size;
 
-                buf[buf_offset..buf_end_offset]
-                    .copy_from_slice(&self.data[data_offset..data_end_offset]);
+                    buf[buf_offset..buf_end_offset]
+                        .copy_from_slice(&self.data[data_offset..data_end_offset]);
 
-                data_remainder_size
-            } else {
-                let buf_end_offset: usize = buf_offset + read_remainder_size;
+                    data_remainder_size
+                } else {
+                    let buf_end_offset: usize = buf_offset + read_remainder_size;
 
-                buf[buf_offset..buf_end_offset].fill(0);
+                    buf[buf_offset..buf_end_offset].fill(0);
 
-                read_remainder_size
-            };
+                    read_remainder_size
+                };
             buf_offset += read_count;
+            current_offset += read_count as u64;
         }
-        self.current_offset += buf_offset as u64;
+        self.current_offset = current_offset;
 
         Ok(buf_offset)
     }

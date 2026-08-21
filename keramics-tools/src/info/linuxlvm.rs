@@ -223,18 +223,17 @@ impl LinuxLvmInfo {
 
             print!("{}", physical_volume_info);
         }
-        for volume_index in 0..lvm_volume_system.get_number_of_volumes() {
-            let lvm_logical_volume: LinuxLvmVolume =
-                match lvm_volume_system.get_volume_by_index(volume_index) {
-                    Ok(logical_volume) => logical_volume,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Missing logical volume: {}", volume_index)
-                        );
-                        return Err(error);
-                    }
-                };
+        for (volume_index, result) in lvm_volume_system.volumes().enumerate() {
+            let lvm_logical_volume: LinuxLvmVolume = match result {
+                Ok(lvm_volume) => lvm_volume,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve volume: {}", volume_index)
+                    );
+                    return Err(error);
+                }
+            };
             let logical_volume_info: LinuxLvmLogicalVolumeInfo =
                 LinuxLvmLogicalVolumeInfo::new(volume_index, &lvm_logical_volume);
 

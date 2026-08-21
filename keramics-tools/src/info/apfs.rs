@@ -16,8 +16,10 @@ use std::fmt;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_formats::Path;
-use keramics_formats::apfs::{ApfsContainer, ApfsFileEntry, ApfsFileSystem, ApfsVolume};
-use keramics_types::{ByteString, Uuid};
+use keramics_formats::apfs::{
+    ApfsContainer, ApfsExtendedAttribute, ApfsFileEntry, ApfsFileSystem, ApfsVolume,
+};
+use keramics_types::ByteString;
 
 use crate::enums::DisplayPathType;
 use crate::formatters::ByteSize;
@@ -97,77 +99,60 @@ impl fmt::Display for ApfsContainerIncompatibilityFeatureFlagsInfo {
 }
 
 /// Apple File System (APFS) container information.
-struct ApfsContainerInfo {
-    /// Identifier.
-    pub identifier: Uuid,
-
-    /// Block size.
-    pub block_size: u32,
-
-    /// Features flags.
-    pub feature_flags: u64,
-
-    /// Read-only compatible feature flags.
-    pub read_only_compatible_feature_flags: u64,
-
-    /// Incompatible feature flags.
-    pub incompatible_feature_flags: u64,
-
-    /// Number of volumes.
-    pub number_of_volumes: usize,
+struct ApfsContainerInfo<'a> {
+    /// Container.
+    container: &'a ApfsContainer,
 }
 
-impl ApfsContainerInfo {
+impl<'a> ApfsContainerInfo<'a> {
     /// Creates new container information.
-    fn new() -> Self {
-        Self {
-            identifier: Uuid::new(),
-            block_size: 0,
-            number_of_volumes: 0,
-            feature_flags: 0,
-            read_only_compatible_feature_flags: 0,
-            incompatible_feature_flags: 0,
-        }
+    fn new(container: &'a ApfsContainer) -> Self {
+        Self { container }
     }
 }
 
-impl fmt::Display for ApfsContainerInfo {
+impl<'a> fmt::Display for ApfsContainerInfo<'a> {
     /// Formats container information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Apple File System (APFS) information:")?;
 
-        println!("    Features\t\t\t\t\t: 0x{:016x}", self.feature_flags);
-        let flags_info: ApfsContainerFeatureFlagsInfo =
-            ApfsContainerFeatureFlagsInfo::new(self.feature_flags);
-        println!("{}", flags_info);
+        let flags: u64 = self.container.get_feature_flags();
+        writeln!(formatter, "    Features\t\t\t\t\t: 0x{:016x}", flags)?;
+        let flags_info: ApfsContainerFeatureFlagsInfo = ApfsContainerFeatureFlagsInfo::new(flags);
+        writeln!(formatter, "{}", flags_info)?;
 
-        println!(
+        let flags: u64 = self.container.get_read_only_compatible_feature_flags();
+        writeln!(
+            formatter,
             "    Read-only compatible features\t\t: 0x{:016x}",
-            self.read_only_compatible_feature_flags
-        );
+            flags
+        )?;
         let flags_info: ApfsContainerReadOnlyCompatibilityFeatureFlagsInfo =
-            ApfsContainerReadOnlyCompatibilityFeatureFlagsInfo::new(
-                self.read_only_compatible_feature_flags,
-            );
-        println!("{}", flags_info);
+            ApfsContainerReadOnlyCompatibilityFeatureFlagsInfo::new(flags);
+        writeln!(formatter, "{}", flags_info)?;
 
-        println!(
+        let flags: u64 = self.container.get_incompatible_feature_flags();
+        writeln!(
+            formatter,
             "    Incompatible features\t\t\t: 0x{:016x}",
-            self.incompatible_feature_flags
-        );
+            flags
+        )?;
         let flags_info: ApfsContainerIncompatibilityFeatureFlagsInfo =
-            ApfsContainerIncompatibilityFeatureFlagsInfo::new(self.incompatible_feature_flags);
-        println!("{}", flags_info);
+            ApfsContainerIncompatibilityFeatureFlagsInfo::new(flags);
+        writeln!(formatter, "{}", flags_info)?;
 
-        writeln!(formatter, "    Identifier\t\t\t\t\t: {}", self.identifier)?;
-
-        let byte_size: ByteSize = ByteSize::new(self.block_size as u64, 1024);
+        writeln!(
+            formatter,
+            "    Identifier\t\t\t\t\t: {}",
+            self.container.get_identifier()
+        )?;
+        let byte_size: ByteSize = ByteSize::new(self.container.get_block_size() as u64, 1024);
         writeln!(formatter, "    Block size\t\t\t\t\t: {}", byte_size)?;
 
         writeln!(
             formatter,
             "    Number of volumes\t\t\t\t: {}",
-            self.number_of_volumes
+            self.container.get_number_of_volumes()
         )?;
         writeln!(formatter)
     }
@@ -197,57 +182,15 @@ impl fmt::Display for ApfsContainerReadOnlyCompatibilityFeatureFlagsInfo {
 }
 
 /// Apple File System (APFS) file entry information.
-struct ApfsFileEntryInfo {
-    /// The identifier.
-    pub identifier: u64,
-
-    /// The name.
-    pub name: Option<ByteString>,
-
-    /// The size.
-    pub size: u64,
-
-    /// Creation date and time.
-    pub creation_time: DateTime,
-
-    /// Modifiation date and time.
-    pub modification_time: DateTime,
-
-    /// Access date and time.
-    pub access_time: DateTime,
-
-    /// Change date and time.
-    pub change_time: DateTime,
-
-    /// Number of links.
-    pub number_of_links: u32,
-
-    /// Owner identifier.
-    pub owner_identifier: u32,
-
-    /// Group identifier.
-    pub group_identifier: u32,
-
-    /// File mode.
-    pub file_mode: u16,
+struct ApfsFileEntryInfo<'a> {
+    /// File entry.
+    file_entry: &'a ApfsFileEntry,
 }
 
-impl ApfsFileEntryInfo {
+impl<'a> ApfsFileEntryInfo<'a> {
     /// Creates new file entry information.
-    fn new() -> Self {
-        Self {
-            identifier: 0,
-            name: None,
-            size: 0,
-            creation_time: DateTime::NotSet,
-            modification_time: DateTime::NotSet,
-            access_time: DateTime::NotSet,
-            change_time: DateTime::NotSet,
-            number_of_links: 0,
-            owner_identifier: 0,
-            group_identifier: 0,
-            file_mode: 0,
-        }
+    fn new(file_entry: &'a ApfsFileEntry) -> Self {
+        Self { file_entry }
     }
 
     /// Retrieves the string representation of a date and time value.
@@ -260,27 +203,33 @@ impl ApfsFileEntryInfo {
     }
 }
 
-impl fmt::Display for ApfsFileEntryInfo {
+impl<'a> fmt::Display for ApfsFileEntryInfo<'a> {
     /// Formats file entry information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(formatter, "    Identifier\t\t\t\t\t: {}", self.identifier)?;
+        writeln!(
+            formatter,
+            "    Identifier\t\t\t\t\t: {}",
+            self.file_entry.get_identifier()
+        )?;
 
         // TODO: print parent identifier
         // TODO: print link identifier
 
-        if let Some(name) = &self.name {
+        if let Some(name) = self.file_entry.get_name() {
             writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?;
         };
-        let byte_size: ByteSize = ByteSize::new(self.size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.file_entry.get_size(), 1024);
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
         // TODO: convert to formatter.
-        let date_time_string: String = Self::get_date_time_string(&self.creation_time);
+        let date_time_string: String =
+            Self::get_date_time_string(self.file_entry.get_creation_time());
 
         writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_string)?;
 
         // TODO: convert to formatter.
-        let date_time_string: String = Self::get_date_time_string(&self.modification_time);
+        let date_time_string: String =
+            Self::get_date_time_string(self.file_entry.get_modification_time());
 
         writeln!(
             formatter,
@@ -288,35 +237,36 @@ impl fmt::Display for ApfsFileEntryInfo {
             date_time_string
         )?;
         // TODO: convert to formatter.
-        let date_time_string: String = Self::get_date_time_string(&self.access_time);
+        let date_time_string: String =
+            Self::get_date_time_string(self.file_entry.get_access_time());
 
         writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_string)?;
 
         // TODO: convert to formatter.
-        let date_time_string: String = Self::get_date_time_string(&self.change_time);
+        let date_time_string: String =
+            Self::get_date_time_string(self.file_entry.get_change_time());
 
         writeln!(formatter, "    Change time\t\t\t\t\t: {}", date_time_string)?;
 
         writeln!(
             formatter,
             "    Number of links\t\t\t\t: {}",
-            self.number_of_links
+            self.file_entry.get_number_of_links()
         )?;
         writeln!(
             formatter,
             "    Owner identifier\t\t\t\t: {}",
-            self.owner_identifier
+            self.file_entry.get_owner_identifier()
         )?;
         writeln!(
             formatter,
             "    Group identifier\t\t\t\t: {}",
-            self.group_identifier
+            self.file_entry.get_group_identifier()
         )?;
-        let file_mode_info: PosixFileModeInfo = PosixFileModeInfo::new(self.file_mode);
+        let file_mode_info: PosixFileModeInfo =
+            PosixFileModeInfo::new(self.file_entry.get_file_mode());
 
         writeln!(formatter, "    File mode\t\t\t\t\t: {}", file_mode_info)?;
-
-        // TODO: print extended attributes
 
         writeln!(formatter)
     }
@@ -435,71 +385,57 @@ impl fmt::Display for ApfsVolumeIncompatibilityFeatureFlagsInfo {
 }
 
 /// Apple File System (APFS) volume information.
-struct ApfsVolumeInfo {
-    /// The volume index.
-    pub index: usize,
+struct ApfsVolumeInfo<'a> {
+    /// Volume index.
+    index: usize,
 
-    /// Identifier.
-    pub identifier: Uuid,
-
-    /// Volume label.
-    pub volume_label: Option<ByteString>,
-
-    /// Features flags.
-    pub feature_flags: u64,
-
-    /// Read-only compatible feature flags.
-    pub read_only_compatible_feature_flags: u64,
-
-    /// Incompatible feature flags.
-    pub incompatible_feature_flags: u64,
+    /// Volue.
+    volume: &'a ApfsVolume,
 }
 
-impl ApfsVolumeInfo {
+impl<'a> ApfsVolumeInfo<'a> {
     /// Creates new volume information.
-    fn new() -> Self {
-        Self {
-            index: 0,
-            identifier: Uuid::new(),
-            volume_label: None,
-            feature_flags: 0,
-            read_only_compatible_feature_flags: 0,
-            incompatible_feature_flags: 0,
-        }
+    fn new(index: usize, volume: &'a ApfsVolume) -> Self {
+        Self { index, volume }
     }
 }
 
-impl fmt::Display for ApfsVolumeInfo {
+impl<'a> fmt::Display for ApfsVolumeInfo<'a> {
     /// Formats volume information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Volume: {}", self.index + 1)?;
 
-        println!("    Features\t\t\t\t\t: 0x{:016x}", self.feature_flags);
-        let flags_info: ApfsVolumeFeatureFlagsInfo =
-            ApfsVolumeFeatureFlagsInfo::new(self.feature_flags);
-        println!("{}", flags_info);
+        let flags: u64 = self.volume.get_feature_flags();
+        writeln!(formatter, "    Features\t\t\t\t\t: 0x{:016x}", flags)?;
+        let flags_info: ApfsVolumeFeatureFlagsInfo = ApfsVolumeFeatureFlagsInfo::new(flags);
+        writeln!(formatter, "{}", flags_info)?;
 
-        println!(
+        let flags: u64 = self.volume.get_read_only_compatible_feature_flags();
+        writeln!(
+            formatter,
             "    Read-only compatible features\t\t: 0x{:016x}",
-            self.read_only_compatible_feature_flags
-        );
+            flags
+        )?;
         let flags_info: ApfsVolumeReadOnlyCompatibilityFeatureFlagsInfo =
-            ApfsVolumeReadOnlyCompatibilityFeatureFlagsInfo::new(
-                self.read_only_compatible_feature_flags,
-            );
-        println!("{}", flags_info);
+            ApfsVolumeReadOnlyCompatibilityFeatureFlagsInfo::new(flags);
+        writeln!(formatter, "{}", flags_info)?;
 
-        println!(
+        let flags: u64 = self.volume.get_incompatible_feature_flags();
+        writeln!(
+            formatter,
             "    Incompatible features\t\t\t: 0x{:016x}",
-            self.incompatible_feature_flags
-        );
+            flags
+        )?;
         let flags_info: ApfsVolumeIncompatibilityFeatureFlagsInfo =
-            ApfsVolumeIncompatibilityFeatureFlagsInfo::new(self.incompatible_feature_flags);
-        println!("{}", flags_info);
+            ApfsVolumeIncompatibilityFeatureFlagsInfo::new(flags);
+        writeln!(formatter, "{}", flags_info)?;
 
-        writeln!(formatter, "    Identifier\t\t\t\t\t: {}", self.identifier)?;
-
-        let volume_label: String = match &self.volume_label {
+        writeln!(
+            formatter,
+            "    Identifier\t\t\t\t\t: {}",
+            self.volume.get_identifier()
+        )?;
+        let volume_label: String = match self.volume.get_volume_label() {
             Some(volume_label) => volume_label.to_string(),
             None => String::new(),
         };
@@ -536,57 +472,6 @@ impl fmt::Display for ApfsVolumeReadOnlyCompatibilityFeatureFlagsInfo {
 pub struct ApfsInfo {}
 
 impl ApfsInfo {
-    /// Retrieves the container information.
-    fn get_container_information(apfs_container: &ApfsContainer) -> ApfsContainerInfo {
-        let mut container_information: ApfsContainerInfo = ApfsContainerInfo::new();
-
-        container_information.identifier = apfs_container.get_identifier().clone();
-        container_information.block_size = apfs_container.get_block_size();
-        container_information.feature_flags = apfs_container.get_feature_flags();
-        container_information.read_only_compatible_feature_flags =
-            apfs_container.get_read_only_compatible_feature_flags();
-        container_information.incompatible_feature_flags =
-            apfs_container.get_incompatible_feature_flags();
-        container_information.number_of_volumes = apfs_container.get_number_of_volumes();
-
-        container_information
-    }
-
-    /// Retrieves the file entry information.
-    fn get_file_entry_information(file_entry: &ApfsFileEntry) -> ApfsFileEntryInfo {
-        let mut file_entry_information: ApfsFileEntryInfo = ApfsFileEntryInfo::new();
-
-        file_entry_information.identifier = file_entry.get_identifier();
-        file_entry_information.name = file_entry.get_name().cloned();
-        file_entry_information.size = file_entry.get_size();
-        file_entry_information.creation_time = file_entry.get_creation_time().clone();
-        file_entry_information.modification_time = file_entry.get_modification_time().clone();
-        file_entry_information.access_time = file_entry.get_access_time().clone();
-        file_entry_information.change_time = file_entry.get_change_time().clone();
-        file_entry_information.number_of_links = file_entry.get_number_of_links();
-        file_entry_information.owner_identifier = file_entry.get_owner_identifier();
-        file_entry_information.group_identifier = file_entry.get_group_identifier();
-        file_entry_information.file_mode = file_entry.get_file_mode();
-
-        file_entry_information
-    }
-
-    /// Retrieves the volume information.
-    fn get_volume_information(volume_index: usize, apfs_volume: &ApfsVolume) -> ApfsVolumeInfo {
-        let mut volume_information: ApfsVolumeInfo = ApfsVolumeInfo::new();
-
-        volume_information.index = volume_index;
-        volume_information.identifier = apfs_volume.get_identifier().clone();
-        volume_information.volume_label = apfs_volume.get_volume_label().cloned();
-        volume_information.feature_flags = apfs_volume.get_feature_flags();
-        volume_information.read_only_compatible_feature_flags =
-            apfs_volume.get_read_only_compatible_feature_flags();
-        volume_information.incompatible_feature_flags =
-            apfs_volume.get_incompatible_feature_flags();
-
-        volume_information
-    }
-
     /// Opens a container.
     pub fn open_container(data_stream: &DataStreamReference) -> Result<ApfsContainer, ErrorTrace> {
         let mut apfs_container: ApfsContainer = ApfsContainer::new();
@@ -610,7 +495,7 @@ impl ApfsInfo {
                 return Err(error);
             }
         };
-        let container_info: ApfsContainerInfo = Self::get_container_information(&apfs_container);
+        let container_info: ApfsContainerInfo = ApfsContainerInfo::new(&apfs_container);
 
         print!("{}", container_info);
 
@@ -625,8 +510,7 @@ impl ApfsInfo {
                     return Err(error);
                 }
             };
-            let volume_info: ApfsVolumeInfo =
-                Self::get_volume_information(volume_index, &apfs_volume);
+            let volume_info: ApfsVolumeInfo = ApfsVolumeInfo::new(volume_index, &apfs_volume);
 
             print!("{}", volume_info);
         }
@@ -635,11 +519,44 @@ impl ApfsInfo {
 
     /// Prints information about a file entry.
     fn print_file_entry(file_entry: &mut ApfsFileEntry) -> Result<(), ErrorTrace> {
-        let file_entry_information: ApfsFileEntryInfo =
-            Self::get_file_entry_information(file_entry);
+        let file_entry_information: ApfsFileEntryInfo = ApfsFileEntryInfo::new(&file_entry);
 
         print!("{}", file_entry_information);
 
+        let number_of_attributes: usize = match file_entry.get_number_of_extended_attributes() {
+            Ok(number_of_attributes) => number_of_attributes,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve number of extended attributes"
+                );
+                return Err(error);
+            }
+        };
+        if number_of_attributes > 0 {
+            println!("    Extended attributes:");
+
+            for (attribute_index, result) in file_entry.extended_attributes().enumerate() {
+                let apfs_extended_attribute: ApfsExtendedAttribute = match result {
+                    Ok(apfs_extended_attribute) => apfs_extended_attribute,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve extended attribute: {}", attribute_index)
+                        );
+                        return Err(error);
+                    }
+                };
+                let attribute_name: &ByteString = apfs_extended_attribute.get_name();
+
+                println!(
+                    "        Attribute {}\t\t\t\t: {}",
+                    attribute_index + 1,
+                    attribute_name
+                );
+            }
+            println!();
+        }
         Ok(())
     }
 
@@ -938,30 +855,39 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
-    use keramics_datetime::ApfsTime;
+
+    use crate::assert_lines_eq;
 
     #[test]
-    fn test_get_container_information() -> Result<(), ErrorTrace> {
+    fn test_container_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs.raw");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let apfs_container: ApfsContainer = ApfsInfo::open_container(&data_stream)?;
-        let test_struct: ApfsContainerInfo = ApfsInfo::get_container_information(&apfs_container);
 
-        assert_eq!(
-            test_struct.identifier.to_string(),
-            "34d0674d-da87-4991-a3de-27eb13011c3e"
+        let test_struct: ApfsContainerInfo = ApfsContainerInfo::new(&apfs_container);
+
+        let expected_string: &str = concat!(
+            "Apple File System (APFS) information:\n",
+            "    Features\t\t\t\t\t: 0x0000000000000000\n",
+            "\n",
+            "    Read-only compatible features\t\t: 0x0000000000000000\n",
+            "\n",
+            "    Incompatible features\t\t\t: 0x0000000000000002\n",
+            "        0x0000000000000002: (NX_INCOMPAT_VERSION2)\n",
+            "\n",
+            "    Identifier\t\t\t\t\t: 34d0674d-da87-4991-a3de-27eb13011c3e\n",
+            "    Block size\t\t\t\t\t: 4.0 KiB (4096 bytes)\n",
+            "    Number of volumes\t\t\t\t: 1\n",
+            "\n"
         );
-        assert_eq!(test_struct.block_size, 4096);
-        assert_eq!(test_struct.feature_flags, 0x00000000);
-        assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000000);
-        assert_eq!(test_struct.incompatible_feature_flags, 0x00000002);
-        assert_eq!(test_struct.number_of_volumes, 1);
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
 
         Ok(())
     }
 
     #[test]
-    fn test_get_file_entry_information() -> Result<(), ErrorTrace> {
+    fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs.raw");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let apfs_container: ApfsContainer = ApfsInfo::open_container(&data_stream)?;
@@ -971,63 +897,53 @@ mod tests {
         let path: Path = Path::from("/testdir1/testfile1");
         let apfs_file_entry: ApfsFileEntry =
             apfs_file_system.get_file_entry_by_path(&path)?.unwrap();
-        let test_struct: ApfsFileEntryInfo = ApfsInfo::get_file_entry_information(&apfs_file_entry);
+        let test_struct: ApfsFileEntryInfo = ApfsFileEntryInfo::new(&apfs_file_entry);
 
-        assert_eq!(test_struct.identifier, 18);
-        assert_eq!(test_struct.name, Some(ByteString::from("testfile1")));
-        assert_eq!(test_struct.size, 9);
-        assert_eq!(
-            test_struct.creation_time,
-            DateTime::ApfsTime(ApfsTime {
-                timestamp: 1785841765254516511
-            })
+        let expected_string: &str = concat!(
+            "    Identifier\t\t\t\t\t: 18\n",
+            "    Name\t\t\t\t\t: testfile1\n",
+            "    Size\t\t\t\t\t: 9 bytes\n",
+            "    Creation time\t\t\t\t: 2026-08-04T11:09:25.254516511\n",
+            "    Modification time\t\t\t\t: 2026-08-04T11:09:25.254251713\n",
+            "    Access time\t\t\t\t\t: 2026-08-04T11:09:25.254251713\n",
+            "    Change time\t\t\t\t\t: 2026-08-04T11:09:25.262832871\n",
+            "    Number of links\t\t\t\t: 2\n",
+            "    Owner identifier\t\t\t\t: 99\n",
+            "    Group identifier\t\t\t\t: 99\n",
+            "    File mode\t\t\t\t\t: -rw-r--r-- (0o100644)\n",
+            "\n"
         );
-        assert_eq!(
-            test_struct.modification_time,
-            DateTime::ApfsTime(ApfsTime {
-                timestamp: 1785841765254251713
-            })
-        );
-        assert_eq!(
-            test_struct.access_time,
-            DateTime::ApfsTime(ApfsTime {
-                timestamp: 1785841765254251713
-            })
-        );
-        assert_eq!(
-            test_struct.change_time,
-            DateTime::ApfsTime(ApfsTime {
-                timestamp: 1785841765262832871
-            })
-        );
-        assert_eq!(test_struct.number_of_links, 2);
-        assert_eq!(test_struct.owner_identifier, 99);
-        assert_eq!(test_struct.group_identifier, 99);
-        assert_eq!(test_struct.file_mode, 0o100644);
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
 
         Ok(())
     }
 
     #[test]
-    fn test_get_volume_information() -> Result<(), ErrorTrace> {
+    fn test_volume_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs.raw");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let apfs_container: ApfsContainer = ApfsInfo::open_container(&data_stream)?;
         let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
-        let test_struct: ApfsVolumeInfo = ApfsInfo::get_volume_information(0, &apfs_volume);
 
-        assert_eq!(test_struct.index, 0);
-        assert_eq!(
-            test_struct.identifier.to_string(),
-            "33d13da9-f1c8-4d2a-b9c7-71ab9dbe5fe2"
+        let test_struct: ApfsVolumeInfo = ApfsVolumeInfo::new(0, &apfs_volume);
+
+        let expected_string: &str = concat!(
+            "Volume: 1\n",
+            "    Features\t\t\t\t\t: 0x0000000000000002\n",
+            "        0x0000000000000002: (APFS_FEATURE_HARDLINK_MAP_RECORDS)\n",
+            "\n",
+            "    Read-only compatible features\t\t: 0x0000000000000000\n",
+            "\n",
+            "    Incompatible features\t\t\t: 0x0000000000000001\n",
+            "        0x0000000000000001: (APFS_INCOMPAT_CASE_INSENSITIVE)\n",
+            "\n",
+            "    Identifier\t\t\t\t\t: 33d13da9-f1c8-4d2a-b9c7-71ab9dbe5fe2\n",
+            "    Volume label\t\t\t\t: apfs_test\n",
+            "\n"
         );
-        assert_eq!(
-            test_struct.volume_label,
-            Some(ByteString::from("apfs_test"))
-        );
-        assert_eq!(test_struct.feature_flags, 0x00000002);
-        assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000000);
-        assert_eq!(test_struct.incompatible_feature_flags, 0x00000001);
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
 
         Ok(())
     }

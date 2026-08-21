@@ -16,7 +16,7 @@ use std::fmt;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_formats::Path;
-use keramics_formats::fat::{FatFileEntry, FatFileSystem, FatFormat, FatString};
+use keramics_formats::fat::{FatFileEntry, FatFileSystem, FatFormat};
 
 use crate::formatters::ByteSize;
 
@@ -86,41 +86,15 @@ impl fmt::Display for FatFileAttributeFlagsInfo {
 }
 
 /// File Allocation Table (FAT) file entry information.
-struct FatFileEntryInfo {
-    /// The identifier.
-    pub identifier: u32,
-
-    /// The name.
-    pub name: Option<FatString>,
-
-    /// The size.
-    pub size: u64,
-
-    /// Creation date and time.
-    pub creation_time: Option<DateTime>,
-
-    /// Access date and time.
-    pub access_time: Option<DateTime>,
-
-    /// Modifiation date and time.
-    pub modification_time: Option<DateTime>,
-
-    /// File attribute flags.
-    pub file_attribute_flags: u8,
+struct FatFileEntryInfo<'a> {
+    /// File entry.
+    file_entry: &'a FatFileEntry,
 }
 
-impl FatFileEntryInfo {
+impl<'a> FatFileEntryInfo<'a> {
     /// Creates new file entry information.
-    fn new() -> Self {
-        Self {
-            identifier: 0,
-            name: None,
-            size: 0,
-            creation_time: None,
-            access_time: None,
-            modification_time: None,
-            file_attribute_flags: 0,
-        }
+    fn new(file_entry: &'a FatFileEntry) -> Self {
+        Self { file_entry }
     }
 
     /// Retrieves the string representation of a date and time value.
@@ -135,28 +109,28 @@ impl FatFileEntryInfo {
     }
 }
 
-impl fmt::Display for FatFileEntryInfo {
+impl<'a> fmt::Display for FatFileEntryInfo<'a> {
     /// Formats file entry information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(
             formatter,
             "    Identifier\t\t\t\t\t: 0x{:08x}",
-            self.identifier
+            self.file_entry.get_identifier()
         )?;
 
-        if let Some(name) = &self.name {
+        if let Some(name) = self.file_entry.get_name() {
             writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?;
         };
-        let byte_size: ByteSize = ByteSize::new(self.size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.file_entry.get_size(), 1024);
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
-        if let Some(date_time) = &self.creation_time {
+        if let Some(date_time) = self.file_entry.get_creation_time() {
             // TODO: convert to formatter.
             let date_time_string: String = Self::get_date_time_string(date_time);
 
             writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_string)?;
         }
-        if let Some(date_time) = &self.modification_time {
+        if let Some(date_time) = self.file_entry.get_modification_time() {
             // TODO: convert to formatter.
             let date_time_string: String = Self::get_date_time_string(date_time);
 
@@ -166,21 +140,57 @@ impl fmt::Display for FatFileEntryInfo {
                 date_time_string
             )?;
         }
-        if let Some(date_time) = &self.access_time {
+        if let Some(date_time) = self.file_entry.get_access_time() {
             // TODO: convert to formatter.
             let date_time_string: String = Self::get_date_time_string(date_time);
 
             writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_string)?;
         }
-        writeln!(
-            formatter,
-            "    File attribute flags\t\t\t: 0x{:02x}",
-            self.file_attribute_flags
-        )?;
-        let flags_info: FatFileAttributeFlagsInfo =
-            FatFileAttributeFlagsInfo::new(self.file_attribute_flags);
+        let flags: u8 = self.file_entry.get_file_attribute_flags();
+
+        writeln!(formatter, "    File attribute flags\t\t\t: 0x{:02x}", flags)?;
+        let flags_info: FatFileAttributeFlagsInfo = FatFileAttributeFlagsInfo::new(flags);
 
         flags_info.fmt(formatter)?;
+
+        writeln!(formatter)
+    }
+}
+
+/// File Allocation Table (FAT) file system information.
+struct FatFileSystemInfo<'a> {
+    /// File system.
+    file_system: &'a FatFileSystem,
+}
+
+impl<'a> FatFileSystemInfo<'a> {
+    /// Creates new file system information.
+    fn new(file_system: &'a FatFileSystem) -> Self {
+        Self { file_system }
+    }
+}
+
+impl<'a> fmt::Display for FatFileSystemInfo<'a> {
+    /// Formats file system information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(formatter, "File Allocation Table (FAT) information:")?;
+
+        let format_version: u8 = match self.file_system.get_format() {
+            FatFormat::Fat12 => 12,
+            FatFormat::Fat16 => 16,
+            FatFormat::Fat32 => 32,
+        };
+        writeln!(
+            formatter,
+            "    Format version\t\t\t\t: FAT-{}",
+            format_version
+        )?;
+
+        let volume_label: String = match self.file_system.get_volume_label() {
+            Some(volume_label) => volume_label.to_string(),
+            None => String::new(),
+        };
+        writeln!(formatter, "    Volume label\t\t\t\t: {}", volume_label)?;
 
         writeln!(formatter)
     }
@@ -190,21 +200,6 @@ impl fmt::Display for FatFileEntryInfo {
 pub struct FatInfo {}
 
 impl FatInfo {
-    /// Retrieves the file entry information.
-    fn get_file_entry_information(file_entry: &FatFileEntry) -> FatFileEntryInfo {
-        let mut file_entry_information: FatFileEntryInfo = FatFileEntryInfo::new();
-
-        file_entry_information.identifier = file_entry.get_identifier();
-        file_entry_information.name = file_entry.get_name();
-        file_entry_information.size = file_entry.get_size();
-        file_entry_information.creation_time = file_entry.get_creation_time().cloned();
-        file_entry_information.modification_time = file_entry.get_modification_time().cloned();
-        file_entry_information.access_time = file_entry.get_access_time().cloned();
-        file_entry_information.file_attribute_flags = file_entry.get_file_attribute_flags();
-
-        file_entry_information
-    }
-
     /// Opens a file system.
     pub fn open_file_system(
         data_stream: &DataStreamReference,
@@ -255,8 +250,7 @@ impl FatInfo {
             };
         println!("File Allocation Table (FAT) file entry information:");
 
-        let file_entry_information: FatFileEntryInfo =
-            Self::get_file_entry_information(&file_entry);
+        let file_entry_information: FatFileEntryInfo = FatFileEntryInfo::new(&file_entry);
 
         print!("{}", file_entry_information);
 
@@ -287,8 +281,7 @@ impl FatInfo {
 
         println!("    Path\t\t\t\t\t: {}", path);
 
-        let file_entry_information: FatFileEntryInfo =
-            Self::get_file_entry_information(&file_entry);
+        let file_entry_information: FatFileEntryInfo = FatFileEntryInfo::new(&file_entry);
 
         print!("{}", file_entry_information);
 
@@ -304,22 +297,9 @@ impl FatInfo {
                 return Err(error);
             }
         };
-        println!("File Allocation Table (FAT) information:");
+        let file_system_information: FatFileSystemInfo = FatFileSystemInfo::new(&fat_file_system);
 
-        let format_version: u8 = match &fat_file_system.format {
-            FatFormat::Fat12 => 12,
-            FatFormat::Fat16 => 16,
-            FatFormat::Fat32 => 32,
-        };
-        println!("    Format version\t\t\t\t: FAT-{}", format_version);
-
-        let volume_label: String = match fat_file_system.get_volume_label() {
-            Some(volume_label) => volume_label.to_string(),
-            None => String::new(),
-        };
-        println!("    Volume label\t\t\t\t: {}", volume_label);
-
-        println!();
+        print!("{}", file_system_information);
 
         Ok(())
     }
@@ -446,8 +426,6 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
-    use keramics_datetime::{FatDate, FatTimeDate, FatTimeDate10Ms};
-    use keramics_types::Ucs2String;
 
     use crate::assert_lines_eq;
 
@@ -459,7 +437,8 @@ mod tests {
 
         let path: Path = Path::from("/testdir1/testfile1");
         let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
-        let test_struct: FatFileEntryInfo = FatInfo::get_file_entry_information(&fat_file_entry);
+
+        let test_struct: FatFileEntryInfo = FatFileEntryInfo::new(&fat_file_entry);
 
         let expected_string: &str = concat!(
             "    Identifier\t\t\t\t\t: 0x00006260\n",
@@ -479,41 +458,21 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_information() -> Result<(), ErrorTrace> {
+    fn test_file_system_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/fat/fat12.raw");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let fat_file_system: FatFileSystem = FatInfo::open_file_system(&data_stream)?;
 
-        let path: Path = Path::from("/testdir1/testfile1");
-        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
-        let test_struct: FatFileEntryInfo = FatInfo::get_file_entry_information(&fat_file_entry);
+        let test_struct: FatFileSystemInfo = FatFileSystemInfo::new(&fat_file_system);
 
-        assert_eq!(test_struct.identifier, 0x00006260);
-        assert_eq!(
-            test_struct.name,
-            Some(FatString::Ucs2String(Ucs2String::from("testfile1")))
+        let expected_string: &str = concat!(
+            "File Allocation Table (FAT) information:\n",
+            "    Format version\t\t\t\t: FAT-12\n",
+            "    Volume label\t\t\t\t: FAT12_TEST\n",
+            "\n"
         );
-        assert_eq!(test_struct.size, 9);
-        assert_eq!(
-            test_struct.creation_time,
-            Some(DateTime::FatTimeDate10Ms(FatTimeDate10Ms {
-                date: 0x5b53,
-                time: 0x958f,
-                fraction: 0x7d,
-            }))
-        );
-        assert_eq!(
-            test_struct.modification_time,
-            Some(DateTime::FatTimeDate(FatTimeDate {
-                date: 0x5b53,
-                time: 0x958f
-            }))
-        );
-        assert_eq!(
-            test_struct.access_time,
-            Some(DateTime::FatDate(FatDate { date: 0x5b53 }))
-        );
-        assert_eq!(test_struct.file_attribute_flags, 0x20);
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
 
         Ok(())
     }

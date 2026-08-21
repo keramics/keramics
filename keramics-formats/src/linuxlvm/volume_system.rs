@@ -32,6 +32,7 @@ use super::physical_volume_label::LinuxLvmPhysicalVolumeLabel;
 use super::raw_location_descriptor::LinuxLvmRawLocationDescriptor;
 use super::volume::LinuxLvmVolume;
 use super::volume_group::LinuxLvmVolumeGroup;
+use super::volumes::LinuxLvmVolumesIterator;
 
 /// Linux Logical Volume Manager (LVM) volume system.
 pub struct LinuxLvmVolumeSystem {
@@ -131,6 +132,11 @@ impl LinuxLvmVolumeSystem {
             volume_index,
             logical_volume,
         ))
+    }
+
+    /// Retrieves a volumes iterator.
+    pub fn volumes(&self) -> LinuxLvmVolumesIterator<'_> {
+        LinuxLvmVolumesIterator::new(self, self.get_number_of_volumes())
     }
 
     /// Opens a storage media image.
@@ -470,6 +476,22 @@ mod tests {
     // TODO: add tests for get_number_of_physical_volumes
     // TODO: add tests for get_number_of_volumes
     // TODO: add tests for get_volume_by_index
+
+    #[test]
+    fn test_volumes() -> Result<(), ErrorTrace> {
+        let volume_system: LinuxLvmVolumeSystem = get_volume_system()?;
+
+        let mut volumes_iterator: LinuxLvmVolumesIterator = volume_system.volumes();
+
+        let result: Option<Result<LinuxLvmVolume, ErrorTrace>> = volumes_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<LinuxLvmVolume, ErrorTrace>> = volumes_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {

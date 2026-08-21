@@ -1,7 +1,7 @@
 # Extensible File Allocation Table (exFAT) file system format
 
-The Extensible File Allocation Table (exFAT) file system format is a successor
-of the [File Allocation Table (FAT)](fat.md) file system format.
+The Extensible File Allocation Table (exFAT) file system format is a successor of the
+[File Allocation Table (FAT)](fat.md) file system format.
 
 ## Overview
 
@@ -177,8 +177,8 @@ A directory entry is 32 bytes in size and consists of:
 | 2 | 22 | | Name string, which contains an UCS-2 little-endian string without an end-of-string character |
 | 24 | 8 | 0 | Unknown (Reserved) |
 
-> Note that the volume label directory entry should only be stored in the first
-> and/or second directory entry of the root directory.
+> Note that the volume label directory entry should only be stored in the first and/or second
+> directory entry of the root directory.
 
 ##### File entry directory entry
 

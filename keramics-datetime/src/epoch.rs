@@ -24,24 +24,13 @@ pub struct Epoch {
 }
 
 impl Epoch {
+    /// Creates a new epoch.
+    #[allow(dead_code)]
     pub fn new(year: i16, month: u8, day_of_month: u8) -> Self {
         Self {
             year,
             month,
             day_of_month,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_new() {
-        let test_struct: Epoch = Epoch::new(1970, 1, 1);
-        assert_eq!(test_struct.year, 1970);
-        assert_eq!(test_struct.month, 1);
-        assert_eq!(test_struct.day_of_month, 1);
     }
 }

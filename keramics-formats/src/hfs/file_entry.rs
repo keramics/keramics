@@ -73,6 +73,9 @@ pub struct HfsFileEntry {
     /// Compressed data header.
     compressed_data_header: Option<DecmpfsHeader>,
 
+    /// Value to indicate to hide the resource fork.
+    hide_resource_fork: bool,
+
     /// Sub directory entries.
     sub_directory_entries: IndexedHashMap<HfsString, HfsDirectoryEntry>,
 
@@ -108,6 +111,7 @@ impl HfsFileEntry {
             directory_entry,
             indirect_node: None,
             compressed_data_header: None,
+            hide_resource_fork: false,
             sub_directory_entries: IndexedHashMap::new(),
             sub_directory_entries_read: false,
             symbolic_link_target: None,
@@ -448,7 +452,7 @@ impl HfsFileEntry {
 
     /// Retrieves the resource fork.
     pub fn get_resource_fork(&mut self) -> Result<Option<HfsFork>, ErrorTrace> {
-        if self.compressed_data_header.is_some() {
+        if self.hide_resource_fork {
             return Ok(None);
         }
         let fork_descriptor: &HfsForkDescriptor = match self.get_resource_fork_descriptor() {
@@ -635,7 +639,7 @@ impl HfsFileEntry {
 
     /// Determines if the file entry has a resource fork.
     pub fn has_resource_fork(&self) -> bool {
-        if self.compressed_data_header.is_some() {
+        if self.hide_resource_fork {
             return false;
         }
         match self.get_resource_fork_descriptor() {
@@ -710,6 +714,24 @@ impl HfsFileEntry {
                             return Err(error);
                         }
                     }
+                    match self.get_data_fork_descriptor() {
+                        Some(fork_descriptor) => {
+                            if fork_descriptor.size != 0 {
+                                return Err(keramics_core::error_trace_new!(
+                                    "Unsupported non-empty data fork"
+                                ));
+                            }
+                        }
+                        None => {
+                            return Err(keramics_core::error_trace_new!(
+                                "Missing data fork descriptor"
+                            ));
+                        }
+                    }
+                    self.hide_resource_fork = match compressed_data_header.compression_method {
+                        4 | 8 | 12 | 14 => true,
+                        _ => false,
+                    };
                     self.compressed_data_header = Some(compressed_data_header);
                 }
                 _ => {

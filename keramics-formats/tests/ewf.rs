@@ -80,7 +80,7 @@ fn read_media() -> Result<(), ErrorTrace> {
     let mut image: EwfImage = open_image(&path_buf, "ext2.E01")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
-    assert_eq!(media_offset, image.media_size);
+    assert_eq!(media_offset, image.get_media_size());
     assert_eq!(md5_hash.as_str(), "b1760d0b35a512ef56970df4e6f8c5d6");
 
     Ok(())

@@ -289,6 +289,26 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_volume_system_information_fmt() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let apm_volume_system: ApmVolumeSystem = ApmInfo::open_volume_system(&data_stream)?;
+
+        let test_struct: ApmVolumeSystemInfo = ApmVolumeSystemInfo::new(&apm_volume_system);
+
+        let expected_string: &str = concat!(
+            "Apple Partition Map (APM) information:\n",
+            "    Bytes per sector\t\t\t\t: 512\n",
+            "    Number of partitions\t\t\t: 2\n",
+            "\n"
+        );
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
+
+        Ok(())
+    }
+
     // TODO: add tests for open_volume_system
     // TODO: add tests for print_volume_system
 }

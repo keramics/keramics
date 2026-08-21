@@ -58,10 +58,6 @@ struct CommandLineArguments {
     /// Enable debug output
     debug: bool,
 
-    #[arg(long, default_value_t = 0)]
-    /// Layer within the storage media image, where 1 represents the first layer
-    image_layer: usize,
-
     #[arg(long)]
     /// Password to unlock storage media image
     password: Vec<String>,
@@ -83,7 +79,7 @@ enum Commands {
     Bodyfile(BodyfileCommandArguments),
 
     /// Calculate digest hashes of a storage media image
-    Hash,
+    Hash(HashCommandArguments),
 
     /// Show the hierarchy of the volumes, partitions and file systems
     Hierarchy,
@@ -95,11 +91,30 @@ struct BodyfileCommandArguments {
     /// Calculate MD5 hashes of the content of file entries
     calculate_md5: bool,
 
+    #[arg(long, default_value_t = 0)]
+    /// Layer within the storage media image, where 1 represents the first layer
+    image_layer: usize,
+
+    /// Comma seperated list of partitions to include
+    #[arg(long)]
+    partitions: Option<String>,
+
     // TODO: allow to set the path component/segment separator
     // TODO: allow to set the data stream name separator
     /// Volume or partition path type
     #[arg(long, default_value_t = DisplayPathType::Index, value_enum)]
     volume_path_type: DisplayPathType,
+
+    /// Comma seperated list of volumes to include
+    #[arg(long)]
+    volumes: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct HashCommandArguments {
+    #[arg(long, default_value_t = 0)]
+    /// Layer within the storage media image, where 1 represents the first layer
+    image_layer: usize,
 }
 
 /// File mode information.
@@ -200,6 +215,8 @@ impl ImageTool {
         source: &PathBuf,
         calculate_md5: bool,
         image_layer: usize,
+        partitions: Option<&String>,
+        volumes: Option<&String>,
     ) -> Result<(), ErrorTrace> {
         let mut vfs_scanner: VfsScanner = VfsScanner::new();
 
@@ -214,8 +231,27 @@ impl ImageTool {
         }
         let mut vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
 
-        // TODO: set scanner options.
         vfs_scan_options.image_layer = image_layer;
+
+        if let Some(partitions_string) = partitions {
+            match vfs_scan_options.parse_partitions(partitions_string.as_str()) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to parse partitions");
+                    return Err(error);
+                }
+            }
+        }
+        if let Some(volumes_string) = volumes {
+            match vfs_scan_options.parse_volumes(volumes_string.as_str()) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to parse volumes");
+                    return Err(error);
+                }
+            }
+        }
+        // TODO: add scanner mediator.
 
         let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
         let vfs_location: VfsLocation = VfsLocation::from(source);
@@ -685,8 +721,122 @@ impl ImageTool {
         Ok(())
     }
 
-    /// Prints information about a scan node.
-    fn print_scan_node(&self, vfs_scan_node: &VfsScanNode, depth: usize) -> Result<(), ErrorTrace> {
+    /// Prints the scan node in bodyfile format.
+    fn print_scan_node_as_bodyfile(
+        &self,
+        vfs_scan_node: &VfsScanNode,
+        calculate_md5: bool,
+    ) -> Result<(), ErrorTrace> {
+        if vfs_scan_node.is_empty() {
+            // Only process scan nodes that contain a file system.
+            if !vfs_scan_node.is_file_system() {
+                return Ok(());
+            }
+            let file_system: VfsFileSystemReference =
+                match self.vfs_resolver.open_file_system(&vfs_scan_node.location) {
+                    Ok(file_system) => file_system,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open file system");
+                        return Err(error);
+                    }
+                };
+            let display_path: String = match vfs_scan_node.location.get_parent() {
+                Some(parent_path) => match self.display_path.get_path(parent_path) {
+                    Ok(path) => path,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve parent display path"
+                        );
+                        return Err(error);
+                    }
+                },
+                None => String::new(),
+            };
+            let mut vfs_finder: VfsFinder = VfsFinder::new(&file_system);
+
+            while let Some(result) = vfs_finder.next() {
+                match result {
+                    Ok((mut file_entry, path)) => {
+                        match self.print_file_entry_as_bodyfile(
+                            &mut file_entry,
+                            &display_path,
+                            &path,
+                            calculate_md5,
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to print file entry"
+                                );
+                                return Err(error);
+                            }
+                        }
+                    }
+                    Err(mut error) => {
+                        let path: &Path = vfs_finder.get_path();
+
+                        if self.stop_on_error {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve file entry from finder: {}{}",
+                                    display_path, path
+                                )
+                            );
+                            return Err(error);
+                        }
+                        // TODO: report file entry containing error
+                    }
+                };
+            }
+        } else {
+            for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
+                match self.print_scan_node_as_bodyfile(sub_scan_node, calculate_md5) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to print sub scan node"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Retrieves a hierarchy prefix.
+    fn get_hierarchy_prefix(&self, levels: &[bool]) -> String {
+        let number_of_levels: usize = levels.len();
+        let mut prefix: String = String::new();
+
+        for (level, is_last) in levels[0..number_of_levels].iter().enumerate() {
+            if level + 1 < number_of_levels {
+                if *is_last {
+                    prefix.push_str("    ");
+                } else {
+                    prefix.push_str("│   ");
+                }
+            } else {
+                if *is_last {
+                    prefix.push_str("└── ");
+                } else {
+                    prefix.push_str("├── ");
+                }
+            }
+        }
+        prefix
+    }
+
+    /// Prints the scan node as part of a hierarchy.
+    fn print_scan_node_as_hierarchy(
+        &self,
+        vfs_scan_node: &VfsScanNode,
+        levels: &mut Vec<bool>,
+    ) -> Result<(), ErrorTrace> {
         let result: Option<VfsFileEntry> = match self
             .vfs_resolver
             .get_file_entry_by_location(&vfs_scan_node.location)
@@ -697,9 +847,8 @@ impl ImageTool {
                 return Err(error);
             }
         };
-        let indentation: String = vec![" "; depth * 4].join("");
+        let prefix: String = self.get_hierarchy_prefix(levels);
         let path: &Path = vfs_scan_node.location.get_path();
-
         let vfs_type: &VfsType = vfs_scan_node.get_type();
 
         let path_string: String = match result.as_ref() {
@@ -796,103 +945,26 @@ impl ImageTool {
             },
             None => path.to_string(),
         };
-        println!("{}{}: path: {}", indentation, vfs_type, path_string);
+        println!("{}{}: path: {}", prefix, vfs_type, path_string);
 
-        for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
-            self.print_scan_node(sub_scan_node, depth + 1)?;
-        }
-        Ok(())
-    }
+        let number_of_sub_nodes: usize = vfs_scan_node.sub_nodes.len();
 
-    /// Prints the scan node in bodyfile format.
-    fn print_scan_node_as_bodyfile(
-        &self,
-        vfs_scan_node: &VfsScanNode,
-        calculate_md5: bool,
-    ) -> Result<(), ErrorTrace> {
-        if vfs_scan_node.is_empty() {
-            // Only process scan nodes that contain a file system.
-            if !vfs_scan_node.is_file_system() {
-                return Ok(());
-            }
-            let file_system: VfsFileSystemReference =
-                match self.vfs_resolver.open_file_system(&vfs_scan_node.location) {
-                    Ok(file_system) => file_system,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to open file system");
-                        return Err(error);
-                    }
-                };
-            let display_path: String = match vfs_scan_node.location.get_parent() {
-                Some(parent_path) => match self.display_path.get_path(parent_path) {
-                    Ok(path) => path,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve parent display path"
-                        );
-                        return Err(error);
-                    }
-                },
-                None => String::new(),
-            };
-            let mut vfs_finder: VfsFinder = VfsFinder::new(&file_system);
+        for (node_index, sub_scan_node) in vfs_scan_node.sub_nodes.iter().enumerate() {
+            let is_last: bool = node_index + 1 == number_of_sub_nodes;
 
-            while let Some(result) = vfs_finder.next() {
-                match result {
-                    Ok((mut file_entry, path)) => {
-                        match self.print_file_entry_as_bodyfile(
-                            &mut file_entry,
-                            &display_path,
-                            &path,
-                            calculate_md5,
-                        ) {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to print file entry"
-                                );
-                                return Err(error);
-                            }
-                        }
-                    }
-                    Err(mut error) => {
-                        let path: &Path = vfs_finder.get_path();
+            levels.push(is_last);
 
-                        if self.stop_on_error {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to retrieve file entry from finder: {}{}",
-                                    display_path, path
-                                )
-                            );
-                            return Err(error);
-                        }
-                        // TODO: report file entry containing error
-                    }
-                };
-            }
-        } else {
-            for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
-                match self.print_scan_node_as_bodyfile(sub_scan_node, calculate_md5) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to print sub scan node"
-                        );
-                        return Err(error);
-                    }
-                }
-            }
+            self.print_scan_node_as_hierarchy(sub_scan_node, levels)?;
+
+            levels.pop();
         }
         Ok(())
     }
 
     /// Scans and prints the hierarchy of volumes, partitions and file systems.
-    fn scan_for_hierarchy(&self, source: &PathBuf, image_layer: usize) -> Result<(), ErrorTrace> {
+    fn scan_for_hierarchy(&self, source: &PathBuf) -> Result<(), ErrorTrace> {
+        let vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
+
         let mut vfs_scanner: VfsScanner = VfsScanner::new();
 
         match vfs_scanner.build() {
@@ -904,11 +976,6 @@ impl ImageTool {
                 ));
             }
         }
-        let mut vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
-
-        // TODO: set scanner options.
-        vfs_scan_options.image_layer = image_layer;
-
         let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
         let vfs_location: VfsLocation = VfsLocation::from(source);
 
@@ -921,8 +988,10 @@ impl ImageTool {
         }
         // TODO: print source type.
 
+        let mut levels: Vec<bool> = Vec::new();
+
         match vfs_scan_context.root_node {
-            Some(scan_node) => match self.print_scan_node(&scan_node, 0) {
+            Some(scan_node) => match self.print_scan_node_as_hierarchy(&scan_node, &mut levels) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to print root scan node");
@@ -982,7 +1051,9 @@ fn main() -> ExitCode {
             match image_tool.generate_bodyfile(
                 &arguments.source,
                 command_arguments.calculate_md5,
-                arguments.image_layer,
+                command_arguments.image_layer,
+                command_arguments.partitions.as_ref(),
+                command_arguments.volumes.as_ref(),
             ) {
                 Ok(_) => {}
                 Err(error) => {
@@ -994,9 +1065,9 @@ fn main() -> ExitCode {
                 }
             }
         }
-        Some(Commands::Hash) => {
+        Some(Commands::Hash(command_arguments)) => {
             let storage_media_image: StorageMediaImage =
-                match StorageMediaImage::open(&arguments.source, arguments.image_layer) {
+                match StorageMediaImage::open(&arguments.source, command_arguments.image_layer) {
                     Ok(storage_media_image) => storage_media_image,
                     Err(error) => {
                         println!(
@@ -1251,7 +1322,7 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         }
-        _ => match image_tool.scan_for_hierarchy(&arguments.source, arguments.image_layer) {
+        _ => match image_tool.scan_for_hierarchy(&arguments.source) {
             Ok(_) => {}
             Err(error) => {
                 println!(

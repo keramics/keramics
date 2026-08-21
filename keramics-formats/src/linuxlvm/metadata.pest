@@ -23,10 +23,6 @@ WHITESPACE = _{
     ("\u{0020}" | "\u{0009}" | "\u{000a}" | "\u{000d}")+
 }
 
-identifier = @{
-    (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")*
-}
-
 integer = @{
     "-"? ~ ASCII_DIGIT+
 }
@@ -37,6 +33,10 @@ string = @{
 
 list_of_strings = {
     "[" ~ (string ~ ("," ~ string)*)? ~ ","? ~ "]"
+}
+
+property_name = @{
+    (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")*
 }
 
 property_value = {
@@ -56,55 +56,63 @@ metadata = {
 }
 
 global_property = {
-    identifier ~ "=" ~ property_value
+    property_name ~ "=" ~ property_value
+}
+
+volume_group_name = @{
+    (ASCII_ALPHANUMERIC | "_" | "+" | ".") ~ (ASCII_ALPHANUMERIC | "_" | "+" | "." | "-")*
 }
 
 volume_group = {
-    identifier ~ "{" ~ (volume_group_property | physical_volumes | logical_volumes)* ~ "}"
+    volume_group_name ~ "{" ~ (volume_group_property | physical_volumes | logical_volumes)* ~ "}"
 }
 
 volume_group_property = {
-    identifier ~ "=" ~ property_value
+    property_name ~ "=" ~ property_value
 }
 
 physical_volumes = {
     "physical_volumes" ~ "{" ~ physical_volume* ~ "}"
 }
 
-physical_volume_identifier = @{
+physical_volume_name = @{
     "pv" ~ ASCII_DIGIT+
 }
 
 physical_volume = {
-    physical_volume_identifier ~ "{" ~ physical_volume_property* ~ "}"
+    physical_volume_name ~ "{" ~ physical_volume_property* ~ "}"
 }
 
 physical_volume_property = {
-    identifier ~ "=" ~ property_value
+    property_name ~ "=" ~ property_value
 }
 
 logical_volumes = {
      "logical_volumes" ~ "{" ~ logical_volume* ~ "}"
 }
 
+logical_volume_name = @{
+    (ASCII_ALPHANUMERIC | "_" | "+" | "." | "-")*
+}
+
 logical_volume = {
-    identifier ~ "{" ~ (logical_volume_property | segment)* ~ "}"
+    logical_volume_name ~ "{" ~ (logical_volume_property | segment)* ~ "}"
 }
 
 logical_volume_property = {
-    identifier ~ "=" ~ property_value
+    property_name ~ "=" ~ property_value
 }
 
-segment_identifier = @{
+segment_name = @{
     "segment" ~ ASCII_DIGIT+
 }
 
 segment = {
-    segment_identifier ~ "{" ~ (segment_property | stripes)* ~ "}"
+    segment_name ~ "{" ~ (segment_property | stripes)* ~ "}"
 }
 
 segment_property = {
-    identifier ~ "=" ~ property_value
+    property_name ~ "=" ~ property_value
 }
 
 stripes = {
@@ -112,5 +120,5 @@ stripes = {
 }
 
 stripe = {
-    "\"" ~ physical_volume_identifier ~ "\"" ~ "," ~ integer
+    "\"" ~ physical_volume_name ~ "\"" ~ "," ~ integer
 }

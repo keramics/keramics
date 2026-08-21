@@ -154,3 +154,64 @@ pub enum EncodingType {
     /// Windows-1258 (Vietnamese)
     Windows1258,
 }
+
+/// Format types.
+#[derive(Clone, ValueEnum)]
+pub enum FormatType {
+    /// Apple Partition Map (APM)
+    Apm,
+
+    /// Apple File System (APFS)
+    Apfs,
+
+    /// Mac OS Encrypted Encoding (cdsaencr)
+    CdsaEncr,
+
+    /// Expert Witness Compression Format (EWF)
+    Ewf,
+
+    /// Extended File System (ext)
+    Ext,
+
+    /// File Allocation Table (FAT)
+    Fat,
+
+    /// GUID Partition Table (GPT)
+    Gpt,
+
+    /// Hierarchical File System (HFS)
+    Hfs,
+
+    /// Linux Logical Volume Manager (LVM)
+    LinuxLvm,
+
+    /// Master Boot Record (MBR)
+    Mbr,
+
+    /// New Technologies File System (NTFS)
+    Ntfs,
+
+    /// Parallels Disk Image (PDI)
+    Pdi,
+
+    /// QEMU Copy-On-Write (QCOW)
+    Qcow,
+
+    /// Mac OS sparse bundle (.sparsebundle)
+    SparseBundle,
+
+    /// Mac OS sparse image (.sparseimage)
+    SparseImage,
+
+    /// Universal Disk Image Format (UDIF)
+    Udif,
+
+    /// Virtual Hard Disk (VHD)
+    Vhd,
+
+    /// Virtual Hard Disk version 2 (VHDX)
+    Vhdx,
+
+    /// VMware Virtual Disk (VMDK)
+    Vmdk,
+}

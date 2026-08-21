@@ -105,14 +105,19 @@ impl BlockReader for ApfsBlockReader {
                 min(read_size - data_offset, range_remainder_size as usize);
             let data_end_offset: usize = data_offset + range_read_size;
 
-            let range_physical_offset: u64 =
-                (extent.physical_block_number as u64) * (self.block_size as u64);
+            // An extent with physical block number 0 is sparse.
+            if extent.physical_block_number == 0 {
+                data[data_offset..data_end_offset].fill(0);
+            } else {
+                let range_physical_offset: u64 =
+                    (extent.physical_block_number as u64) * (self.block_size as u64);
 
-            keramics_core::data_stream_read_exact_at_position!(
-                &self.data_stream,
-                &mut data[data_offset..data_end_offset],
-                SeekFrom::Start(range_physical_offset + range_relative_offset)
-            );
+                keramics_core::data_stream_read_exact_at_position!(
+                    &self.data_stream,
+                    &mut data[data_offset..data_end_offset],
+                    SeekFrom::Start(range_physical_offset + range_relative_offset)
+                );
+            }
             data_offset = data_end_offset;
             current_offset += range_read_size as u64;
             extent_index += 1;

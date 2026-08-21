@@ -136,42 +136,9 @@ impl<'a> fmt::Display for ExtDateTimeInfo<'a> {
 }
 
 /// Extended File System (ext) file entry information.
-struct ExtFileEntryInfo {
-    /// The inode number.
-    pub inode_number: u32,
-
-    /// The name.
-    pub name: Option<ByteString>,
-
-    /// The size.
-    pub size: u64,
-
-    /// Creation date and time.
-    pub creation_time: Option<DateTime>,
-
-    /// Modification date and time.
-    pub modification_time: Option<DateTime>,
-
-    /// Access date and time.
-    pub access_time: Option<DateTime>,
-
-    /// Change date and time.
-    pub change_time: Option<DateTime>,
-
-    /// Deletion date and time.
-    pub deletion_time: DateTime,
-
-    /// Number of links.
-    pub number_of_links: u16,
-
-    /// Owner identifier.
-    pub owner_identifier: u32,
-
-    /// Group identifier.
-    pub group_identifier: u32,
-
-    /// File mode.
-    pub file_mode: u16,
+struct ExtFileEntryInfo<'a> {
+    /// File entry.
+    file_entry: &'a ExtFileEntry,
 
     /// Device identifier.
     pub device_identifier: Option<u16>,
@@ -180,45 +147,38 @@ struct ExtFileEntryInfo {
     pub symbolic_link_target: Option<ByteString>,
 }
 
-impl ExtFileEntryInfo {
+impl<'a> ExtFileEntryInfo<'a> {
     /// Creates new file entry information.
-    fn new() -> Self {
+    fn new(file_entry: &'a ExtFileEntry) -> Self {
         Self {
-            inode_number: 0,
-            name: None,
-            size: 0,
-            creation_time: None,
-            modification_time: None,
-            access_time: None,
-            change_time: None,
-            deletion_time: DateTime::NotSet,
-            number_of_links: 0,
-            owner_identifier: 0,
-            group_identifier: 0,
-            file_mode: 0,
+            file_entry,
             device_identifier: None,
             symbolic_link_target: None,
         }
     }
 }
 
-impl fmt::Display for ExtFileEntryInfo {
+impl<'a> fmt::Display for ExtFileEntryInfo<'a> {
     /// Formats file entry information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(formatter, "    Inode number\t\t\t\t: {}", self.inode_number)?;
+        writeln!(
+            formatter,
+            "    Inode number\t\t\t\t: {}",
+            self.file_entry.get_inode_number()
+        )?;
 
-        if let Some(name) = &self.name {
+        if let Some(name) = self.file_entry.get_name() {
             writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?;
         };
-        let byte_size: ByteSize = ByteSize::new(self.size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.file_entry.get_size(), 1024);
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
-        if let Some(date_time) = &self.creation_time {
+        if let Some(date_time) = self.file_entry.get_creation_time() {
             let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(date_time);
 
             writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
         }
-        if let Some(date_time) = &self.modification_time {
+        if let Some(date_time) = self.file_entry.get_modification_time() {
             let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(date_time);
 
             writeln!(
@@ -227,12 +187,12 @@ impl fmt::Display for ExtFileEntryInfo {
                 date_time_info
             )?;
         }
-        if let Some(date_time) = &self.access_time {
+        if let Some(date_time) = self.file_entry.get_access_time() {
             let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(date_time);
 
             writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_info)?;
         }
-        if let Some(date_time) = &self.change_time {
+        if let Some(date_time) = self.file_entry.get_change_time() {
             let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(date_time);
 
             writeln!(
@@ -241,26 +201,28 @@ impl fmt::Display for ExtFileEntryInfo {
                 date_time_info
             )?;
         }
-        let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(&self.deletion_time);
+        let date_time_info: ExtDateTimeInfo =
+            ExtDateTimeInfo::new(self.file_entry.get_deletion_time());
 
         writeln!(formatter, "    Deletion time\t\t\t\t: {}", date_time_info)?;
 
         writeln!(
             formatter,
             "    Number of links\t\t\t\t: {}",
-            self.number_of_links
+            self.file_entry.get_number_of_links()
         )?;
         writeln!(
             formatter,
             "    Owner identifier\t\t\t\t: {}",
-            self.owner_identifier
+            self.file_entry.get_owner_identifier()
         )?;
         writeln!(
             formatter,
             "    Group identifier\t\t\t\t: {}",
-            self.group_identifier
+            self.file_entry.get_group_identifier()
         )?;
-        let file_mode_info: PosixFileModeInfo = PosixFileModeInfo::new(self.file_mode);
+        let file_mode_info: PosixFileModeInfo =
+            PosixFileModeInfo::new(self.file_entry.get_file_mode());
 
         writeln!(formatter, "    File mode\t\t\t\t\t: {}", file_mode_info)?;
 
@@ -284,61 +246,19 @@ impl fmt::Display for ExtFileEntryInfo {
 }
 
 /// Extended File System (ext) file system information.
-struct ExtFileSystemInfo {
-    /// Format version.
-    format_version: u8,
-
-    /// Compatible feature flags.
-    compatible_feature_flags: u32,
-
-    /// Read-only compatible feature flags.
-    read_only_compatible_feature_flags: u32,
-
-    /// Incompatible feature flags.
-    incompatible_feature_flags: u32,
-
-    /// Volume label.
-    volume_label: Option<ByteString>,
-
-    /// Block size.
-    block_size: u32,
-
-    /// Inode size.
-    inode_size: u16,
-
-    /// Number of inodes.
-    number_of_inodes: u32,
-
-    /// Last mount path.
-    last_mount_path: Option<ByteString>,
-
-    /// Last mount time.
-    last_mount_time: DateTime,
-
-    /// Last written time.
-    last_written_time: DateTime,
+struct ExtFileSystemInfo<'a> {
+    /// File system.
+    file_system: &'a ExtFileSystem,
 }
 
-impl ExtFileSystemInfo {
+impl<'a> ExtFileSystemInfo<'a> {
     /// Creates new file system information.
-    fn new() -> Self {
-        Self {
-            format_version: 0,
-            compatible_feature_flags: 0,
-            read_only_compatible_feature_flags: 0,
-            incompatible_feature_flags: 0,
-            volume_label: None,
-            block_size: 0,
-            inode_size: 0,
-            number_of_inodes: 0,
-            last_mount_path: None,
-            last_mount_time: DateTime::NotSet,
-            last_written_time: DateTime::NotSet,
-        }
+    fn new(file_system: &'a ExtFileSystem) -> Self {
+        Self { file_system }
     }
 }
 
-impl fmt::Display for ExtFileSystemInfo {
+impl<'a> fmt::Display for ExtFileSystemInfo<'a> {
     /// Formats file sytem information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Extended File System (ext) information:")?;
@@ -346,53 +266,58 @@ impl fmt::Display for ExtFileSystemInfo {
         writeln!(
             formatter,
             "    Format version\t\t\t\t: ext{}",
-            self.format_version
+            self.file_system.get_format_version()
         )?;
+        let flags: u32 = self.file_system.get_compatible_feature_flags();
+
         writeln!(
             formatter,
             "    Compatible features\t\t\t\t: 0x{:08x}",
-            self.compatible_feature_flags
+            flags
         )?;
-        let flags_info: ExtCompatibleFeatureFlagsInfo =
-            ExtCompatibleFeatureFlagsInfo::new(self.compatible_feature_flags);
+        let flags_info: ExtCompatibleFeatureFlagsInfo = ExtCompatibleFeatureFlagsInfo::new(flags);
         writeln!(formatter, "{}", flags_info)?;
+
+        let flags: u32 = self.file_system.get_read_only_compatible_feature_flags();
 
         writeln!(
             formatter,
             "    Read-only compatible features\t\t: 0x{:08x}",
-            self.read_only_compatible_feature_flags
+            flags
         )?;
         let flags_info: ExtReadOnlyCompatibleFeatureFlagsInfo =
-            ExtReadOnlyCompatibleFeatureFlagsInfo::new(self.read_only_compatible_feature_flags);
+            ExtReadOnlyCompatibleFeatureFlagsInfo::new(flags);
         writeln!(formatter, "{}", flags_info)?;
+
+        let flags: u32 = self.file_system.get_incompatible_feature_flags();
 
         writeln!(
             formatter,
             "    Incompatible features\t\t\t: 0x{:08x}",
-            self.incompatible_feature_flags
+            flags
         )?;
         let flags_info: ExtIncompatibleFeatureFlagsInfo =
-            ExtIncompatibleFeatureFlagsInfo::new(self.incompatible_feature_flags);
+            ExtIncompatibleFeatureFlagsInfo::new(flags);
         writeln!(formatter, "{}", flags_info)?;
 
-        let volume_label: String = match &self.volume_label {
+        let volume_label: String = match self.file_system.get_volume_label() {
             Some(volume_label) => volume_label.to_string(),
             None => String::new(),
         };
         writeln!(formatter, "    Volume label\t\t\t\t: {}", volume_label)?;
 
-        let byte_size: ByteSize = ByteSize::new(self.block_size as u64, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.file_system.get_block_size() as u64, 1024);
         writeln!(formatter, "    Block size\t\t\t\t\t: {}", byte_size)?;
 
-        let byte_size: ByteSize = ByteSize::new(self.inode_size as u64, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.file_system.get_inode_size() as u64, 1024);
         writeln!(formatter, "    Inode size\t\t\t\t\t: {}", byte_size)?;
 
         writeln!(
             formatter,
             "    Number of inodes\t\t\t\t: {}",
-            self.number_of_inodes
+            self.file_system.get_number_of_inodes()
         )?;
-        let last_mount_path: String = match &self.last_mount_path {
+        let last_mount_path: String = match self.file_system.get_last_mount_path() {
             Some(last_mount_path) => last_mount_path.to_string(),
             None => String::new(),
         };
@@ -401,18 +326,19 @@ impl fmt::Display for ExtFileSystemInfo {
             "    Last mount path\t\t\t\t: {}",
             last_mount_path
         )?;
-        let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(&self.last_mount_time);
+        let date_time_info: ExtDateTimeInfo =
+            ExtDateTimeInfo::new(self.file_system.get_last_mount_time());
 
         writeln!(formatter, "    Last mount time\t\t\t\t: {}", date_time_info)?;
 
-        let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(&self.last_written_time);
+        let date_time_info: ExtDateTimeInfo =
+            ExtDateTimeInfo::new(self.file_system.get_last_written_time());
 
         writeln!(
             formatter,
             "    Last written time\t\t\t\t: {}",
             date_time_info
         )?;
-
         writeln!(formatter)
     }
 }
@@ -658,70 +584,6 @@ impl fmt::Display for ExtReadOnlyCompatibleFeatureFlagsInfo {
 pub struct ExtInfo {}
 
 impl ExtInfo {
-    /// Retrieves the file entry information.
-    fn get_file_entry_information(
-        file_entry: &mut ExtFileEntry,
-    ) -> Result<ExtFileEntryInfo, ErrorTrace> {
-        let mut file_entry_information: ExtFileEntryInfo = ExtFileEntryInfo::new();
-
-        file_entry_information.inode_number = file_entry.get_inode_number();
-        file_entry_information.name = file_entry.get_name().cloned();
-        file_entry_information.size = file_entry.get_size();
-        file_entry_information.creation_time = file_entry.get_creation_time().cloned();
-        file_entry_information.modification_time = file_entry.get_modification_time().cloned();
-        file_entry_information.access_time = file_entry.get_access_time().cloned();
-        file_entry_information.change_time = file_entry.get_change_time().cloned();
-        file_entry_information.deletion_time = file_entry.get_deletion_time().clone();
-        file_entry_information.number_of_links = file_entry.get_number_of_links();
-        file_entry_information.owner_identifier = file_entry.get_owner_identifier();
-        file_entry_information.group_identifier = file_entry.get_group_identifier();
-        file_entry_information.file_mode = file_entry.get_file_mode();
-
-        match file_entry.get_device_identifier() {
-            Ok(result) => file_entry_information.device_identifier = result,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to retrieve device identifier"
-                );
-                return Err(error);
-            }
-        }
-        match file_entry.get_symbolic_link_target() {
-            Ok(result) => file_entry_information.symbolic_link_target = result.cloned(),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to retrieve symbolic link target"
-                );
-                return Err(error);
-            }
-        }
-        Ok(file_entry_information)
-    }
-
-    /// Retrieves the file system information.
-    fn get_file_system_information(ext_file_system: &ExtFileSystem) -> ExtFileSystemInfo {
-        let mut file_system_information: ExtFileSystemInfo = ExtFileSystemInfo::new();
-
-        file_system_information.format_version = ext_file_system.get_format_version();
-        file_system_information.compatible_feature_flags =
-            ext_file_system.get_compatible_feature_flags();
-        file_system_information.read_only_compatible_feature_flags =
-            ext_file_system.get_read_only_compatible_feature_flags();
-        file_system_information.incompatible_feature_flags =
-            ext_file_system.get_incompatible_feature_flags();
-        file_system_information.volume_label = ext_file_system.get_volume_label().cloned();
-        file_system_information.block_size = ext_file_system.get_block_size();
-        file_system_information.inode_size = ext_file_system.get_inode_size();
-        file_system_information.number_of_inodes = ext_file_system.get_number_of_inodes();
-        file_system_information.last_mount_path = ext_file_system.get_last_mount_path().cloned();
-        file_system_information.last_mount_time = ext_file_system.get_last_mount_time().clone();
-        file_system_information.last_written_time = ext_file_system.get_last_written_time().clone();
-
-        file_system_information
-    }
-
     /// Opens a file system.
     pub fn open_file_system(
         data_stream: &DataStreamReference,
@@ -754,17 +616,30 @@ impl ExtInfo {
 
     /// Prints information about a file entry.
     fn print_file_entry(file_entry: &mut ExtFileEntry) -> Result<(), ErrorTrace> {
-        let file_entry_information: ExtFileEntryInfo =
-            match Self::get_file_entry_information(file_entry) {
-                Ok(file_entry_information) => file_entry_information,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve file entry information"
-                    );
-                    return Err(error);
-                }
-            };
+        let device_identifier: Option<u16> = match file_entry.get_device_identifier() {
+            Ok(result) => result,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve device identifier"
+                );
+                return Err(error);
+            }
+        };
+        let symbolic_link_target: Option<ByteString> = match file_entry.get_symbolic_link_target() {
+            Ok(link_target) => link_target.cloned(),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve symbolic link target"
+                );
+                return Err(error);
+            }
+        };
+        let mut file_entry_information: ExtFileEntryInfo = ExtFileEntryInfo::new(&file_entry);
+        file_entry_information.device_identifier = device_identifier;
+        file_entry_information.symbolic_link_target = symbolic_link_target;
+
         print!("{}", file_entry_information);
 
         let number_of_attributes: usize = match file_entry.get_number_of_extended_attributes() {
@@ -901,8 +776,7 @@ impl ExtInfo {
                     return Err(error);
                 }
             };
-        let file_system_information: ExtFileSystemInfo =
-            Self::get_file_system_information(&ext_file_system);
+        let file_system_information: ExtFileSystemInfo = ExtFileSystemInfo::new(&ext_file_system);
 
         print!("{}", file_system_information);
 
@@ -1086,8 +960,13 @@ mod tests {
         let path: Path = Path::from("/testdir1/testfile1");
         let mut ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&path)?.unwrap();
-        let test_struct: ExtFileEntryInfo =
-            ExtInfo::get_file_entry_information(&mut ext_file_entry)?;
+
+        let device_identifier: Option<u16> = ext_file_entry.get_device_identifier()?;
+        let symbolic_link_target: Option<ByteString> =
+            ext_file_entry.get_symbolic_link_target()?.cloned();
+        let mut test_struct: ExtFileEntryInfo = ExtFileEntryInfo::new(&ext_file_entry);
+        test_struct.device_identifier = device_identifier;
+        test_struct.symbolic_link_target = symbolic_link_target;
 
         let expected_string: &str = concat!(
             "    Inode number\t\t\t\t: 14\n",
@@ -1101,6 +980,45 @@ mod tests {
             "    Owner identifier\t\t\t\t: 1000\n",
             "    Group identifier\t\t\t\t: 1000\n",
             "    File mode\t\t\t\t\t: -rw-r--r-- (0o100644)\n",
+            "\n"
+        );
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_file_system_information_fmt() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let ext_file_system: ExtFileSystem =
+            ExtInfo::open_file_system(&data_stream, Some(&CharacterEncoding::Utf8))?;
+
+        let test_struct: ExtFileSystemInfo = ExtFileSystemInfo::new(&ext_file_system);
+
+        let expected_string: &str = concat!(
+            "Extended File System (ext) information:\n",
+            "    Format version\t\t\t\t: ext2\n",
+            "    Compatible features\t\t\t\t: 0x00000038\n",
+            "        0x00000008: Has extended attributes (EXT2_FEATURE_COMPAT_EXT_ATTR)\n",
+            "        0x00000010: Is resizable (EXT2_FEATURE_COMPAT_RESIZE_INO)\n",
+            "        0x00000020: Has indexed directories (EXT2_FEATURE_COMPAT_DIR_INDEX)\n",
+            "\n",
+            "    Read-only compatible features\t\t: 0x00000003\n",
+            "        0x00000001: Has sparse superblocks and group descriptor tables (EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER)\n",
+            "        0x00000002: Contains large files (EXT2_FEATURE_RO_COMPAT_LARGE_FILE)\n",
+            "\n",
+            "    Incompatible features\t\t\t: 0x00000002\n",
+            "        0x00000002: Directory entry has file type (EXT2_FEATURE_INCOMPAT_FILETYPE)\n",
+            "\n",
+            "    Volume label\t\t\t\t: ext2_test\n",
+            "    Block size\t\t\t\t\t: 1.0 KiB (1024 bytes)\n",
+            "    Inode size\t\t\t\t\t: 128 bytes\n",
+            "    Number of inodes\t\t\t\t: 1024\n",
+            "    Last mount path\t\t\t\t: /mnt/keramics\n",
+            "    Last mount time\t\t\t\t: 2025-01-04T07:58:02\n",
+            "    Last written time\t\t\t\t: 2025-01-04T07:58:02\n",
             "\n"
         );
         let string: String = test_struct.to_string();
@@ -1135,85 +1053,6 @@ mod tests {
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
 
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_entry_information() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let ext_file_system: ExtFileSystem =
-            ExtInfo::open_file_system(&data_stream, Some(&CharacterEncoding::Utf8))?;
-
-        let path: Path = Path::from("/testdir1/testfile1");
-        let mut ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
-        let test_struct: ExtFileEntryInfo =
-            ExtInfo::get_file_entry_information(&mut ext_file_entry)?;
-
-        assert_eq!(test_struct.inode_number, 14);
-        assert_eq!(test_struct.name, Some(ByteString::from("testfile1")));
-        assert_eq!(test_struct.size, 9);
-        assert_eq!(test_struct.creation_time, None);
-        assert_eq!(
-            test_struct.modification_time,
-            Some(DateTime::PosixTime32(PosixTime32::new(1735977481)))
-        );
-        assert_eq!(
-            test_struct.access_time,
-            Some(DateTime::PosixTime32(PosixTime32::new(1735977482)))
-        );
-        assert_eq!(
-            test_struct.change_time,
-            Some(DateTime::PosixTime32(PosixTime32::new(1735977481)))
-        );
-        assert_eq!(test_struct.deletion_time, DateTime::NotSet);
-        assert_eq!(test_struct.number_of_links, 2);
-        assert_eq!(test_struct.owner_identifier, 1000);
-        assert_eq!(test_struct.group_identifier, 1000);
-        assert_eq!(test_struct.file_mode, 0o100644);
-        assert_eq!(test_struct.device_identifier, None);
-        assert_eq!(test_struct.symbolic_link_target, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_system_information() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let ext_file_system: ExtFileSystem =
-            ExtInfo::open_file_system(&data_stream, Some(&CharacterEncoding::Utf8))?;
-
-        let test_struct: ExtFileSystemInfo = ExtInfo::get_file_system_information(&ext_file_system);
-
-        assert_eq!(test_struct.format_version, 2);
-        assert_eq!(test_struct.compatible_feature_flags, 0x00000038);
-        assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000003);
-        assert_eq!(test_struct.incompatible_feature_flags, 0x00000002);
-        assert_eq!(
-            test_struct.volume_label,
-            Some(ByteString::from("ext2_test"))
-        );
-        assert_eq!(test_struct.block_size, 1024);
-        assert_eq!(test_struct.inode_size, 128);
-        assert_eq!(test_struct.number_of_inodes, 1024);
-        assert_eq!(
-            test_struct.last_mount_path,
-            Some(ByteString::from("/mnt/keramics"))
-        );
-        assert_eq!(
-            test_struct.last_mount_time,
-            DateTime::PosixTime32(PosixTime32 {
-                timestamp: 1735977482
-            })
-        );
-        assert_eq!(
-            test_struct.last_written_time,
-            DateTime::PosixTime32(PosixTime32 {
-                timestamp: 1735977482
-            })
-        );
         Ok(())
     }
 
