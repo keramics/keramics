@@ -607,6 +607,20 @@ impl ApfsFileEntry {
                         return Err(error);
                     }
                 }
+                match self.inode.data_stream_descriptor.as_ref() {
+                    Some(data_stream_descriptor) => {
+                        if data_stream_descriptor.size != 0 {
+                            return Err(keramics_core::error_trace_new!(
+                                "Unsupported non-empty data fork"
+                            ));
+                        }
+                    }
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Missing data fork data stream descriptor"
+                        ));
+                    }
+                }
                 self.compressed_data_header = Some(compressed_data_header);
             }
             None => {}

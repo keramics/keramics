@@ -464,6 +464,23 @@ fn main() -> ExitCode {
     let format_identifier: FormatIdentifier = match &arguments.format {
         Some(FormatType::Apm) => FormatIdentifier::Apm,
         Some(FormatType::Apfs) => FormatIdentifier::Apfs,
+        Some(FormatType::CdsaEncr) => FormatIdentifier::CdsaEncr,
+        Some(FormatType::Ewf) => FormatIdentifier::Ewf,
+        Some(FormatType::Ext) => FormatIdentifier::Ext,
+        Some(FormatType::Fat) => FormatIdentifier::Fat,
+        Some(FormatType::Gpt) => FormatIdentifier::Gpt,
+        Some(FormatType::Hfs) => FormatIdentifier::Hfs,
+        Some(FormatType::LinuxLvm) => FormatIdentifier::LinuxLvm,
+        Some(FormatType::Mbr) => FormatIdentifier::Mbr,
+        Some(FormatType::Ntfs) => FormatIdentifier::Ntfs,
+        Some(FormatType::Pdi) => FormatIdentifier::Pdi,
+        Some(FormatType::Qcow) => FormatIdentifier::Qcow,
+        Some(FormatType::SparseBundle) => FormatIdentifier::SparseBundle,
+        Some(FormatType::SparseImage) => FormatIdentifier::SparseImage,
+        Some(FormatType::Udif) => FormatIdentifier::Udif,
+        Some(FormatType::Vhd) => FormatIdentifier::Vhd,
+        Some(FormatType::Vhdx) => FormatIdentifier::Vhdx,
+        Some(FormatType::Vmdk) => FormatIdentifier::Vmdk,
         None => {
             if !arguments.image
                 && arguments.source.is_dir()

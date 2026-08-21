@@ -116,7 +116,10 @@ impl ExportTool {
         if vfs_scan_node.is_empty() {
             let vfs_location: VfsLocation = vfs_scan_node.location.new_with_parent(path.clone());
 
-            match self.vfs_resolver.get_data_stream_by_location_and_name(&vfs_location, name) {
+            match self
+                .vfs_resolver
+                .get_data_stream_by_location_and_name(&vfs_location, name)
+            {
                 Ok(Some(data_stream)) => {
                     // TODO: sanitize output path, file name and data stream name.
                     match create_dir_all(&self.output_path) {
