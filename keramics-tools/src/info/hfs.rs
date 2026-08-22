@@ -25,24 +25,59 @@ use crate::formatters::ByteSize;
 use super::constants::*;
 use super::posix::PosixFileModeInfo;
 
+/// Hierarchical File System (HFS) date and time information.
+struct HfsTimeInfo<'a> {
+    /// Format.
+    format: HfsFormat,
+
+    /// Flags.
+    date_time: &'a DateTime,
+}
+
+impl<'a> HfsTimeInfo<'a> {
+    /// Creates new date and time information.
+    fn new(format: &HfsFormat, date_time: &'a DateTime) -> Self {
+        Self {
+            format: format.clone(),
+            date_time,
+        }
+    }
+}
+
+impl<'a> fmt::Display for HfsTimeInfo<'a> {
+    /// Formats date and time information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        match self.date_time {
+            DateTime::NotSet => write!(formatter, "{}", NOT_SET_VALUE),
+            DateTime::HfsTime(hfs_time) => {
+                let iso8601_string: String = hfs_time.to_iso8601_string();
+
+                if self.format == HfsFormat::Hfs {
+                    write!(formatter, "{}", iso8601_string)
+                } else {
+                    write!(formatter, "{}+00:00", iso8601_string)
+                }
+            }
+            _ => write!(formatter, "Unsupported date time"),
+        }
+    }
+}
+
 /// Hierarchical File System (HFS) file entry information.
 struct HfsFileEntryInfo<'a> {
+    /// Format.
+    format: HfsFormat,
+
     /// File entry.
     file_entry: &'a HfsFileEntry,
 }
 
 impl<'a> HfsFileEntryInfo<'a> {
     /// Creates new file entry information.
-    fn new(file_entry: &'a HfsFileEntry) -> Self {
-        Self { file_entry }
-    }
-
-    /// Retrieves the string representation of a date and time value.
-    fn get_date_time_string(date_time: &DateTime) -> String {
-        match date_time {
-            DateTime::HfsTime(hfs_time) => hfs_time.to_iso8601_string(),
-            DateTime::NotSet => String::from(NOT_SET_VALUE),
-            _ => return String::from("Unsupported date time"),
+    fn new(format: &HfsFormat, file_entry: &'a HfsFileEntry) -> Self {
+        Self {
+            format: format.clone(),
+            file_entry,
         }
     }
 }
@@ -65,38 +100,34 @@ impl<'a> fmt::Display for HfsFileEntryInfo<'a> {
         let byte_size: ByteSize = ByteSize::new(self.file_entry.get_size(), 1024);
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
-        // TODO: convert to formatter.
-        let date_time_string: String =
-            Self::get_date_time_string(self.file_entry.get_creation_time());
+        let date_time_info: HfsTimeInfo =
+            HfsTimeInfo::new(&self.format, self.file_entry.get_creation_time());
 
-        writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_string)?;
+        writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
 
-        // TODO: convert to formatter.
-        let date_time_string: String =
-            Self::get_date_time_string(self.file_entry.get_modification_time());
+        let date_time_info: HfsTimeInfo =
+            HfsTimeInfo::new(&self.format, self.file_entry.get_modification_time());
 
         writeln!(
             formatter,
             "    Modification time\t\t\t\t: {}",
-            date_time_string
+            date_time_info
         )?;
         if let Some(date_time) = self.file_entry.get_access_time() {
-            // TODO: convert to formatter.
-            let date_time_string: String = Self::get_date_time_string(date_time);
+            let date_time_info: HfsTimeInfo = HfsTimeInfo::new(&self.format, date_time);
 
-            writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_string)?;
+            writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_info)?;
         }
         if let Some(date_time) = self.file_entry.get_change_time() {
-            // TODO: convert to formatter.
-            let date_time_string: String = Self::get_date_time_string(date_time);
+            let date_time_info: HfsTimeInfo = HfsTimeInfo::new(&self.format, date_time);
 
-            writeln!(formatter, "    Change time\t\t\t\t\t: {}", date_time_string)?;
+            writeln!(formatter, "    Change time\t\t\t\t\t: {}", date_time_info)?;
         }
-        // TODO: convert to formatter.
-        let date_time_string: String =
-            Self::get_date_time_string(self.file_entry.get_backup_time());
+        let date_time_info: HfsTimeInfo =
+            HfsTimeInfo::new(&self.format, self.file_entry.get_backup_time());
 
-        writeln!(formatter, "    Backup time\t\t\t\t\t: {}", date_time_string)?;
+        writeln!(formatter, "    Backup time\t\t\t\t\t: {}", date_time_info)?;
+
         // TODO: print added time
 
         writeln!(
@@ -145,12 +176,12 @@ impl<'a> fmt::Display for HfsFileSystemInfo<'a> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Hierarchical File System (HFS) information:")?;
 
-        let format_version: &str = match self.file_system.get_format() {
+        let format_string: &str = match self.file_system.get_format() {
             HfsFormat::Hfs => "HFS",
             HfsFormat::HfsPlus => "HFS+",
             HfsFormat::HfsX => "HFSX",
         };
-        writeln!(formatter, "    Format version\t\t\t\t: {}", format_version)?;
+        writeln!(formatter, "    Format\t\t\t\t\t: {}", format_string)?;
 
         let volume_label: String = match self.file_system.get_volume_label() {
             Some(volume_label) => volume_label.to_string(),
@@ -204,8 +235,11 @@ impl HfsInfo {
     }
 
     /// Prints information about a file entry.
-    fn print_file_entry(file_entry: &mut HfsFileEntry) -> Result<(), ErrorTrace> {
-        let file_entry_information: HfsFileEntryInfo = HfsFileEntryInfo::new(&file_entry);
+    fn print_file_entry(
+        format: &HfsFormat,
+        file_entry: &mut HfsFileEntry,
+    ) -> Result<(), ErrorTrace> {
+        let file_entry_information: HfsFileEntryInfo = HfsFileEntryInfo::new(format, &file_entry);
 
         print!("{}", file_entry_information);
 
@@ -254,7 +288,7 @@ impl HfsInfo {
         let hfs_file_system: HfsFileSystem = match Self::open_file_system(data_stream) {
             Ok(hfs_file_system) => hfs_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                 return Err(error);
             }
         };
@@ -283,7 +317,8 @@ impl HfsInfo {
             };
         println!("Hierarchical File System (HFS) file entry information:");
 
-        match Self::print_file_entry(&mut file_entry) {
+        let format: &HfsFormat = hfs_file_system.get_format();
+        match Self::print_file_entry(format, &mut file_entry) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -304,7 +339,7 @@ impl HfsInfo {
         let hfs_file_system: HfsFileSystem = match Self::open_file_system(data_stream) {
             Ok(hfs_file_system) => hfs_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                 return Err(error);
             }
         };
@@ -320,7 +355,8 @@ impl HfsInfo {
 
         println!("    Path\t\t\t\t\t: {}", path);
 
-        match Self::print_file_entry(&mut file_entry) {
+        let format: &HfsFormat = hfs_file_system.get_format();
+        match Self::print_file_entry(format, &mut file_entry) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to print file entry");
@@ -335,7 +371,7 @@ impl HfsInfo {
         let hfs_file_system: HfsFileSystem = match Self::open_file_system(data_stream) {
             Ok(hfs_file_system) => hfs_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                 return Err(error);
             }
         };
@@ -354,7 +390,7 @@ impl HfsInfo {
         let hfs_file_system: HfsFileSystem = match Self::open_file_system(data_stream) {
             Ok(hfs_file_system) => hfs_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                 return Err(error);
             }
         };
@@ -468,8 +504,27 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
+    use keramics_datetime::HfsTime;
 
     use crate::assert_lines_eq;
+
+    #[test]
+    fn test_date_time_information_fmt() {
+        let date_time: DateTime = DateTime::HfsTime(HfsTime::new(3458215528));
+        let test_struct: HfsTimeInfo = HfsTimeInfo::new(&HfsFormat::Hfs, &date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "2013-08-01T15:25:28");
+
+        let date_time: DateTime = DateTime::HfsTime(HfsTime::new(3458215528));
+        let test_struct: HfsTimeInfo = HfsTimeInfo::new(&HfsFormat::HfsPlus, &date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "2013-08-01T15:25:28+00:00");
+
+        let date_time: DateTime = DateTime::NotSet;
+        let test_struct: HfsTimeInfo = HfsTimeInfo::new(&HfsFormat::HfsPlus, &date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, NOT_SET_VALUE);
+    }
 
     #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
@@ -480,16 +535,17 @@ mod tests {
         let path: Path = Path::from("/testdir1/testfile1");
         let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let test_struct: HfsFileEntryInfo = HfsFileEntryInfo::new(&hfs_file_entry);
+        let format: &HfsFormat = hfs_file_system.get_format();
+        let test_struct: HfsFileEntryInfo = HfsFileEntryInfo::new(format, &hfs_file_entry);
 
         let expected_string: &str = concat!(
             "    Identifier\t\t\t\t\t: 20\n",
             "    Name\t\t\t\t\t: testfile1\n",
             "    Size\t\t\t\t\t: 9 bytes\n",
-            "    Creation time\t\t\t\t: 2026-08-04T11:09:04\n",
-            "    Modification time\t\t\t\t: 2026-08-04T11:09:04\n",
-            "    Access time\t\t\t\t\t: 2026-08-04T11:09:04\n",
-            "    Change time\t\t\t\t\t: 2026-08-04T11:09:05\n",
+            "    Creation time\t\t\t\t: 2026-08-04T11:09:04+00:00\n",
+            "    Modification time\t\t\t\t: 2026-08-04T11:09:04+00:00\n",
+            "    Access time\t\t\t\t\t: 2026-08-04T11:09:04+00:00\n",
+            "    Change time\t\t\t\t\t: 2026-08-04T11:09:05+00:00\n",
             "    Backup time\t\t\t\t\t: Not set (0)\n",
             "    Number of links\t\t\t\t: 1\n",
             "    Owner identifier\t\t\t\t: 501\n",
@@ -513,7 +569,7 @@ mod tests {
 
         let expected_string: &str = concat!(
             "Hierarchical File System (HFS) information:\n",
-            "    Format version\t\t\t\t: HFS+\n",
+            "    Format\t\t\t\t\t: HFS+\n",
             "    Volume label\t\t\t\t: hfsplus_test\n",
             "    Block size\t\t\t\t\t: 4.0 KiB (4096 bytes)\n",
             "\n"
@@ -524,7 +580,6 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_date_time_string
     // TODO: add tests for open_file_system
     // TODO: add tests for print_file_entry_by_identifier
     // TODO: add tests for print_file_entry_by_path

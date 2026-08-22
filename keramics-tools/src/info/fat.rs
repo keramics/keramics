@@ -21,69 +21,7 @@ use keramics_formats::fat::{FatFileEntry, FatFileSystem, FatFormat};
 use crate::formatters::ByteSize;
 
 use super::constants::*;
-
-/// File Allocation Table (FAT) file attribute flags information.
-struct FatFileAttributeFlagsInfo {
-    /// Flags.
-    flags: u8,
-}
-
-impl FatFileAttributeFlagsInfo {
-    /// Creates new file attribute flags information.
-    fn new(flags: u8) -> Self {
-        Self { flags }
-    }
-}
-
-impl fmt::Display for FatFileAttributeFlagsInfo {
-    /// Formats partition file attribute flags information for display.
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        if self.flags & 0x01 != 0 {
-            writeln!(
-                formatter,
-                "        0x0001: Is read-only (FILE_ATTRIBUTE_READ_ONLY)"
-            )?;
-        }
-        if self.flags & 0x02 != 0 {
-            writeln!(
-                formatter,
-                "        0x0002: Is hidden (FILE_ATTRIBUTE_HIDDEN)"
-            )?;
-        }
-        if self.flags & 0x04 != 0 {
-            writeln!(
-                formatter,
-                "        0x0004: Is system (FILE_ATTRIBUTE_SYSTEM)"
-            )?;
-        }
-
-        if self.flags & 0x10 != 0 {
-            writeln!(
-                formatter,
-                "        0x0010: Is directory (FILE_ATTRIBUTE_DIRECTORY)"
-            )?;
-        }
-        if self.flags & 0x20 != 0 {
-            writeln!(
-                formatter,
-                "        0x0020: Should be archived (FILE_ATTRIBUTE_ARCHIVE)"
-            )?;
-        }
-        if self.flags & 0x40 != 0 {
-            writeln!(
-                formatter,
-                "        0x0040: Is device (FILE_ATTRIBUTE_DEVICE)"
-            )?;
-        }
-        if self.flags & 0x80 != 0 {
-            writeln!(
-                formatter,
-                "        0x0080: Is normal (FILE_ATTRIBUTE_NORMAL)"
-            )?;
-        }
-        Ok(())
-    }
-}
+use super::windows::WindowsFileAttributeFlagsInfo;
 
 /// File Allocation Table (FAT) file entry information.
 struct FatFileEntryInfo<'a> {
@@ -149,7 +87,8 @@ impl<'a> fmt::Display for FatFileEntryInfo<'a> {
         let flags: u8 = self.file_entry.get_file_attribute_flags();
 
         writeln!(formatter, "    File attribute flags\t\t\t: 0x{:02x}", flags)?;
-        let flags_info: FatFileAttributeFlagsInfo = FatFileAttributeFlagsInfo::new(flags);
+        let flags_info: WindowsFileAttributeFlagsInfo =
+            WindowsFileAttributeFlagsInfo::new(flags as u16);
 
         flags_info.fmt(formatter)?;
 
@@ -185,7 +124,11 @@ impl<'a> fmt::Display for FatFileSystemInfo<'a> {
             "    Format version\t\t\t\t: FAT-{}",
             format_version
         )?;
-
+        writeln!(
+            formatter,
+            "    Bytes per sector\t\t\t\t: {}",
+            self.file_system.get_bytes_per_sector()
+        )?;
         let volume_label: String = match self.file_system.get_volume_label() {
             Some(volume_label) => volume_label.to_string(),
             None => String::new(),
@@ -224,7 +167,7 @@ impl FatInfo {
         let fat_file_system: FatFileSystem = match Self::open_file_system(data_stream) {
             Ok(fat_file_system) => fat_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                 return Err(error);
             }
         };
@@ -265,7 +208,7 @@ impl FatInfo {
         let fat_file_system: FatFileSystem = match Self::open_file_system(data_stream) {
             Ok(fat_file_system) => fat_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                 return Err(error);
             }
         };
@@ -293,7 +236,7 @@ impl FatInfo {
         let fat_file_system: FatFileSystem = match Self::open_file_system(data_stream) {
             Ok(fat_file_system) => fat_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                 return Err(error);
             }
         };
@@ -312,7 +255,7 @@ impl FatInfo {
         let fat_file_system: FatFileSystem = match Self::open_file_system(data_stream) {
             Ok(fat_file_system) => fat_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                 return Err(error);
             }
         };
@@ -468,6 +411,7 @@ mod tests {
         let expected_string: &str = concat!(
             "File Allocation Table (FAT) information:\n",
             "    Format version\t\t\t\t: FAT-12\n",
+            "    Bytes per sector\t\t\t\t: 512\n",
             "    Volume label\t\t\t\t: FAT12_TEST\n",
             "\n"
         );

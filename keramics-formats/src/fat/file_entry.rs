@@ -104,12 +104,7 @@ impl FatFileEntry {
     /// Retrieves the name.
     pub fn get_name(&self) -> Option<FatString> {
         match self.directory_entry.as_ref() {
-            Some(directory_entry) => match directory_entry.long_name.as_ref() {
-                Some(long_name) => Some(FatString::Ucs2String(long_name.clone())),
-                None => Some(FatString::ByteString(
-                    directory_entry.short_name.name.clone(),
-                )),
-            },
+            Some(directory_entry) => directory_entry.get_name(),
             None => None,
         }
     }
@@ -127,28 +122,29 @@ impl FatFileEntry {
         if self.is_directory() {
             return Ok(None);
         }
-        let (data_start_cluster, data_size): (u32, u32) = match self.directory_entry.as_ref() {
-            Some(directory_entry) => (
-                directory_entry.short_name.data_start_cluster,
-                directory_entry.short_name.data_size,
-            ),
-            None => (0, 0),
-        };
-        let mut block_reader: FatBlockReader = FatBlockReader::new(
-            &self.data_stream,
-            self.block_allocation_table.cluster_block_size,
-            data_size,
-        );
-        match block_reader.open(&self.block_allocation_table, data_start_cluster as u32) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
-                return Err(error);
+        match self.directory_entry.as_ref() {
+            Some(directory_entry) => {
+                let mut block_reader: FatBlockReader = FatBlockReader::new(
+                    &self.data_stream,
+                    self.block_allocation_table.cluster_block_size,
+                    directory_entry.short_name.data_size,
+                );
+                match block_reader.open(
+                    &self.block_allocation_table,
+                    directory_entry.short_name.data_start_cluster as u32,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
+                        return Err(error);
+                    }
+                }
+                Ok(Some(Arc::new(RwLock::new(FatBlockStream::new(
+                    block_reader,
+                )))))
             }
+            None => Err(keramics_core::error_trace_new!("Missing directory entry")),
         }
-        Ok(Some(Arc::new(RwLock::new(FatBlockStream::new(
-            block_reader,
-        )))))
     }
 
     /// Retrieves a sub file entries iterator.
@@ -349,6 +345,7 @@ mod tests {
                 date: 0x5b53,
                 time: 0x958f,
                 fraction: 0x7d,
+                utc_offset: 0,
             }))
         );
         Ok(())
@@ -367,7 +364,18 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_identifier
+    #[test]
+    fn test_get_identifier() -> Result<(), ErrorTrace> {
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let identifier: u32 = fat_file_entry.get_identifier();
+        assert_eq!(identifier, 0x00006260);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_modification_time() -> Result<(), ErrorTrace> {
@@ -380,7 +388,8 @@ mod tests {
             fat_file_entry.get_modification_time(),
             Some(&DateTime::FatTimeDate(FatTimeDate {
                 date: 0x5b53,
-                time: 0x958f
+                time: 0x958f,
+                utc_offset: 0,
             }))
         );
         Ok(())
@@ -431,49 +440,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
-
-        let path: Path = Path::from("/testdir1");
-        let mut fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&path)?.unwrap();
-
-        let number_of_sub_file_entries: usize = fat_file_entry.get_number_of_sub_file_entries()?;
-        assert_eq!(number_of_sub_file_entries, 3);
-
-        let path: Path = Path::from("/testdir1/testfile1");
-        let mut fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&path)?.unwrap();
-
-        let number_of_sub_file_entries: usize = fat_file_entry.get_number_of_sub_file_entries()?;
-        assert_eq!(number_of_sub_file_entries, 0);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
-
-        let path: Path = Path::from("/testdir1");
-        let mut fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&path)?.unwrap();
-
-        let sub_file_entry: FatFileEntry = fat_file_entry.get_sub_file_entry_by_index(2)?;
-
-        let name: Option<FatString> = sub_file_entry.get_name();
-        assert_eq!(
-            name,
-            Some(FatString::from(
-                "My long, very long file name, so very long"
-            ))
-        );
-        Ok(())
-    }
-
-    // TODO: add tests for get_sub_file_entry_by_name
-
-    #[test]
     fn test_sub_file_entries() -> Result<(), ErrorTrace> {
         let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
 
@@ -494,6 +460,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_sub_file_entry_by_name
 
     #[test]
     fn test_is_directory() -> Result<(), ErrorTrace> {
@@ -540,4 +508,45 @@ mod tests {
     }
 
     // TODO: add tests for read_sub_directory_entries
+
+    #[test]
+    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let mut fat_file_entry: FatFileEntry =
+            fat_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let number_of_sub_file_entries: usize = fat_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 3);
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let mut fat_file_entry: FatFileEntry =
+            fat_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let number_of_sub_file_entries: usize = fat_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let mut fat_file_entry: FatFileEntry =
+            fat_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let sub_file_entry: FatFileEntry = fat_file_entry.get_sub_file_entry_by_index(2)?;
+
+        let name: Option<FatString> = sub_file_entry.get_name();
+        assert_eq!(
+            name,
+            Some(FatString::from(
+                "My long, very long file name, so very long"
+            ))
+        );
+        Ok(())
+    }
 }

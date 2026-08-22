@@ -304,12 +304,6 @@ impl UdifImage {
                             &mut compressed_data,
                             SeekFrom::Start(block_range.data_offset),
                         );
-                        keramics_core::debug_trace_data!(
-                            "UdifCompressedBlock",
-                            block_range.data_offset,
-                            &compressed_data,
-                            block_range.compressed_data_size
-                        );
                         let mut data: Vec<u8> = vec![0; block_range.size as usize];
 
                         match self.decompress_block(&compressed_data, &mut data) {

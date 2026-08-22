@@ -52,7 +52,6 @@ fn fat_get_number_of_seconds(date: u16, time: u16) -> u32 {
     }
     number_of_seconds = (number_of_seconds * 24) + (hours as u32);
     number_of_seconds = (number_of_seconds * 60) + (minutes as u32);
-
     (number_of_seconds * 60) + (seconds as u32)
 }
 
@@ -148,24 +147,52 @@ pub struct FatTimeDate {
 
     /// Time.
     pub time: u16,
+
+    /// UTC offset.
+    pub utc_offset: u8,
 }
 
 impl FatTimeDate {
     /// Creates a new timestamp.
     pub fn new(date: u16, time: u16) -> Self {
-        Self { date, time }
+        Self {
+            date,
+            time,
+            utc_offset: 0,
+        }
     }
 
     /// Reads a timestamp from a byte sequence.
     pub fn from_bytes(data: &[u8]) -> Self {
         let time: u16 = bytes_to_u16_le!(data, 0);
         let date: u16 = bytes_to_u16_le!(data, 2);
-        Self { date, time }
+        Self {
+            date,
+            time,
+            utc_offset: 0,
+        }
     }
 
     /// Retrieves the timestamp as number of seconds since January 1, 1980.
     pub fn get_number_of_seconds(&self) -> u32 {
-        fat_get_number_of_seconds(self.date, self.time)
+        let mut number_of_seconds: u32 = fat_get_number_of_seconds(self.date, self.time);
+
+        // UTC offset contains the number of 15 minute intervals of the time relative to UTC, where
+        // an MSB of 1 indicates the offset is valid (and 0 invalid).
+        if self.utc_offset & 0x80 != 0 {
+            let utc_offset: u8 = self.utc_offset & 0x7f;
+            if utc_offset & 0x40 != 0 {
+                number_of_seconds += ((0x80 - utc_offset) as u32) * 15 * 60;
+            } else {
+                number_of_seconds -= (utc_offset as u32) * 15 * 60;
+            }
+        }
+        number_of_seconds
+    }
+
+    /// Sets the UTC offset.
+    pub fn set_utc_offset(&mut self, utc_offset: u8) {
+        self.utc_offset = utc_offset
     }
 
     /// Retrieves an ISO 8601 string representation of the timestamp.
@@ -173,10 +200,33 @@ impl FatTimeDate {
         let (year, month, day_of_month): (i16, u8, u8) = fat_get_date_values(self.date);
         let (hours, minutes, seconds): (u8, u8, u8) = fat_get_time_values(self.time);
 
-        format!(
-            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
-            year, month, day_of_month, hours, minutes, seconds
-        )
+        if self.utc_offset & 0x80 != 0 {
+            let (time_zone_sign, time_zone_hours, time_zone_minutes): (char, u8, u8) =
+                if self.utc_offset & 0x40 != 0 {
+                    let utc_offset: u8 = 0x80 - (self.utc_offset & 0x7f);
+                    ('-', (utc_offset / 4), (utc_offset % 4) * 60)
+                } else {
+                    let utc_offset: u8 = self.utc_offset & 0x7f;
+                    ('+', (utc_offset / 4), (utc_offset % 4) * 60)
+                };
+            format!(
+                "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}{}{:02}:{:02}",
+                year,
+                month,
+                day_of_month,
+                hours,
+                minutes,
+                seconds,
+                time_zone_sign,
+                time_zone_hours,
+                time_zone_minutes
+            )
+        } else {
+            format!(
+                "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
+                year, month, day_of_month, hours, minutes, seconds
+            )
+        }
     }
 }
 
@@ -204,6 +254,9 @@ pub struct FatTimeDate10Ms {
 
     /// Fraction of second.
     pub fraction: u8,
+
+    /// UTC offset.
+    pub utc_offset: u8,
 }
 
 impl FatTimeDate10Ms {
@@ -213,6 +266,7 @@ impl FatTimeDate10Ms {
             date,
             time,
             fraction,
+            utc_offset: 0,
         }
     }
 
@@ -224,12 +278,31 @@ impl FatTimeDate10Ms {
             date,
             time,
             fraction: data[0],
+            utc_offset: 0,
         }
     }
 
     /// Retrieves the timestamp as number of seconds since January 1, 1980.
     pub fn get_number_of_seconds(&self) -> (u32, u32) {
-        fat_get_number_of_seconds_with_fraction(self.date, self.time, self.fraction)
+        let (mut number_of_seconds, fraction) =
+            fat_get_number_of_seconds_with_fraction(self.date, self.time, self.fraction);
+
+        // UTC offset contains the number of 15 minute intervals of the time relative to UTC, where
+        // an MSB of 1 indicates the offset is valid (and 0 invalid).
+        if self.utc_offset & 0x80 != 0 {
+            let utc_offset: u8 = self.utc_offset & 0x7f;
+            if utc_offset & 0x40 != 0 {
+                number_of_seconds += ((0x80 - utc_offset) as u32) * 15 * 60;
+            } else {
+                number_of_seconds -= (utc_offset as u32) * 15 * 60;
+            }
+        }
+        (number_of_seconds, fraction)
+    }
+
+    /// Sets the UTC offset.
+    pub fn set_utc_offset(&mut self, utc_offset: u8) {
+        self.utc_offset = utc_offset
     }
 
     /// Retrieves an ISO 8601 string representation of the timestamp.
@@ -238,10 +311,34 @@ impl FatTimeDate10Ms {
         let (hours, minutes, seconds, fraction): (u8, u8, u8, u8) =
             fat_get_time_values_with_fraction(self.time, self.fraction);
 
-        format!(
-            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:02}",
-            year, month, day_of_month, hours, minutes, seconds, fraction
-        )
+        if self.utc_offset & 0x80 != 0 {
+            let (time_zone_sign, time_zone_hours, time_zone_minutes): (char, u8, u8) =
+                if self.utc_offset & 0x40 != 0 {
+                    let utc_offset: u8 = 0x80 - (self.utc_offset & 0x7f);
+                    ('-', (utc_offset / 4), (utc_offset % 4) * 60)
+                } else {
+                    let utc_offset: u8 = self.utc_offset & 0x7f;
+                    ('+', (utc_offset / 4), (utc_offset % 4) * 60)
+                };
+            format!(
+                "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:02}{}{:02}:{:02}",
+                year,
+                month,
+                day_of_month,
+                hours,
+                minutes,
+                seconds,
+                fraction,
+                time_zone_sign,
+                time_zone_hours,
+                time_zone_minutes
+            )
+        } else {
+            format!(
+                "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:02}",
+                year, month, day_of_month, hours, minutes, seconds, fraction
+            )
+        }
     }
 }
 
@@ -346,18 +443,38 @@ mod tests {
 
     #[test]
     fn test_fat_time_date_get_number_of_seconds() {
-        let test_struct: FatTimeDate = FatTimeDate::new(0x3d0c, 0xa8d0);
+        let mut test_struct: FatTimeDate = FatTimeDate::new(0x3d0c, 0xa8d0);
 
         let number_of_seconds: u32 = test_struct.get_number_of_seconds();
         assert_eq!(number_of_seconds, 968792792);
+
+        test_struct.set_utc_offset(0x88);
+
+        let number_of_seconds: u32 = test_struct.get_number_of_seconds();
+        assert_eq!(number_of_seconds, 968785592);
+
+        test_struct.set_utc_offset(0xf8);
+
+        let number_of_seconds: u32 = test_struct.get_number_of_seconds();
+        assert_eq!(number_of_seconds, 968799992);
     }
 
     #[test]
     fn test_fat_time_date_to_iso8601_string() {
-        let test_struct: FatTimeDate = FatTimeDate::new(0x3d0c, 0xa8d0);
+        let mut test_struct: FatTimeDate = FatTimeDate::new(0x3d0c, 0xa8d0);
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "2010-08-12T21:06:32");
+
+        test_struct.set_utc_offset(0x88);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "2010-08-12T21:06:32+02:00");
+
+        test_struct.set_utc_offset(0xf8);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "2010-08-12T21:06:32-02:00");
     }
 
     #[test]
@@ -380,19 +497,41 @@ mod tests {
 
     #[test]
     fn test_fat_time_date_10ms_get_number_of_seconds() {
-        let test_struct: FatTimeDate10Ms = FatTimeDate10Ms::new(0x3d0c, 0xa8d0, 0x7d);
+        let mut test_struct: FatTimeDate10Ms = FatTimeDate10Ms::new(0x3d0c, 0xa8d0, 0x7d);
 
         let (number_of_seconds, fraction): (u32, u32) = test_struct.get_number_of_seconds();
         assert_eq!(number_of_seconds, 968792793);
+        assert_eq!(fraction, 25);
+
+        test_struct.set_utc_offset(0x88);
+
+        let (number_of_seconds, fraction): (u32, u32) = test_struct.get_number_of_seconds();
+        assert_eq!(number_of_seconds, 968785593);
+        assert_eq!(fraction, 25);
+
+        test_struct.set_utc_offset(0xf8);
+
+        let (number_of_seconds, fraction): (u32, u32) = test_struct.get_number_of_seconds();
+        assert_eq!(number_of_seconds, 968799993);
         assert_eq!(fraction, 25);
     }
 
     #[test]
     fn test_fat_time_date_10ms_to_iso8601_string() {
-        let test_struct: FatTimeDate10Ms = FatTimeDate10Ms::new(0x3d0c, 0xa8d0, 0x7d);
+        let mut test_struct: FatTimeDate10Ms = FatTimeDate10Ms::new(0x3d0c, 0xa8d0, 0x7d);
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "2010-08-12T21:06:33.25");
+
+        test_struct.set_utc_offset(0x88);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "2010-08-12T21:06:33.25+02:00");
+
+        test_struct.set_utc_offset(0xf8);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "2010-08-12T21:06:33.25-02:00");
     }
 
     #[test]

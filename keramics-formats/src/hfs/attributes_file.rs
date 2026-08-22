@@ -99,6 +99,8 @@ impl HfsAttributesFile {
                 return Err(error);
             }
         };
+        read_node_numbers.insert(node_number);
+
         let is_branch: bool = match &node.node_type {
             HfsBtreeNodeType::HeaderNode | HfsBtreeNodeType::IndexNode => true,
             HfsBtreeNodeType::LeafNode => false,
@@ -141,71 +143,71 @@ impl HfsAttributesFile {
                     return Err(error);
                 }
             }
-            if !is_branch {
-                if key.identifier == identifier {
-                    let name: HfsString = match key.read_name(record_data) {
-                        Ok(name) => name,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!("Unable to read name of key: {}", record_index)
-                            );
-                            return Err(error);
-                        }
-                    };
-                    match self.read_attribute_record(&key, record_data) {
-                        Ok(attribute_record) => {
-                            attributes.insert(name, attribute_record);
-                        }
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!("Unable to read attribute record: {}", record_index)
-                            );
-                            return Err(error);
-                        }
-                    }
-                }
-            } else if record_index > 0 {
-                if key.identifier >= identifier {
-                    let data_offset: usize = last_key.size as usize;
-
-                    if data_offset + 4 > last_record_data.len() {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Invalid data size of record: {} value out of bounds",
-                            record_index
-                        )));
-                    }
-                    keramics_core::debug_trace_data!(
-                        format!("HfsAttributesBranchNodeValue: {}", record_index),
-                        node.get_record_offset_by_index(record_index - 1),
-                        &last_record_data[data_offset..data_offset + 4],
-                        4
-                    );
-                    let sub_node_number: u32 = bytes_to_u32_be!(last_record_data, data_offset);
-
-                    match self.get_attributes_by_identifier_from_node(
-                        data_stream,
-                        sub_node_number,
-                        identifier,
-                        attributes,
-                        read_node_numbers,
-                    ) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to retrieve attributes from node: {}",
-                                    sub_node_number
-                                )
-                            );
-                            return Err(error);
-                        }
-                    }
-                }
+            if key.size >= 6 {
                 if key.identifier > identifier {
                     break;
+                }
+                if key.identifier == identifier {
+                    if !is_branch {
+                        let name: HfsString = match key.read_name(record_data) {
+                            Ok(name) => name,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!("Unable to read name of key: {}", record_index)
+                                );
+                                return Err(error);
+                            }
+                        };
+                        match self.read_attribute_record(&key, record_data) {
+                            Ok(attribute_record) => {
+                                attributes.insert(name, attribute_record);
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!("Unable to read attribute record: {}", record_index)
+                                );
+                                return Err(error);
+                            }
+                        }
+                    } else if record_index > 0 {
+                        let data_offset: usize = last_key.size as usize;
+
+                        if data_offset + 4 > last_record_data.len() {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Invalid data size of record: {} value out of bounds",
+                                record_index
+                            )));
+                        }
+                        keramics_core::debug_trace_data!(
+                            format!("HfsAttributesBranchNodeValue: {}", record_index),
+                            node.get_record_offset_by_index(record_index - 1),
+                            &last_record_data[data_offset..data_offset + 4],
+                            4
+                        );
+                        let sub_node_number: u32 = bytes_to_u32_be!(last_record_data, data_offset);
+
+                        match self.get_attributes_by_identifier_from_node(
+                            data_stream,
+                            sub_node_number,
+                            identifier,
+                            attributes,
+                            read_node_numbers,
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable to retrieve attributes from node: {}",
+                                        sub_node_number
+                                    )
+                                );
+                                return Err(error);
+                            }
+                        }
+                    }
                 }
             }
             record_index += 1;
@@ -213,12 +215,7 @@ impl HfsAttributesFile {
             last_key = key;
             last_record_data = record_data;
         }
-        if is_branch {
-            if record_index == 0 {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid record index value out of bounds"
-                ));
-            }
+        if is_branch && record_index > 0 {
             let data_offset: usize = last_key.size as usize;
 
             if data_offset + 4 > last_record_data.len() {

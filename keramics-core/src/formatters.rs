@@ -15,6 +15,9 @@
 pub fn debug_format_array(array: &[String]) -> String {
     // TODO: pass string for indentation?
     let number_of_values: usize = array.len();
+    if number_of_values == 0 {
+        return String::from("[]");
+    }
     let string_value: &String = &array[0];
     let mut use_short_hand: bool = true;
 

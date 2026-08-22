@@ -13,17 +13,13 @@
 
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_core::{DataStreamReference, DebugTrace, ErrorTrace};
 use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
 
 use super::enums::FatFormat;
 
 /// File Allocation Table (FAT) cluster block allocation table.
 pub struct FatBlockAllocationTable {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Format.
     pub format: FatFormat,
 
@@ -50,7 +46,6 @@ impl FatBlockAllocationTable {
         cluster_block_size: u32,
     ) -> Self {
         Self {
-            mediator: Mediator::current(),
             format: format.clone(),
             offset,
             number_of_entries,
@@ -80,11 +75,12 @@ impl FatBlockAllocationTable {
                 entry_index
             )));
         }
-        let entry_offset: u64 = match &self.format {
-            FatFormat::Fat12 => ((entry_index as u64) / 2) * 3,
-            FatFormat::Fat16 => (entry_index as u64) * 2,
-            FatFormat::Fat32 => (entry_index as u64) * 4,
-        };
+        let entry_offset: u64 = self.offset
+            + match &self.format {
+                FatFormat::Fat12 => ((entry_index as u64) / 2) * 3,
+                FatFormat::Fat16 => (entry_index as u64) * 2,
+                FatFormat::Fat32 => (entry_index as u64) * 4,
+            };
         let entry_size: usize = match &self.format {
             FatFormat::Fat12 => 3,
             FatFormat::Fat16 => 2,
@@ -95,7 +91,7 @@ impl FatBlockAllocationTable {
         keramics_core::data_stream_read_exact_at_position!(
             data_stream,
             &mut data,
-            SeekFrom::Start(self.offset + entry_offset)
+            SeekFrom::Start(entry_offset)
         );
         let entry: u32 = match &self.format {
             FatFormat::Fat12 => {
@@ -110,20 +106,16 @@ impl FatBlockAllocationTable {
                 bytes_to_u32_le!(data, 0)
             }
         };
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print("FatBlockAllocationTableEntry: {\n");
-            self.mediator
-                .debug_print(format!("    entry_index: {},\n", entry_index));
-            self.mediator.debug_print(format!(
-                "    entry_offset: {} (0x{:x}),\n",
-                self.offset + entry_offset,
-                self.offset + entry_offset
-            ));
-            self.mediator
-                .debug_print(format!("    cluster_block_number: {},\n", entry));
-            self.mediator.debug_print("}\n");
-        }
+        DebugTrace::static_scope(|debug_trace| {
+            debug_trace.print_start("FatBlockAllocationTableEntry");
+            debug_trace.print_field("entry_index", entry_index);
+            debug_trace.print_field(
+                "entry_offset",
+                format!("{} (0x{:x})", entry_offset, entry_offset),
+            );
+            debug_trace.print_field("cluster_block_number", entry);
+            debug_trace.print_end();
+        });
         Ok(entry)
     }
 }

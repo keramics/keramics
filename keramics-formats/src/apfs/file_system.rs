@@ -58,7 +58,7 @@ impl ApfsFileSystem {
         }
     }
 
-    /// Retrieves the file entry for a specific identifier.
+    /// Retrieves the file entry for a specific identifier (file system object identifier).
     pub fn get_file_entry_by_identifier(
         &self,
         identifier: u64,
@@ -116,7 +116,6 @@ impl ApfsFileSystem {
                 return Err(error);
             }
         };
-        // TODO: cache file entries.
         for path_component in path.components[1..].iter() {
             file_entry = match file_entry.get_sub_file_entry_by_name(path_component) {
                 Ok(Some(file_entry)) => file_entry,

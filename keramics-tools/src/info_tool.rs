@@ -35,9 +35,9 @@ mod storage_media_image;
 
 use crate::enums::{DisplayPathType, EncodingType, FormatType};
 use crate::info::{
-    ApfsInfo, ApmInfo, CdsaEncrInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, HfsInfo, LinuxLvmInfo,
-    MbrInfo, NtfsInfo, PdiInfo, QcowInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo,
-    VhdxInfo, VmdkInfo,
+    ApfsInfo, ApmInfo, CdsaEncrInfo, EwfInfo, ExFatInfo, ExtInfo, FatInfo, GptInfo, HfsInfo,
+    LinuxLvmInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo, SparseBundleInfo, SparseImageInfo,
+    UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
 };
 use crate::storage_media_image::StorageMediaImage;
 
@@ -300,6 +300,7 @@ impl InfoTool {
         }
         format_scanner.add_apfs_signatures();
         format_scanner.add_apm_signatures();
+        format_scanner.add_exfat_signatures();
         format_scanner.add_ext_signatures();
         format_scanner.add_fat_signatures();
         format_scanner.add_hfs_signatures();
@@ -466,6 +467,7 @@ fn main() -> ExitCode {
         Some(FormatType::Apfs) => FormatIdentifier::Apfs,
         Some(FormatType::CdsaEncr) => FormatIdentifier::CdsaEncr,
         Some(FormatType::Ewf) => FormatIdentifier::Ewf,
+        Some(FormatType::ExFat) => FormatIdentifier::ExFat,
         Some(FormatType::Ext) => FormatIdentifier::Ext,
         Some(FormatType::Fat) => FormatIdentifier::Fat,
         Some(FormatType::Gpt) => FormatIdentifier::Gpt,
@@ -519,6 +521,9 @@ fn main() -> ExitCode {
                 arguments.volume,
                 command_arguments.entry,
             ),
+            FormatIdentifier::ExFat => {
+                ExFatInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
+            }
             FormatIdentifier::Ext => ExtInfo::print_file_entry_by_identifier(
                 &data_stream,
                 command_arguments.entry,
@@ -545,6 +550,9 @@ fn main() -> ExitCode {
                 &command_arguments.volume_path_type,
                 command_arguments.path.as_ref(),
             ),
+            FormatIdentifier::ExFat => {
+                ExFatInfo::print_hierarchy(&data_stream, command_arguments.path.as_ref())
+            }
             FormatIdentifier::Ext => ExtInfo::print_hierarchy(
                 &data_stream,
                 info_tool.character_encoding.as_ref(),
@@ -573,6 +581,7 @@ fn main() -> ExitCode {
                 FormatIdentifier::Apfs => {
                     ApfsInfo::print_file_entry_by_path(&data_stream, arguments.volume, &path)
                 }
+                FormatIdentifier::ExFat => ExFatInfo::print_file_entry_by_path(&data_stream, &path),
                 FormatIdentifier::Ext => ExtInfo::print_file_entry_by_path(
                     &data_stream,
                     &path,
@@ -593,6 +602,7 @@ fn main() -> ExitCode {
             FormatIdentifier::CdsaEncr => CdsaEncrInfo::print_container(&data_stream),
             // TODO: add support for individual EWF segment file.
             FormatIdentifier::Ewf => EwfInfo::print_image(&arguments.source),
+            FormatIdentifier::ExFat => ExFatInfo::print_file_system(&data_stream),
             FormatIdentifier::Ext => {
                 ExtInfo::print_file_system(&data_stream, info_tool.character_encoding.as_ref())
             }

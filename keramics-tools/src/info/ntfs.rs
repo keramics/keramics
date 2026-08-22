@@ -571,7 +571,7 @@ impl NtfsInfo {
         let ntfs_file_system: NtfsFileSystem = match Self::open_file_system(data_stream) {
             Ok(ntfs_file_system) => ntfs_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                 return Err(error);
             }
         };
@@ -666,7 +666,7 @@ impl NtfsInfo {
         let ntfs_file_system: NtfsFileSystem = match Self::open_file_system(data_stream) {
             Ok(ntfs_file_system) => ntfs_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                 return Err(error);
             }
         };
@@ -699,7 +699,7 @@ impl NtfsInfo {
         let ntfs_file_system: NtfsFileSystem = match Self::open_file_system(data_stream) {
             Ok(ntfs_file_system) => ntfs_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                 return Err(error);
             }
         };
@@ -766,7 +766,7 @@ impl NtfsInfo {
         let ntfs_file_system: NtfsFileSystem = match Self::open_file_system(data_stream) {
             Ok(ntfs_file_system) => ntfs_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                 return Err(error);
             }
         };

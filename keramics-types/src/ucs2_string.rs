@@ -84,6 +84,11 @@ impl Ucs2String {
         }
     }
 
+    /// Appends an UCS-2 string to the current.
+    pub fn append(&mut self, ucs2_string: &mut Ucs2String) {
+        self.elements.append(&mut ucs2_string.elements)
+    }
+
     /// Creates a new UCS-2 string with case folding applied.
     pub fn new_with_case_folding(&self, mappings: &Ucs2CharacterMappings) -> Self {
         let elements: Vec<u16> = self

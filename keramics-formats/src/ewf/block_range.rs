@@ -15,6 +15,7 @@
 #[derive(Clone, Debug, PartialEq)]
 pub enum EwfBlockRangeType {
     Compressed,
+    Corrupt,
     InFile,
 }
 

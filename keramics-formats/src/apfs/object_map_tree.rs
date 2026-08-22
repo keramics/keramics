@@ -225,6 +225,8 @@ impl ApfsObjectMapTree {
                 return Err(error);
             }
         };
+        read_node_block_numbers.insert(block_number);
+
         let mut last_key: ApfsObjectMapKey = ApfsObjectMapKey::new();
         let mut last_entry_index: usize = 0;
 

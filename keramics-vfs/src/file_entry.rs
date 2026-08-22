@@ -3369,6 +3369,7 @@ mod tests {
                 date: 0x5b53,
                 time: 0x958f,
                 fraction: 0x7d,
+                utc_offset: 0,
             }))
         );
         Ok(())
@@ -3438,7 +3439,8 @@ mod tests {
             result,
             Some(&DateTime::FatTimeDate(FatTimeDate {
                 date: 0x5b53,
-                time: 0x958f
+                time: 0x958f,
+                utc_offset: 0,
             }))
         );
         Ok(())

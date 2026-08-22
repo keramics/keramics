@@ -192,15 +192,6 @@ impl<'a> ApfsFileEntryInfo<'a> {
     fn new(file_entry: &'a ApfsFileEntry) -> Self {
         Self { file_entry }
     }
-
-    /// Retrieves the string representation of a date and time value.
-    fn get_date_time_string(date_time: &DateTime) -> String {
-        match date_time {
-            DateTime::ApfsTime(apfs_time) => apfs_time.to_iso8601_string(),
-            DateTime::NotSet => String::from(NOT_SET_VALUE),
-            _ => return String::from("Unsupported date time"),
-        }
-    }
 }
 
 impl<'a> fmt::Display for ApfsFileEntryInfo<'a> {
@@ -221,32 +212,25 @@ impl<'a> fmt::Display for ApfsFileEntryInfo<'a> {
         let byte_size: ByteSize = ByteSize::new(self.file_entry.get_size(), 1024);
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
-        // TODO: convert to formatter.
-        let date_time_string: String =
-            Self::get_date_time_string(self.file_entry.get_creation_time());
+        let date_time_info: ApfsTimeInfo = ApfsTimeInfo::new(self.file_entry.get_creation_time());
 
-        writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_string)?;
+        writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
 
-        // TODO: convert to formatter.
-        let date_time_string: String =
-            Self::get_date_time_string(self.file_entry.get_modification_time());
+        let date_time_info: ApfsTimeInfo =
+            ApfsTimeInfo::new(self.file_entry.get_modification_time());
 
         writeln!(
             formatter,
             "    Modification time\t\t\t\t: {}",
-            date_time_string
+            date_time_info
         )?;
-        // TODO: convert to formatter.
-        let date_time_string: String =
-            Self::get_date_time_string(self.file_entry.get_access_time());
+        let date_time_info: ApfsTimeInfo = ApfsTimeInfo::new(self.file_entry.get_access_time());
 
-        writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_string)?;
+        writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_info)?;
 
-        // TODO: convert to formatter.
-        let date_time_string: String =
-            Self::get_date_time_string(self.file_entry.get_change_time());
+        let date_time_info: ApfsTimeInfo = ApfsTimeInfo::new(self.file_entry.get_change_time());
 
-        writeln!(formatter, "    Change time\t\t\t\t\t: {}", date_time_string)?;
+        writeln!(formatter, "    Change time\t\t\t\t\t: {}", date_time_info)?;
 
         writeln!(
             formatter,
@@ -269,6 +253,32 @@ impl<'a> fmt::Display for ApfsFileEntryInfo<'a> {
         writeln!(formatter, "    File mode\t\t\t\t\t: {}", file_mode_info)?;
 
         writeln!(formatter)
+    }
+}
+
+/// Apple File System (APFS) date and time information.
+struct ApfsTimeInfo<'a> {
+    /// Flags.
+    date_time: &'a DateTime,
+}
+
+impl<'a> ApfsTimeInfo<'a> {
+    /// Creates new date and time information.
+    fn new(date_time: &'a DateTime) -> Self {
+        Self { date_time }
+    }
+}
+
+impl<'a> fmt::Display for ApfsTimeInfo<'a> {
+    /// Formats date and time information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        match self.date_time {
+            DateTime::NotSet => write!(formatter, "{}", NOT_SET_VALUE),
+            DateTime::ApfsTime(apfs_time) => {
+                write!(formatter, "{}+00:00", apfs_time.to_iso8601_string())
+            }
+            _ => write!(formatter, "Unsupported date time"),
+        }
     }
 }
 
@@ -855,6 +865,7 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
+    use keramics_datetime::ApfsTime;
 
     use crate::assert_lines_eq;
 
@@ -887,6 +898,19 @@ mod tests {
     }
 
     #[test]
+    fn test_date_time_information_fmt() {
+        let date_time: DateTime = DateTime::ApfsTime(ApfsTime::new(1281643591987654321));
+        let test_struct: ApfsTimeInfo = ApfsTimeInfo::new(&date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "2010-08-12T20:06:31.987654321+00:00");
+
+        let date_time: DateTime = DateTime::NotSet;
+        let test_struct: ApfsTimeInfo = ApfsTimeInfo::new(&date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, NOT_SET_VALUE);
+    }
+
+    #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs.raw");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
@@ -903,10 +927,10 @@ mod tests {
             "    Identifier\t\t\t\t\t: 18\n",
             "    Name\t\t\t\t\t: testfile1\n",
             "    Size\t\t\t\t\t: 9 bytes\n",
-            "    Creation time\t\t\t\t: 2026-08-04T11:09:25.254516511\n",
-            "    Modification time\t\t\t\t: 2026-08-04T11:09:25.254251713\n",
-            "    Access time\t\t\t\t\t: 2026-08-04T11:09:25.254251713\n",
-            "    Change time\t\t\t\t\t: 2026-08-04T11:09:25.262832871\n",
+            "    Creation time\t\t\t\t: 2026-08-04T11:09:25.254516511+00:00\n",
+            "    Modification time\t\t\t\t: 2026-08-04T11:09:25.254251713+00:00\n",
+            "    Access time\t\t\t\t\t: 2026-08-04T11:09:25.254251713+00:00\n",
+            "    Change time\t\t\t\t\t: 2026-08-04T11:09:25.262832871+00:00\n",
             "    Number of links\t\t\t\t: 2\n",
             "    Owner identifier\t\t\t\t: 99\n",
             "    Group identifier\t\t\t\t: 99\n",

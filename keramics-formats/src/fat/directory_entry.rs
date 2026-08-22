@@ -17,6 +17,7 @@ use keramics_types::{Ucs2CharacterMappings, Ucs2String};
 
 use super::long_name_directory_entry::FatLongNameDirectoryEntry;
 use super::short_name_directory_entry::FatShortNameDirectoryEntry;
+use super::string::FatString;
 
 /// File Allocation Table (FAT) directory entry.
 #[derive(Clone)]
@@ -52,15 +53,21 @@ impl FatDirectoryEntry {
         }
     }
 
+    /// Retrieves the name.
+    pub fn get_name(&self) -> Option<FatString> {
+        match self.long_name.as_ref() {
+            Some(long_name) => Some(FatString::Ucs2String(long_name.clone())),
+            None => Some(FatString::ByteString(self.short_name.name.clone())),
+        }
+    }
+
     /// Fills the directory entry based on a long name directory entries.
     pub fn set_long_name(&mut self, long_name_entries: &mut Vec<FatLongNameDirectoryEntry>) {
         if !long_name_entries.is_empty() {
             let mut long_name: Ucs2String = Ucs2String::new();
 
             for long_name_entry in long_name_entries.iter_mut().rev() {
-                long_name
-                    .elements
-                    .append(&mut long_name_entry.name.elements);
+                long_name.append(&mut long_name_entry.name);
             }
             long_name_entries.clear();
 

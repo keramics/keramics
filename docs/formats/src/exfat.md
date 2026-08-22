@@ -7,17 +7,33 @@ The Extensible File Allocation Table (exFAT) file system format is a successor o
 
 An exFAT file system consists of:
 
-* One or more reserved sectors
-  * a boot record (or boot sector)
-* One or more cluster block allocation tables
-* File and directory data
+* Main boot region
+  * boot sector (or boot record)
+  * 7 extended boot sectors
+  * OEM parameters sector
+  * Reserved sector
+  * boot checksum sector
+* Backup boot region
+  * boot sector (or boot record)
+  * 7 extended boot sectors
+  * OEM parameters sector
+  * Reserved sector
+  * boot checksum sector
+* File Allocation Table region
+  * Aligment padding
+  * First cluster block allocation tables
+  * Zero or more backup block allocation tables
+* Data region
+  * Aligment padding
+  * Cluster heap
+  * File and directory data
 
 ### Characteristics
 
 | Characteristics | Description |
 | --- | --- |
 | Byte order | little-endian |
-| Date and time values | FAT date and time |
+| Date and time values | FAT date and time, in local time with UTC offset |
 | Character strings | UCS-2 little-endian, which allows for unpaired Unicode surrogates such as "U+d800" and "U+dc00" |
 
 ### Boot record
@@ -34,9 +50,9 @@ The boot record is at least 512 bytes in size and consists of:
 | 64 | 8 | | Partition offset |
 | 72 | 8 | | Total number of sectors |
 | 80 | 4 | | Cluster block allocation table start sector |
-| 84 | 4 | | Cluster block allocation table size in number of sectors, which must be non 0 |
-| 88 | 4 | | Data cluster start sector |
-| 92 | 4 | | Total number of data clusters |
+| 84 | 4 | | Cluster block allocation table size, in number of sectors, which must be non 0 |
+| 88 | 4 | | Cluster heap start sector |
+| 92 | 4 | | Number of clusters |
 | 96 | 4 | | Root directory start cluster |
 | 100 | 4 | | Volume serial number |
 | 104 | 1 | | Format revision minor number |
@@ -55,7 +71,7 @@ The boot record is at least 512 bytes in size and consists of:
 
 | Value | Identifier | Description |
 | --- | --- | --- |
-| 0x0001 | ActiveFat | Active FAT, 0 for the first FAT, 1 for the second FAT |
+| 0x0001 | ActiveFat | Active FAT, where 0 represents the first FAT |
 | 0x0002 | VolumeDirty | Is dirty |
 | 0x0004 | MediaFailure | Has media failures |
 | 0x0008 | ClearToZero | Must be cleared |
@@ -86,6 +102,20 @@ Where the data cluster number has the following meanings:
 | 0xfffffff7 | Bad cluster |
 | 0xfffffff8 - 0xffffffff | End of cluster chain |
 
+## Cluster heap
+
+A cluster heap consists of:
+
+* One ore more sector allocation table entries
+
+### Sector allocation table entry
+
+A sector allocation table entry is 32 bits in size and consists of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 32 bits | | Data sector number |
+
 ## Directory
 
 A directory consists of:
@@ -100,15 +130,16 @@ A directory entry is 32 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 1 | | Entry type |
+| 1 | 1 | | [Entry flags](#directory_entry_flags) |
 | 1 | 19 | | Entry data |
-| 20 | 4 | | Data stream start cluster |
-| 24 | 8 | | Data stream size |
+| 20 | 4 | | Data start cluster |
+| 24 | 8 | | Data size |
 
 #### Directory entry type
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 5 bits | | Type type code |
+| 0.0 | 5 bits | | Type type code |
 | 0.5 | 1 bit | | Is non-critical (also referred to as type importance) |
 | 0.6 | 1 bit | | Is secondary entry (also referred to as type category) |
 | 0.7 | 1 bit | | In use |
@@ -127,19 +158,19 @@ A directory entry is 32 bytes in size and consists of:
 | Value | Description |
 | --- | --- |
 | <td colspan="4">*Critical and primary*</td> |
-| 0x81 | Allocation bitmap |
-| 0x82 | Case folding mappings |
-| 0x83 | Volume label |
+| 0x81 | [Allocation bitmap](#allocation_bitmap_record) |
+| 0x82 | [Case folding mappings](#case_folding_mappings_record) |
+| 0x83 | [Volume label](#volume_label_record) |
 | | |
-| 0x85 | File entry |
+| 0x85 | [File entry](#file_entry_record) |
 | | |
 | <td colspan="4">*Non-critical and primary*</td> |
-| 0xa0 | Volume identifier |
+| 0xa0 | [Volume identifier](#volume_identifier_record) |
 | 0xa1 | TexFAT padding |
 | | |
 | <td colspan="4">*Critical and secondary*</td> |
-| 0xc0 | Data stream |
-| 0xc1 | File entry name |
+| 0xc0 | [Data stream](#data_stream_record) |
+| 0xc1 | [File (entry) name](#file_name_record) |
 | | |
 | <td colspan="4">*Non-critical and secondary*</td> |
 | 0xe0 | Vendor extension |
@@ -147,17 +178,36 @@ A directory entry is 32 bytes in size and consists of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-##### Allocation bitmap directory entry
+#### Directory entry flags {#directory_entry_flags}
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0.0 | 1 bit | | Unknown (AllocationPossible) |
+| 0.1 | 1 bit | | Continuous allocation (NoFatChain), if set do not use the cluster block allocation table |
+| 0.2 | 6 bits | | Unknown |
+
+```python
+offset = ( ( cluster_block_number - 2 ) * cluster_block_size ) + cluster_chain_offset
+```
+
+##### Allocation bitmap record {#allocation_bitmap_record}
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 1 | 0x81 | Entry type |
-| 1 | 1 | | Bitmap flags |
+| 1 | 1 | | [Bitmap flags](#allocation_bitmap_flags) |
 | 2 | 18 | 0 | Unknown (Reserved) |
-| 20 | 4 | | Data stream start cluster |
-| 24 | 8 | | Data stream size |
+| 20 | 4 | | Data start cluster |
+| 24 | 8 | | Data size |
 
-##### Case folding mappings directory entry
+###### Allocation bitmap flags {#allocation_bitmap_flags}
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0.0 | 1 bit | | Unknown (BitmapIdentifier) |
+| 0.1 | 7 bits | | Unknown (reserved) |
+
+##### Case folding mappings record {#case_folding_mappings_record}
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -165,28 +215,28 @@ A directory entry is 32 bytes in size and consists of:
 | 1 | 3 | 0 | Unknown (Reserved) |
 | 4 | 4 | | Checksum |
 | 8 | 12 | 0 | Unknown (Reserved) |
-| 20 | 4 | | Data stream start cluster |
-| 24 | 8 | | Data stream size |
+| 20 | 4 | | Data start cluster |
+| 24 | 8 | | Data size |
 
-##### Volume label directory entry
+##### Volume label record {#volume_label_record}
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 1 | 0x83 | Entry type |
-| 1 | 1 | | Name number of characters |
+| 1 | 1 | | Name size, in number of characters |
 | 2 | 22 | | Name string, which contains an UCS-2 little-endian string without an end-of-string character |
 | 24 | 8 | 0 | Unknown (Reserved) |
 
-> Note that the volume label directory entry should only be stored in the first and/or second
-> directory entry of the root directory.
+> Note that the volume label record should only be stored in the first and/or second directory entry
+> of the root directory.
 
-##### File entry directory entry
+##### File entry record {#file_entry_record}
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 1 | 0x85 | Entry type |
-| 1 | 1 | | Unknown (Secondary count) |
-| 2 | 2 | | Unknown (Set checksum) |
+| 1 | 1 | | [Entry flags](#directory_entry_flags) |
+| 2 | 2 | | Entry set checksum |
 | 4 | 2 | | [File attribute flags](#file_attribute_flags) |
 | 6 | 2 | 0 | Unknown (Reserved) |
 | 8 | 2 | | Creation time |
@@ -197,43 +247,43 @@ A directory entry is 32 bytes in size and consists of:
 | 18 | 2 | | Last access date |
 | 20 | 1 | | Creation time fraction of seconds, which contains fraction of 2-seconds in 10 ms intervals |
 | 21 | 1 | | Last modification time fraction of seconds, which contains fraction of 2-seconds in 10 ms intervals |
-| 22 | 1 | | Creation time UTC offset, which contains number of 15 minute intervals of the time relative to UTC, where the MSB indicates the offset is valid |
-| 23 | 1 | | Last modification time UTC offset, which contains number of 15 minute intervals of the time relative to UTC, where the MSB indicates the offset is valid |
-| 24 | 1 | | Last access time UTC offset, which contains number of 15 minute intervals of the time relative to UTC, where the MSB indicates the offset is valid |
+| 22 | 1 | | Creation time UTC offset, which contains number of 15 minute intervals of the time relative to UTC, where an MSB of 1 indicates the offset is valid (and 0 invalid) |
+| 23 | 1 | | Last modification time UTC offset, which contains number of 15 minute intervals of the time relative to UTC, where an MSB of 1 indicates the offset is valid (and 0 invalid) |
+| 24 | 1 | | Last access time UTC offset, which contains number of 15 minute intervals of the time relative to UTC, where an MSB of 1 indicates the offset is valid (and 0 invalid) |
 | 25 | 7 | 0 | Unknown (Reserved) |
 
-##### Volume identifier directory entry
+##### Volume identifier record {#volume_identifier_record}
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 1 | 0xa0 | Entry type |
-| 1 | 1 | | Unknown (Secondary count) |
-| 2 | 2 | | Unknown (Set checksum) |
+| 1 | 1 | | [Entry flags](#directory_entry_flags) |
+| 2 | 2 | | Entry set checksum |
 | 4 | 2 | | Unknown (Flags) |
 | 6 | 16 | | Volume identifier, which contains a GUID |
 | 22 | 10 | 0 | Unknown (Reserved) |
 
-##### Data stream directory entry
+##### Data stream record {#data_stream_record}
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 1 | 0xc0 | Entry type |
-| 1 | 1 | | Unknown (Flags) |
+| 1 | 1 | | [Entry flags](#directory_entry_flags) |
 | 2 | 1 | 0 | Unknown (Reserved) |
-| 3 | 1 | | Name number of characters |
+| 3 | 1 | | Name size, in number of characters |
 | 4 | 2 | | Name hash |
 | 6 | 2 | 0 | Unknown (Reserved) |
-| 8 | 8 | | Data stream valid data size |
+| 8 | 8 | | Valid data size |
 | 16 | 4 | 0 | Unknown (Reserved) |
-| 20 | 4 | | Data stream start cluster |
-| 24 | 8 | | Data stream size |
+| 20 | 4 | | Data start cluster |
+| 24 | 8 | | Data size |
 
-##### File entry name directory entry
+##### File name record {#file_name_record}
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 1 | 0xc1 | Entry type |
-| 1 | 1 | | Unknown (Flags) |
+| 1 | 1 | | [Entry flags](#directory_entry_flags) |
 | 2 | 30 | | Name string, which contains an UCS-2 little-endian string without an end-of-string character |
 
 ### File attribute flags {#file_attribute_flags}

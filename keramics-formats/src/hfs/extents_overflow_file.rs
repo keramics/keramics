@@ -95,6 +95,8 @@ impl HfsExtentsOverflowFile {
                 return Err(error);
             }
         };
+        read_node_numbers.insert(node_number);
+
         let is_branch: bool = match &node.node_type {
             HfsBtreeNodeType::HeaderNode | HfsBtreeNodeType::IndexNode => true,
             HfsBtreeNodeType::LeafNode => false,
@@ -197,12 +199,7 @@ impl HfsExtentsOverflowFile {
             last_key = key;
             last_record_data = record_data;
         }
-        if is_branch {
-            if record_index == 0 {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid record index value out of bounds"
-                ));
-            }
+        if is_branch && record_index > 0 {
             let data_offset: usize = last_key.size as usize;
 
             if data_offset + 4 > last_record_data.len() {
