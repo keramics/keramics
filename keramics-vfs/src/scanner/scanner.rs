@@ -125,6 +125,7 @@ impl VfsScanner {
         // The Master Boot Record (MBR) signatures are used in other volume
         // system or file formats, such as:
         // * BitLocker drive encryption (BDE)
+        // * Extensible File Allocation Table (exFAT)
         // * File Allocation Table (FAT)
         // * New Technologies File System (NTFS)
 
@@ -148,6 +149,7 @@ impl VfsScanner {
                 return Err(error);
             }
         }
+        self.phase2_volume_system_scanner.add_exfat_signatures();
         self.phase2_volume_system_scanner.add_fat_signatures();
         self.phase2_volume_system_scanner.add_ntfs_signatures();
 
@@ -186,6 +188,7 @@ impl VfsScanner {
                 return Err(error);
             }
         }
+        self.file_system_scanner.add_exfat_signatures();
         self.file_system_scanner.add_ext_signatures();
         self.file_system_scanner.add_fat_signatures();
         self.file_system_scanner.add_hfs_signatures();
@@ -343,6 +346,7 @@ impl VfsScanner {
         match vfs_location.get_type() {
             VfsType::Apfs
             | VfsType::ApfsContainer
+            | VfsType::ExFat
             | VfsType::Ext
             | VfsType::Fake
             | VfsType::Fat
@@ -503,6 +507,7 @@ impl VfsScanner {
         data_stream: &DataStreamReference,
     ) -> Result<Option<VfsType>, ErrorTrace> {
         match self.scan_for_file_system_format(&data_stream) {
+            Ok(Some(FormatIdentifier::ExFat)) => Ok(Some(VfsType::ExFat)),
             Ok(Some(FormatIdentifier::Ext)) => Ok(Some(VfsType::Ext)),
             Ok(Some(FormatIdentifier::Fat)) => Ok(Some(VfsType::Fat)),
             Ok(Some(FormatIdentifier::Hfs)) => Ok(Some(VfsType::Hfs)),
@@ -732,7 +737,12 @@ impl VfsScanner {
 
         // TODO: handle image with both GPT and MBR volume systems.
         match scan_node.get_type() {
-            VfsType::Apfs | VfsType::Ext | VfsType::Fat | VfsType::Hfs | VfsType::Ntfs => {}
+            VfsType::Apfs
+            | VfsType::ExFat
+            | VfsType::Ext
+            | VfsType::Fat
+            | VfsType::Hfs
+            | VfsType::Ntfs => {}
             VfsType::ApfsContainer => {
                 let mut apfs_container: ApfsContainer = ApfsContainer::new();
 
@@ -1319,6 +1329,7 @@ impl VfsScanner {
             }
         };
         match &format_identifier {
+            Some(FormatIdentifier::ExFat) => return Ok(None),
             Some(FormatIdentifier::Fat) => return Ok(None),
             Some(FormatIdentifier::Ntfs) => return Ok(None),
             Some(format_identifier) => {
@@ -1761,6 +1772,21 @@ mod tests {
     }
 
     // TODO: add test for scan_for_format with unsupported path type
+
+    #[test]
+    fn test_scan_for_file_system_format_vfs_with_exfat() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        let path_string: String = get_test_data_path("exfat/exfat.raw");
+        let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
+        let vfs_type: VfsType = format_scanner
+            .scan_for_file_system_format_vfs(&data_stream)?
+            .unwrap();
+
+        assert_eq!(vfs_type, VfsType::ExFat);
+
+        Ok(())
+    }
 
     #[test]
     fn test_scan_for_file_system_format_vfs_with_ext() -> Result<(), ErrorTrace> {

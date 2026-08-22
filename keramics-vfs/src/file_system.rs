@@ -13,6 +13,7 @@
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::apfs::ApfsFileSystem;
+use keramics_formats::exfat::ExFatFileSystem;
 use keramics_formats::ext::ExtFileSystem;
 use keramics_formats::fat::FatFileSystem;
 use keramics_formats::hfs::HfsFileSystem;
@@ -47,6 +48,7 @@ pub enum VfsFileSystem {
     ApfsContainer(ApfsContainerFileSystem),
     Apm(ApmFileSystem),
     Ewf(EwfFileSystem),
+    ExFat(ExFatFileSystem),
     Ext(ExtFileSystem),
     Fake(FakeFileSystem),
     Fat(FatFileSystem),
@@ -75,6 +77,7 @@ impl VfsFileSystem {
             VfsType::ApfsContainer => VfsFileSystem::ApfsContainer(ApfsContainerFileSystem::new()),
             VfsType::Apm => VfsFileSystem::Apm(ApmFileSystem::new()),
             VfsType::Ewf => VfsFileSystem::Ewf(EwfFileSystem::new()),
+            VfsType::ExFat => VfsFileSystem::ExFat(ExFatFileSystem::new()),
             VfsType::Ext => VfsFileSystem::Ext(ExtFileSystem::new()),
             VfsType::Fake => VfsFileSystem::Fake(FakeFileSystem::new()),
             VfsType::Fat => VfsFileSystem::Fat(FatFileSystem::new()),
@@ -104,6 +107,7 @@ impl VfsFileSystem {
             VfsFileSystem::ApfsContainer(_) => VfsType::ApfsContainer,
             VfsFileSystem::Apm(_) => VfsType::Apm,
             VfsFileSystem::Ewf(_) => VfsType::Ewf,
+            VfsFileSystem::ExFat(_) => VfsType::ExFat,
             VfsFileSystem::Ext(_) => VfsType::Ext,
             VfsFileSystem::Fake(_) => VfsType::Fake,
             VfsFileSystem::Fat(_) => VfsType::Fat,
@@ -149,6 +153,19 @@ impl VfsFileSystem {
             }
             VfsFileSystem::Apm(apm_file_system) => Ok(apm_file_system.file_entry_exists(path)),
             VfsFileSystem::Ewf(ewf_file_system) => Ok(ewf_file_system.file_entry_exists(path)),
+            VfsFileSystem::ExFat(exfat_file_system) => {
+                match exfat_file_system.get_file_entry_by_path(path) {
+                    Ok(Some(_)) => Ok(true),
+                    Ok(None) => Ok(false),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve exFAT file entry"
+                        );
+                        Err(error)
+                    }
+                }
+            }
             VfsFileSystem::Ext(ext_file_system) => {
                 match ext_file_system.get_file_entry_by_path(path) {
                     Ok(Some(_)) => Ok(true),
@@ -321,6 +338,12 @@ impl VfsFileSystem {
                     None => Ok(None),
                 }
             }
+            VfsFileSystem::ExFat(exfat_file_system) => {
+                match exfat_file_system.get_file_entry_by_path(path)? {
+                    Some(file_entry) => Ok(Some(VfsFileEntry::ExFat(file_entry))),
+                    None => Ok(None),
+                }
+            }
             VfsFileSystem::Ext(ext_file_system) => {
                 match ext_file_system.get_file_entry_by_path(path)? {
                     Some(file_entry) => Ok(Some(VfsFileEntry::Ext(file_entry))),
@@ -478,6 +501,17 @@ impl VfsFileSystem {
 
                 Ok(Some(VfsFileEntry::Ewf(ewf_file_entry)))
             }
+            VfsFileSystem::ExFat(exfat_file_system) => match exfat_file_system.get_root_directory()
+            {
+                Ok(exfat_file_entry) => Ok(Some(VfsFileEntry::ExFat(exfat_file_entry))),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve exFAT root directory"
+                    );
+                    Err(error)
+                }
+            },
             VfsFileSystem::Ext(ext_file_system) => match ext_file_system.get_root_directory() {
                 Ok(Some(ext_file_entry)) => Ok(Some(VfsFileEntry::Ext(ext_file_entry))),
                 Ok(None) => Ok(None),
@@ -631,6 +665,9 @@ impl VfsFileSystem {
             VfsFileSystem::Ewf(ewf_file_system) => {
                 ewf_file_system.open(parent_file_system, vfs_location)
             }
+            VfsFileSystem::ExFat(exfat_file_system) => {
+                Self::open_exfat_file_system(exfat_file_system, parent_file_system, vfs_location)
+            }
             VfsFileSystem::Ext(ext_file_system) => {
                 Self::open_ext_file_system(ext_file_system, parent_file_system, vfs_location)
             }
@@ -743,6 +780,48 @@ impl VfsFileSystem {
                 "Unsupported parent file entry: {}",
                 file_entry.get_type()
             ))),
+        }
+    }
+
+    /// Opens an exFAT file system.
+    fn open_exfat_file_system(
+        exfat_file_system: &mut ExFatFileSystem,
+        parent_file_system: Option<&VfsFileSystemReference>,
+        vfs_location: &VfsLocation,
+    ) -> Result<(), ErrorTrace> {
+        let file_system: &VfsFileSystemReference = match parent_file_system {
+            Some(file_system) => file_system,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Missing parent file system"
+                ));
+            }
+        };
+        let path: &Path = vfs_location.get_path();
+
+        let data_stream: DataStreamReference =
+            match file_system.get_data_stream_by_path_and_name(path, None) {
+                Ok(Some(data_stream)) => data_stream,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing data stream: {}",
+                        path,
+                    )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                    return Err(error);
+                }
+            };
+        match exfat_file_system.read_data_stream(&data_stream) {
+            Ok(_) => Ok(()),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read exfat file system from data stream"
+                );
+                Err(error)
+            }
         }
     }
 
@@ -1182,6 +1261,71 @@ mod tests {
     #[test]
     fn test_get_file_entry_by_path_with_ewf_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with exFAT.
+
+    fn get_exfat_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::ExFat);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("exfat/exfat.raw");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_exfat_file_system()?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
+
+        let path: Path = Path::from("/bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_exfat_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_exfat_file_system()?;
+
+        let path: Path = Path::from("/bogus");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_exfat_file() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_exfat_file_system()?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_exfat_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_exfat_file_system()?;
 
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
