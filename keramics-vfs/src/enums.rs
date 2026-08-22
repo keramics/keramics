@@ -32,6 +32,7 @@ pub enum VfsType {
     Apfs,
     ApfsContainer,
     Apm,
+    ExFat,
     Ext,
     Ewf,
     Fake,
@@ -58,23 +59,24 @@ impl fmt::Display for VfsType {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let string: &str = match self {
             VfsType::Apfs => "APFS",
-            VfsType::ApfsContainer => "APFS (Container)",
+            VfsType::ApfsContainer => "APFS-Container",
             VfsType::Apm => "APM",
-            VfsType::Ext => "EXT",
+            VfsType::ExFat => "exFAT",
+            VfsType::Ext => "ext",
             VfsType::Ewf => "EWF",
-            VfsType::Fake => "FAKE",
+            VfsType::Fake => "fake",
             VfsType::Fat => "FAT",
             VfsType::Gpt => "GPT",
             VfsType::Hfs => "HFS",
-            VfsType::LinuxLvm => "LVM (Linux)",
+            VfsType::LinuxLvm => "LinuxLVM",
             VfsType::Mbr => "MBR",
             VfsType::Ntfs => "NTFS",
             VfsType::Os => "OS",
             VfsType::Pdi => "PDI",
             VfsType::Qcow => "QCOW",
-            VfsType::SparseBundle => "SPARSEBUNDLE",
-            VfsType::SparseImage => "SPARSEIMAGE",
-            VfsType::SplitRaw => "SPLITRAW",
+            VfsType::SparseBundle => "sparsebundle",
+            VfsType::SparseImage => "sparseimage",
+            VfsType::SplitRaw => "split-RAW",
             VfsType::Udif => "UDIF",
             VfsType::Vhd => "VHD",
             VfsType::Vhdx => "VHDX",
@@ -96,15 +98,19 @@ mod tests {
 
         let vfs_type: VfsType = VfsType::ApfsContainer;
         let string: String = vfs_type.to_string();
-        assert_eq!(string, "APFS (Container)");
+        assert_eq!(string, "APFS-Container");
 
         let vfs_type: VfsType = VfsType::Apm;
         let string: String = vfs_type.to_string();
         assert_eq!(string, "APM");
 
+        let vfs_type: VfsType = VfsType::ExFat;
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "exFAT");
+
         let vfs_type: VfsType = VfsType::Ext;
         let string: String = vfs_type.to_string();
-        assert_eq!(string, "EXT");
+        assert_eq!(string, "ext");
 
         let vfs_type: VfsType = VfsType::Ewf;
         let string: String = vfs_type.to_string();
@@ -112,7 +118,7 @@ mod tests {
 
         let vfs_type: VfsType = VfsType::Fake;
         let string: String = vfs_type.to_string();
-        assert_eq!(string, "FAKE");
+        assert_eq!(string, "fake");
 
         let vfs_type: VfsType = VfsType::Fat;
         let string: String = vfs_type.to_string();
@@ -128,7 +134,7 @@ mod tests {
 
         let vfs_type: VfsType = VfsType::LinuxLvm;
         let string: String = vfs_type.to_string();
-        assert_eq!(string, "LVM (Linux)");
+        assert_eq!(string, "LinuxLVM");
 
         let vfs_type: VfsType = VfsType::Mbr;
         let string: String = vfs_type.to_string();
@@ -152,15 +158,15 @@ mod tests {
 
         let vfs_type: VfsType = VfsType::SparseBundle;
         let string: String = vfs_type.to_string();
-        assert_eq!(string, "SPARSEBUNDLE");
+        assert_eq!(string, "sparsebundle");
 
         let vfs_type: VfsType = VfsType::SparseImage;
         let string: String = vfs_type.to_string();
-        assert_eq!(string, "SPARSEIMAGE");
+        assert_eq!(string, "sparseimage");
 
         let vfs_type: VfsType = VfsType::SplitRaw;
         let string: String = vfs_type.to_string();
-        assert_eq!(string, "SPLITRAW");
+        assert_eq!(string, "split-RAW");
 
         let vfs_type: VfsType = VfsType::Udif;
         let string: String = vfs_type.to_string();

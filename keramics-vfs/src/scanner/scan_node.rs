@@ -48,7 +48,12 @@ impl VfsScanNode {
         // Note that below no catch all match is used to ensure a compiler error is raised when a
         // new VFS type is added.
         match self.location.get_type() {
-            VfsType::Apfs | VfsType::Ext | VfsType::Fat | VfsType::Hfs | VfsType::Ntfs => true,
+            VfsType::Apfs
+            | VfsType::ExFat
+            | VfsType::Ext
+            | VfsType::Fat
+            | VfsType::Hfs
+            | VfsType::Ntfs => true,
             VfsType::ApfsContainer
             | VfsType::Apm
             | VfsType::Ewf

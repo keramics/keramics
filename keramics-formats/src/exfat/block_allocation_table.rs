@@ -69,7 +69,6 @@ impl ExFatBlockAllocationTable {
             SeekFrom::Start(entry_offset)
         );
         let entry: u32 = bytes_to_u32_le!(data, 0);
-        println!("X: 0x{:08x}, {}, {}", entry_offset, entry_index, entry);
 
         DebugTrace::static_scope(|debug_trace| {
             debug_trace.print_start("ExFatBlockAllocationTableEntry");

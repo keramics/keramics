@@ -17,6 +17,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_formats::apfs::ApfsFileEntry;
 use keramics_formats::apfs::constants::*;
+use keramics_formats::exfat::ExFatFileEntry;
 use keramics_formats::ext::ExtFileEntry;
 use keramics_formats::ext::constants::*;
 use keramics_formats::fat::{FatFileEntry, FatString};
@@ -55,6 +56,7 @@ pub enum VfsFileEntry {
     Apfs(ApfsFileEntry),
     ApfsContainer(ApfsContainerFileEntry),
     Apm(ApmFileEntry),
+    ExFat(ExFatFileEntry),
     Ext(ExtFileEntry),
     Ewf(EwfFileEntry),
     Fake(Arc<FakeFileEntry>),
@@ -84,6 +86,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_) => VfsType::ApfsContainer,
             VfsFileEntry::Apm(_) => VfsType::Apm,
             VfsFileEntry::Ewf(_) => VfsType::Ewf,
+            VfsFileEntry::ExFat(_) => VfsType::ExFat,
             VfsFileEntry::Ext(_) => VfsType::Ext,
             VfsFileEntry::Fake(_) => VfsType::Fake,
             VfsFileEntry::Fat(_) => VfsType::Fat,
@@ -124,6 +127,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Apfs(apfs_file_entry) => Some(apfs_file_entry.get_access_time()),
+            VfsFileEntry::ExFat(exfat_file_entry) => exfat_file_entry.get_access_time(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_access_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_access_time(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_access_time(),
@@ -139,6 +143,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
             | VfsFileEntry::LinuxLvm(_)
@@ -180,6 +185,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Apfs(apfs_file_entry) => Some(apfs_file_entry.get_creation_time()),
+            VfsFileEntry::ExFat(exfat_file_entry) => exfat_file_entry.get_creation_time(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_creation_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_creation_time(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_creation_time(),
@@ -198,6 +204,7 @@ impl VfsFileEntry {
             | VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
@@ -235,6 +242,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
@@ -282,6 +290,13 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_file_type(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_file_type(),
+            VfsFileEntry::ExFat(exfat_file_entry) => {
+                if exfat_file_entry.is_directory() {
+                    VfsFileType::Directory
+                } else {
+                    VfsFileType::File
+                }
+            }
             VfsFileEntry::Ext(ext_file_entry) => {
                 let file_type: u16 = ext_file_entry.get_file_mode() & 0xf000;
                 match file_type {
@@ -371,6 +386,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Apfs(apfs_file_entry) => Some(apfs_file_entry.get_modification_time()),
+            VfsFileEntry::ExFat(exfat_file_entry) => exfat_file_entry.get_modification_time(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_modification_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_modification_time(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_modification_time(),
@@ -386,6 +402,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
@@ -415,6 +432,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
@@ -449,6 +467,10 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Apm(apm_file_entry) => Some(apm_file_entry.get_name()),
             VfsFileEntry::Ewf(ewf_file_entry) => Some(ewf_file_entry.get_name()),
+            VfsFileEntry::ExFat(exfat_file_entry) => match exfat_file_entry.get_name() {
+                Some(name) => Some(PathComponent::from(name)),
+                None => None,
+            },
             VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_name() {
                 Some(name) => Some(PathComponent::from(name)),
                 None => None,
@@ -503,6 +525,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
@@ -533,6 +556,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
@@ -564,6 +588,7 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_size(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_size(),
+            VfsFileEntry::ExFat(exfat_file_entry) => exfat_file_entry.get_size(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_size(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_size(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_size(),
@@ -593,6 +618,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
@@ -699,6 +725,13 @@ impl VfsFileEntry {
                 EwfFileEntry::Layer { .. } => 1,
                 EwfFileEntry::Root { .. } => 0,
             },
+            VfsFileEntry::ExFat(exfat_file_entry) => {
+                if exfat_file_entry.is_directory() {
+                    0
+                } else {
+                    1
+                }
+            }
             VfsFileEntry::Ext(ext_file_entry) => {
                 let file_type: u16 = ext_file_entry.get_file_mode() & 0xf000;
 
@@ -814,6 +847,7 @@ impl VfsFileEntry {
             VfsFileEntry::Apfs(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Ext(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
@@ -900,6 +934,7 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_data_stream(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_data_stream(),
+            VfsFileEntry::ExFat(exfat_file_entry) => exfat_file_entry.get_data_stream(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_data_stream(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_data_stream(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_data_stream(),
@@ -942,6 +977,7 @@ impl VfsFileEntry {
             | VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Ext(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
@@ -979,6 +1015,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
@@ -1022,6 +1059,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
@@ -1076,6 +1114,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
@@ -1150,6 +1189,7 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.is_root_file_entry(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.is_root_file_entry(),
+            VfsFileEntry::ExFat(exfat_file_entry) => exfat_file_entry.is_root_directory(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.is_root_directory(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.is_root_file_entry(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.is_root_directory(),
@@ -1196,6 +1236,9 @@ impl FileEntryIterator for VfsFileEntry {
             )),
             VfsFileEntry::Ewf(ewf_file_entry) => Ok(VfsFileEntry::Ewf(
                 ewf_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::ExFat(exfat_file_entry) => Ok(VfsFileEntry::ExFat(
+                exfat_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
             VfsFileEntry::Ext(ext_file_entry) => Ok(VfsFileEntry::Ext(
                 ext_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
@@ -1280,6 +1323,9 @@ impl FileEntryIterator for VfsFileEntry {
             VfsFileEntry::Ewf(ewf_file_entry) => {
                 Ok(ewf_file_entry.get_number_of_sub_file_entries())
             }
+            VfsFileEntry::ExFat(exfat_file_entry) => {
+                exfat_file_entry.get_number_of_sub_file_entries()
+            }
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_sub_file_entries(),
             VfsFileEntry::Fake(fake_file_entry) => {
                 Ok(fake_file_entry.get_number_of_sub_file_entries())
@@ -1351,6 +1397,7 @@ mod tests {
     };
     use keramics_encodings::CharacterEncoding;
     use keramics_formats::apfs::{ApfsContainer, ApfsFileSystem, ApfsVolume};
+    use keramics_formats::exfat::ExFatFileSystem;
     use keramics_formats::ext::ExtFileSystem;
     use keramics_formats::fat::FatFileSystem;
     use keramics_formats::hfs::HfsFileSystem;
@@ -1402,9 +1449,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_access_time();
         assert_eq!(
             result,
-            Some(&DateTime::ApfsTime(ApfsTime {
+            Some(DateTime::ApfsTime(ApfsTime {
                 timestamp: 1785841765254251713
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -1416,9 +1464,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_change_time();
         assert_eq!(
             result,
-            Some(&DateTime::ApfsTime(ApfsTime {
+            Some(DateTime::ApfsTime(ApfsTime {
                 timestamp: 1785841765262832871
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -1430,9 +1479,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
         assert_eq!(
             result,
-            Some(&DateTime::ApfsTime(ApfsTime {
+            Some(DateTime::ApfsTime(ApfsTime {
                 timestamp: 1785841765254516511
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -1499,9 +1549,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
         assert_eq!(
             result,
-            Some(&DateTime::ApfsTime(ApfsTime {
+            Some(DateTime::ApfsTime(ApfsTime {
                 timestamp: 1785841765254251713
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -2786,9 +2837,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_access_time();
         assert_eq!(
             result,
-            Some(&DateTime::PosixTime32(PosixTime32 {
+            Some(DateTime::PosixTime32(PosixTime32 {
                 timestamp: 1735977482
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -2800,9 +2852,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_change_time();
         assert_eq!(
             result,
-            Some(&DateTime::PosixTime32(PosixTime32 {
+            Some(DateTime::PosixTime32(PosixTime32 {
                 timestamp: 1735977481
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -2879,9 +2932,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
         assert_eq!(
             result,
-            Some(&DateTime::PosixTime32(PosixTime32 {
+            Some(DateTime::PosixTime32(PosixTime32 {
                 timestamp: 1735977481
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -3313,6 +3367,369 @@ mod tests {
     // TODO: add test_get_sub_file_entry_by_index_with_fake
     // TODO: add test_sub_file_entries_with_fake
 
+    // Tests with exFAT.
+
+    fn get_exfat_file_system() -> Result<ExFatFileSystem, ErrorTrace> {
+        let mut file_system: ExFatFileSystem = ExFatFileSystem::new();
+
+        let path_string: String = get_test_data_path("exfat/exfat.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file_system.read_data_stream(&data_stream)?;
+
+        Ok(file_system)
+    }
+
+    fn get_exfat_file_entry(path_string: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let exfat_file_system: ExFatFileSystem = get_exfat_file_system()?;
+
+        let path: Path = Path::from(path_string);
+        match exfat_file_system.get_file_entry_by_path(&path)? {
+            Some(exfat_file_entry) => Ok(VfsFileEntry::ExFat(exfat_file_entry)),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path_string
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        assert_eq!(
+            result,
+            Some(DateTime::FatTimeDate(FatTimeDate {
+                date: 0x5d15,
+                time: 0x62cd,
+                utc_offset: 0x80,
+            }))
+            .as_ref()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        assert_eq!(
+            result,
+            Some(DateTime::FatTimeDate10Ms(FatTimeDate10Ms {
+                date: 0x5d15,
+                time: 0x62cd,
+                fraction: 0x26,
+                utc_offset: 0x80,
+            }))
+            .as_ref()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        assert_eq!(
+            result,
+            Some(DateTime::FatTimeDate10Ms(FatTimeDate10Ms {
+                date: 0x5d15,
+                time: 0x62cd,
+                fraction: 0x26,
+                utc_offset: 0x80,
+            }))
+            .as_ref()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(
+            name,
+            Some(PathComponent::from(Ucs2String::from("testfile1")))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 9);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target_with_exfat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_exfat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add test for get_data_fork_by_index
+
+    #[test]
+    fn test_data_forks_with_exfat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_exfat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let mut vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_name_with_exfat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let name: Option<PathComponent> = None;
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_some());
+
+        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_exfat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_exfat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_exfat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extended_attributes_with_exfat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let mut extended_attributes_iterator: VfsExtendedAttributesIterator =
+            vfs_file_entry.extended_attributes();
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_exfat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 3);
+
+        let mut vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1/testfile1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_exfat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(2)?;
+
+        let name: Option<PathComponent> = sub_file_entry.get_name();
+        assert_eq!(
+            name,
+            Some(PathComponent::from(Ucs2String::from(
+                "My long, very long file name, so very long"
+            )))
+        );
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_exfat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_exfat_file_entry("/testdir1")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(2).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
     // Tests with FAT.
 
     fn get_fat_file_system() -> Result<FatFileSystem, ErrorTrace> {
@@ -3344,7 +3761,10 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
 
         let result: Option<&DateTime> = vfs_file_entry.get_access_time();
-        assert_eq!(result, Some(&DateTime::FatDate(FatDate { date: 0x5b53 })));
+        assert_eq!(
+            result,
+            Some(DateTime::FatDate(FatDate { date: 0x5b53 })).as_ref()
+        );
         Ok(())
     }
 
@@ -3365,12 +3785,13 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
         assert_eq!(
             result,
-            Some(&DateTime::FatTimeDate10Ms(FatTimeDate10Ms {
+            Some(DateTime::FatTimeDate10Ms(FatTimeDate10Ms {
                 date: 0x5b53,
                 time: 0x958f,
                 fraction: 0x7d,
                 utc_offset: 0,
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -3437,11 +3858,12 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
         assert_eq!(
             result,
-            Some(&DateTime::FatTimeDate(FatTimeDate {
+            Some(DateTime::FatTimeDate(FatTimeDate {
                 date: 0x5b53,
                 time: 0x958f,
                 utc_offset: 0,
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -4031,9 +4453,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_access_time();
         assert_eq!(
             result,
-            Some(&DateTime::HfsTime(HfsTime {
+            Some(DateTime::HfsTime(HfsTime {
                 timestamp: 3868686544
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -4045,9 +4468,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_change_time();
         assert_eq!(
             result,
-            Some(&DateTime::HfsTime(HfsTime {
+            Some(DateTime::HfsTime(HfsTime {
                 timestamp: 3868686545
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -4059,9 +4483,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
         assert_eq!(
             result,
-            Some(&DateTime::HfsTime(HfsTime {
+            Some(DateTime::HfsTime(HfsTime {
                 timestamp: 3868686544
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -4128,9 +4553,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
         assert_eq!(
             result,
-            Some(&DateTime::HfsTime(HfsTime {
+            Some(DateTime::HfsTime(HfsTime {
                 timestamp: 3868686544
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -5089,9 +5515,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_access_time();
         assert_eq!(
             result,
-            Some(&DateTime::Filetime(Filetime {
+            Some(DateTime::Filetime(Filetime {
                 timestamp: 0x1db5e8ba6892474
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -5103,9 +5530,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_change_time();
         assert_eq!(
             result,
-            Some(&DateTime::Filetime(Filetime {
+            Some(DateTime::Filetime(Filetime {
                 timestamp: 0x1db5e8ba689275d
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -5117,9 +5545,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
         assert_eq!(
             result,
-            Some(&DateTime::Filetime(Filetime {
+            Some(DateTime::Filetime(Filetime {
                 timestamp: 0x1db5e8ba6892474
             }))
+            .as_ref()
         );
         Ok(())
     }
@@ -5186,9 +5615,10 @@ mod tests {
         let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
         assert_eq!(
             result,
-            Some(&DateTime::Filetime(Filetime {
+            Some(DateTime::Filetime(Filetime {
                 timestamp: 0x1db5e8ba689275d
             }))
+            .as_ref()
         );
         Ok(())
     }
