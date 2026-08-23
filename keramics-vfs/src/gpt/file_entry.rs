@@ -14,8 +14,8 @@
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::{PathComponent, PartitionIterator};
 use keramics_formats::gpt::{GptPartition, GptVolumeSystem};
+use keramics_formats::{PartitionIterator, PathComponent};
 use keramics_types::Uuid;
 
 use crate::enums::VfsFileType;
