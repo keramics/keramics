@@ -155,6 +155,11 @@ mod tests {
         let mut test_struct = ApmPartitionMapEntry::new();
         test_struct.read_data(&test_data)?;
 
+        assert_eq!(test_struct.number_of_entries, 3);
+        assert_eq!(test_struct.start_sector, 66);
+        assert_eq!(test_struct.number_of_sectors, 446);
+        assert_eq!(test_struct.name, ByteString::from("MyHFS"));
+        assert_eq!(test_struct.type_identifier, ByteString::from("Apple_HFS"));
         assert_eq!(test_struct.status_flags, 0x0000007f);
 
         Ok(())
@@ -177,6 +182,11 @@ mod tests {
         let mut test_struct = ApmPartitionMapEntry::new();
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
+        assert_eq!(test_struct.number_of_entries, 3);
+        assert_eq!(test_struct.start_sector, 66);
+        assert_eq!(test_struct.number_of_sectors, 446);
+        assert_eq!(test_struct.name, ByteString::from("MyHFS"));
+        assert_eq!(test_struct.type_identifier, ByteString::from("Apple_HFS"));
         assert_eq!(test_struct.status_flags, 0x0000007f);
 
         Ok(())

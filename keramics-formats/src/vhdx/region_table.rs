@@ -56,30 +56,31 @@ impl VhdxRegionTable {
         let mut data_offset: usize = 16;
         let data_size: usize = data.len();
 
-        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0x82f63b78, 0);
+        if region_table_header.checksum != 0 {
+            let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0x82f63b78, 0);
 
-        crc32_context.update(&data[0..4]);
-        crc32_context.update(&[0; 4]);
-        crc32_context.update(&data[8..65536]);
+            crc32_context.update(&data[0..4]);
+            crc32_context.update(&[0; 4]);
+            crc32_context.update(&data[8..65536]);
 
-        let calculated_checksum: u32 = crc32_context.finalize();
+            let calculated_checksum: u32 = crc32_context.finalize();
 
-        if region_table_header.checksum != 0 && region_table_header.checksum != calculated_checksum
-        {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
-                region_table_header.checksum, calculated_checksum
-            )));
-        }
-        for entry_index in 0..region_table_header.number_of_entries {
-            let data_end_offset: usize = data_offset + 32;
-
-            if data_end_offset > data_size {
+            if region_table_header.checksum != calculated_checksum {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Invalid number of entries: {} value out of bounds",
-                    region_table_header.number_of_entries
+                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                    region_table_header.checksum, calculated_checksum
                 )));
             }
+        }
+        let entries_end_offset: usize =
+            data_offset + ((region_table_header.number_of_entries as usize) * 32);
+
+        if entries_end_offset >= data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported region table - number of entries value out of bounds"
+            ));
+        }
+        for entry_index in 0..region_table_header.number_of_entries {
             keramics_core::debug_trace_structure!(VhdxRegionTableEntry::debug_read_data(
                 &data[data_offset..]
             ));
@@ -95,7 +96,7 @@ impl VhdxRegionTable {
                     return Err(error);
                 }
             }
-            data_offset = data_end_offset;
+            data_offset += 32;
 
             self.entries.insert(
                 region_table_entry.type_identifier.clone(),
@@ -138,6 +139,8 @@ impl VhdxRegionTable {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use keramics_core::open_fake_data_stream;
 
     fn get_test_data() -> Vec<u8> {
         return vec![
@@ -4858,5 +4861,16 @@ mod tests {
         assert!(result.is_err());
     }
 
-    // TODO: add test_read_at_position
+    #[test]
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut test_struct = VhdxRegionTable::new();
+        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
+
+        assert_eq!(test_struct.entries.len(), 2);
+
+        Ok(())
+    }
 }

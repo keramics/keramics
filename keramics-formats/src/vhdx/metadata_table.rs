@@ -126,6 +126,8 @@ impl VhdxMetadataTable {
 mod tests {
     use super::*;
 
+    use keramics_core::open_fake_data_stream;
+
     fn get_test_data() -> Vec<u8> {
         return vec![
             0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,
@@ -4835,5 +4837,16 @@ mod tests {
         assert!(result.is_err());
     }
 
-    // TODO: add test_read_at_position
+    #[test]
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut test_struct = VhdxMetadataTable::new();
+        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
+
+        assert_eq!(test_struct.entries.len(), 6);
+
+        Ok(())
+    }
 }

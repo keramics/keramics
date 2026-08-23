@@ -15,7 +15,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use keramics_core::ErrorTrace;
-use keramics_formats::cdsaencr::{CdsaEncrCredential, CdsaEncrEncryptionType};
+use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::udif::{UdifCompressionMethod, UdifImage};
 use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 use keramics_types::Uuid;
@@ -26,28 +26,13 @@ use crate::formatters::ByteSize;
 use super::constants::*;
 
 /// Information about an Universal Disk Image Format (UDIF) image.
-struct UdifImageInfo {
-    /// Segment set identifier.
-    pub segment_set_identifier: Uuid,
-
-    /// Number of segments.
-    pub number_of_segments: u32,
-
-    /// Compression method.
-    pub compression_method: UdifCompressionMethod,
-
-    /// Encryption type.
-    pub encryption_type: Option<CdsaEncrEncryptionType>,
-
-    /// Media size.
-    pub media_size: u64,
-
-    /// Bytes per sector.
-    pub bytes_per_sector: u16,
+struct UdifImageInfo<'a> {
+    /// Image.
+    image: &'a UdifImage,
 }
 
-impl UdifImageInfo {
-    const COMPRESSION_METHODS: &[(UdifCompressionMethod, &'static str); 6] = &[
+impl<'a> UdifImageInfo<'a> {
+    const COMPRESSION_METHODS: &'static [(UdifCompressionMethod, &'static str); 6] = &[
         (UdifCompressionMethod::Adc, "ADC"),
         (UdifCompressionMethod::Bzip2, "bzip2"),
         (UdifCompressionMethod::Lzfse, "LZFSE/LZVN"),
@@ -57,35 +42,30 @@ impl UdifImageInfo {
     ];
 
     /// Creates new image information.
-    fn new() -> Self {
-        Self {
-            segment_set_identifier: Uuid::new(),
-            number_of_segments: 0,
-            compression_method: UdifCompressionMethod::None,
-            encryption_type: None,
-            media_size: 0,
-            bytes_per_sector: 0,
-        }
+    fn new(image: &'a UdifImage) -> Self {
+        Self { image }
     }
 
     /// Retrieves the compression method as a string.
-    pub fn get_compression_method_string(&self) -> &str {
+    pub fn get_compression_method_string(compression_method: &UdifCompressionMethod) -> &str {
         Self::COMPRESSION_METHODS
-            .binary_search_by(|(key, _)| key.cmp(&self.compression_method))
+            .binary_search_by(|(key, _)| key.cmp(compression_method))
             .map_or_else(|_| "Unknown", |index| Self::COMPRESSION_METHODS[index].1)
     }
 }
 
-impl fmt::Display for UdifImageInfo {
+impl<'a> fmt::Display for UdifImageInfo<'a> {
     /// Formats image information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Universal Disk Image Format (UDIF) information:")?;
 
+        let segment_set_identifier: &Uuid = self.image.get_segment_set_identifier();
+
         let value_string: String;
-        let segment_set_identifier_string: &str = if self.segment_set_identifier.is_nil() {
+        let segment_set_identifier_string: &str = if segment_set_identifier.is_nil() {
             NOT_SET_VALUE
         } else {
-            value_string = format!("{}", self.segment_set_identifier);
+            value_string = format!("{}", segment_set_identifier);
             value_string.as_str()
         };
         writeln!(
@@ -96,11 +76,11 @@ impl fmt::Display for UdifImageInfo {
         writeln!(
             formatter,
             "    Number of segments\t\t\t\t: {}",
-            self.number_of_segments
+            self.image.get_number_of_segments()
         )?;
         // TODO: print (segment) set identifier
 
-        if let Some(encryption_type) = &self.encryption_type {
+        if let Some(encryption_type) = self.image.get_encryption_type() {
             writeln!(formatter, "    Encryption information:")?;
             writeln!(
                 formatter,
@@ -111,23 +91,28 @@ impl fmt::Display for UdifImageInfo {
             // TODO: print key protectors
             // TODO: print identifier
         }
+        writeln!(formatter)?;
+
         writeln!(formatter, "    Compression information:")?;
 
-        let compression_method_string: &str = self.get_compression_method_string();
+        let compression_method_string: &str =
+            Self::get_compression_method_string(self.image.get_compression_method());
         writeln!(
             formatter,
             "        Compression method\t\t\t: {}",
             compression_method_string
         )?;
+        writeln!(formatter)?;
+
         writeln!(formatter, "    Media information:")?;
 
-        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.image.get_media_size(), 1024);
         writeln!(formatter, "        Media size\t\t\t\t: {}", byte_size)?;
 
         writeln!(
             formatter,
             "        Bytes per sector\t\t\t: {}",
-            self.bytes_per_sector
+            self.image.get_bytes_per_sector()
         )?;
         writeln!(formatter)
     }
@@ -137,20 +122,6 @@ impl fmt::Display for UdifImageInfo {
 pub struct UdifInfo {}
 
 impl UdifInfo {
-    /// Retrieves the image information.
-    fn get_image_information(udif_image: &UdifImage) -> UdifImageInfo {
-        let mut image_information: UdifImageInfo = UdifImageInfo::new();
-
-        image_information.segment_set_identifier = udif_image.get_segment_set_identifier().clone();
-        image_information.number_of_segments = udif_image.get_number_of_segments();
-        image_information.compression_method = udif_image.get_compression_method().clone();
-        image_information.encryption_type = udif_image.get_encryption_type().cloned();
-        image_information.media_size = udif_image.get_media_size();
-        image_information.bytes_per_sector = udif_image.get_bytes_per_sector();
-
-        image_information
-    }
-
     /// Opens an image.
     fn open_image(path_buf: &PathBuf) -> Result<UdifImage, ErrorTrace> {
         let mut base_path: PathBuf = path_buf.clone();
@@ -217,7 +188,7 @@ impl UdifInfo {
                 }
             }
         }
-        let image_information: UdifImageInfo = Self::get_image_information(&udif_image);
+        let image_information: UdifImageInfo = UdifImageInfo::new(&udif_image);
 
         print!("{}", image_information);
 
@@ -235,14 +206,16 @@ mod tests {
     fn test_image_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
         let udif_image: UdifImage = UdifInfo::open_image(&path_buf)?;
-        let test_struct: UdifImageInfo = UdifInfo::get_image_information(&udif_image);
+        let test_struct: UdifImageInfo = UdifImageInfo::new(&udif_image);
 
         let expected_string: &str = concat!(
             "Universal Disk Image Format (UDIF) information:\n",
             "    Segment set identifier\t\t\t: Not set (0)\n",
             "    Number of segments\t\t\t\t: 1\n",
+            "\n",
             "    Compression information:\n",
             "        Compression method\t\t\t: zlib\n",
+            "\n",
             "    Media information:\n",
             "        Media size\t\t\t\t: 1.9 MiB (1964032 bytes)\n",
             "        Bytes per sector\t\t\t: 512\n",
@@ -250,25 +223,6 @@ mod tests {
         );
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_image_information() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
-        let udif_image: UdifImage = UdifInfo::open_image(&path_buf)?;
-        let test_struct: UdifImageInfo = UdifInfo::get_image_information(&udif_image);
-
-        assert_eq!(
-            test_struct.segment_set_identifier.to_string(),
-            "00000000-0000-0000-0000-000000000000"
-        );
-        assert_eq!(test_struct.number_of_segments, 1);
-        assert_eq!(test_struct.compression_method, UdifCompressionMethod::Zlib);
-        assert_eq!(test_struct.encryption_type, None);
-        assert_eq!(test_struct.media_size, 1964032);
-        assert_eq!(test_struct.bytes_per_sector, 512);
 
         Ok(())
     }

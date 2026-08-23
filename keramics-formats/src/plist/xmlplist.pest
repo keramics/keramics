@@ -393,7 +393,9 @@ plist_external_identifier = {
 
 plist_public_identifier_literal = {
     "\"-//Apple//DTD PLIST 1.0//EN\"" |
-    "'-//Apple//DTD PLIST 1.0//EN'"
+    "'-//Apple//DTD PLIST 1.0//EN'" |
+    "\"-//Apple Computer//DTD PLIST 1.0//EN\"" |
+    "'-//Apple Computer//DTD PLIST 1.0//EN'"
 }
 
 plist_system_literal = {

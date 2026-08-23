@@ -1,0 +1,240 @@
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may
+ * obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+
+use std::io::SeekFrom;
+
+use keramics_core::{DataStreamReference, ErrorTrace};
+
+use super::disklabel_entry::BsdDiskLabelEntry;
+use super::disklabel_header::BsdDiskLabelHeader;
+
+/// BSD disklabel (bsdlabel).
+pub struct BsdDiskLabel {
+    /// The bytes per sector.
+    pub bytes_per_sector: u32,
+
+    /// Entries.
+    pub entries: Vec<BsdDiskLabelEntry>,
+}
+
+impl BsdDiskLabel {
+    /// Creates a new disklabel.
+    pub fn new() -> Self {
+        Self {
+            bytes_per_sector: 0,
+            entries: Vec::new(),
+        }
+    }
+
+    /// Reads the disklabel from a buffer.
+    fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        keramics_core::debug_trace_structure!(BsdDiskLabelHeader::debug_read_data(data));
+
+        let mut disklabel_header: BsdDiskLabelHeader = BsdDiskLabelHeader::new();
+
+        match disklabel_header.read_data(data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read disklabel header");
+                return Err(error);
+            }
+        }
+        let mut data_offset: usize = 148;
+        let data_size: usize = data.len();
+
+        if disklabel_header.number_of_entries > 16 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported disklabel - number of entries value out of bounds"
+            ));
+        }
+        let entries_end_offset: usize =
+            data_offset + ((disklabel_header.number_of_entries as usize) * 16);
+
+        if entries_end_offset >= data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported disklabel - number of entries value out of bounds"
+            ));
+        }
+        if disklabel_header.checksum != 0 {
+            let mut calculated_checksum: u16 = 0;
+
+            for (chunk_index, chunk) in data[0..entries_end_offset].chunks_exact(2).enumerate() {
+                let value_16bit: u16 = if chunk_index == 68 {
+                    0
+                } else {
+                    u16::from_le_bytes(chunk.try_into().unwrap())
+                };
+                calculated_checksum ^= value_16bit;
+            }
+            if disklabel_header.checksum != calculated_checksum {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between stored: 0x{:04x} and calculated: 0x{:04x} checksums",
+                    disklabel_header.checksum, calculated_checksum
+                )));
+            }
+        }
+        self.bytes_per_sector = disklabel_header.bytes_per_sector;
+
+        for entry_index in 0..disklabel_header.number_of_entries {
+            keramics_core::debug_trace_structure!(BsdDiskLabelEntry::debug_read_data(
+                &data[data_offset..]
+            ));
+            let mut disklabel_entry: BsdDiskLabelEntry = BsdDiskLabelEntry::new();
+
+            match disklabel_entry.read_data(&data[data_offset..]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to read disklabel entry: {}", entry_index)
+                    );
+                    return Err(error);
+                }
+            }
+            data_offset += 16;
+
+            // Ignore the full volume and empty entries.
+            if entry_index != 2 && disklabel_entry.number_of_sectors > 0 {
+                disklabel_entry.entry_index = entry_index;
+
+                self.entries.push(disklabel_entry);
+            }
+        }
+        Ok(())
+    }
+
+    /// Reads the disklabel from a specific position in a data stream.
+    pub fn read_at_position(
+        &mut self,
+        data_stream: &DataStreamReference,
+        position: SeekFrom,
+    ) -> Result<(), ErrorTrace> {
+        let mut data: Vec<u8> = vec![0; 512];
+
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
+
+        keramics_core::debug_trace_data!("BsdDiskLabel", offset, &data, 512);
+
+        match self.read_data(&data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read disklabel at offset: {} (0x{:08x})",
+                        offset, offset
+                    )
+                );
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::open_fake_data_stream;
+
+    fn get_test_data() -> Vec<u8> {
+        return vec![
+            0x57, 0x45, 0x56, 0x82, 0x00, 0x00, 0x00, 0x00, 0x61, 0x6d, 0x6e, 0x65, 0x73, 0x69,
+            0x61, 0x63, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
+            0x00, 0x00, 0x3f, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x82, 0x00, 0x00, 0x00,
+            0x3f, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x10, 0x0e, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x56, 0x82, 0x67, 0x31, 0x08, 0x00,
+            0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x1f, 0x00, 0x00, 0x10, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+    }
+
+    #[test]
+    fn test_read_data() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = BsdDiskLabel::new();
+        test_struct.read_data(&test_data)?;
+
+        assert_eq!(test_struct.bytes_per_sector, 512);
+        assert_eq!(test_struct.entries.len(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_with_unsupported_signature() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[0] = 0xff;
+
+        let mut test_struct = BsdDiskLabel::new();
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_with_checksum_mismatch() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[4] = 0xff;
+
+        let mut test_struct = BsdDiskLabel::new();
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut test_struct = BsdDiskLabel::new();
+        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
+
+        assert_eq!(test_struct.bytes_per_sector, 512);
+        assert_eq!(test_struct.entries.len(), 1);
+
+        Ok(())
+    }
+}

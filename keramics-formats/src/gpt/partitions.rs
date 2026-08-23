@@ -11,46 +11,9 @@
  * under the License.
  */
 
-use keramics_core::ErrorTrace;
+use crate::iterators::PartitionsIterator;
 
-use super::partition::GptPartition;
 use super::volume_system::GptVolumeSystem;
 
 /// GUID Partition Table (GPT) partitions iterator.
-pub struct GptPartitionsIterator<'a> {
-    /// Volume system.
-    volume_system: &'a GptVolumeSystem,
-
-    /// Number of partitions.
-    number_of_partitions: usize,
-
-    /// Partititon index.
-    partition_index: usize,
-}
-
-impl<'a> GptPartitionsIterator<'a> {
-    /// Creates a new iterator.
-    pub fn new(volume_system: &'a GptVolumeSystem, number_of_partitions: usize) -> Self {
-        Self {
-            volume_system,
-            number_of_partitions,
-            partition_index: 0,
-        }
-    }
-}
-
-impl<'a> Iterator for GptPartitionsIterator<'a> {
-    type Item = Result<GptPartition, ErrorTrace>;
-
-    /// Retrieves the next file entry.
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.partition_index >= self.number_of_partitions {
-            return None;
-        }
-        let item: Self::Item = self
-            .volume_system
-            .get_partition_by_index(self.partition_index);
-        self.partition_index += 1;
-        Some(item)
-    }
-}
+pub type GptPartitionsIterator<'a> = PartitionsIterator<'a, GptVolumeSystem>;

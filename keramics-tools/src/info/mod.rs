@@ -13,6 +13,7 @@
 
 mod apfs;
 mod apm;
+mod bsdlabel;
 mod cdsaencr;
 mod constants;
 mod ewf;
@@ -37,6 +38,7 @@ mod windows;
 
 pub use apfs::ApfsInfo;
 pub use apm::ApmInfo;
+pub use bsdlabel::BsdDiskLabelInfo;
 pub use cdsaencr::CdsaEncrInfo;
 pub use ewf::EwfInfo;
 pub use exfat::ExFatInfo;

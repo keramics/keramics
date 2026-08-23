@@ -16,9 +16,9 @@ mod block_tree;
 mod block_tree_node;
 mod enums;
 mod fake_file_resolver;
-mod file_entries_iterator;
 mod file_resolver;
 mod indexed_hash_map;
+mod iterators;
 pub mod lru_cache;
 mod macros;
 mod os_file_resolver;
@@ -65,14 +65,14 @@ pub mod hfs;
 pub mod ntfs;
 
 pub use enums::FormatIdentifier;
-pub use file_entries_iterator::FileEntriesIterator;
 pub use file_resolver::{FileResolver, FileResolverReference};
+pub use iterators::{FileEntriesIterator, PartitionsIterator};
 pub use os_file_resolver::{OsFileResolver, open_os_file_resolver};
 pub use path::Path;
 pub use path_component::PathComponent;
 pub use range_stream::RangeStream;
 pub use scanner::FormatScanner;
-pub use traits::FileEntryIterator;
+pub use traits::{FileEntryIterator, PartitionIterator};
 
 #[cfg(test)]
 mod tests {

@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use crate::file_entries_iterator::FileEntriesIterator;
+use crate::iterators::FileEntriesIterator;
 
 use super::file_entry::FatFileEntry;
 

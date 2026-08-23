@@ -19,6 +19,8 @@ An Apple Partition Map (APM) consists of:
 | Date and time values | N/A |
 | Character strings | ASCII |
 
+The number of bytes per sector is 512 or 2048.
+
 ### Terminology
 
 | Term | Description |

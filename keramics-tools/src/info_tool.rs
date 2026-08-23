@@ -35,9 +35,9 @@ mod storage_media_image;
 
 use crate::enums::{DisplayPathType, EncodingType, FormatType};
 use crate::info::{
-    ApfsInfo, ApmInfo, CdsaEncrInfo, EwfInfo, ExFatInfo, ExtInfo, FatInfo, GptInfo, HfsInfo,
-    LinuxLvmInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo, SparseBundleInfo, SparseImageInfo,
-    UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
+    ApfsInfo, ApmInfo, BsdDiskLabelInfo, CdsaEncrInfo, EwfInfo, ExFatInfo, ExtInfo, FatInfo,
+    GptInfo, HfsInfo, LinuxLvmInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo, SparseBundleInfo,
+    SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
 };
 use crate::storage_media_image::StorageMediaImage;
 
@@ -300,6 +300,7 @@ impl InfoTool {
         }
         format_scanner.add_apfs_signatures();
         format_scanner.add_apm_signatures();
+        format_scanner.add_bsdlabel_signatures();
         format_scanner.add_exfat_signatures();
         format_scanner.add_ext_signatures();
         format_scanner.add_fat_signatures();
@@ -463,8 +464,9 @@ fn main() -> ExitCode {
             }
         };
     let format_identifier: FormatIdentifier = match &arguments.format {
-        Some(FormatType::Apm) => FormatIdentifier::Apm,
         Some(FormatType::Apfs) => FormatIdentifier::Apfs,
+        Some(FormatType::Apm) => FormatIdentifier::Apm,
+        Some(FormatType::BsdDiskLabel) => FormatIdentifier::BsdDiskLabel,
         Some(FormatType::CdsaEncr) => FormatIdentifier::CdsaEncr,
         Some(FormatType::Ewf) => FormatIdentifier::Ewf,
         Some(FormatType::ExFat) => FormatIdentifier::ExFat,
@@ -599,6 +601,7 @@ fn main() -> ExitCode {
         None => match &format_identifier {
             FormatIdentifier::Apfs => ApfsInfo::print_container(&data_stream),
             FormatIdentifier::Apm => ApmInfo::print_volume_system(&data_stream),
+            FormatIdentifier::BsdDiskLabel => BsdDiskLabelInfo::print_volume_system(&data_stream),
             FormatIdentifier::CdsaEncr => CdsaEncrInfo::print_container(&data_stream),
             // TODO: add support for individual EWF segment file.
             FormatIdentifier::Ewf => EwfInfo::print_image(&arguments.source),

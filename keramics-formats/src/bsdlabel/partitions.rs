@@ -13,7 +13,7 @@
 
 use crate::iterators::PartitionsIterator;
 
-use super::volume_system::ApmVolumeSystem;
+use super::volume_system::BsdDiskLabelVolumeSystem;
 
-/// Apple Partition Map (APM) partitions iterator.
-pub type ApmPartitionsIterator<'a> = PartitionsIterator<'a, ApmVolumeSystem>;
+/// BSD disklabel (bsdlabel) partitions iterator.
+pub type BsdDiskLabelPartitionsIterator<'a> = PartitionsIterator<'a, BsdDiskLabelVolumeSystem>;

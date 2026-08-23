@@ -67,7 +67,8 @@ An uncompressed UDIF segment file consist of:
 A compressed UDIF segment file consist of:
 
 * Data fork, containing the image data
-* Optional resource fork or XML plist
+* Optional XML plist
+* Optional resource fork
 * [File footer](#file_footer) at the end of the file
 
 #### Encrypted Encoding version 1 encrypted UDIF segment file
@@ -459,6 +460,8 @@ It is currently unknown if non-sequential segment files are supported.
 
 The XML plist and resource fork could be used simultaneously, allowing for a single UDIF to
 contain multiple images.
+
+It is currently assumed that the XML plist is leading.
 
 ### XML plist and/or resource fork in non-first segment files
 
