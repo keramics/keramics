@@ -22,7 +22,7 @@ assert_availability_binary newfs
 
 set -e
 
-sudo mkdir -p ${MOUNT_POINT}
+mkdir -p ${MOUNT_POINT}
 
 mkdir -p test_data/ufs
 

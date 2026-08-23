@@ -29,6 +29,7 @@ mkdir -p test_data/hfs
 set +e
 
 sudo modprobe hfs
+
 if [ $? -eq 0 ];
 then
     set -e
@@ -49,11 +50,12 @@ then
     create_test_file_entries ${MOUNT_POINT}
 
     sudo umount ${MOUNT_POINT}
-
-    set +e
 fi
 
+set +e
+
 sudo modprobe hfsplus
+
 if [ $? -eq 0 ];
 then
     set -e
@@ -74,8 +76,6 @@ then
     create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
 
     sudo umount ${MOUNT_POINT}
-
-    set +e
 fi
 
 # Create a HFS-wrapped HFS+ file system.
