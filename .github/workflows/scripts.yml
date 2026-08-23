@@ -17,7 +17,7 @@ jobs:
         usesh: true
         mem: 4096
         prepare: |
-          pkg install -y freebsd-bsdlabel
+          pkg install -y bash freebsd-bsdlabel
     - name: Generate test data
       shell: freebsd {0}
       run: |
@@ -39,24 +39,24 @@ jobs:
         sudo apt-get install -y attr ewf-tools exfatprogs genisoimage hfsprogs hfsutils qemu-utils
     - name: Generate test data
       run: |
-        ./scripts/generate_ewf_test_data_linux.sh
+        ./scripts/generate_lvm_test_data_linux.sh
+        ./scripts/generate_luks_test_data_linux.sh
+        ./scripts/generate_mbr_test_data_linux.sh
         ./scripts/generate_exfat_test_data_linux.sh
         ./scripts/generate_ext_test_data_linux.sh
         ./scripts/generate_fat_test_data_linux.sh
         ./scripts/generate_gpt_test_data_linux.sh
         ./scripts/generate_hfs_test_data_linux.sh
         ./scripts/generate_iso9660_test_data_linux.sh
-        ./scripts/generate_lvm_test_data_linux.sh
-        ./scripts/generate_luks_test_data_linux.sh
-        ./scripts/generate_mbr_test_data_linux.sh
         ./scripts/generate_ntfs_test_data_linux.sh
+        ./scripts/generate_xfs_test_data_linux.sh
+        ./scripts/generate_ewf_test_data_linux.sh
         ./scripts/generate_qcow_test_data_linux.sh
         ./scripts/generate_splitraw_test_data_linux.sh
         ./scripts/generate_vdi_test_data_linux.sh
         ./scripts/generate_vhd_test_data_linux.sh
         ./scripts/generate_vhdx_test_data_linux.sh
         ./scripts/generate_vmdk_test_data_linux.sh
-        ./scripts/generate_xfs_test_data_linux.sh
     - uses: actions/upload-artifact@v7
       with:
         name: test-data-linux

@@ -32,7 +32,7 @@ SECTOR_SIZE=512
 
 dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
 
-mkfs.exfat -L "exfat_test" -s ${SECTOR_SIZE} ${IMAGE_FILE}
+mkfs.exfat -L "exfat_test" ${IMAGE_FILE}
 
 sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
 
