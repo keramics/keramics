@@ -11,9 +11,5 @@
  * under the License.
  */
 
-use crate::iterators::PartitionsIterator;
-
-use super::volume_system::ApmVolumeSystem;
-
-/// Apple Partition Map (APM) partitions iterator.
-pub type ApmPartitionsIterator<'a> = PartitionsIterator<'a, ApmVolumeSystem>;
+/// BSD disklabel signature.
+pub(crate) const BSD_DISKLABEL_SIGNATURE: &[u8] = b"WEV\x82";

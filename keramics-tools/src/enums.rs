@@ -205,19 +205,25 @@ pub enum EncodingType {
 /// Format types.
 #[derive(Clone, ValueEnum)]
 pub enum FormatType {
-    /// Apple Partition Map (APM)
-    Apm,
-
     /// Apple File System (APFS)
     Apfs,
 
+    /// Apple Partition Map (APM)
+    Apm,
+
+    /// BSD disklabel (bsdlabel)
+    #[value(name = "bsdlabel")]
+    BsdDiskLabel,
+
     /// Mac OS Encrypted Encoding (cdsaencr)
+    #[value(name = "cdsaencr")]
     CdsaEncr,
 
     /// Expert Witness Compression Format (EWF)
     Ewf,
 
     /// Extensible File Allocation Table (exFAT)
+    #[value(name = "exfat")]
     ExFat,
 
     /// Extended File System (ext)
@@ -233,6 +239,7 @@ pub enum FormatType {
     Hfs,
 
     /// Linux Logical Volume Manager (LVM)
+    #[value(name = "linuxlvm")]
     LinuxLvm,
 
     /// Master Boot Record (MBR)
@@ -248,9 +255,11 @@ pub enum FormatType {
     Qcow,
 
     /// Mac OS sparse bundle (.sparsebundle)
+    #[value(name = "sparsebundle")]
     SparseBundle,
 
     /// Mac OS sparse image (.sparseimage)
+    #[value(name = "sparseimage")]
     SparseImage,
 
     /// Universal Disk Image Format (UDIF)

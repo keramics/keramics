@@ -14,6 +14,7 @@
 use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::PartitionIterator;
 use keramics_formats::gpt::{GptPartition, GptVolumeSystem};
 use keramics_types::Uuid;
 

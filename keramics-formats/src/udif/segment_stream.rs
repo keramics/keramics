@@ -319,11 +319,6 @@ impl UdifSegmentStream {
                 "Unsupported segment file: 1 - segment number value out of bounds"
             ));
         }
-        if segment_file.plist_size != 0 && segment_file.resource_fork_size != 0 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported segment file: 1 - both XML plist and resource fork in use"
-            ));
-        }
         if segment_file.segment_offset != self.size {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported segment file: 1 - segment offset value out of bounds"

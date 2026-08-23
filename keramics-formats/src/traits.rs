@@ -28,7 +28,22 @@ pub trait FileEntryIterator {
     fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace>;
 
     /// Retrieves a specific sub file entry.
-    fn get_sub_file_entry_by_index(&mut self, index: usize) -> Result<Self, ErrorTrace>
+    fn get_sub_file_entry_by_index(
+        &mut self,
+        sub_file_entry_index: usize,
+    ) -> Result<Self, ErrorTrace>
     where
         Self: Sized;
+}
+
+/// Partition iterator trait.
+pub trait PartitionIterator {
+    /// Partition item.
+    type PartitionItem;
+
+    /// Retrieves a specific paritition.
+    fn get_partition_by_index(
+        &self,
+        partition_index: usize,
+    ) -> Result<Self::PartitionItem, ErrorTrace>;
 }

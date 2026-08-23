@@ -13,7 +13,7 @@
 
 use keramics_core::ErrorTrace;
 
-use super::traits::FileEntryIterator;
+use super::traits::{FileEntryIterator, PartitionIterator};
 
 /// Generic file entries iterator.
 pub struct FileEntriesIterator<'a, T: FileEntryIterator> {
@@ -64,6 +64,47 @@ impl<'a, T: FileEntryIterator> Iterator for FileEntriesIterator<'a, T> {
             .get_sub_file_entry_by_index(self.sub_file_entry_index);
 
         self.sub_file_entry_index += 1;
+
+        Some(item)
+    }
+}
+
+/// Generic partitions iterator.
+pub struct PartitionsIterator<'a, T: PartitionIterator> {
+    /// Volume system.
+    volume_system: &'a T,
+
+    /// Number of partitions.
+    number_of_partitions: usize,
+
+    /// Partititon index.
+    partition_index: usize,
+}
+
+impl<'a, T: PartitionIterator> PartitionsIterator<'a, T> {
+    /// Creates a new iterator.
+    pub fn new(volume_system: &'a T, number_of_partitions: usize) -> Self {
+        Self {
+            volume_system,
+            number_of_partitions,
+            partition_index: 0,
+        }
+    }
+}
+
+impl<'a, T: PartitionIterator> Iterator for PartitionsIterator<'a, T> {
+    type Item = Result<T::PartitionItem, ErrorTrace>;
+
+    /// Retrieves the next partition.
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.partition_index >= self.number_of_partitions {
+            return None;
+        }
+        let item: Self::Item = self
+            .volume_system
+            .get_partition_by_index(self.partition_index);
+
+        self.partition_index += 1;
 
         Some(item)
     }

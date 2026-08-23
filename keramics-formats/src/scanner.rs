@@ -19,6 +19,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_sigscan::{PatternType, ScanContext, Scanner, Signature};
 
 use super::apfs::constants::*;
+use super::bsdlabel::constants::*;
 use super::cdsaencr::constants::*;
 use super::enums::FormatIdentifier;
 use super::ewf::constants::*;
@@ -60,9 +61,10 @@ impl FormatScanner {
 
     /// Adds Apple Partition Map (APM) signatures.
     pub fn add_apm_signatures(&mut self) {
-        // APM signature.
-        // Note that technically "PM" at offset 512 or 2048 is the Apple Partion Map
-        // signature but using the partition type is less error prone.
+        // Note that technically "PM" is the Apple Partion Map signature but using the partition
+        // type is less false-positive prone.
+
+        // Signature for 512 bytes per sector.
         self.signature_scanner.add_signature(Signature::new(
             "apm1",
             PatternType::BoundToStart,
@@ -73,6 +75,7 @@ impl FormatScanner {
                 0x00, 0x00, 0x00, 0x00,
             ],
         ));
+        // Signature for 2048 bytes per sector.
         self.signature_scanner.add_signature(Signature::new(
             "apm2",
             PatternType::BoundToStart,
@@ -82,6 +85,16 @@ impl FormatScanner {
                 0x6e, 0x5f, 0x6d, 0x61, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x00,
             ],
+        ));
+    }
+
+    /// Adds BSD disklabel (bsdlabel) signatures.
+    pub fn add_bsdlabel_signatures(&mut self) {
+        self.signature_scanner.add_signature(Signature::new(
+            "bsdlabel1",
+            PatternType::BoundToStart,
+            512,
+            BSD_DISKLABEL_SIGNATURE,
         ));
     }
 
@@ -415,6 +428,7 @@ impl FormatScanner {
             let format_identifier: FormatIdentifier = match signature.identifier.as_str() {
                 "apfs1" => FormatIdentifier::Apfs,
                 "apm1" | "apm2" => FormatIdentifier::Apm,
+                "bsdlabel1" => FormatIdentifier::BsdDiskLabel,
                 "cdsaencr1" | "cdsaencr2" => FormatIdentifier::CdsaEncr,
                 "ewf1" | "ewf2" => FormatIdentifier::Ewf,
                 "exfat1" => FormatIdentifier::ExFat,
@@ -455,6 +469,7 @@ mod tests {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apfs_signatures();
         format_scanner.add_apm_signatures();
+        format_scanner.add_bsdlabel_signatures();
         format_scanner.add_cdsaencr_signatures();
         format_scanner.add_ewf_signatures();
         format_scanner.add_exfat_signatures();
@@ -480,6 +495,7 @@ mod tests {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apfs_signatures();
         format_scanner.add_apm_signatures();
+        format_scanner.add_bsdlabel_signatures();
         format_scanner.add_cdsaencr_signatures();
         format_scanner.add_ewf_signatures();
         format_scanner.add_ext_signatures();

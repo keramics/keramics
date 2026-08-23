@@ -18,6 +18,8 @@ use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
+use crate::traits::PartitionIterator;
+
 use super::partition::GptPartition;
 use super::partition_entry::GptPartitionEntry;
 use super::partition_table_header::GptPartitionTableHeader;
@@ -69,29 +71,6 @@ impl GptVolumeSystem {
     /// Retrieves the number of partitions.
     pub fn get_number_of_partitions(&self) -> usize {
         self.partition_entries.len()
-    }
-
-    /// Retrieves a partition by index.
-    pub fn get_partition_by_index(
-        &self,
-        partition_index: usize,
-    ) -> Result<GptPartition, ErrorTrace> {
-        match self.partition_entries.get(partition_index) {
-            Some(partition_entry) => match self.data_stream.as_ref() {
-                Some(data_stream) => Ok(GptPartition::new(
-                    data_stream,
-                    self.bytes_per_sector,
-                    &partition_entry,
-                )),
-                None => Err(keramics_core::error_trace_new!("Missing data stream")),
-            },
-            None => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "No partition with index: {}",
-                    partition_index
-                )));
-            }
-        }
     }
 
     // TODO: add get_partition_index_by_identifier
@@ -282,6 +261,33 @@ impl GptVolumeSystem {
         self.bytes_per_sector = bytes_per_sector;
 
         Ok(())
+    }
+}
+
+impl PartitionIterator for GptVolumeSystem {
+    type PartitionItem = GptPartition;
+
+    /// Retrieves a partition by index.
+    fn get_partition_by_index(
+        &self,
+        partition_index: usize,
+    ) -> Result<Self::PartitionItem, ErrorTrace> {
+        match self.partition_entries.get(partition_index) {
+            Some(partition_entry) => match self.data_stream.as_ref() {
+                Some(data_stream) => Ok(GptPartition::new(
+                    data_stream,
+                    self.bytes_per_sector,
+                    &partition_entry,
+                )),
+                None => Err(keramics_core::error_trace_new!("Missing data stream")),
+            },
+            None => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "No partition with index: {}",
+                    partition_index
+                )));
+            }
+        }
     }
 }
 

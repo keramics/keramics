@@ -30,6 +30,9 @@ Labels "a", "b", "c" and "d" have a predefined meaning:
 
 ## BSD disklabel
 
+The BSD disklabel is stored at offset 512. It can be preceded by a [MBR](mbr.md) with a single
+partition of type 0xa5 (FreeBSD).
+
 The BSD disklabel is of variable size and consists of:
 
 | Offset | Size | Value | Description |
@@ -59,13 +62,18 @@ The BSD disklabel is of variable size and consists of:
 | 112 | 5 x 4 | | Unknown (Reserved) |
 | 132 | 4 | "WEV\x82" | Signature |
 | 136 | 2 | | Checksum, which contains a XOR of the BSD disklabel |
-| 138 | 2 | | Number of partition entries |
+| 138 | 2 | | Number of partition entries, should not exceed 16 (MAXPARTITIONS) |
 | 140 | 4 | | Boot area size in bytes |
 | 144 | 4 | | Maximum superblock size in bytes |
 | 148 | number of partitions x 16 | | Array of partition entries |
 
 > Note that the number of partition entries contains the total number of entries in the array, not
-> the number of partitions allocated.
+> the number of partitions in use.
+
+The checksum is calculated as following:
+
+* set the checksum value to 0
+* XOR every 16-bit value in the disklabel
 
 ### Drive types {#drive_types}
 

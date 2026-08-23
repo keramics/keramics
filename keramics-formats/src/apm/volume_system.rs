@@ -15,6 +15,8 @@ use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
+use crate::traits::PartitionIterator;
+
 use super::constants::*;
 use super::partition::ApmPartition;
 use super::partition_map_entry::ApmPartitionMapEntry;
@@ -52,27 +54,6 @@ impl ApmVolumeSystem {
     /// Retrieves the number of partitions.
     pub fn get_number_of_partitions(&self) -> usize {
         self.partition_map_entries.len()
-    }
-
-    /// Retrieves a partition by index.
-    pub fn get_partition_by_index(
-        &self,
-        partition_index: usize,
-    ) -> Result<ApmPartition, ErrorTrace> {
-        match self.partition_map_entries.get(partition_index) {
-            Some(partition_entry) => match self.data_stream.as_ref() {
-                Some(data_stream) => Ok(ApmPartition::new(
-                    &data_stream,
-                    self.bytes_per_sector,
-                    partition_entry,
-                )),
-                None => Err(keramics_core::error_trace_new!("Missing data stream")),
-            },
-            None => Err(keramics_core::error_trace_new!(format!(
-                "No partition with index: {}",
-                partition_index
-            ))),
-        }
     }
 
     /// Retrieves a partitions iterator.
@@ -169,6 +150,31 @@ impl ApmVolumeSystem {
             }
         }
         Ok(())
+    }
+}
+
+impl PartitionIterator for ApmVolumeSystem {
+    type PartitionItem = ApmPartition;
+
+    /// Retrieves a partition by index.
+    fn get_partition_by_index(
+        &self,
+        partition_index: usize,
+    ) -> Result<Self::PartitionItem, ErrorTrace> {
+        match self.partition_map_entries.get(partition_index) {
+            Some(partition_entry) => match self.data_stream.as_ref() {
+                Some(data_stream) => Ok(ApmPartition::new(
+                    &data_stream,
+                    self.bytes_per_sector,
+                    partition_entry,
+                )),
+                None => Err(keramics_core::error_trace_new!("Missing data stream")),
+            },
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No partition with index: {}",
+                partition_index
+            ))),
+        }
     }
 }
 
