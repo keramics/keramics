@@ -1,15 +1,14 @@
 # BSD disklabel format
 
-The BSD disklabel format is a partitioning schema mainly used by BSD operating
-systems.
+The BSD disklabel format is a partitioning schema mainly used by BSD operating systems.
 
 ## Overview
 
-A BSD disklabel consists of one or more partition entries, labeled
-alphabetically from "a" to "h" (or "p" in some BSD variants).
+A BSD disklabel consists of one or more partition entries, labeled alphabetically from "a" to "h"
+(or "p" in some BSD variants).
 
-> Note that BSD disklabel originally contained 8 entries for describing
-> partitions and some BSD variants have since increased this to 16 partitions.
+> Note that BSD disklabel originally contained 8 entries for describing partitions and some BSD
+> variants have since increased this to 16 partitions.
 
 Labels "a", "b", "c" and "d" have a predefined meaning:
 
@@ -18,8 +17,8 @@ Labels "a", "b", "c" and "d" have a predefined meaning:
 * "c" is the volume used by disklabel;
 * "d" is the entire physical disk.
 
-> Note that information about partition "d" is not stored in the corresponding
-> BSD disklabel partition entry and typically filled with 0-byte values.
+> Note that information about partition "d" is not stored in the corresponding BSD disklabel
+> partition entry and typically filled with 0-byte values.
 
 ### Characteristics
 
@@ -65,8 +64,8 @@ The BSD disklabel is of variable size and consists of:
 | 144 | 4 | | Maximum superblock size in bytes |
 | 148 | number of partitions x 16 | | Array of partition entries |
 
-> Note that the number of partition entries contains the total number of entries
-> in the array, not the number of partitions allocated.
+> Note that the number of partition entries contains the total number of entries in the array, not
+> the number of partitions allocated.
 
 ### Drive types {#drive_types}
 

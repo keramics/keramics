@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Script to generate Keramics exFAT file system test files on Linux.
+# Script to generate Keramics VHD test files on Linux.
 #
 # Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
 #
@@ -16,28 +16,20 @@
 
 source ./scripts/shared_linux.sh
 
-assert_availability_binary dd
-assert_availability_binary mkfs.exfat
+assert_availability_binary qemu-img
 
 set -e
 
-sudo mkdir -p ${MOUNT_POINT}
+mkdir -p test_data/vhd
 
-mkdir -p test_data/exfat
+BASE_IMAGE_FILE="test_data/ext/ext2.raw"
 
-# Create a exFAT file system.
-IMAGE_FILE="test_data/exfat/exfat.raw"
-IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
-SECTOR_SIZE=512
+if [ -f "${BASE_IMAGE_FILE}" ]
+then
+    # Create a VHD image with an ext2 file system.
+    IMAGE_FILE="test_data/vhd/ext2.vhd"
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
-
-mkfs.exfat -L "exfat_test" -s ${SECTOR_SIZE} ${IMAGE_FILE}
-
-sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
-
-create_test_file_entries_with_long_file_name ${MOUNT_POINT}
-
-sudo umount ${MOUNT_POINT}
+    qemu-img convert -f raw -O vpc "${BASE_IMAGE_FILE}" "${IMAGE_FILE}"
+fi
 
 exit ${EXIT_SUCCESS}

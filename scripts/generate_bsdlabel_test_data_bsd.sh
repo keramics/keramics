@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Script to generate Keramics exFAT file system test files on Linux.
+# Script to generate Keramics BSD disklabel test files on FreeBSD.
 #
 # Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
 #
@@ -14,30 +14,39 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-source ./scripts/shared_linux.sh
+source ./scripts/shared_bsd.sh
 
+assert_availability_binary bsdlabel
 assert_availability_binary dd
-assert_availability_binary mkfs.exfat
+assert_availability_binary mdconfig
+assert_availability_binary newfs
 
 set -e
 
 sudo mkdir -p ${MOUNT_POINT}
 
-mkdir -p test_data/exfat
+mkdir -p test_data/bsdlabel
 
-# Create a exFAT file system.
-IMAGE_FILE="test_data/exfat/exfat.raw"
+# Create an image with a BSD disklabel and an UFS file system
 IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
+IMAGE_FILE="test_data/bsdlabel/bsdlabel.raw"
+
 dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
 
-mkfs.exfat -L "exfat_test" -s ${SECTOR_SIZE} ${IMAGE_FILE}
+mdconfig -a -t vnode -f ${IMAGE_FILE} -u 9
 
-sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
+bsdlabel -w -B md9 auto
 
-create_test_file_entries_with_long_file_name ${MOUNT_POINT}
+newfs -L ufs1_test -O 1 md9a
 
-sudo umount ${MOUNT_POINT}
+mount /dev/md9a ${MOUNT_POINT}
+
+create_test_file_entries ${MOUNT_POINT}
+
+umount ${MOUNT_POINT}
+
+mdconfig -d -u 9
 
 exit ${EXIT_SUCCESS}
