@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Script to generate Keramics test files on Mac OS.
+# Shared functionality for scripts to generate Keramics test files on Mac OS.
 #
 # Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
 #
@@ -140,6 +140,11 @@ create_file_entries()
     mkfifo ${MOUNT_POINT}/testdir1/pipe1
 }
 
+# Detaches a disk image
+#
+# Arguments:
+#   a string containing the disk image file name
+#
 detach_image()
 {
     DISK_NODE=$(hdiutil info | awk -v img="$1" '
@@ -160,193 +165,9 @@ detach_image()
         fi
         echo ""
         echo "${DISK_NODE} busy, waiting 10 seconds."
+
         sleep 10
     done
 
     set -e
 }
-
-assert_availability_binary diskutil
-assert_availability_binary hdiutil
-assert_availability_binary mkfifo
-assert_availability_binary mknod
-assert_availability_binary sw_vers
-
-set -e
-
-mkdir -p test_data
-
-# Create an image with an APM partition table and a HFS+ file system
-IMAGE_FILE="test_data/apm/apm"
-IMAGE_SIZE="4M"
-
-mkdir -p test_data/apm
-rm -f ${IMAGE_FILE}.dmg
-
-hdiutil create -fs 'HFS+' -layout 'SPUD' -size ${IMAGE_SIZE} -type UDIF -volname hfsplus_test ${IMAGE_FILE}
-
-hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
-
-create_file_entries "/Volumes/hfsplus_test"
-
-detach_image ${IMAGE_FILE}.dmg
-
-# Create a sparse image with a HFS+ file system
-IMAGE_FILE="test_data/sparseimage/hfsplus"
-IMAGE_SIZE="4M"
-
-mkdir -p test_data/sparseimage
-rm -f ${IMAGE_FILE}.sparseimage
-
-hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSE -volname hfsplus_test ${IMAGE_FILE}
-
-hdiutil attach ${IMAGE_FILE}.sparseimage -noautoopen -nobrowse
-
-create_file_entries "/Volumes/hfsplus_test"
-
-detach_image ${IMAGE_FILE}.sparseimage
-
-BASE_IMAGE_FILE="${IMAGE_FILE}.sparseimage"
-
-IMAGE_FILE="test_data/sparseimage/hfsplus_aes128"
-
-rm -f ${IMAGE_FILE}.sparseimage
-
-echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE} -encryption AES-128 -format UDSP -stdinpass -o ${IMAGE_FILE}
-
-# echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE} -encryption AES-128 -format UDSP -stdinpass -tgtimagekey encrypted-encoding-version=1 -o ${IMAGE_FILE}
-
-# Create a sparse bundle with a HFS+ file system
-IMAGE_FILE="test_data/sparsebundle/hfsplus"
-IMAGE_SIZE="4M"
-
-mkdir -p test_data/sparsebundle
-rm -rf ${IMAGE_FILE}.sparsebundle
-
-hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSEBUNDLE -volname hfsplus_test ${IMAGE_FILE}
-
-hdiutil attach ${IMAGE_FILE}.sparsebundle -noautoopen -nobrowse
-
-create_file_entries "/Volumes/hfsplus_test"
-
-detach_image ${IMAGE_FILE}.sparsebundle
-
-BASE_IMAGE_FILE="${IMAGE_FILE}.sparsebundle"
-
-IMAGE_FILE="test_data/sparsebundle/hfsplus_aes128"
-
-rm -rf ${IMAGE_FILE}.sparsebundle
-
-echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE} -encryption AES-128 -format UDSB -stdinpass -o ${IMAGE_FILE}
-
-# echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE} -encryption AES-128 -format UDSP -stdinpass -tgtimagekey encrypted-encoding-version=1 -o ${IMAGE_FILE}
-
-
-# Create a raw image with a HFS+ file system
-IMAGE_FILE="test_data/hfs/hfsplus"
-IMAGE_SIZE="4M"
-
-mkdir -p test_data/hfs
-rm -f ${IMAGE_FILE}.dmg
-
-hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type UDIF -volname hfsplus_test ${IMAGE_FILE}
-
-hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
-
-create_file_entries "/Volumes/hfsplus_test"
-
-detach_image ${IMAGE_FILE}.dmg
-
-# Create compressed UDIF images
-mkdir -p test_data/udif
-
-BASE_IMAGE_FILE="${IMAGE_FILE}.dmg"
-
-# Create an ADC compressed UDIF image.
-IMAGE_FILE="test_data/udif/hfsplus_adc"
-
-rm -f ${IMAGE_FILE}.dmg
-
-hdiutil convert ${BASE_IMAGE_FILE} -format UDCO -o ${IMAGE_FILE}
-
-# Create a bzip2 compressed UDIF image.
-IMAGE_FILE="test_data/udif/hfsplus_bzip2"
-
-rm -f ${IMAGE_FILE}.dmg
-
-hdiutil convert ${BASE_IMAGE_FILE} -format UDBZ -o ${IMAGE_FILE}
-
-# Create a lzfse compressed UDIF image.
-IMAGE_FILE="test_data/udif/hfsplus_lzfse"
-
-rm -f ${IMAGE_FILE}.dmg
-
-hdiutil convert ${BASE_IMAGE_FILE} -format ULFO -o ${IMAGE_FILE}
-
-# Create a lzma compressed UDIF image.
-IMAGE_FILE="test_data/udif/hfsplus_lzma"
-
-rm -f ${IMAGE_FILE}.dmg
-
-hdiutil convert ${BASE_IMAGE_FILE} -format ULMO -o ${IMAGE_FILE}
-
-# Create a zlib compressed UDIF image.
-IMAGE_FILE="test_data/udif/hfsplus_zlib"
-
-rm -f ${IMAGE_FILE}.dmg
-
-hdiutil convert ${BASE_IMAGE_FILE} -format UDZO -o ${IMAGE_FILE}
-
-# Create a zlib compressed UDIF image with a resource fork.
-# Note this works with older versions of hdiutil that support flatten/unflatten.
-#
-# IMAGE_FILE="test_data/udif/hfsplus_rsrc"
-#
-# rm -f ${IMAGE_FILE}.dmg
-#
-# hdiutil convert ${BASE_IMAGE_FILE} -format UDZO -o ${IMAGE_FILE}
-#
-# hdiutil unflatten test.dmg
-# hdiutil flatten -noxml test.dmg
-
-# Create an AES-128 encrypted zlib compressed UDIF image.
-IMAGE_FILE="test_data/udif/hfsplus_zlib_aes128"
-
-rm -f ${IMAGE_FILE}.dmg
-
-echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE} -encryption AES-128 -format UDZO -stdinpass -o ${IMAGE_FILE}
-
-# echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE} -encryption AES-128 -format UDZO -stdinpass -tgtimagekey encrypted-encoding-version=1 -o ${IMAGE_FILE}
-
-# Create an uncompressed segmented UDIF image.
-#
-# IMAGE_FILE="test_data/udif/hfsplus_segments"
-# IMAGE_SIZE="4M"
-#
-# hdiutil attach -nomount test_data/udif/hfsplus_zlib
-# sudo hdiutil create -srcdevice /dev/rdisk# -format UDIF -segmentSize 10K ${IMAGE_FILE}
-
-# Create a zlib compressed segmented UDIF image.
-#
-# IMAGE_FILE="test_data/udif/hfsplus_zlib_segments"
-# IMAGE_SIZE="4M"
-#
-# hdiutil attach -nomount test_data/udif/hfsplus_zlib
-# sudo hdiutil create -srcdevice /dev/rdisk# -format UDZO -segmentSize 10K ${IMAGE_FILE}
-
-# Create a raw image with an APFS container and single volume with a case-insensitive file system
-IMAGE_FILE="test_data/apfs/apfs"
-IMAGE_SIZE="4M"
-
-mkdir -p test_data/apfs
-rm -f ${IMAGE_FILE}.dmg
-
-hdiutil create -fs 'APFS' -size ${IMAGE_SIZE} -type UDIF -volname apfs_test ${IMAGE_FILE}
-
-hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
-
-create_file_entries "/Volumes/apfs_test"
-
-detach_image ${IMAGE_FILE}.dmg
-
-exit ${EXIT_SUCCESS}

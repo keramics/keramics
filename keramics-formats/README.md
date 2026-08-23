@@ -9,6 +9,7 @@ Supported data formats:
 * [Apple File System (APFS) format](https://keramics.github.io/apfs.html)
 * [Apple File System Compression (decmpfs) format](https://keramics.github.io/decmpfs.html)
 * [Apple Partition Map (APM) format](https://keramics.github.io/apm.html)
+* [BSD disklabel format](https:////keramics.github.io/bsdlabel.html)
 * [Expert Witness Compression Format (EWF)](https://keramics.github.io/ewf.html)
 * [Extended File System (ext) format](https://keramics.github.io/ext.html)
 * [File Allocation Table (FAT) file system format](https://keramics.github.io/fat.html)
@@ -21,7 +22,7 @@ Supported data formats:
 * [New Technologies File System (NTFS) format](https://keramics.github.io/ntfs.html)
 * [Parallels Disk Image (PDI) format](https://keramics.github.io/pdi.html)
 * [QEMU Copy-On-Write (QCOW) image file format](https://keramics.github.io/qcow.html)
-* Split raw storage media image format
+* Split (or segmented) RAW storage media image format
 * [Universal Disk Image Format (UDIF)](https://keramics.github.io/udif.html)
 * [Virtual Hard Disk (VHD) image format](https://keramics.github.io/vhd.html)
 * [Virtual Hard Disk version 2 (VHDX) image format](https://keramics.github.io/vhdx.html)

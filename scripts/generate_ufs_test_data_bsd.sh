@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+#
+# Script to generate Keramics UFS file system test files on FreeBSD.
+#
+# Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License. You may
+# obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+source ./scripts/shared_bsd.sh
+
+assert_availability_binary dd
+assert_availability_binary mdconfig
+assert_availability_binary newfs
+
+set -e
+
+mkdir -p ${MOUNT_POINT}
+
+mkdir -p test_data/ufs
+
+IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
+SECTOR_SIZE=512
+
+# Create an image with an UFS1 file system
+IMAGE_FILE="test_data/ufs/ufs1.raw"
+
+echo "Generating: ${IMAGE_FILE}"
+
+dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+
+mdconfig -a -t vnode -f ${IMAGE_FILE} -u 9
+
+gpart create -s bsd md9
+gpart add -t freebsd-ufs md9
+
+newfs -L ufs1_test -O 1 md9a
+
+mount /dev/md9a ${MOUNT_POINT}
+
+create_test_file_entries ${MOUNT_POINT}
+
+umount ${MOUNT_POINT}
+
+mdconfig -d -u 9
+
+# Create an image with an UFS2 file system
+IMAGE_FILE="test_data/ufs/ufs2.raw"
+
+echo "Generating: ${IMAGE_FILE}"
+
+dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+
+mdconfig -a -t vnode -f ${IMAGE_FILE} -u 9
+
+gpart create -s bsd md9
+gpart add -t freebsd-ufs md9
+
+newfs -L ufs2_test -O 2 md9a
+
+mount /dev/md9a ${MOUNT_POINT}
+
+create_test_file_entries ${MOUNT_POINT}
+
+umount ${MOUNT_POINT}
+
+mdconfig -d -u 9
+
+exit ${EXIT_SUCCESS}

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Script to generate Keramics FAT file system test files on Linux.
+# Script to generate Keramics exFAT file system test files on Linux.
 #
 # Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
 #
@@ -25,19 +25,28 @@ sudo mkdir -p ${MOUNT_POINT}
 
 mkdir -p test_data/exfat
 
-# Create a exFAT file system.
-IMAGE_FILE="test_data/exfat/exfat.raw"
-IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
-SECTOR_SIZE=512
+set +e
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+sudo modprobe exfat
 
-mkfs.exfat -L "exfat_test" -s ${SECTOR_SIZE} ${IMAGE_FILE}
+if [ $? -eq 0 ];
+then
+    set -e
 
-sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
+    # Create a exFAT file system.
+    IMAGE_FILE="test_data/exfat/exfat.raw"
+    IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
+    SECTOR_SIZE=512
 
-create_test_file_entries_with_long_file_name ${MOUNT_POINT}
+    dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
 
-sudo umount ${MOUNT_POINT}
+    mkfs.exfat -L "exfat_test" ${IMAGE_FILE}
+
+    sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
+
+    create_test_file_entries_with_long_file_name ${MOUNT_POINT}
+
+    sudo umount ${MOUNT_POINT}
+fi
 
 exit ${EXIT_SUCCESS}

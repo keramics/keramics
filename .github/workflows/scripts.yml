@@ -7,6 +7,28 @@ permissions: read-all
 env:
   CARGO_TERM_COLOR: always
 jobs:
+  generate_test_data_freebsd:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+    - name: Start VM
+      uses: vmactions/freebsd-vm@v1
+      with:
+        usesh: true
+        mem: 4096
+        prepare: |
+          pkg install -y bash freebsd-bsdlabel
+    - name: Generate test data
+      shell: freebsd {0}
+      run: |
+        ./scripts/generate_bsdlabel_test_data_bsd.sh
+        ./scripts/generate_ufs_test_data_bsd.sh
+    - uses: actions/upload-artifact@v7
+      with:
+        name: test-data-freebsd
+        path: |
+          test_data/bsdlabel/*.raw
+          test_data/ufs/*.raw
   generate_test_data_linux:
     runs-on: ubuntu-latest
     steps:
@@ -14,19 +36,48 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y attr exfatprogs genisoimage hfsprogs hfsutils qemu-utils
+        sudo apt-get install -y attr ewf-tools exfatprogs genisoimage hfsprogs hfsutils qemu-utils
     - name: Generate test data
       run: |
+        ./scripts/generate_lvm_test_data_linux.sh
+        ./scripts/generate_luks_test_data_linux.sh
+        ./scripts/generate_mbr_test_data_linux.sh
+        ./scripts/generate_exfat_test_data_linux.sh
+        ./scripts/generate_ext_test_data_linux.sh
         ./scripts/generate_fat_test_data_linux.sh
         ./scripts/generate_gpt_test_data_linux.sh
         ./scripts/generate_hfs_test_data_linux.sh
         ./scripts/generate_iso9660_test_data_linux.sh
-        ./scripts/generate_lvm_test_data_linux.sh
-        ./scripts/generate_luks_test_data_linux.sh
-        ./scripts/generate_mbr_test_data_linux.sh
         ./scripts/generate_ntfs_test_data_linux.sh
         ./scripts/generate_xfs_test_data_linux.sh
-        ./scripts/generate_test_data_linux.sh
+        ./scripts/generate_ewf_test_data_linux.sh
+        ./scripts/generate_qcow_test_data_linux.sh
+        ./scripts/generate_splitraw_test_data_linux.sh
+        ./scripts/generate_vdi_test_data_linux.sh
+        ./scripts/generate_vhd_test_data_linux.sh
+        ./scripts/generate_vhdx_test_data_linux.sh
+        ./scripts/generate_vmdk_test_data_linux.sh
+    - uses: actions/upload-artifact@v7
+      with:
+        name: test-data-linux
+        path: |
+          test_data/ewf/*.E01
+          test_data/exfat/*.raw
+          test_data/ext/*.raw
+          test_data/fat/*.raw
+          test_data/gpt/*.raw
+          test_data/iso9660/*.iso
+          test_data/linuxlvm/*.raw
+          test_data/luks/*.raw
+          test_data/mbr/*.raw
+          test_data/ntfs/*.raw
+          test_data/qcow/*.qcow2
+          test_data/splitraw/*.raw.00*
+          test_data/vdi/*.vdi
+          test_data/vhd/*.vhd
+          test_data/vhdx/*.vhdx
+          test_data/vmdk/*.vmdk
+          test_data/xfs/*.raw
   generate_test_data_macos:
     runs-on: macos-latest
     steps:
@@ -36,4 +87,20 @@ jobs:
         brew update -q
         brew install -q afsctool openssl || true
     - name: Generate test data
-      run: ./scripts/generate_test_data_macos.sh
+      run: |
+        ./scripts/generate_apfs_test_data_macos.sh
+        ./scripts/generate_apm_test_data_macos.sh
+        ./scripts/generate_hfs_test_data_macos.sh
+        ./scripts/generate_sparsebundle_test_data_macos.sh
+        ./scripts/generate_sparseimage_test_data_macos.sh
+        ./scripts/generate_udif_test_data_macos.sh
+    - uses: actions/upload-artifact@v7
+      with:
+        name: test-data-macos
+        path: |
+          test_data/apfs/*.dmg
+          test_data/apm/*.dmg
+          test_data/hfs/*.dmg
+          test_data/sparsebundle/**
+          test_data/sparseimage/*.dmg
+          test_data/udif/*.dmg
