@@ -33,6 +33,8 @@ SECTOR_SIZE=512
 
 IMAGE_FILE="test_data/bsdlabel/bsdlabel.raw"
 
+echo "Generating: ${IMAGE_FILE}"
+
 dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
 
 mdconfig -a -t vnode -f ${IMAGE_FILE} -u 9

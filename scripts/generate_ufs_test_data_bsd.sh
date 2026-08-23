@@ -32,9 +32,14 @@ SECTOR_SIZE=512
 # Create an image with an UFS1 file system
 IMAGE_FILE="test_data/ufs/ufs1.raw"
 
+echo "Generating: ${IMAGE_FILE}"
+
 dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
 
 mdconfig -a -t vnode -f ${IMAGE_FILE} -u 9
+
+gpart create -s bsd md9
+gpart add -t freebsd-ufs md9
 
 newfs -L ufs1_test -O 1 md9a
 
@@ -49,9 +54,14 @@ mdconfig -d -u 9
 # Create an image with an UFS2 file system
 IMAGE_FILE="test_data/ufs/ufs2.raw"
 
+echo "Generating: ${IMAGE_FILE}"
+
 dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
 
 mdconfig -a -t vnode -f ${IMAGE_FILE} -u 9
+
+gpart create -s bsd md9
+gpart add -t freebsd-ufs md9
 
 newfs -L ufs2_test -O 2 md9a
 
