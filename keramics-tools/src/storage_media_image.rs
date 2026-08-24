@@ -37,7 +37,7 @@ pub enum StorageMediaImage {
         ewf_image: Arc<RwLock<EwfImage>>,
     },
     Pdi {
-        pdi_image_layer: Arc<RwLock<PdiImageLayer>>,
+        pdi_image_layer: Arc<PdiImageLayer>,
     },
     Qcow {
         qcow_image_layer: QcowImageLayer,
@@ -100,7 +100,7 @@ impl StorageMediaImage {
             Self::Ewf { ewf_image } => ewf_image.clone(),
             Self::Pdi {
                 pdi_image_layer, ..
-            } => pdi_image_layer.clone(),
+            } => pdi_image_layer.get_data_stream(),
             Self::Qcow {
                 qcow_image_layer, ..
             } => qcow_image_layer.clone(),

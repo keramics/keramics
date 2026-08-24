@@ -13,39 +13,13 @@
 
 use std::path::PathBuf;
 
-use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::Path;
 use keramics_formats::hfs::{HfsFileEntry, HfsFileSystem};
-use keramics_hashes::{DigestHashContext, Md5Context};
 
-fn read_data_stream(data_stream: &DataStreamReference) -> Result<(u64, String), ErrorTrace> {
-    let mut data: Vec<u8> = vec![0; 35891];
-    let mut md5_context: Md5Context = Md5Context::new();
-    let mut offset: u64 = 0;
+mod util;
 
-    match data_stream.write() {
-        Ok(mut data_stream) => loop {
-            let read_count = data_stream.read(&mut data)?;
-            if read_count == 0 {
-                break;
-            }
-            md5_context.update(&data[..read_count]);
-
-            offset += read_count as u64;
-        },
-        Err(error) => {
-            return Err(keramics_core::error_trace_new_with_error!(
-                "Unable to obtain write lock on data stream",
-                error
-            ));
-        }
-    };
-    let hash_value: Vec<u8> = md5_context.finalize();
-    let hash_string: String = format_as_string(&hash_value);
-
-    Ok((offset, hash_string))
-}
+use util::read_data_stream;
 
 fn read_path(file_system: &HfsFileSystem, path_string: &str) -> Result<(u64, String), ErrorTrace> {
     let path: Path = Path::from(path_string);

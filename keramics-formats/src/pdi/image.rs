@@ -13,7 +13,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::io::SeekFrom;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
@@ -45,7 +45,7 @@ pub struct PdiImage {
     snapshots: Vec<PdiSnapshotDescriptor>,
 
     /// Layers.
-    layers: Vec<Arc<RwLock<PdiImageLayer>>>,
+    layers: Vec<Arc<PdiImageLayer>>,
 
     /// Media size.
     media_size: u64,
@@ -100,10 +100,7 @@ impl PdiImage {
     }
 
     /// Retrieves a layer by index.
-    pub fn get_layer_by_index(
-        &self,
-        layer_index: usize,
-    ) -> Result<Arc<RwLock<PdiImageLayer>>, ErrorTrace> {
+    pub fn get_layer_by_index(&self, layer_index: usize) -> Result<Arc<PdiImageLayer>, ErrorTrace> {
         match self.layers.get(layer_index) {
             Some(image_layer) => Ok(image_layer.clone()),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -546,7 +543,7 @@ impl PdiImage {
                 }
             };
             if let Some(parent_identifier) = image_layer.parent_identifier.as_ref() {
-                let parent_image_layer: &Arc<RwLock<PdiImageLayer>> =
+                let parent_image_layer: &Arc<PdiImageLayer> =
                     match layer_indexes.get(parent_identifier) {
                         Some(parent_layer_index) => &self.layers[*parent_layer_index],
                         None => {
@@ -576,7 +573,7 @@ impl PdiImage {
             }
             layer_indexes.insert(layer_identifier, self.layers.len());
 
-            self.layers.push(Arc::new(RwLock::new(image_layer)));
+            self.layers.push(Arc::new(image_layer));
         }
         Ok(())
     }
@@ -884,17 +881,9 @@ mod tests {
     fn test_get_layer_by_index() -> Result<(), ErrorTrace> {
         let image: PdiImage = get_image()?;
 
-        let layer: Arc<RwLock<PdiImageLayer>> = image.get_layer_by_index(0)?;
+        let image_layer: Arc<PdiImageLayer> = image.get_layer_by_index(0)?;
+        assert_eq!(image_layer.media_size, 33554432);
 
-        match layer.read() {
-            Ok(image_layer) => assert_eq!(image_layer.media_size, 33554432),
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain read lock on PDI layer",
-                    error
-                ));
-            }
-        }
         Ok(())
     }
 

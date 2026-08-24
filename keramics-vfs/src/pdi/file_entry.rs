@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
@@ -28,13 +28,7 @@ pub enum PdiFileEntry {
         name_index: usize,
 
         /// Layer.
-        layer: Arc<RwLock<PdiImageLayer>>,
-
-        /// Size.
-        size: u64,
-
-        /// Identifier.
-        identifier: Uuid,
+        layer: Arc<PdiImageLayer>,
     },
 
     /// Root file entry.
@@ -48,7 +42,7 @@ impl PdiFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
-            PdiFileEntry::Layer { layer, .. } => Ok(Some(layer.clone())),
+            PdiFileEntry::Layer { layer, .. } => Ok(Some(layer.get_data_stream())),
             PdiFileEntry::Root { .. } => Ok(None),
         }
     }
@@ -64,7 +58,7 @@ impl PdiFileEntry {
     /// Retrieves the identifier.
     pub fn get_identifier(&self) -> Option<&Uuid> {
         match self {
-            PdiFileEntry::Layer { identifier, .. } => Some(&identifier),
+            PdiFileEntry::Layer { layer, .. } => Some(layer.get_identifier()),
             PdiFileEntry::Root { .. } => None,
         }
     }
@@ -90,7 +84,7 @@ impl PdiFileEntry {
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
-            PdiFileEntry::Layer { size, .. } => *size,
+            PdiFileEntry::Layer { layer, .. } => layer.get_media_size(),
             PdiFileEntry::Root { .. } => 0,
         }
     }
@@ -113,32 +107,10 @@ impl PdiFileEntry {
                 Err(keramics_core::error_trace_new!("No sub file entries"))
             }
             PdiFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
-                Ok(image_layer) => {
-                    let media_size: u64;
-                    let identifier: Uuid;
-
-                    match image_layer.read() {
-                        Ok(pdi_image_layer) => {
-                            media_size = pdi_image_layer.get_media_size();
-                            identifier = pdi_image_layer.get_identifier().clone();
-                        }
-                        Err(error) => {
-                            return Err(keramics_core::error_trace_new_with_error!(
-                                format!(
-                                    "Unable to obtain read lock on image layer: {}",
-                                    sub_file_entry_index
-                                ),
-                                error
-                            ));
-                        }
-                    }
-                    Ok(PdiFileEntry::Layer {
-                        name_index: sub_file_entry_index,
-                        layer: image_layer.clone(),
-                        size: media_size,
-                        identifier,
-                    })
-                }
+                Ok(image_layer) => Ok(PdiFileEntry::Layer {
+                    name_index: sub_file_entry_index,
+                    layer: image_layer.clone(),
+                }),
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
@@ -181,28 +153,11 @@ mod tests {
     }
 
     fn get_layer_file_entry(image: &Arc<PdiImage>) -> Result<PdiFileEntry, ErrorTrace> {
-        let image_layer: Arc<RwLock<PdiImageLayer>> = image.get_layer_by_index(0)?;
+        let image_layer: Arc<PdiImageLayer> = image.get_layer_by_index(0)?;
 
-        let media_size: u64;
-        let identifier: Uuid;
-
-        match image_layer.read() {
-            Ok(pdi_image_layer) => {
-                media_size = pdi_image_layer.get_media_size();
-                identifier = pdi_image_layer.get_identifier().clone();
-            }
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain read lock on image layer",
-                    error
-                ));
-            }
-        }
         Ok(PdiFileEntry::Layer {
             name_index: 0,
             layer: image_layer,
-            size: media_size,
-            identifier,
         })
     }
 
