@@ -45,7 +45,7 @@ pub struct GptVolumeSystem {
 }
 
 impl GptVolumeSystem {
-    const SUPPORTED_BYTES_PER_SECTOR: [u16; 2] = [512, 4096];
+    const SUPPORTED_BYTES_PER_SECTOR: [u16; 4] = [512, 1024, 2048, 4096];
 
     /// Creates a volume system.
     pub fn new() -> Self {

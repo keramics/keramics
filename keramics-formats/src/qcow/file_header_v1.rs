@@ -48,7 +48,7 @@ impl QcowFileHeaderV1 {
         if &data[0..4] != QCOW_FILE_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
-        if data[4..8] != [0x00, 0x00, 0x00, 0x01] {
+        if &data[4..8] != &[0x00, 0x00, 0x00, 0x01] {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported format version"
             ));

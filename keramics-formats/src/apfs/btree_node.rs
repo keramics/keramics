@@ -174,23 +174,21 @@ impl ApfsBtreeNode {
         }
         let entries_data_offset: usize =
             data_offset + (self.node_header.entries_data_offset as usize);
+        let entries_data_size: usize = self.node_header.entries_data_size as usize;
 
-        if (self.node_header.entries_data_size as usize) > data_end_offset - entries_data_offset {
+        if entries_data_size > data_end_offset - entries_data_offset {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported entries data size value out of bounds"
             ));
         }
-        let keys_data_offset: usize =
-            entries_data_offset + (self.node_header.entries_data_size as usize);
+        let keys_data_offset: usize = entries_data_offset + entries_data_size;
 
         let entry_size: usize = if self.node_header.flags & 0x0004 == 0 {
             8
         } else {
             4
         };
-        if (self.node_header.number_of_keys as usize)
-            > (self.node_header.entries_data_size as usize) / entry_size
-        {
+        if (self.node_header.number_of_keys as usize) > entries_data_size / entry_size {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported number of keys value out of bounds"
             ));
@@ -244,14 +242,13 @@ impl ApfsBtreeNode {
                     entry.value_data_size = 8;
                 }
             }
-            if entry.value_data_offset > data_end_offset {
+            if entry.key_data_offset >= data_end_offset - keys_data_offset {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Invalid entry: {} - value data offset value out of bounds",
+                    "Invalid entry: {} - value key offset value out of bounds",
                     entry_index
                 )));
             }
             entry.key_data_offset += keys_data_offset;
-            entry.value_data_offset = data_end_offset - entry.value_data_offset;
 
             if entry.key_data_size > data_end_offset - entry.key_data_offset {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -259,6 +256,14 @@ impl ApfsBtreeNode {
                     entry_index
                 )));
             }
+            if entry.value_data_offset >= data_end_offset {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid entry: {} - value data offset value out of bounds",
+                    entry_index
+                )));
+            }
+            entry.value_data_offset = data_end_offset - entry.value_data_offset;
+
             if entry.value_data_size > data_end_offset - entry.value_data_offset {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Invalid entry: {} - value data size value out of bounds",

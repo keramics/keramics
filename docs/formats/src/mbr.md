@@ -120,7 +120,7 @@ about the logical partition (volume) and additional extended partition tables.
 | --- | --- | --- | --- |
 | 0 | 446 | 0x00 | Unknown (Unused), which should contain zero bytes |
 | 446 | 16 | | Partition table entry 1, contains the logical partition |
-| 462 | 16 | | Partition table entry 2, which should contain an extended partition (of type 0x05) or be unused and contain zero bytes |
+| 462 | 16 | | Partition table entry 2, which should contain an extended partition (of type 0x05) or contain zero bytes if unused |
 | 478 | 16 | 0x00 | Partition table entry 3, which should be unused and contain zero bytes |
 | 494 | 16 | 0x00 | Partition table entry 4, which should be unused and contain zero bytes |
 | 510 | 2 | "\x55\xaa" | Signature |
@@ -130,6 +130,8 @@ addresses in the EPR are relative to the start of the first EPR.
 
 The first EPR typically has a [partition type](#partition_types) of "Extended (CHS)" (0x05) or
 "Extended (LBA)" (0x0f).
+
+> Note that an extended boot record can be empty.
 
 ## The partition table entry
 

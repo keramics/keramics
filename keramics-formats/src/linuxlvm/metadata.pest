@@ -52,10 +52,10 @@ list_of_values = {
 }
 
 metadata = {
-    SOI ~ global_property* ~ volume_group ~ global_property* ~ EOI
+    SOI ~ top_level_property* ~ volume_group ~ top_level_property* ~ EOI
 }
 
-global_property = {
+top_level_property = {
     property_name ~ "=" ~ property_value
 }
 

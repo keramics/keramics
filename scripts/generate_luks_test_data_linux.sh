@@ -27,22 +27,43 @@ set -e
 
 sudo mkdir -p ${MOUNT_POINT}
 
-mkdir -p test_data/luks
+mkdir -p test_data/luksde
 
 # Create a LUKS 1 encrypted volume system with an ext2 file system.
-IMAGE_FILE="test_data/luks/luks1.raw"
+IMAGE_FILE="test_data/luksde/luks1.raw"
 IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
 dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
 
-cryptsetup --batch-mode --cipher aes-cbc-plain --hash sha1 --type luks1 luksFormat ${IMAGE_FILE} <<EOT
-KeramicsLuks1
-EOT
+echo -n KeRaMiCs | cryptsetup --batch-mode --cipher aes-cbc-plain --hash sha1 --pbkdf-force-iterations 12345 --type luks1 luksFormat ${IMAGE_FILE} -
 
-sudo cryptsetup luksOpen ${IMAGE_FILE} keramics_luks <<EOT
-KeramicsLuks1
-EOT
+echo -n KeRaMiCs | sudo cryptsetup luksOpen ${IMAGE_FILE} keramics_luks -
+
+sudo mke2fs -I 128 -L "ext2_test" -q -t ext2 /dev/mapper/keramics_luks
+
+sudo mount -o loop,rw /dev/mapper/keramics_luks ${MOUNT_POINT}
+
+sudo chown ${USER} ${MOUNT_POINT}
+
+create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
+
+sudo umount ${MOUNT_POINT}
+
+sleep 1
+
+sudo cryptsetup luksClose keramics_luks
+
+# Create a LUKS 2 encrypted volume system with an ext2 file system.
+IMAGE_FILE="test_data/luksde/luks2.raw"
+IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
+SECTOR_SIZE=512
+
+dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+
+echo -n KeRaMiCs | cryptsetup --align-payload=1 --batch-mode --cipher aes-cbc-plain --hash sha1 --luks2-metadata-size=16k --luks2-keyslots-size=256k --type luks2 luksFormat ${IMAGE_FILE} -
+
+echo -n KeRaMiCs | sudo cryptsetup luksOpen ${IMAGE_FILE} keramics_luks -
 
 sudo mke2fs -I 128 -L "ext2_test" -q -t ext2 /dev/mapper/keramics_luks
 

@@ -28,7 +28,7 @@ pub enum CdsaEncrEncryptionContext {
 
 impl CdsaEncrEncryptionContext {
     /// Decrypts data.
-    pub fn decrypt_cbc(
+    pub fn decrypt(
         &self,
         initialization_vector: &[u8],
         encrypted_data: &[u8],
@@ -43,6 +43,17 @@ impl CdsaEncrEncryptionContext {
             }
             CdsaEncrEncryptionContext::None => {
                 return Err(keramics_core::error_trace_new!("Unable to decrypt data"));
+            }
+        }
+    }
+
+    /// Sets the key.
+    pub fn set_key(&mut self, key: &[u8]) -> Result<(), ErrorTrace> {
+        match self {
+            CdsaEncrEncryptionContext::Aes(context) => context.set_key(key),
+            CdsaEncrEncryptionContext::Des3(context) => context.set_key(key),
+            CdsaEncrEncryptionContext::None => {
+                return Err(keramics_core::error_trace_new!("Unable to set key"));
             }
         }
     }
@@ -135,53 +146,33 @@ impl CdsaEncrEncryption {
         }
     }
 
-    /// Retrieve an encryption context.
+    /// Retrieves an encryption context.
     pub fn get_encryption_context(
         encryption_type: &CdsaEncrEncryptionType,
         key: &[u8],
     ) -> Result<Option<CdsaEncrEncryptionContext>, ErrorTrace> {
-        match encryption_type.method {
+        let mut encryption_context: CdsaEncrEncryptionContext = match encryption_type.method {
             0x00000011 => match encryption_type.mode {
-                5 | 6 => {
-                    let mut context: Des3Context = Des3Context::new();
-
-                    match context.set_key(key) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to set key in DES3-CBC context"
-                            );
-                            return Err(error);
-                        }
-                    }
-                    Ok(Some(CdsaEncrEncryptionContext::Des3(context)))
-                }
-                _ => Ok(None),
+                5 | 6 => CdsaEncrEncryptionContext::Des3(Des3Context::new()),
+                _ => return Ok(None),
             },
             0x80000001 => match encryption_type.mode {
-                5 | 6 => {
-                    let mut context: AesContext = AesContext::new();
-
-                    match context.set_key(key) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to set key in AES-CBC context"
-                            );
-                            return Err(error);
-                        }
-                    }
-                    Ok(Some(CdsaEncrEncryptionContext::Aes(context)))
-                }
-                _ => Ok(None),
+                5 | 6 => CdsaEncrEncryptionContext::Aes(AesContext::new()),
+                _ => return Ok(None),
             },
-            _ => Ok(None),
+            _ => return Ok(None),
+        };
+        match encryption_context.set_key(key) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to set key in context");
+                return Err(error);
+            }
         }
+        Ok(Some(encryption_context))
     }
 
-    /// Retrieve a HMAC context.
+    /// Retrieves a HMAC context.
     pub fn get_hmac_context(
         hmac_method: u32,
         key: &[u8],
@@ -195,7 +186,7 @@ impl CdsaEncrEncryption {
         }
     }
 
-    /// Retrieve a key derivation context.
+    /// Retrieves a key derivation context.
     pub fn get_key_derivation_context(
         key_derivation_method: u32,
         salt: &[u8],

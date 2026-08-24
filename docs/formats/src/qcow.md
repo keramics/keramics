@@ -91,7 +91,7 @@ The file header - version 1 is 48 bytes in size and consist of:
 | 24 | 8 | | Storage media size |
 | 32 | 1 | | Number of cluster block bits |
 | 33 | 1 | | Number of level 2 table bits |
-| 34 | 2 | | [yellow-background]*Unknown (empty values)* |
+| 34 | 2 | | Unknown (empty values) |
 | 36 | 4 | | Encryption method |
 | 40 | 8 | | Level 1 table offset |
 

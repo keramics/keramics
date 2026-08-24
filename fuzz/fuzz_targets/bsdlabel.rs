@@ -11,18 +11,17 @@
  * under the License.
  */
 
-/// FAT boot signature: "\x55\xaa".
-pub(super) const FAT_BOOT_SIGNATURE: [u8; 2] = [0x55, 0xaa];
+#![no_main]
 
-/// Support bytes per sector values.
-pub(super) const FAT_SUPPORTED_BYTES_PER_SECTOR: [u16; 7] =
-    [512, 1024, 2048, 4096, 8192, 16384, 32768];
+use libfuzzer_sys::fuzz_target;
 
-/// Support sector per cluster block values.
-pub(super) const FAT_SUPPORTED_SECTORS_PER_CLUSTER_BLOCK: [u8; 8] = [1, 2, 4, 8, 16, 32, 64, 128];
+use keramics_core::{DataStreamReference, open_fake_data_stream};
+use keramics_formats::bsdlabel::BsdDiskLabelVolumeSystem;
 
-/// Volume label file attribute flag.
-pub(super) const FAT_FILE_ATTRIBUTE_FLAG_VOLUME_LABEL: u8 = 0x08;
+// BSD disklabel (bsdlabel) volume system fuzz target.
+fuzz_target!(|data: &[u8]| {
+    let mut bsdlabel_volume_system: BsdDiskLabelVolumeSystem = BsdDiskLabelVolumeSystem::new();
 
-/// Directory file attribute flag.
-pub(super) const FAT_FILE_ATTRIBUTE_FLAG_DIRECTORY: u8 = 0x10;
+    let data_stream: DataStreamReference = open_fake_data_stream(&data);
+    _ = bsdlabel_volume_system.read_data_stream(&data_stream);
+});

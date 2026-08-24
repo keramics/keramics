@@ -150,7 +150,7 @@ impl CdsaEncrPassphraseWrappedKey {
                         Ok(Some(context)) => context,
                         Ok(None) => {
                             return Err(keramics_core::error_trace_new!(format!(
-                                "Unsupported key deriviation method: {}",
+                                "Unsupported key derivation method: {}",
                                 self.key_derivation_method
                             )));
                         }
@@ -211,7 +211,7 @@ impl CdsaEncrPassphraseWrappedKey {
                     };
                 let mut padded_key_data: Vec<u8> = vec![0; self.wrapped_key_data.len()];
 
-                match encryption_context.decrypt_cbc(
+                match encryption_context.decrypt(
                     &mut initialization_vector,
                     &self.wrapped_key_data,
                     &mut padded_key_data,

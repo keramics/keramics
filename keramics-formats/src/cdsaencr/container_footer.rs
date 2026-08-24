@@ -256,7 +256,7 @@ impl CdsaEncrContainerFooter {
                         Ok(Some(context)) => context,
                         Ok(None) => {
                             return Err(keramics_core::error_trace_new!(format!(
-                                "Unsupported key deriviation method: {}",
+                                "Unsupported key derivation method: {}",
                                 self.key_derivation_method
                             )));
                         }
@@ -353,7 +353,7 @@ impl CdsaEncrContainerFooter {
         }
         let mut intermediate_key_data: Vec<u8> = vec![0; intermediate_key_data_size];
 
-        match encryption_context.decrypt_cbc(
+        match encryption_context.decrypt(
             &mut initialization_vector,
             &wrapped_key_data,
             &mut intermediate_key_data,
@@ -398,7 +398,7 @@ impl CdsaEncrContainerFooter {
         }
         let mut final_key_data: Vec<u8> = vec![0; final_key_data_size];
 
-        match encryption_context.decrypt_cbc(
+        match encryption_context.decrypt(
             &mut initialization_vector,
             &reversed_key_data[8..],
             &mut final_key_data,

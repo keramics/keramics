@@ -61,12 +61,6 @@ impl EwfFile {
             &mut compressed_data,
             SeekFrom::Start(chunk_offset)
         );
-        keramics_core::debug_trace_data!(
-            "EwfCompressedChunk",
-            chunk_offset,
-            &compressed_data,
-            chunk_size
-        );
         _ = crate::zlib_decompress!(&compressed_data, data, "Unable to decompress chunk data");
 
         Ok(())

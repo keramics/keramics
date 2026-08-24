@@ -107,7 +107,8 @@ impl MbrVolumeSystem {
         }
         if self.bytes_per_sector == 0 {
             for partition_entry in master_boot_record.partition_entries.iter() {
-                if partition_entry.partition_type == 5 || partition_entry.partition_type == 15 {
+                if partition_entry.partition_type == 0x05 || partition_entry.partition_type == 0x0f
+                {
                     for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter() {
                         let offset: u64 =
                             partition_entry.start_address_lba * (*bytes_per_sector as u64);
@@ -173,25 +174,7 @@ impl MbrVolumeSystem {
         partition_entries.sort_by_key(|partition_entry| partition_entry.start_address_lba);
 
         let data_stream_size: u64 = keramics_core::data_stream_get_size!(data_stream);
-        let mut last_end_address_lba: u64 = 0;
 
-        for partition_entry in partition_entries.iter() {
-            if partition_entry.start_address_lba < last_end_address_lba {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported overlapping partition entries"
-                ));
-            }
-            last_end_address_lba =
-                partition_entry.start_address_lba + (partition_entry.number_of_sectors as u64);
-            let end_offset: u64 = (last_end_address_lba as u64) * (self.bytes_per_sector as u64);
-
-            // TODO: mark the partition as corrupt
-            if end_offset > data_stream_size {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid partition entry size value out of bounds"
-                ));
-            }
-        }
         if self.bytes_per_sector == 0 {
             let mut largest_bytes_per_sector: u16 = 0;
 
@@ -212,7 +195,8 @@ impl MbrVolumeSystem {
                         &mut boot_signature,
                         SeekFrom::Start(offset + 510)
                     );
-                    // Some file systems like FAT and NTFS use the MBR boot signature in their boot sectors.
+                    // Some file systems like exFat, FAT and NTFS use the MBR boot signature in
+                    // their boot sectors.
                     if &boot_signature == MBR_BOOT_SIGNATURE {
                         self.bytes_per_sector = *bytes_per_sector;
 
@@ -222,6 +206,28 @@ impl MbrVolumeSystem {
                 }
                 if self.bytes_per_sector == 0 && largest_bytes_per_sector == 512 {
                     self.bytes_per_sector = 512;
+                }
+            }
+        }
+        if self.bytes_per_sector != 0 {
+            let mut last_end_address_lba: u64 = 0;
+
+            for partition_entry in partition_entries.iter() {
+                if partition_entry.start_address_lba < last_end_address_lba {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported overlapping partition entries"
+                    ));
+                }
+                last_end_address_lba =
+                    partition_entry.start_address_lba + (partition_entry.number_of_sectors as u64);
+                let end_offset: u64 =
+                    (last_end_address_lba as u64) * (self.bytes_per_sector as u64);
+
+                // TODO: mark the partition as corrupt
+                if end_offset > data_stream_size {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid partition entry size value out of bounds"
+                    ));
                 }
             }
         }
@@ -289,16 +295,13 @@ impl MbrVolumeSystem {
             }
         }
         if let Some(mut partition_entry) = extended_boot_record.partition_entries.pop_front() {
-            if partition_entry.partition_type == 0 {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported partition entry: 0 - unsupported type: 0x{:02x}",
-                    partition_entry.partition_type
-                )));
-            }
-            partition_entry.index = first_entry_index;
-            partition_entry.start_address_lba += current_extended_boot_record_lba;
+            // Note that an extended boot record can be empty.
+            if partition_entry.partition_type != 0 {
+                partition_entry.index = first_entry_index;
+                partition_entry.start_address_lba += current_extended_boot_record_lba;
 
-            self.partition_entries.push(partition_entry);
+                self.partition_entries.push(partition_entry);
+            }
         }
         if next_extended_boot_record_offset != 0 {
             match self.read_extended_boot_record(

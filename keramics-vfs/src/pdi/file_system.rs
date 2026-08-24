@@ -11,12 +11,11 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
 use keramics_formats::pdi::{PdiImage, PdiImageLayer};
 use keramics_formats::{FileResolverReference, Path};
-use keramics_types::Uuid;
 
 use crate::file_resolver::new_vfs_file_resolver;
 use crate::location::VfsLocation;
@@ -100,7 +99,7 @@ impl PdiFileSystem {
                 }
                 layer_index -= 1;
 
-                let image_layer: Arc<RwLock<PdiImageLayer>> =
+                let image_layer: Arc<PdiImageLayer> =
                     match self.image.get_layer_by_index(layer_index) {
                         Ok(image_layer) => image_layer,
                         Err(mut error) => {
@@ -111,26 +110,9 @@ impl PdiFileSystem {
                             return Err(error);
                         }
                     };
-                let media_size: u64;
-                let identifier: Uuid;
-
-                match image_layer.read() {
-                    Ok(pdi_image_layer) => {
-                        media_size = pdi_image_layer.get_media_size();
-                        identifier = pdi_image_layer.get_identifier().clone();
-                    }
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            format!("Unable to obtain read lock on image layer: {}", layer_index),
-                            error
-                        ));
-                    }
-                };
                 Ok(Some(PdiFileEntry::Layer {
                     name_index: layer_index,
                     layer: image_layer.clone(),
-                    size: media_size,
-                    identifier,
                 }))
             }
             None => {

@@ -25,7 +25,7 @@ use super::constants::*;
         field(name = "format_version", data_type = "u32"),
         field(name = "start_sector", data_type = "u64"),
         field(name = "number_of_sectors", data_type = "u64"),
-        field(name = "unknown1", data_type = "u64"),
+        field(name = "base_data_offset", data_type = "u64"),
         field(name = "unknown2", data_type = "u32", format = "hex"),
         field(name = "unknown3", data_type = "u32"),
         field(name = "unknown4", data_type = "[u32; 6]"),
@@ -44,6 +44,9 @@ pub struct UdifBlockTableHeader {
     /// Number of sectors.
     pub number_of_sectors: u64,
 
+    /// Base data offset.
+    pub base_data_offset: u64,
+
     /// Number of entries.
     pub number_of_entries: u32,
 }
@@ -54,6 +57,7 @@ impl UdifBlockTableHeader {
         Self {
             start_sector: 0,
             number_of_sectors: 0,
+            base_data_offset: 0,
             number_of_entries: 0,
         }
     }
@@ -76,6 +80,7 @@ impl UdifBlockTableHeader {
         }
         self.start_sector = bytes_to_u64_be!(data, 8);
         self.number_of_sectors = bytes_to_u64_be!(data, 16);
+        self.base_data_offset = bytes_to_u64_be!(data, 24);
         self.number_of_entries = bytes_to_u32_be!(data, 200);
 
         Ok(())
@@ -115,6 +120,7 @@ mod tests {
 
         assert_eq!(test_struct.start_sector, 0);
         assert_eq!(test_struct.number_of_sectors, 1);
+        assert_eq!(test_struct.base_data_offset, 0);
         assert_eq!(test_struct.number_of_entries, 2);
 
         Ok(())

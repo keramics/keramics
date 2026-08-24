@@ -142,12 +142,12 @@ The raw location descriptor (struct raw_locn) is 24 bytes in size and consist of
 The metadata consist of:
 
 * Volume group main section
-  * Physical volumes sub section
-    * Physical volume sub sections
-  * Logical volumes sub section
-    * Logical volume sub sections
-      * Segment sub section
-* Global properties
+  * Physical volumes object
+    * Physical volume object
+  * Logical volumes object
+    * Logical volume object
+      * Segment object
+* Top level properties
 
 According to "RHEL 5 - Logical Volume Manager Administration" by default, an identical copy of the
 metadata is maintained in every metadata area in every physical volume within the volume group. The
@@ -226,15 +226,13 @@ myvg {
 
 ### Properties
 
-The metadata sections are textual and use the following properties.
-
-A property is defined as:
+The metadata is textual and uses properties, where a property is defined as:
 
 ```text
 <identifier> = <value>
 ```
 
-Where &lt;identifier&gt; contains a unique name of the property and &lt;value&gt; is one of the
+The identifier contains an unique name of the property and &lt;value&gt; is one of the
 following types:
 
 | Value | Description |
@@ -250,172 +248,106 @@ The # character is used for comments. A comment continues to the end-of-line.
 > Note that for now it is assumed that the # character is not allowed to be used in any of the
 > values.
 
-### Volume group main section
-
-The volume group main section is defined as:
-
-```text
-<name> {
-<properties>
-<sub sections>
-}
-```
-
-Where:
-
-* &lt;name&gt; contains the [name](#names) of the volume group;
-* &lt;properties&gt; contains one of the following properties.
-
-TODO: Note can there be more than 1 volume group?
+### Top level properties
 
 | Value | Description |
 | --- | --- |
-| extent_size | The size of an extent, in number of sectors |
-| flags | [Flags](#flags) |
-| format | Optional format identifier, such as "lvm2" |
-| id | Volume group identifier (VG UUID), which contains an ASCII string in the following format: fg1fKZ-xoHz-CfAD-yQPx-l2HL-Y7kA-9kJ9LD |
-| max_lv | Maximum number of logical volumes |
-| max_pv | Maximum number of physical volumes |
-| metadata_copies | Unknown (The number of metadata copies?) |
-| seqno | Metadata sequence number |
-| status | The [status flags](#status_flags), which contains a list of strings |
+| "contents" | The contents of the metadata area, which contains the string "Text Format Volume Group" |
+| "creation_host" | The hostname of the system on which metadata area was created, which can contain a trailing comment that contains the output equivalent to "uname -a" |
+| "creation_time" | The creation time of the metadata area, which contains an interger containing the number of seconds since January 1, 1970 00:00:00 UTC and can contain a trailing comment that contains the creation time as a ctime (function) string in UTC |
+| "description" | Unknown (Description of the metadata area?) |
+| [&lt;volume group name&gt;](#metadata_names) | [Volume group object](#metadata_volume_group_object) |
+| "version" | The metadata area version, which contains an integer value of 1 |
 
-&lt;sub sections&gt; contains one of the following sub sections:
+> Note it is assumed that there can only be 1 volume group object.
 
-| Value | Description |
-| --- | --- |
-| physical_volumes | The physical volumes sub sections |
-| logical_volumes | The logical volumes sub sections |
-
-### Volume group and logical volume names {#names}
+### Volume group and logical volume names {#metadata_names}
 
 * Allowed characters: "a-z", "A-Z", "0-9", "\_", "+", ".", and "-" (hypen)
 * A volume group name should not start with a hypen
 * A logical volume name can start with a hypen, but it is reserved for logical volumes that have
   been removed but are stil being tracked by the format
 
-### Physical volumes sub section
+> Note that some implementations use lv_ as the prefix for a logical volume, however this is not
+> enforced by the format.
 
-The physical volumes sub section is defined as:
+### Volume group object {#metadata_volume_group_object}
 
-```text
-physical_volumes {
-<sub sections>
-}
-```
-
-Where:
-
-* &lt;sub sections&gt; contains one of the following sub sections:
+The volume group object contains the following properties:
 
 | Value | Description |
 | --- | --- |
-| pv# | Individual physical volume sub section, where # is a place holder for a the physical volume number e.g. pv0. 0 appears to be the first number that is used |
+| "extent_size" | The size of an extent, in number of sectors |
+| "flags" | [Flags](#flags) |
+| "format" | Optional format identifier, such as "lvm2" |
+| "id" | Volume group identifier (VG UUID), which contains an ASCII string in the following format: fg1fKZ-xoHz-CfAD-yQPx-l2HL-Y7kA-9kJ9LD |
+| "logical_volumes" | [Logical volumes object](#metadata_logical_volumes_object) |
+| "max_lv" | Maximum number of logical volumes |
+| "max_pv" | Maximum number of physical volumes |
+| "metadata_copies" | Unknown (The number of metadata copies?) |
+| "physical_volumes" | [Physical volumes object](#metadata_physical_volumes_object) |
+| "seqno" | Metadata sequence number |
+| "status" | The [status flags](#status_flags), which contains a list of strings |
 
-### Physical volume sub section
+### Physical volumes object {#metadata_physical_volumes_object}
 
-Each physical volume sub section is defined as:
-
-```text
-pv# {
-<properties>
-}
-```
-
-Where:
-
-* \# is a place holder for a the physical volume number e.g. pv0
-* &lt;properties&gt; contains one of the following properties:
-
-| Value | Description |
-| --- | --- |
-| device | The device filename, which contains an ASCII string, e.g. /dev/dm-0 |
-| device_id | Unknown (device identifier "/tmp/lvm.raw") |
-| device_id_type | Unknown (device type "loop_file") |
-| dev_size | The physical volume size including non-usable space, in number of sectors |
-| flags | [Flags](#flags) |
-| id | Physical volume identifier (PV UUID), which contains an ASCII string in the following format: 9LBcEB-7PQT-GIlL-I0Kx-rtzr-ynju-SL983W |
-| pe_count | The number of (allocated) extents in the physical volume |
-| pe_start | The start extent, which contains an offset in bytes relative from the start of the physical volume |
-| status | The [status flags](#status_flags), which contains a list of strings |
-
-### Logical volumes sub section
-
-The logical volumes sub section is defined as:
-
-```text
-logical_volumes {
-<sub sections>
-}
-```
-
-Where:
-
-* &lt;sub sections&gt; contains one of the following sub sections:
+The physical volumes object contains the following properties:
 
 | Value | Description |
 | --- | --- |
-| &lt;name&gt; | Individual physical volume sub section, where &lt;name&gt; is a place holder for a the logical volume name |
+| pv# | Individual [physical volume object](#metadata_physical_volume_object), where # is a place holder for a the physical volume number e.g. pv0. 0 appears to be the first number that is used |
 
-### Logical volume sub section
+### Physical volume object {#metadata_physical_volume_object}
 
-Each logical volume sub section is defined as:
-
-```text
-<name> {
-<properties>
-<sub sections>
-}
-```
-
-Where:
-
-* &lt;name&gt; contains the [name](#names) of the physical volume
-
-Some implementations use lv_ as the prefix for a logical volume note that the format does not imply
-this convention.
-
-* &lt;properties&gt; contains one of the following properties:
+Each physical volume object contains the following properties:
 
 | Value | Description |
 | --- | --- |
-| creation_host | The hostname of the system on which the logical volume was created |
-| creation_time | The creation time of the metadata area, which contains an interger containing the number of seconds since January 1, 1970 00:00:00 UTC and can contain a trailing comment that contains the creation time as a ctime (function) string in UTC |
-| flags | [Flags](#flags) |
-| id | Physical volume identifier (PV UUID), which contains an ASCII string in the following format: 9LBcEB-7PQT-GIlL-I0Kx-rtzr-ynju-SL983W |
-| segment_count | The number of segment sub sections |
-| status | [Status flags](#status_flags), which contains a list of strings |
+| "device" | The device filename, which contains an ASCII string, e.g. /dev/dm-0 |
+| "device_id" | Unknown (device identifier "/tmp/lvm.raw") |
+| "device_id_type" | Unknown (device type "loop_file") |
+| "dev_size" | The physical volume size including non-usable space, in number of sectors |
+| "flags" | [Flags](#flags) |
+| "id" | Physical volume identifier (PV UUID), which contains an ASCII string in the following format: 9LBcEB-7PQT-GIlL-I0Kx-rtzr-ynju-SL983W |
+| "pe_count" | The number of (allocated) extents in the physical volume |
+| "pe_start" | The start extent, which contains an offset in bytes relative from the start of the physical volume |
+| "status" | The [status flags](#status_flags), which contains a list of strings |
 
-* &lt;sub sections&gt; contains one of the following sub sections:
+### Logical volumes object {#metadata_logical_volumes_object}
 
-| Value | Description |
-| --- | --- |
-| segment# | Individual physical volume sub section, where # is a place holder for the segment number e.g. segment1. 1 appears to be the first number that is used |
-
-### Segment sub section
-
-Each segment sub section is defined as:
-
-```text
-segment# {
-<properties>
-}
-```
-
-Where:
-
-* \# is a place holder for the segment number e.g. segment1
-* &lt;properties&gt; contains one of the following properties:
+The logical volumes object contains the following properties:
 
 | Value | Description |
 | --- | --- |
-| extent_count | The number of extents in the segment (or current logical extent) |
-| start_extent | The start extent of the segment, which contains an offset in number of extents relative from the start of the segment |
-| stripe_count | The number of stripes in the segment, where 1 represents linear striping |
-| stripes | The stripes list |
-| type | The [segment type](#segment_types) |
+| [&lt;logical volume name&gt;](#metadata_names) | Individual [logical volume object](#metadata_logical_volume_object), where &lt;name&gt; is a place holder for a the logical volume name |
 
-### Segment types {#segment_types}
+### Logical volume object {#metadata_logical_volume_object}
+
+Each logical volume object contains the following properties:
+
+| Value | Description |
+| --- | --- |
+| "creation_host" | The hostname of the system on which the logical volume was created |
+| "creation_time" | The creation time of the metadata area, which contains an interger containing the number of seconds since January 1, 1970 00:00:00 UTC and can contain a trailing comment that contains the creation time as a ctime (function) string in UTC |
+| "flags" | [Flags](#flags) |
+| "id | Physical volume identifier (PV UUID), which contains an ASCII string in the following format: 9LBcEB-7PQT-GIlL-I0Kx-rtzr-ynju-SL983W |
+| "segment_count" | The number of segments |
+| "segment#" | Individual [segment objects](#metadata_segment_object), where # is a place holder for the segment number e.g. segment1. 1 appears to be the first number that is used |
+| "status" | [Status flags](#status_flags), which contains a list of strings |
+
+### Segment object {#metadata_segment_object}
+
+Each segment object contains the following properties:
+
+| Value | Description |
+| --- | --- |
+| "extent_count" | The number of extents in the segment (or current logical extent) |
+| "start_extent" | The start extent of the segment, which contains an offset in number of extents relative from the start of the segment |
+| "stripe_count" | The number of stripes in the segment, where 1 represents linear striping |
+| "stripes" | [Stripes list](#metadata_stripes_list) |
+| "type" | [Segment type](#metadata_segment_types) |
+
+### Segment types {#metadata_segment_types}
 
 | Value | Description |
 | --- | --- |
@@ -456,7 +388,7 @@ Where:
 
 > Note that a comparable list can be retrieved using `lvm segtypes`.
 
-### Stripes list
+### Stripes list {#metadata_stripes_list}
 
 ```text
 stripes = [
@@ -475,16 +407,6 @@ start_extent_offset = (
     (start_extent_number * extent_size * sector_size) + physical_volume_data_area_start_offset
 )
 ```
-
-### Global properties
-
-| Value | Description |
-| --- | --- |
-| contents | The contents of the metadata area, which contains the string "Text Format Volume Group" |
-| creation_host | The hostname of the system on which metadata area was created, which can contain a trailing comment that contains the output equivalent to "uname -a" |
-| creation_time | The creation time of the metadata area, which contains an interger containing the number of seconds since January 1, 1970 00:00:00 UTC and can contain a trailing comment that contains the creation time as a ctime (function) string in UTC |
-| description | Unknown (Description of the metadata area?) |
-| version | The metadata area version, which contains an integer value of 1 |
 
 ### Status flags {#status_flags}
 

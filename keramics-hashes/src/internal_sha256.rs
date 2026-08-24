@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::cmp::min;
+
 use keramics_types::bytes_to_u32_be;
 
 /// SHA-256 block size.
@@ -165,12 +167,13 @@ impl InternalSha256Context {
 
     /// Calculates the digest hash of the data.
     pub fn update(&mut self, data: &[u8]) {
+        // TODO: make similar changes as in MD5 and SHA-1 to pass hash_values as mutable
         let data_size: usize = data.len();
         let mut data_offset: usize = 0;
 
         if self.block_offset > 0 {
             let remaining_block_size: usize = SHA256_BLOCK_SIZE - self.block_offset;
-            let read_size: usize = std::cmp::min(remaining_block_size, data_size - data_offset);
+            let read_size: usize = min(remaining_block_size, data_size - data_offset);
 
             let block_end_offset: usize = self.block_offset + read_size;
             let data_end_offset: usize = data_offset + read_size;
