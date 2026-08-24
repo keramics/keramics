@@ -15,6 +15,7 @@
 //!
 //! Provides support for calculating a MD5 hash (RFC 1321).
 
+use std::cmp::min;
 use std::slice::ChunksExact;
 
 use super::traits::DigestHashContext;
@@ -67,6 +68,218 @@ macro_rules! md5_transform_step {
     };
 }
 
+/// MD5 transform step for rounds 0 to 15
+macro_rules! md5_transform_step1 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
+        let initial_hash: u32 = ($block_hash1 & $block_hash2) | (!$block_hash1 & $block_hash3);
+
+        let block_hash: u32 = initial_hash
+            .wrapping_add($block_hash0)
+            .wrapping_add($values_32bit[MD5_VALUES_32BIT_INDEX[$index]])
+            .wrapping_add(MD5_SINES[$index])
+            .rotate_left(MD5_BIT_SHIFTS[$index]);
+
+        $block_hash0 = $block_hash1.wrapping_add(block_hash);
+    };
+}
+
+/// MD5 transform step for rounds 16 to 31
+macro_rules! md5_transform_step2 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
+        let initial_hash: u32 = ($block_hash1 & $block_hash3) | ($block_hash2 & !$block_hash3);
+
+        let block_hash: u32 = initial_hash
+            .wrapping_add($block_hash0)
+            .wrapping_add($values_32bit[MD5_VALUES_32BIT_INDEX[$index]])
+            .wrapping_add(MD5_SINES[$index])
+            .rotate_left(MD5_BIT_SHIFTS[$index]);
+
+        $block_hash0 = $block_hash1.wrapping_add(block_hash);
+    };
+}
+
+/// MD5 transform step for rounds 32 to 47
+macro_rules! md5_transform_step3 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
+        let initial_hash: u32 = $block_hash1 ^ $block_hash2 ^ $block_hash3;
+
+        let block_hash: u32 = initial_hash
+            .wrapping_add($block_hash0)
+            .wrapping_add($values_32bit[MD5_VALUES_32BIT_INDEX[$index]])
+            .wrapping_add(MD5_SINES[$index])
+            .rotate_left(MD5_BIT_SHIFTS[$index]);
+
+        $block_hash0 = $block_hash1.wrapping_add(block_hash);
+    };
+}
+
+/// MD5 transform step for rounds 48 to 63
+macro_rules! md5_transform_step4 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
+        let initial_hash: u32 = $block_hash2 ^ ($block_hash1 | !$block_hash3);
+
+        let block_hash: u32 = initial_hash
+            .wrapping_add($block_hash0)
+            .wrapping_add($values_32bit[MD5_VALUES_32BIT_INDEX[$index]])
+            .wrapping_add(MD5_SINES[$index])
+            .rotate_left(MD5_BIT_SHIFTS[$index]);
+
+        $block_hash0 = $block_hash1.wrapping_add(block_hash);
+    };
+}
+
+/// MD5 transform step for a group of 4 32-bit values for rounds 0 to 15
+macro_rules! md5_transform_group_step1 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
+        md5_transform_step1!(
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $values_32bit,
+            $index
+        );
+        md5_transform_step1!(
+            $block_hash3,
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $values_32bit,
+            $index + 1
+        );
+        md5_transform_step1!(
+            $block_hash2,
+            $block_hash3,
+            $block_hash0,
+            $block_hash1,
+            $values_32bit,
+            $index + 2
+        );
+        md5_transform_step1!(
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $block_hash0,
+            $values_32bit,
+            $index + 3
+        );
+    };
+}
+
+/// MD5 transform step for a group of 4 32-bit values for rounds 16 to 31
+macro_rules! md5_transform_group_step2 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
+        md5_transform_step2!(
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $values_32bit,
+            $index
+        );
+        md5_transform_step2!(
+            $block_hash3,
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $values_32bit,
+            $index + 1
+        );
+        md5_transform_step2!(
+            $block_hash2,
+            $block_hash3,
+            $block_hash0,
+            $block_hash1,
+            $values_32bit,
+            $index + 2
+        );
+        md5_transform_step2!(
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $block_hash0,
+            $values_32bit,
+            $index + 3
+        );
+    };
+}
+
+/// MD5 transform step for a group of 4 32-bit values for rounds 32 to 47
+macro_rules! md5_transform_group_step3 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
+        md5_transform_step3!(
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $values_32bit,
+            $index
+        );
+        md5_transform_step3!(
+            $block_hash3,
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $values_32bit,
+            $index + 1
+        );
+        md5_transform_step3!(
+            $block_hash2,
+            $block_hash3,
+            $block_hash0,
+            $block_hash1,
+            $values_32bit,
+            $index + 2
+        );
+        md5_transform_step3!(
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $block_hash0,
+            $values_32bit,
+            $index + 3
+        );
+    };
+}
+
+/// MD5 transform step for a group of 4 32-bit values for rounds 48 to 63
+macro_rules! md5_transform_group_step4 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
+        md5_transform_step4!(
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $values_32bit,
+            $index
+        );
+        md5_transform_step4!(
+            $block_hash3,
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $values_32bit,
+            $index + 1
+        );
+        md5_transform_step4!(
+            $block_hash2,
+            $block_hash3,
+            $block_hash0,
+            $block_hash1,
+            $values_32bit,
+            $index + 2
+        );
+        md5_transform_step4!(
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $block_hash0,
+            $values_32bit,
+            $index + 3
+        );
+    };
+}
+
 /// Context for calculating a MD5 hash.
 pub struct Md5Context {
     /// Hash values.
@@ -109,135 +322,43 @@ impl Md5Context {
         let mut block_hash3: u32 = hash_values[3];
 
         for index in (0..16).step_by(4) {
-            let initial_hash: u32 = (block_hash1 & block_hash2) | (!block_hash1 & block_hash3);
-
-            md5_transform_step!(initial_hash, block_hash0, block_hash1, values_32bit, index);
-
-            let initial_hash: u32 = (block_hash0 & block_hash1) | (!block_hash0 & block_hash2);
-
-            md5_transform_step!(
-                initial_hash,
-                block_hash3,
+            md5_transform_group_step1!(
                 block_hash0,
-                values_32bit,
-                index + 1
-            );
-            let initial_hash: u32 = (block_hash3 & block_hash0) | (!block_hash3 & block_hash1);
-
-            md5_transform_step!(
-                initial_hash,
-                block_hash2,
-                block_hash3,
-                values_32bit,
-                index + 2
-            );
-            let initial_hash: u32 = (block_hash2 & block_hash3) | (!block_hash2 & block_hash0);
-
-            md5_transform_step!(
-                initial_hash,
                 block_hash1,
                 block_hash2,
+                block_hash3,
                 values_32bit,
-                index + 3
+                index
             );
         }
         for index in (16..32).step_by(4) {
-            let initial_hash: u32 = (block_hash1 & block_hash3) | (block_hash2 & !block_hash3);
-
-            md5_transform_step!(initial_hash, block_hash0, block_hash1, values_32bit, index);
-
-            let initial_hash: u32 = (block_hash0 & block_hash2) | (block_hash1 & !block_hash2);
-
-            md5_transform_step!(
-                initial_hash,
-                block_hash3,
+            md5_transform_group_step2!(
                 block_hash0,
-                values_32bit,
-                index + 1
-            );
-            let initial_hash: u32 = (block_hash3 & block_hash1) | (block_hash0 & !block_hash1);
-
-            md5_transform_step!(
-                initial_hash,
-                block_hash2,
-                block_hash3,
-                values_32bit,
-                index + 2
-            );
-            let initial_hash: u32 = (block_hash2 & block_hash0) | (block_hash3 & !block_hash0);
-
-            md5_transform_step!(
-                initial_hash,
                 block_hash1,
                 block_hash2,
+                block_hash3,
                 values_32bit,
-                index + 3
+                index
             );
         }
         for index in (32..48).step_by(4) {
-            let initial_hash: u32 = block_hash1 ^ block_hash2 ^ block_hash3;
-
-            md5_transform_step!(initial_hash, block_hash0, block_hash1, values_32bit, index);
-
-            let initial_hash: u32 = block_hash0 ^ block_hash1 ^ block_hash2;
-
-            md5_transform_step!(
-                initial_hash,
-                block_hash3,
+            md5_transform_group_step3!(
                 block_hash0,
-                values_32bit,
-                index + 1
-            );
-            let initial_hash: u32 = block_hash3 ^ block_hash0 ^ block_hash1;
-
-            md5_transform_step!(
-                initial_hash,
-                block_hash2,
-                block_hash3,
-                values_32bit,
-                index + 2
-            );
-            let initial_hash: u32 = block_hash2 ^ block_hash3 ^ block_hash0;
-
-            md5_transform_step!(
-                initial_hash,
                 block_hash1,
                 block_hash2,
+                block_hash3,
                 values_32bit,
-                index + 3
+                index
             );
         }
         for index in (48..64).step_by(4) {
-            let initial_hash: u32 = block_hash2 ^ (block_hash1 | !block_hash3);
-
-            md5_transform_step!(initial_hash, block_hash0, block_hash1, values_32bit, index);
-
-            let initial_hash: u32 = block_hash1 ^ (block_hash0 | !block_hash2);
-
-            md5_transform_step!(
-                initial_hash,
-                block_hash3,
+            md5_transform_group_step4!(
                 block_hash0,
-                values_32bit,
-                index + 1
-            );
-            let initial_hash: u32 = block_hash0 ^ (block_hash3 | !block_hash1);
-
-            md5_transform_step!(
-                initial_hash,
-                block_hash2,
-                block_hash3,
-                values_32bit,
-                index + 2
-            );
-            let initial_hash: u32 = block_hash3 ^ (block_hash2 | !block_hash0);
-
-            md5_transform_step!(
-                initial_hash,
                 block_hash1,
                 block_hash2,
+                block_hash3,
                 values_32bit,
-                index + 3
+                index
             );
         }
         // Update the hash values
@@ -298,7 +419,8 @@ impl DigestHashContext for Md5Context {
         let data_offset: usize = if self.block_offset == 0 {
             0
         } else {
-            let data_end_offset: usize = MD5_BLOCK_SIZE - self.block_offset;
+            let remaining_block_size: usize = MD5_BLOCK_SIZE - self.block_offset;
+            let data_end_offset: usize = min(remaining_block_size, data.len());
 
             for byte_value in data[0..data_end_offset].iter() {
                 self.block[self.block_offset] = *byte_value;

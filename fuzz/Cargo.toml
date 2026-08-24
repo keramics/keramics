@@ -38,6 +38,13 @@ doc = false
 required-features = ["fuzzing"]
 
 [[bin]]
+name = "bsdlabel"
+path = "fuzz_targets/bsdlabel.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
 name = "bzip2"
 path = "fuzz_targets/bzip2.rs"
 test = false

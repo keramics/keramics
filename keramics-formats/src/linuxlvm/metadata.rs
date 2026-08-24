@@ -67,13 +67,13 @@ impl LinuxLvmMetadata {
 
             match rule {
                 Rule::EOI => {}
-                Rule::global_property => {
-                    match self.parse_global_property(token_pair.into_inner()) {
+                Rule::top_level_property => {
+                    match self.parse_top_level_property(token_pair.into_inner()) {
                         Ok(_) => {}
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                "Unable to parse global property"
+                                "Unable to parse top level property"
                             );
                             return Err(error);
                         }
@@ -101,18 +101,6 @@ impl LinuxLvmMetadata {
                 }
             }
         }
-        Ok(())
-    }
-
-    /// Parses a global property.
-    fn parse_global_property(&self, inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
-        _ = inner_pairs;
-
-        // contents - string
-        // creation_host - string
-        // creation_time - integer
-        // description - string
-        // version - integer
         Ok(())
     }
 
@@ -289,7 +277,7 @@ impl LinuxLvmMetadata {
                 }
             }
             None => {
-                return Err(keramics_core::error_trace_new!("Unsupported identifier",));
+                return Err(keramics_core::error_trace_new!("Unsupported identifier"));
             }
         }
         physical_volume.name = name.to_string();
@@ -627,6 +615,18 @@ impl LinuxLvmMetadata {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Parses a top level property.
+    fn parse_top_level_property(&self, inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
+        _ = inner_pairs;
+
+        // contents - string
+        // creation_host - string
+        // creation_time - integer
+        // description - string
+        // version - integer
         Ok(())
     }
 

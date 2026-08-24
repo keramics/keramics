@@ -15,6 +15,7 @@
 //!
 //! Provides support for calculating a SHA-1 hash (RFC 1321, FIPS 180-1).
 
+use std::cmp::min;
 use std::slice::ChunksExact;
 
 use super::traits::DigestHashContext;
@@ -24,6 +25,252 @@ const SHA1_BLOCK_SIZE: usize = 64;
 
 /// SHA-1 initial hash values.
 const SHA1_HASH_VALUES: [u32; 5] = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0];
+
+/// SHA-1 transform step for rounds 0 to 19
+macro_rules! sha1_transform_step1 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $value_32bit:expr) => {
+        let initial_hash: u32 = ($block_hash1 & $block_hash2) | (!$block_hash1 & $block_hash3);
+
+        $block_hash4 = $block_hash4
+            .wrapping_add($block_hash0.rotate_left(5))
+            .wrapping_add(initial_hash)
+            .wrapping_add(0x5a827999)
+            .wrapping_add($value_32bit);
+
+        $block_hash1 = $block_hash1.rotate_left(30);
+    };
+}
+
+/// SHA-1 transform step for rounds 20 to 39
+macro_rules! sha1_transform_step2 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $value_32bit:expr) => {
+        let initial_hash: u32 = $block_hash1 ^ $block_hash2 ^ $block_hash3;
+
+        $block_hash4 = $block_hash4
+            .wrapping_add($block_hash0.rotate_left(5))
+            .wrapping_add(initial_hash)
+            .wrapping_add(0x6ed9eba1)
+            .wrapping_add($value_32bit);
+
+        $block_hash1 = $block_hash1.rotate_left(30);
+    };
+}
+
+/// SHA-1 transform step for rounds 40 to 59
+macro_rules! sha1_transform_step3 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $value_32bit:expr) => {
+        let initial_hash: u32 = ($block_hash1 & $block_hash2)
+            | ($block_hash1 & $block_hash3)
+            | ($block_hash2 & $block_hash3);
+
+        $block_hash4 = $block_hash4
+            .wrapping_add($block_hash0.rotate_left(5))
+            .wrapping_add(initial_hash)
+            .wrapping_add(0x8f1bbcdc)
+            .wrapping_add($value_32bit);
+
+        $block_hash1 = $block_hash1.rotate_left(30);
+    };
+}
+
+/// SHA-1 transform step for rounds 60 to 79
+macro_rules! sha1_transform_step4 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $value_32bit:expr) => {
+        let initial_hash: u32 = $block_hash1 ^ $block_hash2 ^ $block_hash3;
+
+        $block_hash4 = $block_hash4
+            .wrapping_add($block_hash0.rotate_left(5))
+            .wrapping_add(initial_hash)
+            .wrapping_add(0xca62c1d6)
+            .wrapping_add($value_32bit);
+
+        $block_hash1 = $block_hash1.rotate_left(30);
+    };
+}
+
+/// SHA-1 transform step for a group of 5 32-bit values for rounds 0 to 19
+macro_rules! sha1_transform_group_step1 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $values_32bit:expr, $index:expr) => {
+        sha1_transform_step1!(
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $block_hash4,
+            $values_32bit[$index]
+        );
+        sha1_transform_step1!(
+            $block_hash4,
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $values_32bit[$index + 1]
+        );
+        sha1_transform_step1!(
+            $block_hash3,
+            $block_hash4,
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $values_32bit[$index + 2]
+        );
+        sha1_transform_step1!(
+            $block_hash2,
+            $block_hash3,
+            $block_hash4,
+            $block_hash0,
+            $block_hash1,
+            $values_32bit[$index + 3]
+        );
+        sha1_transform_step1!(
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $block_hash4,
+            $block_hash0,
+            $values_32bit[$index + 4]
+        );
+    };
+}
+
+/// SHA-1 transform step for a group of 5 32-bit values for rounds 20 to 39
+macro_rules! sha1_transform_group_step2 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $values_32bit:expr, $index:expr) => {
+        sha1_transform_step2!(
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $block_hash4,
+            $values_32bit[$index]
+        );
+        sha1_transform_step2!(
+            $block_hash4,
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $values_32bit[$index + 1]
+        );
+        sha1_transform_step2!(
+            $block_hash3,
+            $block_hash4,
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $values_32bit[$index + 2]
+        );
+        sha1_transform_step2!(
+            $block_hash2,
+            $block_hash3,
+            $block_hash4,
+            $block_hash0,
+            $block_hash1,
+            $values_32bit[$index + 3]
+        );
+        sha1_transform_step2!(
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $block_hash4,
+            $block_hash0,
+            $values_32bit[$index + 4]
+        );
+    };
+}
+
+/// SHA-1 transform step for a group of 5 32-bit values for rounds 40 to 59
+macro_rules! sha1_transform_group_step3 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $values_32bit:expr, $index:expr) => {
+        sha1_transform_step3!(
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $block_hash4,
+            $values_32bit[$index]
+        );
+        sha1_transform_step3!(
+            $block_hash4,
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $values_32bit[$index + 1]
+        );
+        sha1_transform_step3!(
+            $block_hash3,
+            $block_hash4,
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $values_32bit[$index + 2]
+        );
+        sha1_transform_step3!(
+            $block_hash2,
+            $block_hash3,
+            $block_hash4,
+            $block_hash0,
+            $block_hash1,
+            $values_32bit[$index + 3]
+        );
+        sha1_transform_step3!(
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $block_hash4,
+            $block_hash0,
+            $values_32bit[$index + 4]
+        );
+    };
+}
+
+/// SHA-1 transform step for a group of 5 32-bit values for rounds 60 to 79
+macro_rules! sha1_transform_group_step4 {
+    ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $values_32bit:expr, $index:expr) => {
+        sha1_transform_step4!(
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $block_hash4,
+            $values_32bit[$index]
+        );
+        sha1_transform_step4!(
+            $block_hash4,
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $values_32bit[$index + 1]
+        );
+        sha1_transform_step4!(
+            $block_hash3,
+            $block_hash4,
+            $block_hash0,
+            $block_hash1,
+            $block_hash2,
+            $values_32bit[$index + 2]
+        );
+        sha1_transform_step4!(
+            $block_hash2,
+            $block_hash3,
+            $block_hash4,
+            $block_hash0,
+            $block_hash1,
+            $values_32bit[$index + 3]
+        );
+        sha1_transform_step4!(
+            $block_hash1,
+            $block_hash2,
+            $block_hash3,
+            $block_hash4,
+            $block_hash0,
+            $values_32bit[$index + 4]
+        );
+    };
+}
 
 /// Context for calculating a SHA-1 hash.
 pub struct Sha1Context {
@@ -75,30 +322,49 @@ impl Sha1Context {
         let mut block_hash3: u32 = hash_values[3];
         let mut block_hash4: u32 = hash_values[4];
 
-        for (value_index, value_32bit) in values_32bit.iter().enumerate() {
-            let block_hash: u32 = if value_index < 20 {
-                0x5a827999_u32
-                    .wrapping_add((block_hash1 & block_hash2) | (!(block_hash1) & block_hash3))
-            } else if value_index < 40 {
-                0x6ed9eba1_u32.wrapping_add(block_hash1 ^ block_hash2 ^ block_hash3)
-            } else if value_index < 60 {
-                0x8f1bbcdc_u32.wrapping_add(
-                    (block_hash1 & block_hash2)
-                        | (block_hash1 & block_hash3)
-                        | (block_hash2 & block_hash3),
-                )
-            } else {
-                0xca62c1d6_u32.wrapping_add(block_hash1 ^ block_hash2 ^ block_hash3)
-            }
-            .wrapping_add(block_hash4)
-            .wrapping_add(block_hash0.rotate_left(5))
-            .wrapping_add(*value_32bit);
-
-            block_hash4 = block_hash3;
-            block_hash3 = block_hash2;
-            block_hash2 = block_hash1.rotate_left(30);
-            block_hash1 = block_hash0;
-            block_hash0 = block_hash;
+        for index in (0..20).step_by(5) {
+            sha1_transform_group_step1!(
+                block_hash0,
+                block_hash1,
+                block_hash2,
+                block_hash3,
+                block_hash4,
+                values_32bit,
+                index
+            );
+        }
+        for index in (20..40).step_by(5) {
+            sha1_transform_group_step2!(
+                block_hash0,
+                block_hash1,
+                block_hash2,
+                block_hash3,
+                block_hash4,
+                values_32bit,
+                index
+            );
+        }
+        for index in (40..60).step_by(5) {
+            sha1_transform_group_step3!(
+                block_hash0,
+                block_hash1,
+                block_hash2,
+                block_hash3,
+                block_hash4,
+                values_32bit,
+                index
+            );
+        }
+        for index in (60..80).step_by(5) {
+            sha1_transform_group_step4!(
+                block_hash0,
+                block_hash1,
+                block_hash2,
+                block_hash3,
+                block_hash4,
+                values_32bit,
+                index
+            );
         }
         // Update the hash values
         hash_values[0] = block_hash0.wrapping_add(hash_values[0]);
@@ -159,7 +425,8 @@ impl DigestHashContext for Sha1Context {
         let data_offset: usize = if self.block_offset == 0 {
             0
         } else {
-            let data_end_offset: usize = SHA1_BLOCK_SIZE - self.block_offset;
+            let remaining_block_size: usize = SHA1_BLOCK_SIZE - self.block_offset;
+            let data_end_offset: usize = min(remaining_block_size, data.len());
 
             for byte_value in data[0..data_end_offset].iter() {
                 self.block[self.block_offset] = *byte_value;

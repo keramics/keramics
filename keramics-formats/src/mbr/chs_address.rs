@@ -48,9 +48,15 @@ impl MbrChsAddress {
     }
 
     /// Calculates the LBA from the CHS address.
-    pub fn calculate_lba(&self, heads_per_cylinder: u32, sectors_per_track: u32) -> u32 {
-        ((((self.cylinder as u32) * heads_per_cylinder) + (self.head as u32)) * sectors_per_track)
-            + ((self.sector as u32) - 1)
+    pub fn calculate_lba(&self, heads_per_cylinder: u32, sectors_per_track: u32) -> u64 {
+        ((((self.cylinder as u64) * (heads_per_cylinder as u64)) + (self.head as u64))
+            * (sectors_per_track as u64))
+            + ((self.sector as u64) - 1)
+    }
+
+    /// Determines if the CHS address is empty.
+    pub fn is_empty(&self) -> bool {
+        return self.head == 0 && self.cylinder == 0 && self.sector == 0;
     }
 
     /// Reads the CHS address from a buffer.
@@ -83,8 +89,22 @@ mod tests {
         let mut test_struct = MbrChsAddress::new();
         test_struct.read_data(&test_data)?;
 
-        let lba: u32 = test_struct.calculate_lba(255, 63);
+        let lba: u64 = test_struct.calculate_lba(255, 63);
         assert_eq!(lba, 48321);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_empty() -> Result<(), ErrorTrace> {
+        let mut test_struct = MbrChsAddress::new();
+
+        assert!(test_struct.is_empty());
+
+        let test_data: Vec<u8> = get_test_data();
+        test_struct.read_data(&test_data)?;
+
+        assert!(!test_struct.is_empty());
 
         Ok(())
     }

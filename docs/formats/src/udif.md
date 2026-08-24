@@ -400,7 +400,7 @@ The block table header is 204 bytes in size and consists of:
 | 4 | 4 | 1 | Format version |
 | 8 | 8 | | Start sector, which contains the sector number relative to the start of the media data |
 | 16 | 8 | | Number of sectors |
-| 24 | 8 | | Unknown (DataOffset), which seems to be always 0 |
+| 24 | 8 | | Base data offset, which contains the byte offset relative to the start of the segment data stream |
 | 32 | 4 | | Unknown (BuffersNeeded) |
 | 36 | 4 | | Unknown (BlockDescriptors) |
 | 40 | 6 x 4 = 24 | 0 | Unknown (reserved) |
@@ -416,10 +416,10 @@ The block table entry (BLKXChunkEntry) is 40 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | | [Entry type](#udif_block_table_entry_types) |
-| 4 | 4 | | Unknown (comment?) |
+| 4 | 4 | | Unknown (comment related?) |
 | 8 | 8 | | Start sector, which contains the sector number relative to the start of the start sector of the block table |
 | 16 | 8 | | Number of sectors |
-| 24 | 8 | | Data offset, which contains the byte offset relative to the start of the segment data stream |
+| 24 | 8 | | Data offset, which contains the byte offset relative to the base data offset in the block table header |
 | 32 | 8 | | Data size, which contain the number of bytes of data stored, which is 0 for sparse data |
 
 #### UDIF block table entry types {#udif_block_table_entry_types}

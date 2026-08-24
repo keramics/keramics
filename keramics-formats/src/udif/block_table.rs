@@ -65,7 +65,6 @@ impl UdifBlockTable {
             keramics_core::debug_trace_structure!(UdifBlockTableEntry::debug_read_data(
                 &data[data_offset..]
             ));
-
             let mut block_table_entry: UdifBlockTableEntry = UdifBlockTableEntry::new();
 
             match block_table_entry.read_data(&data[data_offset..]) {
@@ -79,6 +78,8 @@ impl UdifBlockTable {
                 }
             }
             data_offset += 40;
+
+            block_table_entry.data_offset += block_table_header.base_data_offset;
 
             self.entries.push(block_table_entry);
         }

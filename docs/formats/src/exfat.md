@@ -7,17 +7,17 @@ The Extensible File Allocation Table (exFAT) file system format is a successor o
 
 An exFAT file system consists of:
 
-* Main boot region
+* Main boot region (11 sectors)
   * boot sector (or boot record)
-  * 7 extended boot sectors
-  * OEM parameters sector
-  * Reserved sector
+  * 7 extended boot sectors; can contain a sector signature ("\x55\xaa")
+  * OEM parameters sector; can contain a sector signature ("\x55\xaa")
+  * Reserved sector; can contain a sector signature ("\x55\xaa")
   * boot checksum sector
-* Backup boot region
+* Backup boot region (11 sectors)
   * boot sector (or boot record)
-  * 7 extended boot sectors
-  * OEM parameters sector
-  * Reserved sector
+  * 7 extended boot sectors; can contain a sector signature ("\x55\xaa")
+  * OEM parameters sector; can contain a sector signature ("\x55\xaa")
+  * Reserved sector; can contain a sector signature ("\x55\xaa")
   * boot checksum sector
 * File Allocation Table region
   * Aligment padding
@@ -36,7 +36,7 @@ An exFAT file system consists of:
 | Date and time values | FAT date and time, in local time with UTC offset |
 | Character strings | UCS-2 little-endian, which allows for unpaired Unicode surrogates such as "U+d800" and "U+dc00" |
 
-### Boot record
+## Boot record
 
 The boot record is stored in the first sector of the volume.
 
@@ -76,6 +76,31 @@ The boot record is at least 512 bytes in size and consists of:
 | 0x0004 | MediaFailure | Has media failures |
 | 0x0008 | ClearToZero | Must be cleared |
 | 0xfff0 | | Unknown (reserved) |
+
+## Boot checksum sector
+
+The boot checksum sector is at least 512 bytes in size and consists of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Boot checksum |
+| 4 | 4 | | Copy of boot checksum |
+| 8 | 4 | | Copy of boot checksum |
+| 12 | 4 | | Copy of boot checksum |
+| 16 | 496 | | Unknown (empty values) |
+
+```python
+checksum = 0
+
+for index in range(0, 11 * bytes_per_sector):
+    # Ignore the volume flags and percent in use values.
+    if index in (106, 107, 112):
+        continue
+
+    carry = 0x80000000 if (checksum & 1) else 0
+    checksum = carry + (checksum >> 1) + sectors[index]
+    checksum &= 0xFFFFFFFF
+```
 
 ## Cluster block allocation table
 

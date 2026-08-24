@@ -28,6 +28,8 @@ Labels "a", "b", "c" and "d" have a predefined meaning:
 | Date and time values | N/A |
 | Character strings | ASCII |
 
+The number of bytes per sector is 512.
+
 ## BSD disklabel
 
 The BSD disklabel is stored at offset 512. It can be preceded by a [MBR](mbr.md) with a single

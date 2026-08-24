@@ -217,6 +217,12 @@ impl DecmpfsBlockReader {
                     &mut block_descriptor_data,
                     SeekFrom::Start(4)
                 );
+                keramics_core::debug_trace_data!(
+                    "DecmpfsBlockDescriptors",
+                    4,
+                    &block_descriptor_data,
+                    first_block_offset - 4,
+                );
                 self.block_offsets.push(first_block_offset);
 
                 let mut data_offset: usize = 0;
@@ -326,8 +332,14 @@ impl DecmpfsBlockReader {
                     &mut block_descriptor_data,
                     SeekFrom::Start(264)
                 );
+                keramics_core::debug_trace_data!(
+                    "DecmpfsBlockDescriptors",
+                    264,
+                    &block_descriptor_data,
+                    block_descriptor_data_size,
+                );
                 let mut data_offset: usize = 0;
-                let mut last_block_offset: u32 = 8;
+                let mut next_block_offset: u32 = 8;
 
                 for entry_index in 0..number_of_blocks {
                     keramics_core::debug_trace_structure!(
@@ -350,13 +362,13 @@ impl DecmpfsBlockReader {
                     }
                     data_offset += 8;
 
-                    if zlib_block_descriptor.offset < last_block_offset {
+                    if zlib_block_descriptor.offset < next_block_offset {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Invalid block descriptor: {} offset value out of bounds",
                             entry_index
                         )));
                     }
-                    if zlib_block_descriptor.offset - last_block_offset > 65537 {
+                    if zlib_block_descriptor.size > 65537 {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Invalid block descriptor: {} size value out of bounds",
                             entry_index
@@ -364,15 +376,15 @@ impl DecmpfsBlockReader {
                     }
                     self.block_offsets.push(zlib_block_descriptor.offset + 260);
 
-                    last_block_offset = zlib_block_descriptor.offset;
+                    next_block_offset = zlib_block_descriptor.offset + zlib_block_descriptor.size;
                 }
-                if self.compressed_size - (last_block_offset as u64) > 65537 {
+                if (next_block_offset as u64) > self.compressed_size {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Invalid block descriptor: {} size value out of bounds",
                         number_of_blocks - 1
                     )));
                 }
-                if zlib_header.footer_offset < last_block_offset + 260 {
+                if zlib_header.footer_offset < next_block_offset + 260 {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid footer offset value out of bounds"
                     ));

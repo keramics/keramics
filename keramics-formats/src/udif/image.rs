@@ -329,6 +329,11 @@ impl UdifImage {
                             )));
                         }
                     };
+                    if range_data.len() != (block_range.size as usize) {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unable to retrieve block range data",
+                        ));
+                    }
                     data[data_offset..data_end_offset]
                         .copy_from_slice(&range_data[range_data_offset..range_data_end_offset]);
                 }

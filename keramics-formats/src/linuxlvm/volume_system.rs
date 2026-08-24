@@ -231,7 +231,7 @@ impl LinuxLvmVolumeSystem {
             let number_of_physical_volumes: usize = volume_group.physical_volumes.len();
 
             if number_of_physical_volumes == 0 {
-                return Err(keramics_core::error_trace_new!("Missing physical volumes",));
+                return Err(keramics_core::error_trace_new!("Missing physical volumes"));
             }
             // TODO: add support for multiple physical volumes.
             if volume_group.physical_volumes.len() != 1 {

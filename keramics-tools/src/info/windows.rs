@@ -86,8 +86,8 @@ mod tests {
     fn test_file_attribute_flags_information_fmt() {
         let test_struct: WindowsFileAttributeFlagsInfo = WindowsFileAttributeFlagsInfo::new(0x0020);
 
-        let expected_string: &str =
-            concat!("        0x0020: Should be archived (FILE_ATTRIBUTE_ARCHIVE)\n",);
+        let expected_string: &str = "        0x0020: Should be archived (FILE_ATTRIBUTE_ARCHIVE)\n";
+
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
     }

@@ -139,6 +139,10 @@ mod tests {
         let string: String = format_identifier.to_string();
         assert_eq!(string, "hfs");
 
+        let format_identifier: FormatIdentifier = FormatIdentifier::LinuxLvm;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "linuxlvm");
+
         let format_identifier: FormatIdentifier = FormatIdentifier::Mbr;
         let string: String = format_identifier.to_string();
         assert_eq!(string, "mbr");

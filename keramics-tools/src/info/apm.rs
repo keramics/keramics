@@ -14,7 +14,6 @@
 use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::PartitionIterator;
 use keramics_formats::apm::{ApmPartition, ApmVolumeSystem};
 use keramics_types::ByteString;
 
@@ -49,7 +48,7 @@ impl<'a> fmt::Display for ApmPartitionInfo<'a> {
         let name: &ByteString = self.partition.get_name();
 
         if !name.is_empty() {
-            writeln!(formatter, "    Name\t\t\t\t\t: {}", name,)?;
+            writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?;
         }
         let partition_offset: u64 = self.partition.get_partition_offset();
 
@@ -234,6 +233,7 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
+    use keramics_formats::PartitionIterator;
 
     use crate::assert_lines_eq;
 

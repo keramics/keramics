@@ -271,7 +271,7 @@ impl CdsaEncrContainer {
             };
         match self
             .encryption_context
-            .decrypt_cbc(&mut initialization_vector, encrypted_data, data)
+            .decrypt(&mut initialization_vector, encrypted_data, data)
         {
             Ok(_) => {}
             Err(mut error) => {
@@ -579,7 +579,7 @@ impl CdsaEncrContainer {
                         keramics_core::error_trace_add_frame!(
                             error,
                             format!(
-                                "Unable to retrieve encryption type: {}",
+                                "Unable to retrieve encryption context for type: {}",
                                 self.encryption_type
                             )
                         );

@@ -14,7 +14,6 @@
 use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::PartitionIterator;
 use keramics_formats::bsdlabel::{BsdDiskLabelPartition, BsdDiskLabelVolumeSystem};
 
 use crate::formatters::ByteSize;
@@ -160,6 +159,7 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
+    use keramics_formats::PartitionIterator;
 
     use crate::assert_lines_eq;
 

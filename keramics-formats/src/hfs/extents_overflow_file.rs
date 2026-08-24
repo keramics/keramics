@@ -139,8 +139,11 @@ impl HfsExtentsOverflowFile {
                     return Err(error);
                 }
             }
-            if !is_branch {
-                if key.identifier == identifier {
+            if key.identifier > identifier {
+                break;
+            }
+            if key.identifier == identifier {
+                if !is_branch {
                     match self.read_extents_overflow_record(record_data, extents) {
                         Ok(_) => {}
                         Err(mut error) => {
@@ -151,9 +154,7 @@ impl HfsExtentsOverflowFile {
                             return Err(error);
                         }
                     }
-                }
-            } else if record_index > 0 {
-                if key.identifier >= identifier {
+                } else if record_index > 0 {
                     let data_offset: usize = last_key.size as usize;
 
                     if data_offset + 4 > last_record_data.len() {
@@ -189,9 +190,6 @@ impl HfsExtentsOverflowFile {
                             return Err(error);
                         }
                     }
-                }
-                if key.identifier > identifier {
-                    break;
                 }
             }
             record_index += 1;
