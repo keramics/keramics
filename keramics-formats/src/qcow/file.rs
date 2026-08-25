@@ -84,9 +84,6 @@ pub struct QcowFile {
     /// Backing file.
     backing_file: Option<Arc<QcowFile>>,
 
-    /// The current offset.
-    current_offset: u64,
-
     /// Media size.
     pub(super) media_size: u64,
 }
@@ -115,7 +112,6 @@ impl QcowFile {
             encryption_method: QcowEncryptionMethod::None,
             backing_file_name: None,
             backing_file: None,
-            current_offset: 0,
             media_size: 0,
         }
     }

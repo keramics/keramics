@@ -52,14 +52,11 @@ pub struct VhdFile {
     /// Block size.
     block_size: u32,
 
-    /// Block table offset.
-    block_table_offset: u64,
+    /// Block allocation table offset.
+    block_allocation_table_offset: u64,
 
     /// Number of blocks.
     number_of_blocks: u32,
-
-    /// The current offset.
-    current_offset: u64,
 
     /// Media size.
     pub(super) media_size: u64,
@@ -77,9 +74,8 @@ impl VhdFile {
             parent_file: None,
             bytes_per_sector: 0,
             block_size: 0,
-            block_table_offset: 0,
+            block_allocation_table_offset: 0,
             number_of_blocks: 0,
-            current_offset: 0,
             media_size: 0,
         }
     }
@@ -110,7 +106,7 @@ impl VhdFile {
                             &self.disk_type,
                             self.bytes_per_sector,
                             self.block_size,
-                            self.block_table_offset,
+                            self.block_allocation_table_offset,
                             self.number_of_blocks,
                             parent_data_stream,
                             self.media_size,
@@ -236,7 +232,7 @@ impl VhdFile {
                 )));
             }
             self.block_size = dynamic_disk_header.block_size;
-            self.block_table_offset = dynamic_disk_header.block_table_offset;
+            self.block_allocation_table_offset = dynamic_disk_header.block_table_offset;
             self.number_of_blocks = dynamic_disk_header.number_of_blocks;
 
             if !dynamic_disk_header.parent_identifier.is_nil() {

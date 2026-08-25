@@ -114,7 +114,7 @@ impl StorageMediaImage {
             } => vhd_image_layer.get_data_stream(),
             Self::Vhdx {
                 vhdx_image_layer, ..
-            } => Some(vhdx_image_layer.clone()),
+            } => vhdx_image_layer.get_data_stream(),
             Self::Vmdk {
                 vmdk_image_layer, ..
             } => Some(vmdk_image_layer.clone()),

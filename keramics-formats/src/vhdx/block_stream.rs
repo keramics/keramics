@@ -13,10 +13,10 @@
 
 use crate::block_stream::BlockStream;
 
-use super::block_reader::VhdBlockReader;
+use super::block_reader::VhdxBlockReader;
 
-/// Virtual Hard Disk (VHD) (dynamic and differential disk) block stream.
-pub type VhdBlockStream = BlockStream<VhdBlockReader>;
+/// Virtual Hard Disk version 2 (VHDX) block steam.
+pub type VhdxBlockStream = BlockStream<VhdxBlockReader>;
 
 #[cfg(test)]
 mod tests {
@@ -28,28 +28,28 @@ mod tests {
     use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
 
     use crate::tests::get_test_data_path;
-    use crate::vhd::enums::VhdDiskType;
+    use crate::vhdx::enums::VhdxDiskType;
 
-    fn get_block_stream() -> Result<VhdBlockStream, ErrorTrace> {
-        let path_string: String = get_test_data_path("vhd/ext2.vhd");
+    fn get_block_stream() -> Result<VhdxBlockStream, ErrorTrace> {
+        let path_string: String = get_test_data_path("vhdx/ext2.vhdx");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
-        Ok(VhdBlockStream::new(VhdBlockReader::new(
+        Ok(VhdxBlockStream::new(VhdxBlockReader::new(
             &data_stream,
-            &VhdDiskType::Dynamic,
+            &VhdxDiskType::Dynamic,
             512,
-            2097152,
-            0x0000000000000600,
-            3,
+            8388608,
+            0x0000000000200000,
+            1048576,
             None,
-            4212736,
+            4194304,
         )))
     }
 
     #[test]
     fn test_get_offset() -> Result<(), ErrorTrace> {
-        let mut block_stream: VhdBlockStream = get_block_stream()?;
+        let mut block_stream: VhdxBlockStream = get_block_stream()?;
 
         block_stream.seek(SeekFrom::Start(1024))?;
 
@@ -61,17 +61,17 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: VhdBlockStream = get_block_stream()?;
+        let mut block_stream: VhdxBlockStream = get_block_stream()?;
 
         let size: u64 = block_stream.get_size()?;
-        assert_eq!(size, 4212736);
+        assert_eq!(size, 4194304);
 
         Ok(())
     }
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
-        let mut block_stream: VhdBlockStream = get_block_stream()?;
+        let mut block_stream: VhdxBlockStream = get_block_stream()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
@@ -81,7 +81,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let mut block_stream: VhdBlockStream = get_block_stream()?;
+        let mut block_stream: VhdxBlockStream = get_block_stream()?;
         let size: u64 = block_stream.get_size()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::End(-512))?;
@@ -92,7 +92,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let mut block_stream: VhdBlockStream = get_block_stream()?;
+        let mut block_stream: VhdxBlockStream = get_block_stream()?;
 
         let offset = block_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn test_seek_before_zero() -> Result<(), ErrorTrace> {
-        let mut block_stream: VhdBlockStream = get_block_stream()?;
+        let mut block_stream: VhdxBlockStream = get_block_stream()?;
 
         let result: Result<u64, ErrorTrace> = block_stream.seek(SeekFrom::Current(-512));
         assert!(result.is_err());
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: VhdBlockStream = get_block_stream()?;
+        let mut block_stream: VhdxBlockStream = get_block_stream()?;
         let size: u64 = block_stream.get_size()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::End(512))?;
@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let mut block_stream: VhdBlockStream = get_block_stream()?;
+        let mut block_stream: VhdxBlockStream = get_block_stream()?;
         block_stream.seek(SeekFrom::Start(1024))?;
 
         let mut data: Vec<u8> = vec![0; 512];
@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: VhdBlockStream = get_block_stream()?;
+        let mut block_stream: VhdxBlockStream = get_block_stream()?;
         block_stream.seek(SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];
