@@ -169,7 +169,7 @@ mod tests {
     }
 
     fn get_test_data() -> Vec<u8> {
-        return vec![0x11, 0x22, 0x33, 0x44, 0x55, 0x66];
+        vec![0x11, 0x22, 0x33, 0x44, 0x55, 0x66]
     }
 
     fn get_test_data_stream() -> TestDataStream {

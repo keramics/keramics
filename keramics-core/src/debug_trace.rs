@@ -322,8 +322,8 @@ mod tests {
     use crate::errors::ErrorTrace;
     use crate::formatters::format_as_hexdump;
 
-    fn get_test_data() -> [u8; 16] {
-        [
+    fn get_test_data() -> Vec<u8> {
+        vec![
             0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad,
             0xbe, 0xef,
         ]
@@ -432,14 +432,14 @@ mod tests {
     fn test_print_data_with_debug_output_enabled() {
         Mediator::new(true).make_current();
 
-        let test_data: [u8; 16] = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
         DebugTrace::print_data("test", 0, &test_data, 16, false);
         DebugTrace::print_data("test", 0, &test_data, 16, true);
     }
 
     #[test]
     fn test_print_data_with_debug_output_disabled() {
-        let test_data: [u8; 16] = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
         DebugTrace::print_data("test", 0, &test_data, 16, false);
         DebugTrace::print_data("test", 0, &test_data, 16, true);
     }
@@ -448,13 +448,13 @@ mod tests {
     fn test_print_data_field_with_debug_output_enabled() {
         Mediator::new(true).make_current();
 
-        let test_data: [u8; 16] = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
         DebugTrace::print_data_field("test", &test_data);
     }
 
     #[test]
     fn test_print_data_field_with_debug_output_disabled() {
-        let test_data: [u8; 16] = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
         DebugTrace::print_data_field("test", &test_data);
     }
 
@@ -500,13 +500,13 @@ mod tests {
     fn test_print_structure_with_debug_output_enabled() {
         Mediator::new(true).make_current();
 
-        let test_data: [u8; 16] = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
         DebugTrace::print_structure(test_debug_read_data, &test_data);
     }
 
     #[test]
     fn test_print_structure_with_debug_output_disabled() {
-        let test_data: [u8; 16] = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
         DebugTrace::print_structure(test_debug_read_data, &test_data);
     }
 
@@ -567,8 +567,8 @@ mod tests {
             "test {\n    identifier: value,\n    identifier: 42,\nidentifier: 42\ntest\n"
         );
 
-        let test_data: [u8; 16] = get_test_data();
-        let test_data_hexdump: String = format_as_hexdump(&get_test_data(), true);
+        let test_data: Vec<u8> = get_test_data();
+        let test_data_hexdump: String = format_as_hexdump(&test_data, true);
         let mut expected_string: String = String::from(
             "test {\n    identifier: value,\n    identifier: 42,\nidentifier: 42\ntest\n",
         );
@@ -622,7 +622,7 @@ mod tests {
         scope.print_value("identifier", 42);
         assert_eq!(scope.output, "");
 
-        let test_data: [u8; 16] = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
 
         scope.print_data("test data", 0, &test_data, 16, true);
         assert_eq!(scope.output, "");
