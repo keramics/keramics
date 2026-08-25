@@ -174,6 +174,43 @@ mod tests {
     }
 
     #[test]
+    fn test_debug_format_array_with_0bytes() {
+        let test_data: Vec<String> = Vec::new();
+
+        let string: String = debug_format_array(&test_data);
+        assert_eq!(string, "[]");
+    }
+
+    #[test]
+    fn test_debug_format_array_with_3bytes() {
+        let test_data: Vec<String> = ["1"; 3].iter().map(|value| value.to_string()).collect();
+
+        let string: String = debug_format_array(&test_data);
+        assert_eq!(string, "[1; 3]");
+    }
+
+    #[test]
+    fn test_debug_format_array_with_32bytes() {
+        let test_data: Vec<String> = (0..32).map(|value| value.to_string()).collect();
+
+        let first_row: String = (0..16)
+            .map(|value| value.to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        let last_row: String = (16..32)
+            .map(|value| value.to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        let string: String = debug_format_array(&test_data);
+        assert_eq!(
+            string,
+            format!("[\n        {},\n        {}\n    ]", first_row, last_row)
+        );
+    }
+
+    #[test]
     fn test_format_as_hexdump_0bytes() {
         let test_data: [u8; 0] = [];
         let expected_string = ["", ""].join("\n");

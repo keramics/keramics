@@ -122,10 +122,10 @@ mod tests {
     use keramics_core::open_fake_data_stream;
 
     fn get_test_data() -> Vec<u8> {
-        return vec![
+        vec![
             0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00,
-        ];
+        ]
     }
 
     #[test]
