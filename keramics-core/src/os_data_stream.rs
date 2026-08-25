@@ -141,11 +141,29 @@ mod tests {
     }
 
     #[test]
+    fn test_open_os_data_stream_with_nonexistent_file() {
+        let path_string: String = get_test_data_path("directory/bogus.txt");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let result: Result<DataStreamReference, ErrorTrace> = open_os_data_stream(&path_buf);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_seek() -> Result<(), ErrorTrace> {
         let mut file: File = get_data_stream()?;
 
         let offset: u64 = DataStream::seek(&mut file, SeekFrom::Start(101))?;
         assert_eq!(offset, 101);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_to_end() -> Result<(), ErrorTrace> {
+        let mut file: File = get_data_stream()?;
+
+        let offset: u64 = DataStream::seek(&mut file, SeekFrom::End(0))?;
+        assert_eq!(offset, 202);
 
         Ok(())
     }
@@ -223,6 +241,33 @@ mod tests {
         let mut data: Vec<u8> = vec![0; 64];
         let read_size: usize = DataStream::read(&mut file, &mut data)?;
         assert_eq!(read_size, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_beyond_size() -> Result<(), ErrorTrace> {
+        let mut file: File = get_data_stream()?;
+
+        DataStream::seek(&mut file, SeekFrom::End(-10))?;
+
+        let mut data: Vec<u8> = vec![0; 64];
+        let read_size: usize = DataStream::read(&mut file, &mut data)?;
+        assert_eq!(read_size, 10);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_empty_buffer() -> Result<(), ErrorTrace> {
+        let mut file: File = get_data_stream()?;
+
+        let mut data: [u8; 0] = [];
+        let read_size: usize = DataStream::read(&mut file, &mut data)?;
+        assert_eq!(read_size, 0);
+
+        let offset: u64 = file.get_offset()?;
+        assert_eq!(offset, 0);
 
         Ok(())
     }

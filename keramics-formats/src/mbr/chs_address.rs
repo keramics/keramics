@@ -81,7 +81,7 @@ mod tests {
     use super::*;
 
     fn get_test_data() -> Vec<u8> {
-        return vec![0x02, 0xc1, 0x00];
+        vec![0x02, 0xc1, 0x00]
     }
 
     #[test]
