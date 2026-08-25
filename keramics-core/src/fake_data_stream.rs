@@ -267,14 +267,12 @@ mod tests {
         let read_size: usize = data_stream.read(&mut data)?;
         assert_eq!(read_size, 64);
 
-        let expected_data: String = [
+        let expected_data: &str = concat!(
             "A ceramic is any of the various hard, brittle, heat-resistant, and ",
             "corrosion-resistant materials made by shaping and then firing an inorganic, ",
             "nonmetallic material, such as clay, at a high temperature.\n",
-        ]
-        .join("");
-
-        assert_eq!(data, expected_data.as_bytes()[128..192]);
+        );
+        assert_eq!(&data, &expected_data.as_bytes()[128..192]);
 
         Ok(())
     }
@@ -287,6 +285,120 @@ mod tests {
         let mut data: Vec<u8> = vec![0; 64];
         let read_size: usize = data_stream.read(&mut data)?;
         assert_eq!(read_size, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_and_read_with_data_offset() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let mut data_stream: FakeDataStream = FakeDataStream::new(&test_data, 32768);
+
+        data_stream.set_data_offset(128);
+
+        let size: u64 = data_stream.get_size()?;
+        assert_eq!(size, 32768 + 128);
+
+        let mut data: Vec<u8> = vec![0; 64];
+        let read_size: usize = data_stream.read(&mut data)?;
+        assert_eq!(read_size, 64);
+        assert_eq!(&data, &[0; 64]);
+
+        data_stream.seek(SeekFrom::Start(128))?;
+
+        let read_size: usize = data_stream.read(&mut data)?;
+        assert_eq!(read_size, 64);
+
+        let expected_data: &str = concat!(
+            "A ceramic is any of the various hard, brittle, heat-resistant, and ",
+            "corrosion-resistant materials made by shaping and then firing an inorganic, ",
+            "nonmetallic material, such as clay, at a high temperature.\n",
+        );
+        assert_eq!(&data, &expected_data.as_bytes()[0..64]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_and_read_with_spanning_range() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let mut data_stream: FakeDataStream = FakeDataStream::new(&test_data, 32768);
+        let data_size: u64 = test_data.len() as u64;
+
+        data_stream.seek(SeekFrom::Start(data_size - 8))?;
+
+        let mut data: Vec<u8> = vec![0; 32];
+        let read_size: usize = data_stream.read(&mut data)?;
+        assert_eq!(read_size, 32);
+
+        let expected_data: &str = concat!(
+            "A ceramic is any of the various hard, brittle, heat-resistant, and ",
+            "corrosion-resistant materials made by shaping and then firing an inorganic, ",
+            "nonmetallic material, such as clay, at a high temperature.\n",
+        );
+        let test_data_offset: usize = (data_size as usize) - 8;
+        assert_eq!(&data[0..8], &expected_data.as_bytes()[test_data_offset..]);
+        assert_eq!(&data[8..24], &[0; 16]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_beyond_size() -> Result<(), ErrorTrace> {
+        let mut data_stream: FakeDataStream = get_test_data_stream();
+        data_stream.seek(SeekFrom::End(0))?;
+
+        let mut data: Vec<u8> = vec![0; 64];
+        let read_size: usize = data_stream.read(&mut data)?;
+        assert_eq!(read_size, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_with_empty_buffer() -> Result<(), ErrorTrace> {
+        let mut data_stream: FakeDataStream = get_test_data_stream();
+
+        let mut data: Vec<u8> = vec![];
+        let read_size: usize = data_stream.read(&mut data)?;
+        assert_eq!(read_size, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_fake_data_stream() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut data_stream = data_stream.write().expect("unable to obtain write lock");
+        let size: u64 = data_stream.get_size()?;
+        assert_eq!(size, test_data.len() as u64);
+
+        let mut data: Vec<u8> = vec![0; 64];
+        let read_size: usize = data_stream.read(&mut data)?;
+        assert_eq!(read_size, 64);
+        assert_eq!(&data, &test_data[0..64]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_fake_data_stream_with_offset() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_offset: u64 = 64;
+        let data_stream: DataStreamReference =
+            open_fake_data_stream_with_offset(&test_data, data_offset);
+
+        let mut data_stream = data_stream.write().expect("unable to obtain write lock");
+        let size: u64 = data_stream.get_size()?;
+        assert_eq!(size, (test_data.len() as u64) + data_offset);
+
+        data_stream.seek(SeekFrom::Start(data_offset))?;
+        let mut data: Vec<u8> = vec![0; 32];
+        let read_size: usize = data_stream.read(&mut data)?;
+        assert_eq!(read_size, 32);
+        assert_eq!(&data, &test_data[0..32]);
 
         Ok(())
     }
