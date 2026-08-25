@@ -92,11 +92,11 @@ fn read_media_sparse_dynamic() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_media_differential() -> Result<(), ErrorTrace> {
-    let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ntfs-differential.vhd");
-    let mut file: VhdFile = open_file(&path_buf)?;
-
     let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ntfs-parent.vhd");
     let parent_file: VhdFile = open_file(&path_buf)?;
+
+    let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ntfs-differential.vhd");
+    let mut file: VhdFile = open_file(&path_buf)?;
     file.set_parent(&Arc::new(parent_file))?;
 
     let data_stream: DataStreamReference = file.get_data_stream().unwrap();

@@ -16,7 +16,6 @@ use std::sync::Arc;
 use keramics_core::ErrorTrace;
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
 use keramics_formats::{FileResolverReference, Path, PathComponent};
-use keramics_types::Uuid;
 
 use crate::file_resolver::new_vfs_file_resolver;
 use crate::location::VfsLocation;
@@ -110,26 +109,9 @@ impl VhdxFileSystem {
                         return Err(error);
                     }
                 };
-                let media_size: u64;
-                let identifier: Uuid;
-
-                match image_layer.read() {
-                    Ok(vhdx_image_layer) => {
-                        media_size = vhdx_image_layer.get_media_size();
-                        identifier = vhdx_image_layer.get_identifier().clone();
-                    }
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            format!("Unable to obtain read lock on image layer: {}", layer_index),
-                            error
-                        ));
-                    }
-                }
                 Ok(Some(VhdxFileEntry::Layer {
                     index: layer_index,
                     layer: image_layer.clone(),
-                    size: media_size,
-                    identifier,
                 }))
             }
             None => {

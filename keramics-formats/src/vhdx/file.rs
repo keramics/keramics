@@ -11,18 +11,15 @@
  * under the License.
  */
 
-use std::cmp::min;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{Ucs2String, Uuid, bytes_to_u32_le, bytes_to_u64_le};
 
-use crate::block_tree::BlockTree;
-
-use super::block_allocation_table::{VhdxBlockAllocationTable, VhdxBlockAllocationTableEntry};
-use super::block_range::{VhdxBlockRange, VhdxBlockRangeType};
+use super::block_reader::VhdxBlockReader;
+use super::block_stream::VhdxBlockStream;
 use super::constants::*;
 use super::enums::VhdxDiskType;
 use super::file_header::VhdxFileHeader;
@@ -31,7 +28,6 @@ use super::metadata_table::VhdxMetadataTable;
 use super::parent_locator::VhdxParentLocator;
 use super::region_table::VhdxRegionTable;
 use super::region_table_entry::VhdxRegionTableEntry;
-use super::sector_bitmap::VhdxSectorBitmap;
 
 /// Virtual Hard Disk version 2 (VHDX) file.
 pub struct VhdxFile {
@@ -43,12 +39,6 @@ pub struct VhdxFile {
 
     /// Format version.
     format_version: u16,
-
-    /// Block allocation table.
-    block_allocation_table: Option<VhdxBlockAllocationTable>,
-
-    /// Block tree.
-    block_tree: BlockTree<VhdxBlockRange>,
 
     /// Disk type.
     disk_type: VhdxDiskType,
@@ -63,7 +53,7 @@ pub struct VhdxFile {
     parent_name: Option<Ucs2String>,
 
     /// Parent file.
-    parent_file: Option<Arc<RwLock<VhdxFile>>>,
+    parent_file: Option<Arc<VhdxFile>>,
 
     /// Bytes per sector.
     pub(super) bytes_per_sector: u16,
@@ -71,14 +61,17 @@ pub struct VhdxFile {
     /// Block size.
     block_size: u32,
 
+    /// Block allocation table offset.
+    block_allocation_table_offset: u64,
+
+    /// Block allocation table size.
+    block_allocation_table_size: u32,
+
     /// Number of entries per chunk;
     entries_per_chunk: u64,
 
     /// Sector bitmap size.
     sector_bitmap_size: u32,
-
-    /// The current offset.
-    current_offset: u64,
 
     /// Media size.
     pub(super) media_size: u64,
@@ -91,8 +84,6 @@ impl VhdxFile {
             mediator: Mediator::current(),
             data_stream: None,
             format_version: 0,
-            block_allocation_table: None,
-            block_tree: BlockTree::<VhdxBlockRange>::new(0, 0, 0),
             disk_type: VhdxDiskType::Fixed,
             identifier: Uuid::new(),
             parent_identifier: None,
@@ -100,9 +91,10 @@ impl VhdxFile {
             parent_file: None,
             bytes_per_sector: 0,
             block_size: 0,
+            block_allocation_table_offset: 0,
+            block_allocation_table_size: 0,
             entries_per_chunk: 0,
             sector_bitmap_size: 0,
-            current_offset: 0,
             media_size: 0,
         }
     }
@@ -110,6 +102,31 @@ impl VhdxFile {
     /// Retrieves the bytes per sector.
     pub fn get_bytes_per_sector(&self) -> u16 {
         self.bytes_per_sector
+    }
+
+    /// Retrieves a data stream.
+    pub fn get_data_stream(&self) -> Option<DataStreamReference> {
+        match &self.data_stream {
+            Some(data_stream) => {
+                let parent_data_stream: Option<DataStreamReference> = match &self.parent_file {
+                    Some(parent_file) => parent_file.get_data_stream(),
+                    None => None,
+                };
+                Some(Arc::new(RwLock::new(VhdxBlockStream::new(
+                    VhdxBlockReader::new(
+                        data_stream,
+                        &self.disk_type,
+                        self.bytes_per_sector,
+                        self.block_size,
+                        self.block_allocation_table_offset,
+                        self.block_allocation_table_size,
+                        parent_data_stream,
+                        self.media_size,
+                    ),
+                ))))
+            }
+            None => None,
+        }
     }
 
     /// Retrieves the disk type.
@@ -275,27 +292,19 @@ impl VhdxFile {
             ((1 << 23) * (self.bytes_per_sector as u64)) / (self.block_size as u64);
         self.sector_bitmap_size = 1048576 / (self.entries_per_chunk as u32);
 
+        self.block_allocation_table_offset = block_allocation_table_region.data_offset;
+        self.block_allocation_table_size = block_allocation_table_region.data_size;
+
         let number_of_entries: u32 = block_allocation_table_region.data_size / 8;
+        let blocks_data_size: u64 = (number_of_entries as u64) * (self.block_size as u64);
 
-        self.block_allocation_table = Some(VhdxBlockAllocationTable::new(
-            block_allocation_table_region.data_offset,
-            number_of_entries,
-        ));
-        let block_tree_data_size: u64 = (number_of_entries as u64) * (self.block_size as u64);
-        let sectors_per_block: u32 = self.block_size / (self.bytes_per_sector as u32);
-
-        if self.media_size > block_tree_data_size {
+        if self.media_size > blocks_data_size {
             let calculated_number_of_blocks: u64 = self.media_size.div_ceil(self.block_size as u64);
             return Err(keramics_core::error_trace_new!(format!(
                 "Number of blocks: {} in block allocation table too small for virtual disk size: {} ({} blocks)",
                 number_of_entries, self.media_size, calculated_number_of_blocks,
             )));
         }
-        self.block_tree = BlockTree::<VhdxBlockRange>::new(
-            block_tree_data_size,
-            sectors_per_block as u64,
-            self.bytes_per_sector as u64,
-        );
         Ok(())
     }
 
@@ -573,345 +582,23 @@ impl VhdxFile {
         Ok(())
     }
 
-    /// Reads a specific block allocation entry and fills the block tree.
-    fn read_block_allocation_entry(&mut self, block_number: u64) -> Result<(), ErrorTrace> {
-        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-        };
-        let table_entry: u64 = if self.disk_type == VhdxDiskType::Fixed {
-            block_number
-        } else {
-            ((block_number / self.entries_per_chunk) * (self.entries_per_chunk + 1))
-                + (block_number % self.entries_per_chunk)
-        };
-        let block_allocation_table: &VhdxBlockAllocationTable =
-            self.block_allocation_table.as_ref().unwrap();
-
-        let entry: VhdxBlockAllocationTableEntry =
-            match block_allocation_table.read_entry(data_stream, table_entry as u32) {
-                Ok(entry) => entry,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read block allocation table entry"
-                    );
-                    return Err(error);
-                }
-            };
-        if self.disk_type == VhdxDiskType::Differential && entry.block_state != 6 {
-            match self.read_sector_bitmap(block_number, entry.block_offset) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read sector bitmap");
-                    return Err(error);
-                }
-            }
-        } else {
-            let block_media_offset: u64 = block_number * (self.block_size as u64);
-
-            let block_range: VhdxBlockRange = if entry.block_state < 6 {
-                VhdxBlockRange::new(
-                    block_media_offset,
-                    0,
-                    self.block_size as u64,
-                    VhdxBlockRangeType::Sparse,
-                )
-            } else {
-                VhdxBlockRange::new(
-                    block_media_offset,
-                    entry.block_offset,
-                    self.block_size as u64,
-                    VhdxBlockRangeType::InFile,
-                )
-            };
-            match self.block_tree.insert_value(
-                block_media_offset,
-                self.block_size as u64,
-                block_range,
-            ) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to insert block range into block tree"
-                    );
-                    return Err(error);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Reads a specific sector bitmap and fills the block tree.
-    fn read_sector_bitmap(
-        &mut self,
-        block_number: u64,
-        block_offset: u64,
-    ) -> Result<(), ErrorTrace> {
-        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-        };
-        let table_entry: u64 =
-            (1 + (block_number / self.entries_per_chunk)) * (self.entries_per_chunk + 1) - 1;
-
-        let block_allocation_table: &VhdxBlockAllocationTable =
-            self.block_allocation_table.as_ref().unwrap();
-
-        let entry: VhdxBlockAllocationTableEntry =
-            match block_allocation_table.read_entry(data_stream, table_entry as u32) {
-                Ok(entry) => entry,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read block allocation table entry"
-                    );
-                    return Err(error);
-                }
-            };
-        let sector_bitmap_offset: u64 = entry.block_offset
-            + ((block_number % self.entries_per_chunk) * self.sector_bitmap_size as u64);
-
-        let mut sector_bitmap: VhdxSectorBitmap =
-            VhdxSectorBitmap::new(self.sector_bitmap_size as usize, self.bytes_per_sector);
-
-        match sector_bitmap.read_at_position(data_stream, SeekFrom::Start(sector_bitmap_offset)) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read sector bitmap");
-                return Err(error);
-            }
-        }
-        let mut range_media_offset: u64 = block_number * (self.block_size as u64);
-        let mut range_data_offset: u64 = block_offset;
-
-        for bitmap_range in sector_bitmap.ranges.iter() {
-            let block_range: VhdxBlockRange = if bitmap_range.is_set {
-                VhdxBlockRange::new(
-                    range_media_offset,
-                    range_data_offset,
-                    bitmap_range.size,
-                    VhdxBlockRangeType::InFile,
-                )
-            } else {
-                VhdxBlockRange::new(
-                    range_media_offset,
-                    0,
-                    bitmap_range.size,
-                    VhdxBlockRangeType::InParent,
-                )
-            };
-            match self
-                .block_tree
-                .insert_value(range_media_offset, bitmap_range.size, block_range)
-            {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to insert block range into block tree"
-                    );
-                    return Err(error);
-                }
-            }
-            range_media_offset += bitmap_range.size;
-            range_data_offset += bitmap_range.size;
-        }
-        Ok(())
-    }
-
-    /// Reads media data based on the block ranges in the block tree.
-    fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
-        let read_size: usize = data.len();
-        let mut data_offset: usize = 0;
-        let mut current_offset: u64 = offset;
-
-        let mut block_number: u64 = current_offset / (self.block_size as u64);
-
-        while data_offset < read_size {
-            if current_offset >= self.media_size {
-                break;
-            }
-            let mut result: Result<Option<&VhdxBlockRange>, ErrorTrace> =
-                self.block_tree.get_value(current_offset);
-
-            if result == Ok(None) {
-                match self.read_block_allocation_entry(block_number) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to read block allocation entry: {}", block_number)
-                        );
-                        return Err(error);
-                    }
-                }
-                result = self.block_tree.get_value(current_offset);
-            }
-            let block_range: &VhdxBlockRange = match result {
-                Ok(Some(block_range)) => block_range,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Missing block range for offset: {} (0x{:08x})",
-                        current_offset, current_offset
-                    )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve block range for offset: {} (0x{:08x})",
-                            current_offset, current_offset,
-                        )
-                    );
-                    return Err(error);
-                }
-            };
-            let range_relative_offset: u64 = current_offset - block_range.media_offset;
-            let range_remainder_size: u64 = block_range.size - range_relative_offset;
-
-            let range_read_size: usize =
-                min(read_size - data_offset, range_remainder_size as usize);
-            let data_end_offset: usize = data_offset + range_read_size;
-
-            let range_read_count: usize = match block_range.range_type {
-                VhdxBlockRangeType::InFile => match self.data_stream.as_ref() {
-                    Some(data_stream) => {
-                        keramics_core::data_stream_read_at_position!(
-                            data_stream,
-                            &mut data[data_offset..data_end_offset],
-                            SeekFrom::Start(block_range.data_offset + range_relative_offset)
-                        )
-                    }
-                    None => {
-                        return Err(keramics_core::error_trace_new!("Missing data stream"));
-                    }
-                },
-                VhdxBlockRangeType::InParent => match self.parent_file.as_ref() {
-                    Some(parent_file) => {
-                        keramics_core::data_stream_read_at_position!(
-                            parent_file,
-                            &mut data[data_offset..data_end_offset],
-                            SeekFrom::Start(current_offset)
-                        )
-                    }
-                    None => {
-                        return Err(keramics_core::error_trace_new!("Missing parent file"));
-                    }
-                },
-                VhdxBlockRangeType::Sparse => {
-                    data[data_offset..data_end_offset].fill(0);
-
-                    range_read_size
-                }
-            };
-            if range_read_count == 0 {
-                break;
-            }
-            data_offset += range_read_count;
-            current_offset += range_read_count as u64;
-
-            block_number += 1;
-        }
-        Ok(data_offset)
-    }
-
     /// Sets the parent file.
-    pub fn set_parent(&mut self, parent_file: &Arc<RwLock<VhdxFile>>) -> Result<(), ErrorTrace> {
+    pub fn set_parent(&mut self, parent_file: &Arc<VhdxFile>) -> Result<(), ErrorTrace> {
         let parent_identifier: &Uuid = match &self.parent_identifier {
             Some(parent_identifier) => parent_identifier,
             None => {
                 return Err(keramics_core::error_trace_new!("Missing parent identifier"));
             }
         };
-        match parent_file.read() {
-            Ok(file) => {
-                if *parent_identifier != file.identifier {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Parent identifier: {} does not match identifier of parent file: {}",
-                        parent_identifier, file.identifier,
-                    )));
-                }
-            }
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain read lock on parent file",
-                    error
-                ));
-            }
+        if parent_identifier != &parent_file.identifier {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Parent identifier: {} does not match identifier of parent file: {}",
+                parent_identifier, parent_file.identifier,
+            )));
         }
         self.parent_file = Some(parent_file.clone());
 
         Ok(())
-    }
-}
-
-impl DataStream for VhdxFile {
-    /// Retrieves the current position.
-    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
-        Ok(self.current_offset)
-    }
-
-    /// Retrieves the size of the data.
-    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
-        Ok(self.media_size)
-    }
-
-    /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
-        if self.current_offset >= self.media_size {
-            return Ok(0);
-        }
-        let remaining_media_size: u64 = self.media_size - self.current_offset;
-        let mut read_size: usize = buf.len();
-
-        if (read_size as u64) > remaining_media_size {
-            read_size = remaining_media_size as usize;
-        }
-        let read_count: usize =
-            match self.read_data_from_blocks(&mut buf[..read_size], self.current_offset) {
-                Ok(read_count) => read_count,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
-                    return Err(error);
-                }
-            };
-        self.current_offset += read_count as u64;
-
-        Ok(read_count)
-    }
-
-    /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
-        self.current_offset = match pos {
-            SeekFrom::Current(relative_offset) => {
-                match self.current_offset.checked_add_signed(relative_offset) {
-                    Some(offset) => offset,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Invalid offset value out of bounds"
-                        ));
-                    }
-                }
-            }
-            SeekFrom::End(relative_offset) => {
-                match self.media_size.checked_add_signed(relative_offset) {
-                    Some(offset) => offset,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Invalid offset value out of bounds"
-                        ));
-                    }
-                }
-            }
-            SeekFrom::Start(offset) => offset,
-        };
-        Ok(self.current_offset)
     }
 }
 
@@ -1080,148 +767,5 @@ mod tests {
     }
 
     // TODO: add tests for read_metadata_values
-    // TODO: add tests for read_block_allocation_entry
-    // TODO: add tests for read_sector_bitmap
-    // TODO: add tests for read_data_from_blocks
     // TODO: add tests for set_parent
-
-    #[test]
-    fn test_get_offset() -> Result<(), ErrorTrace> {
-        let mut file: VhdxFile = get_file()?;
-
-        file.seek(SeekFrom::Start(1024))?;
-
-        let offset: u64 = file.get_offset()?;
-        assert_eq!(offset, 1024);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut file: VhdxFile = get_file()?;
-
-        let size: u64 = file.get_size()?;
-        assert_eq!(size, 4194304);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_from_start() -> Result<(), ErrorTrace> {
-        let mut file: VhdxFile = get_file()?;
-
-        let offset: u64 = file.seek(SeekFrom::Start(1024))?;
-        assert_eq!(offset, 1024);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let mut file: VhdxFile = get_file()?;
-
-        let offset: u64 = file.seek(SeekFrom::End(-512))?;
-        assert_eq!(offset, file.media_size - 512);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let mut file: VhdxFile = get_file()?;
-
-        let offset = file.seek(SeekFrom::Start(1024))?;
-        assert_eq!(offset, 1024);
-
-        let offset: u64 = file.seek(SeekFrom::Current(-512))?;
-        assert_eq!(offset, 512);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_before_zero() -> Result<(), ErrorTrace> {
-        let mut file: VhdxFile = get_file()?;
-
-        let result: Result<u64, ErrorTrace> = file.seek(SeekFrom::Current(-512));
-        assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
-        let mut file: VhdxFile = get_file()?;
-
-        let offset: u64 = file.seek(SeekFrom::End(512))?;
-        assert_eq!(offset, file.media_size + 512);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let mut file: VhdxFile = get_file()?;
-        file.seek(SeekFrom::Start(1024))?;
-
-        let mut data: Vec<u8> = vec![0; 512];
-        let read_size: usize = file.read(&mut data)?;
-        assert_eq!(read_size, 512);
-
-        let expected_data: Vec<u8> = vec![
-            0x00, 0x04, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0xcc, 0x00, 0x00, 0x00, 0x43, 0x0f,
-            0x00, 0x00, 0xe3, 0x03, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x04,
-            0x00, 0x00, 0x0a, 0xea, 0x78, 0x67, 0x0a, 0xea, 0x78, 0x67, 0x02, 0x00, 0xff, 0xff,
-            0x53, 0xef, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0xea, 0x78, 0x67, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x0b, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x38, 0x00, 0x00, 0x00, 0x02, 0x00,
-            0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x57, 0x1e, 0x25, 0x97, 0x42, 0xa1, 0x4d, 0x6a,
-            0xad, 0xa9, 0xcd, 0xb1, 0x19, 0x1b, 0x5d, 0xea, 0x65, 0x78, 0x74, 0x32, 0x5f, 0x74,
-            0x65, 0x73, 0x74, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2f, 0x6d, 0x6e, 0x74,
-            0x2f, 0x6b, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x73, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2a, 0x43,
-            0x11, 0xae, 0xbe, 0xdb, 0x40, 0x41, 0xa4, 0xb6, 0xf5, 0x6b, 0x15, 0x34, 0xd6, 0x66,
-            0x01, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0xea,
-            0x78, 0x67, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2e, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-        assert_eq!(data, expected_data);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_and_read_beyond_media_size() -> Result<(), ErrorTrace> {
-        let mut file: VhdxFile = get_file()?;
-        file.seek(SeekFrom::End(512))?;
-
-        let mut data: Vec<u8> = vec![0; 512];
-        let read_size: usize = file.read(&mut data)?;
-        assert_eq!(read_size, 0);
-
-        Ok(())
-    }
 }

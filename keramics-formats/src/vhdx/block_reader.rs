@@ -19,18 +19,18 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use crate::block_tree::BlockTree;
 use crate::traits::BlockReader;
 
-use super::block_allocation_table::{VhdBlockAllocationTable, VhdBlockAllocationTableEntry};
-use super::block_range::{VhdBlockRange, VhdBlockRangeType};
-use super::enums::VhdDiskType;
-use super::sector_bitmap::VhdSectorBitmap;
+use super::block_allocation_table::{VhdxBlockAllocationTable, VhdxBlockAllocationTableEntry};
+use super::block_range::{VhdxBlockRange, VhdxBlockRangeType};
+use super::enums::VhdxDiskType;
+use super::sector_bitmap::VhdxSectorBitmap;
 
-/// Virtual Hard Disk (VHD) (dynamic and differential disk) block reader.
-pub struct VhdBlockReader {
+/// Virtual Hard Disk version 2 (VHDX) block reader.
+pub struct VhdxBlockReader {
     /// Data stream.
     data_stream: DataStreamReference,
 
     /// Disk type.
-    disk_type: VhdDiskType,
+    disk_type: VhdxDiskType,
 
     /// Bytes per sector.
     bytes_per_sector: u16,
@@ -38,14 +38,17 @@ pub struct VhdBlockReader {
     /// Block size.
     block_size: u32,
 
+    /// Number of entries per chunk;
+    entries_per_chunk: u64,
+
     /// Sector bitmap size.
     sector_bitmap_size: u32,
 
     /// Block allocation table.
-    block_allocation_table: VhdBlockAllocationTable,
+    block_allocation_table: VhdxBlockAllocationTable,
 
     /// Block tree.
-    block_tree: BlockTree<VhdBlockRange>,
+    block_tree: BlockTree<VhdxBlockRange>,
 
     /// Parent data stream.
     parent_data_stream: Option<DataStreamReference>,
@@ -54,34 +57,36 @@ pub struct VhdBlockReader {
     size: u64,
 }
 
-impl VhdBlockReader {
+impl VhdxBlockReader {
     /// Creates a block reader.
     pub fn new(
         data_stream: &DataStreamReference,
-        disk_type: &VhdDiskType,
+        disk_type: &VhdxDiskType,
         bytes_per_sector: u16,
         block_size: u32,
         block_allocation_table_offset: u64,
-        number_of_blocks: u32,
+        block_allocation_table_size: u32,
         parent_data_stream: Option<DataStreamReference>,
         size: u64,
     ) -> Self {
         let sectors_per_block: u32 = block_size / (bytes_per_sector as u32);
-        let sector_bitmap_size: u32 = sectors_per_block
-            .div_ceil(8)
-            .next_multiple_of(bytes_per_sector as u32);
+        let sector_bitmap_size: u32 =
+            (sectors_per_block / 8).next_multiple_of(bytes_per_sector as u32);
+        let entries_per_chunk: u64 = ((1 << 23) * (bytes_per_sector as u64)) / (block_size as u64);
+        let number_of_blocks: u32 = block_allocation_table_size.div_ceil(8);
 
         Self {
             data_stream: data_stream.clone(),
             disk_type: disk_type.clone(),
             bytes_per_sector,
             block_size,
+            entries_per_chunk,
             sector_bitmap_size,
-            block_allocation_table: VhdBlockAllocationTable::new(
+            block_allocation_table: VhdxBlockAllocationTable::new(
                 block_allocation_table_offset,
                 number_of_blocks,
             ),
-            block_tree: BlockTree::<VhdBlockRange>::new(
+            block_tree: BlockTree::<VhdxBlockRange>::new(
                 size,
                 sectors_per_block as u64,
                 bytes_per_sector as u64,
@@ -93,9 +98,15 @@ impl VhdBlockReader {
 
     /// Reads a specific block allocation entry and fills the block tree.
     fn read_block_allocation_entry(&mut self, block_number: u64) -> Result<(), ErrorTrace> {
-        let entry: VhdBlockAllocationTableEntry = match self
+        let table_entry: u64 = if self.disk_type == VhdxDiskType::Fixed {
+            block_number
+        } else {
+            ((block_number / self.entries_per_chunk) * (self.entries_per_chunk + 1))
+                + (block_number % self.entries_per_chunk)
+        };
+        let entry: VhdxBlockAllocationTableEntry = match self
             .block_allocation_table
-            .read_entry(&self.data_stream, block_number as u32)
+            .read_entry(&self.data_stream, table_entry as u32)
         {
             Ok(entry) => entry,
             Err(mut error) => {
@@ -106,8 +117,8 @@ impl VhdBlockReader {
                 return Err(error);
             }
         };
-        if entry.sector_number != 0xffffffff {
-            match self.read_sector_bitmap(block_number, entry.sector_number) {
+        if self.disk_type == VhdxDiskType::Differential && entry.block_state != 6 {
+            match self.read_sector_bitmap(block_number, entry.block_offset) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read sector bitmap");
@@ -117,19 +128,19 @@ impl VhdBlockReader {
         } else {
             let block_media_offset: u64 = block_number * (self.block_size as u64);
 
-            let block_range: VhdBlockRange = if self.disk_type == VhdDiskType::Dynamic {
-                VhdBlockRange::new(
+            let block_range: VhdxBlockRange = if entry.block_state < 6 {
+                VhdxBlockRange::new(
                     block_media_offset,
                     0,
                     self.block_size as u64,
-                    VhdBlockRangeType::Sparse,
+                    VhdxBlockRangeType::Sparse,
                 )
             } else {
-                VhdBlockRange::new(
+                VhdxBlockRange::new(
                     block_media_offset,
-                    0,
+                    entry.block_offset,
                     self.block_size as u64,
-                    VhdBlockRangeType::InParent,
+                    VhdxBlockRangeType::InFile,
                 )
             };
             match self.block_tree.insert_value(
@@ -154,12 +165,29 @@ impl VhdBlockReader {
     fn read_sector_bitmap(
         &mut self,
         block_number: u64,
-        sector_number: u32,
+        block_offset: u64,
     ) -> Result<(), ErrorTrace> {
-        let sector_bitmap_offset: u64 = (sector_number as u64) * (self.bytes_per_sector as u64);
+        let table_entry: u64 =
+            (1 + (block_number / self.entries_per_chunk)) * (self.entries_per_chunk + 1) - 1;
 
-        let mut sector_bitmap: VhdSectorBitmap =
-            VhdSectorBitmap::new(self.sector_bitmap_size as usize, self.bytes_per_sector);
+        let entry: VhdxBlockAllocationTableEntry = match self
+            .block_allocation_table
+            .read_entry(&self.data_stream, table_entry as u32)
+        {
+            Ok(entry) => entry,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read block allocation table entry"
+                );
+                return Err(error);
+            }
+        };
+        let sector_bitmap_offset: u64 = entry.block_offset
+            + ((block_number % self.entries_per_chunk) * self.sector_bitmap_size as u64);
+
+        let mut sector_bitmap: VhdxSectorBitmap =
+            VhdxSectorBitmap::new(self.sector_bitmap_size as usize, self.bytes_per_sector);
 
         match sector_bitmap
             .read_at_position(&self.data_stream, SeekFrom::Start(sector_bitmap_offset))
@@ -171,29 +199,22 @@ impl VhdBlockReader {
             }
         }
         let mut range_media_offset: u64 = block_number * (self.block_size as u64);
-        let mut range_data_offset: u64 = sector_bitmap_offset + (self.sector_bitmap_size as u64);
+        let mut range_data_offset: u64 = block_offset;
 
         for bitmap_range in sector_bitmap.ranges.iter() {
-            let block_range: VhdBlockRange = if bitmap_range.is_set {
-                VhdBlockRange::new(
+            let block_range: VhdxBlockRange = if bitmap_range.is_set {
+                VhdxBlockRange::new(
                     range_media_offset,
                     range_data_offset,
                     bitmap_range.size,
-                    VhdBlockRangeType::InFile,
-                )
-            } else if self.disk_type == VhdDiskType::Dynamic {
-                VhdBlockRange::new(
-                    range_media_offset,
-                    0,
-                    bitmap_range.size,
-                    VhdBlockRangeType::Sparse,
+                    VhdxBlockRangeType::InFile,
                 )
             } else {
-                VhdBlockRange::new(
+                VhdxBlockRange::new(
                     range_media_offset,
                     0,
                     bitmap_range.size,
-                    VhdBlockRangeType::InParent,
+                    VhdxBlockRangeType::InParent,
                 )
             };
             match self
@@ -216,7 +237,7 @@ impl VhdBlockReader {
     }
 }
 
-impl BlockReader for VhdBlockReader {
+impl BlockReader for VhdxBlockReader {
     /// Retrieves the size of the data.
     fn get_size(&self) -> u64 {
         self.size
@@ -228,13 +249,13 @@ impl BlockReader for VhdBlockReader {
         let mut data_offset: usize = 0;
         let mut current_offset: u64 = offset;
 
+        let mut block_number: u64 = current_offset / (self.block_size as u64);
+
         while data_offset < read_size {
             if current_offset >= self.size {
                 break;
             }
-            let block_number: u64 = current_offset / (self.block_size as u64);
-
-            let mut result: Result<Option<&VhdBlockRange>, ErrorTrace> =
+            let mut result: Result<Option<&VhdxBlockRange>, ErrorTrace> =
                 self.block_tree.get_value(current_offset);
 
             if result == Ok(None) {
@@ -250,7 +271,7 @@ impl BlockReader for VhdBlockReader {
                 }
                 result = self.block_tree.get_value(current_offset);
             }
-            let block_range: &VhdBlockRange = match result {
+            let block_range: &VhdxBlockRange = match result {
                 Ok(Some(block_range)) => block_range,
                 Ok(None) => {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -277,28 +298,26 @@ impl BlockReader for VhdBlockReader {
             let data_end_offset: usize = data_offset + range_read_size;
 
             let range_read_count: usize = match block_range.range_type {
-                VhdBlockRangeType::InFile => {
+                VhdxBlockRangeType::InFile => {
                     keramics_core::data_stream_read_at_position!(
                         &self.data_stream,
                         &mut data[data_offset..data_end_offset],
                         SeekFrom::Start(block_range.data_offset + range_relative_offset)
                     )
                 }
-                VhdBlockRangeType::InParent => match &self.parent_data_stream {
-                    Some(data_stream) => {
+                VhdxBlockRangeType::InParent => match &self.parent_data_stream {
+                    Some(parent_data_stream) => {
                         keramics_core::data_stream_read_at_position!(
-                            data_stream,
+                            parent_data_stream,
                             &mut data[data_offset..data_end_offset],
                             SeekFrom::Start(current_offset)
                         )
                     }
                     None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Missing parent data stream"
-                        ));
+                        return Err(keramics_core::error_trace_new!("Missing parent file"));
                     }
                 },
-                VhdBlockRangeType::Sparse => {
+                VhdxBlockRangeType::Sparse => {
                     data[data_offset..data_end_offset].fill(0);
 
                     range_read_size
@@ -309,6 +328,8 @@ impl BlockReader for VhdBlockReader {
             }
             data_offset += range_read_count;
             current_offset += range_read_count as u64;
+
+            block_number += 1;
         }
         Ok(data_offset)
     }

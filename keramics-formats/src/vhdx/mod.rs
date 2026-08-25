@@ -13,6 +13,8 @@
 
 mod block_allocation_table;
 mod block_range;
+mod block_reader;
+mod block_stream;
 pub(crate) mod constants;
 mod enums;
 mod file;
