@@ -111,7 +111,7 @@ impl StorageMediaImage {
             Self::Udif { udif_image } => Some(udif_image.clone()),
             Self::Vhd {
                 vhd_image_layer, ..
-            } => Some(vhd_image_layer.clone()),
+            } => vhd_image_layer.get_data_stream(),
             Self::Vhdx {
                 vhdx_image_layer, ..
             } => Some(vhdx_image_layer.clone()),

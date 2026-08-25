@@ -493,7 +493,7 @@ impl VhdxFile {
                 if self.mediator.debug_output {
                     self.mediator.debug_print(format!(
                         "    virtual_disk_identifier: {},\n",
-                        virtual_disk_identifier.to_string()
+                        virtual_disk_identifier
                     ));
                 }
             }
@@ -834,8 +834,7 @@ impl VhdxFile {
                 if *parent_identifier != file.identifier {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Parent identifier: {} does not match identifier of parent file: {}",
-                        parent_identifier.to_string(),
-                        file.identifier.to_string(),
+                        parent_identifier, file.identifier,
                     )));
                 }
             }

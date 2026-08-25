@@ -12,44 +12,14 @@
  */
 
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
-use keramics_core::formatters::format_as_string;
-use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
+use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::vhd::VhdFile;
-use keramics_hashes::{DigestHashContext, Md5Context};
 
-fn read_media_from_file(file: &mut VhdFile) -> Result<(u64, String), ErrorTrace> {
-    let mut data: Vec<u8> = vec![0; 35891];
-    let mut md5_context: Md5Context = Md5Context::new();
-    let mut media_offset: u64 = 0;
+mod util;
 
-    loop {
-        let read_count = match file.read(&mut data) {
-            Ok(read_count) => read_count,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to read from VHD file at offset {} (0x{:08x})",
-                        media_offset, media_offset
-                    )
-                );
-                return Err(error);
-            }
-        };
-        if read_count == 0 {
-            break;
-        }
-        md5_context.update(&data[..read_count]);
-
-        media_offset += read_count as u64;
-    }
-    let hash_value: Vec<u8> = md5_context.finalize();
-    let hash_string: String = format_as_string(&hash_value);
-
-    Ok((media_offset, hash_string))
-}
+use util::read_data_stream;
 
 fn open_file(path: &PathBuf) -> Result<VhdFile, ErrorTrace> {
     let data_stream: DataStreamReference = match open_os_data_stream(path) {
@@ -79,9 +49,11 @@ fn open_file(path: &PathBuf) -> Result<VhdFile, ErrorTrace> {
 #[test]
 fn read_media_fixed() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ntfs-parent.vhd");
-    let mut file: VhdFile = open_file(&path_buf)?;
+    let file: VhdFile = open_file(&path_buf)?;
+    let data_stream: DataStreamReference = file.get_data_stream().unwrap();
 
-    let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
+    let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+
     assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "acb42a740c63c1f72e299463375751c8");
 
@@ -91,9 +63,11 @@ fn read_media_fixed() -> Result<(), ErrorTrace> {
 #[test]
 fn read_media_dynamic() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ntfs-dynamic.vhd");
-    let mut file: VhdFile = open_file(&path_buf)?;
+    let file: VhdFile = open_file(&path_buf)?;
+    let data_stream: DataStreamReference = file.get_data_stream().unwrap();
 
-    let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
+    let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+
     assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "4ce30a0c21dd037023a5692d85ade033");
 
@@ -103,9 +77,11 @@ fn read_media_dynamic() -> Result<(), ErrorTrace> {
 #[test]
 fn read_media_sparse_dynamic() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ext2.vhd");
-    let mut file: VhdFile = open_file(&path_buf)?;
+    let file: VhdFile = open_file(&path_buf)?;
+    let data_stream: DataStreamReference = file.get_data_stream().unwrap();
 
-    let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
+    let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+
     assert_eq!(media_offset, file.get_media_size());
     // Note that the VHD has 18432 bytes of additional storage media data due to the image
     // creation process.
@@ -121,10 +97,12 @@ fn read_media_differential() -> Result<(), ErrorTrace> {
 
     let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ntfs-parent.vhd");
     let parent_file: VhdFile = open_file(&path_buf)?;
+    file.set_parent(&Arc::new(parent_file))?;
 
-    file.set_parent(&Arc::new(RwLock::new(parent_file)))?;
+    let data_stream: DataStreamReference = file.get_data_stream().unwrap();
 
-    let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
+    let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+
     assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "4241cbc76e0e17517fb564238edbe415");
 
