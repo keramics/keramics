@@ -13,42 +13,12 @@
 
 use std::path::PathBuf;
 
-use keramics_core::formatters::format_as_string;
-use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
+use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::qcow::QcowFile;
-use keramics_hashes::{DigestHashContext, Md5Context};
 
-fn read_media_from_file(file: &mut QcowFile) -> Result<(u64, String), ErrorTrace> {
-    let mut data: Vec<u8> = vec![0; 35891];
-    let mut md5_context: Md5Context = Md5Context::new();
-    let mut media_offset: u64 = 0;
+mod util;
 
-    loop {
-        let read_count = match file.read(&mut data) {
-            Ok(read_count) => read_count,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to read from QCOW file at offset {} (0x{:08x})",
-                        media_offset, media_offset
-                    )
-                );
-                return Err(error);
-            }
-        };
-        if read_count == 0 {
-            break;
-        }
-        md5_context.update(&data[..read_count]);
-
-        media_offset += read_count as u64;
-    }
-    let hash_value: Vec<u8> = md5_context.finalize();
-    let hash_string: String = format_as_string(&hash_value);
-
-    Ok((media_offset, hash_string))
-}
+use util::read_data_stream;
 
 fn open_file(path: &PathBuf) -> Result<QcowFile, ErrorTrace> {
     let data_stream: DataStreamReference = match open_os_data_stream(path) {
@@ -78,9 +48,11 @@ fn open_file(path: &PathBuf) -> Result<QcowFile, ErrorTrace> {
 #[test]
 fn read_media() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
-    let mut file: QcowFile = open_file(&path_buf)?;
+    let file: QcowFile = open_file(&path_buf)?;
+    let data_stream: DataStreamReference = file.get_data_stream().unwrap();
 
-    let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
+    let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+
     assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "b1760d0b35a512ef56970df4e6f8c5d6");
 

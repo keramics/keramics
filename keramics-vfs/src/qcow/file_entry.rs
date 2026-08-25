@@ -44,7 +44,7 @@ impl QcowFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
-            QcowFileEntry::Layer { layer, .. } => Ok(Some(layer.clone())),
+            QcowFileEntry::Layer { layer, .. } => Ok(layer.get_data_stream()),
             QcowFileEntry::Root { .. } => Ok(None),
         }
     }
@@ -102,20 +102,8 @@ impl QcowFileEntry {
             }
             QcowFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
                 Ok(image_layer) => {
-                    let media_size: u64;
+                    let media_size: u64 = image_layer.get_media_size();
 
-                    match image_layer.read() {
-                        Ok(qcow_file) => media_size = qcow_file.get_media_size(),
-                        Err(error) => {
-                            return Err(keramics_core::error_trace_new_with_error!(
-                                format!(
-                                    "Unable to obtain read lock on image layer: {}",
-                                    sub_file_entry_index
-                                ),
-                                error
-                            ));
-                        }
-                    }
                     Ok(QcowFileEntry::Layer {
                         name_index: sub_file_entry_index,
                         layer: image_layer.clone(),
@@ -167,19 +155,8 @@ mod tests {
     fn get_layer_file_entry(image: &Arc<QcowImage>) -> Result<QcowFileEntry, ErrorTrace> {
         let image_layer: QcowImageLayer = image.get_layer_by_index(0)?;
 
-        let media_size: u64;
+        let media_size: u64 = image_layer.get_media_size();
 
-        match image_layer.read() {
-            Ok(qcow_file) => {
-                media_size = qcow_file.get_media_size();
-            }
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain read lock on image layer",
-                    error
-                ));
-            }
-        }
         Ok(QcowFileEntry::Layer {
             name_index: 0,
             layer: image_layer.clone(),

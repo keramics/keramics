@@ -160,7 +160,7 @@ mod tests {
             test_struct.name,
             ByteString {
                 encoding: CharacterEncoding::Ascii,
-                elements: vec![b'T', b'E', b'S', b'T', b'D', b'I', b'R', b'1'],
+                elements: b"TESTDIR1".to_vec(),
             }
         );
         assert_eq!(test_struct.file_attribute_flags, 0x10);

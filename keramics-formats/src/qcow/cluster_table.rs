@@ -59,17 +59,11 @@ pub struct QcowClusterTable {
 
 impl QcowClusterTable {
     /// Creates a new cluster table.
-    pub fn new() -> Self {
+    pub fn new(offset: u64, number_of_entries: u32) -> Self {
         Self {
-            offset: 0,
-            number_of_entries: 0,
+            offset,
+            number_of_entries,
         }
-    }
-
-    /// Creates a new cluster table.
-    pub fn set_range(&mut self, offset: u64, number_of_entries: u32) {
-        self.offset = offset;
-        self.number_of_entries = number_of_entries;
     }
 
     /// Reads a cluster table entry.
@@ -109,6 +103,12 @@ impl QcowClusterTable {
             }
         }
         Ok(entry)
+    }
+
+    /// Sets the range.
+    pub fn set_range(&mut self, offset: u64, number_of_entries: u32) {
+        self.offset = offset;
+        self.number_of_entries = number_of_entries;
     }
 }
 
@@ -154,8 +154,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut test_struct = QcowClusterTable::new();
-        test_struct.set_range(0, 2);
+        let test_struct = QcowClusterTable::new(0, 2);
 
         let test_entry: QcowClusterTableEntry = test_struct.read_entry(&data_stream, 0)?;
         assert_eq!(test_entry.reference, 4);

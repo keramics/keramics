@@ -95,29 +95,29 @@ impl StorageMediaImage {
     }
 
     /// Retrieves a data stream.
-    pub fn get_data_stream(&self) -> DataStreamReference {
+    pub fn get_data_stream(&self) -> Option<DataStreamReference> {
         match self {
-            Self::Ewf { ewf_image } => ewf_image.clone(),
+            Self::Ewf { ewf_image } => Some(ewf_image.clone()),
             Self::Pdi {
                 pdi_image_layer, ..
-            } => pdi_image_layer.get_data_stream(),
+            } => Some(pdi_image_layer.get_data_stream()),
             Self::Qcow {
                 qcow_image_layer, ..
-            } => qcow_image_layer.clone(),
-            Self::Raw { data_stream } => data_stream.clone(),
-            Self::SparseBundle { sparsebundle_image } => sparsebundle_image.clone(),
-            Self::SparseImage { sparseimage_file } => sparseimage_file.clone(),
-            Self::SplitRaw { splitraw_image } => splitraw_image.clone(),
-            Self::Udif { udif_image } => udif_image.clone(),
+            } => qcow_image_layer.get_data_stream(),
+            Self::Raw { data_stream } => Some(data_stream.clone()),
+            Self::SparseBundle { sparsebundle_image } => Some(sparsebundle_image.clone()),
+            Self::SparseImage { sparseimage_file } => Some(sparseimage_file.clone()),
+            Self::SplitRaw { splitraw_image } => Some(splitraw_image.clone()),
+            Self::Udif { udif_image } => Some(udif_image.clone()),
             Self::Vhd {
                 vhd_image_layer, ..
-            } => vhd_image_layer.clone(),
+            } => Some(vhd_image_layer.clone()),
             Self::Vhdx {
                 vhdx_image_layer, ..
-            } => vhdx_image_layer.clone(),
+            } => Some(vhdx_image_layer.clone()),
             Self::Vmdk {
                 vmdk_image_layer, ..
-            } => vmdk_image_layer.clone(),
+            } => Some(vmdk_image_layer.clone()),
         }
     }
 

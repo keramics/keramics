@@ -1077,8 +1077,13 @@ fn main() -> ExitCode {
                         return ExitCode::FAILURE;
                     }
                 };
-            let data_stream: DataStreamReference = storage_media_image.get_data_stream();
-
+            let data_stream: DataStreamReference = match storage_media_image.get_data_stream() {
+                Some(data_stream) => data_stream,
+                None => {
+                    println!("Unable to retrieve data stream\n");
+                    return ExitCode::FAILURE;
+                }
+            };
             let media_size: u64 = match data_stream.write() {
                 Ok(mut data_stream) => match data_stream.get_size() {
                     Ok(size) => size,

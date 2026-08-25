@@ -80,5 +80,42 @@ impl FatDirectoryEntry {
 mod tests {
     use super::*;
 
-    // TODO: add tests
+    use keramics_core::ErrorTrace;
+    use keramics_encodings::CharacterEncoding;
+    use keramics_types::ByteString;
+
+    use crate::fat::short_name_directory_entry_fat12::Fat12ShortNameDirectoryEntry;
+
+    fn get_test_data_fat12() -> Vec<u8> {
+        return vec![
+            0x54, 0x45, 0x53, 0x54, 0x44, 0x49, 0x52, 0x31, 0x20, 0x20, 0x20, 0x10, 0x00, 0x7d,
+            0x8f, 0x95, 0x53, 0x5b, 0x53, 0x5b, 0x00, 0x00, 0x8f, 0x95, 0x53, 0x5b, 0x03, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ];
+    }
+
+    // TODO: add tests for get_lookup_name
+
+    #[test]
+    fn test_get_name() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data_fat12();
+
+        let mut short_name: FatShortNameDirectoryEntry = FatShortNameDirectoryEntry::new();
+        Fat12ShortNameDirectoryEntry::read_data(&mut short_name, &test_data)?;
+
+        let test_struct: FatDirectoryEntry = FatDirectoryEntry::new(0x00001a80, short_name);
+
+        let name: Option<FatString> = test_struct.get_name();
+        assert_eq!(
+            name,
+            Some(FatString::ByteString(ByteString {
+                encoding: CharacterEncoding::Ascii,
+                elements: b"TESTDIR1".to_vec(),
+            }))
+        );
+
+        Ok(())
+    }
+
+    // TODO: add tests for set_long_name
 }

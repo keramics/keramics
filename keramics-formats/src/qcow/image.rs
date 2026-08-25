@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
@@ -20,12 +20,12 @@ use crate::path_component::PathComponent;
 
 use super::file::QcowFile;
 
-pub type QcowImageLayer = Arc<RwLock<QcowFile>>;
+pub type QcowImageLayer = Arc<QcowFile>;
 
 /// QEMU Copy-On-Write (QCOW) storage media image.
 pub struct QcowImage {
     /// Layers.
-    layers: Vec<Arc<RwLock<QcowFile>>>,
+    layers: Vec<Arc<QcowFile>>,
 
     /// Bytes per sector.
     bytes_per_sector: u16,
@@ -142,7 +142,7 @@ impl QcowImage {
                     }
                 }
             }
-            self.layers.push(Arc::new(RwLock::new(file)));
+            self.layers.push(Arc::new(file));
 
             file_index += 1;
         }
@@ -196,17 +196,9 @@ mod tests {
     fn test_get_layer_by_index() -> Result<(), ErrorTrace> {
         let image: QcowImage = get_image()?;
 
-        let layer: QcowImageLayer = image.get_layer_by_index(0)?;
+        let image_layer: QcowImageLayer = image.get_layer_by_index(0)?;
+        assert_eq!(image_layer.media_size, 4194304);
 
-        match layer.read() {
-            Ok(file) => assert_eq!(file.media_size, 4194304),
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain read lock on QCOW layer",
-                    error
-                ));
-            }
-        }
         Ok(())
     }
 

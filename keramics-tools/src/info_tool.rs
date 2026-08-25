@@ -188,12 +188,20 @@ impl InfoTool {
     ) -> Result<DataStreamReference, ErrorTrace> {
         let data_stream: DataStreamReference = if self.image_mode {
             match StorageMediaImage::open(path, image_layer) {
-                Ok(storage_media_image) => storage_media_image.get_data_stream(),
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to open storage media image",
-                        error
-                    ));
+                Ok(storage_media_image) => match storage_media_image.get_data_stream() {
+                    Some(data_stream) => data_stream,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unable to retrieve data stream",
+                        ));
+                    }
+                },
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to open storage media image"
+                    );
+                    return Err(error);
                 }
             }
         } else {
