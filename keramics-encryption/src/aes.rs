@@ -226,6 +226,7 @@ const AES_REVERSE_TABLE2: [u32; 256] = generate_derived_table(&AES_REVERSE_TABLE
 const AES_REVERSE_TABLE3: [u32; 256] = generate_derived_table(&AES_REVERSE_TABLE0, 24);
 
 /// Context for AES encryption.
+#[derive(Clone)]
 pub struct AesContext {
     /// Decryption round keys.
     decryption_round_keys: Vec<u32>,

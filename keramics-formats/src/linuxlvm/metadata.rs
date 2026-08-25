@@ -196,7 +196,7 @@ impl LinuxLvmMetadata {
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             format!(
-                                "Unable to convert proprerty: {} to integer",
+                                "Unable to convert property: {} to integer",
                                 property_identifier
                             ),
                             error
@@ -346,7 +346,7 @@ impl LinuxLvmMetadata {
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             format!(
-                                "Unable to convert proprerty: {} to integer",
+                                "Unable to convert property: {} to integer",
                                 property_identifier
                             ),
                             error
@@ -366,7 +366,7 @@ impl LinuxLvmMetadata {
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             format!(
-                                "Unable to convert proprerty: {} to integer",
+                                "Unable to convert property: {} to integer",
                                 property_identifier
                             ),
                             error
@@ -380,7 +380,7 @@ impl LinuxLvmMetadata {
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             format!(
-                                "Unable to convert proprerty: {} to integer",
+                                "Unable to convert property: {} to integer",
                                 property_identifier
                             ),
                             error
@@ -510,7 +510,7 @@ impl LinuxLvmMetadata {
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             format!(
-                                "Unable to convert proprerty: {} to integer",
+                                "Unable to convert property: {} to integer",
                                 property_identifier
                             ),
                             error
@@ -524,7 +524,7 @@ impl LinuxLvmMetadata {
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             format!(
-                                "Unable to convert proprerty: {} to integer",
+                                "Unable to convert property: {} to integer",
                                 property_identifier
                             ),
                             error
@@ -538,7 +538,7 @@ impl LinuxLvmMetadata {
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             format!(
-                                "Unable to convert proprerty: {} to integer",
+                                "Unable to convert property: {} to integer",
                                 property_identifier
                             ),
                             error
@@ -736,7 +736,7 @@ impl LinuxLvmMetadata {
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             format!(
-                                "Unable to convert proprerty: {} to integer",
+                                "Unable to convert property: {} to integer",
                                 property_identifier
                             ),
                             error
@@ -751,7 +751,7 @@ impl LinuxLvmMetadata {
                         Err(error) => {
                             return Err(keramics_core::error_trace_new_with_error!(
                                 format!(
-                                    "Unable to convert proprerty: {} to integer",
+                                    "Unable to convert property: {} to integer",
                                     property_identifier
                                 ),
                                 error
@@ -765,7 +765,7 @@ impl LinuxLvmMetadata {
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             format!(
-                                "Unable to convert proprerty: {} to integer",
+                                "Unable to convert property: {} to integer",
                                 property_identifier
                             ),
                             error

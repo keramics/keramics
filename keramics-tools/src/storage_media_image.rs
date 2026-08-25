@@ -17,6 +17,7 @@ use std::sync::{Arc, RwLock};
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::ewf::EwfImage;
+use keramics_formats::luksde::{LuksCredential, LuksEncryptedVolume};
 use keramics_formats::pdi::{PdiImage, PdiImageLayer};
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
 use keramics_formats::sparsebundle::SparseBundleImage;
@@ -35,6 +36,9 @@ use keramics_vfs::{VfsCredential, VfsCredentialStore, VfsScanner};
 pub enum StorageMediaImage {
     Ewf {
         ewf_image: Arc<RwLock<EwfImage>>,
+    },
+    Luks {
+        luks_volume: LuksEncryptedVolume,
     },
     Pdi {
         pdi_image_layer: Arc<PdiImageLayer>,
@@ -98,6 +102,7 @@ impl StorageMediaImage {
     pub fn get_data_stream(&self) -> Option<DataStreamReference> {
         match self {
             Self::Ewf { ewf_image } => Some(ewf_image.clone()),
+            Self::Luks { luks_volume } => luks_volume.get_data_stream(),
             Self::Pdi {
                 pdi_image_layer, ..
             } => Some(pdi_image_layer.get_data_stream()),
@@ -214,8 +219,10 @@ impl StorageMediaImage {
                 return Err(error);
             }
         }
-        // Scan for volume and file system formats to detect raw storage media images.
+        // Scan for volume and file system formats to detect encrypted volumes and raw storage
+        // media images.
         match vfs_scanner.scan_for_volume_system_format(&data_stream) {
+            Ok(Some(FormatIdentifier::Luks)) => return Self::open_luks_volume(path),
             Ok(Some(_)) => return Self::open_raw_image(path),
             Ok(None) => {}
             Err(mut error) => {
@@ -284,6 +291,57 @@ impl StorageMediaImage {
         Ok(Self::Ewf {
             ewf_image: Arc::new(RwLock::new(ewf_image)),
         })
+    }
+
+    /// Opens a LUKS encrypted volume.
+    fn open_luks_volume(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let data_stream: DataStreamReference = match open_os_data_stream(path) {
+            Ok(data_stream) => data_stream,
+            Err(mut error) => {
+                // TODO: get printable version of path instead of using display().
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to open data stream: {}", path.display())
+                );
+                return Err(error);
+            }
+        };
+        let mut luks_volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+
+        match luks_volume.read_data_stream(&data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read LUKS encrypted volume from data stream"
+                );
+                return Err(error);
+            }
+        }
+        if luks_volume.is_locked() {
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut credentials: Vec<LuksCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        credentials.push(LuksCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match luks_volume.unlock(&credentials) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to unlock LUKS encrypted volume"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        Ok(Self::Luks { luks_volume })
     }
 
     /// Opens a PDI image.

@@ -57,7 +57,6 @@ impl<'a> fmt::Display for CdsaEncrContainerInfo<'a> {
             "        Encryption method\t\t\t: {}",
             self.container.get_encryption_type()
         )?;
-        // TODO: print human readable encryption method
         // TODO: print key protectors
         // TODO: print identifier
 

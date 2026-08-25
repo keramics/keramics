@@ -19,6 +19,7 @@ use super::traits::CryptEcb;
 const XTS_SUPPORTED_KEY_SIZES: [usize; 2] = [16, 32];
 
 /// Context for XTS (XEX-based tweaked-codebook mode with ciphertext stealing) encryption and decryption.
+#[derive(Clone)]
 pub struct XtsContext<T: CryptEcb, const BLOCK_SIZE: usize> {
     /// Encryption and decryption context.
     context: T,

@@ -1,0 +1,220 @@
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may
+ * obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+
+// Linux Unified Key Setup (LUKS) Disk Encryption metadata grammar.
+
+// Built-in pest rule to ignore white space.
+WHITESPACE = _{
+    ("\u{0020}" | "\u{0009}" | "\u{000a}" | "\u{000d}")+
+}
+
+exponent = @{
+    ("e" | "E") ~ ("+" | "-")? ~ ASCII_DIGIT+
+}
+
+integer = @{
+    "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*
+}
+
+unicode_character = @{
+    "u" ~ ASCII_HEX_DIGIT{4}
+}
+
+escaped_character = @{
+    "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t" | unicode_character)
+}
+
+string_part = @{
+    (!("\"" | "\\") ~ ANY)* ~ (escaped_character ~ string_part)*
+}
+
+json_array = {
+    "[" ~ (json_value ~ ("," ~ json_value)*)? ~ "]"
+}
+
+json_boolean = {
+    "false" |
+    "true"
+}
+
+json_null = {
+    "null"
+}
+
+json_integer = @{
+    "-"? ~ integer ~ ("." ~ ASCII_DIGIT+)? ~ exponent?
+}
+
+json_object = {
+    "{" ~ (json_property ~ ("," ~ json_property)*)? ~ "}"
+}
+
+json_property = {
+    json_string ~ ":" ~ json_value
+}
+
+json_string = ${
+    "\"" ~ string_part ~ "\""
+}
+
+json_value = _{
+    json_array |
+    json_boolean |
+    json_integer |
+    json_null |
+    json_object |
+    json_string
+}
+
+metadata = {
+    SOI ~ "{" ~ top_level_property ~ ("," ~ top_level_property)* ~ "}" ~ EOI
+}
+
+top_level_property = {
+    "\"config\"" ~ ":" ~ config_object |
+    "\"digests\"" ~ ":" ~ digests_object |
+    "\"keyslots\"" ~ ":" ~ keyslots_object |
+    "\"segments\"" ~ ":" ~ segments_object |
+    "\"tokens\"" ~ ":" ~ tokens_object |
+    json_property
+}
+
+config_object = {
+    "{" ~ (config_property ~ ("," ~ config_property)*)? ~ "}"
+}
+
+config_property = {
+    "\"flags\"" ~ ":" ~ json_array |
+    "\"json_size\"" ~ ":" ~ json_string |
+    "\"keyslots_size\"" ~ ":" ~ json_string |
+    json_property
+}
+
+digests_object = {
+    "{" ~ (digests_property ~ ("," ~ digests_property)*)? ~ "}"
+}
+
+digests_property = {
+    json_string ~ ":" ~ digest_object
+}
+
+digest_object = {
+    "{" ~ (digest_property ~ ("," ~ digest_property)*)? ~ "}"
+}
+
+digest_property = {
+    "\"digest\"" ~ ":" ~ json_string |
+    "\"hash\"" ~ ":" ~ json_string |
+    "\"iterations\"" ~ ":" ~ json_integer |
+    "\"keyslots\"" ~ ":" ~ json_array |
+    "\"salt\"" ~ ":" ~ json_string |
+    "\"segments\"" ~ ":" ~ json_array |
+    "\"type\"" ~ ":" ~ json_string |
+    json_property
+}
+
+keyslots_object = {
+    "{" ~ (keyslots_property ~ ("," ~ keyslots_property)*)? ~ "}"
+}
+
+keyslots_property = {
+    json_string ~ ":" ~ keyslot_object
+}
+
+keyslot_object = {
+    "{" ~ (keyslot_property ~ ("," ~ keyslot_property)*)? ~ "}"
+}
+
+keyslot_property = {
+    "\"af\"" ~ ":" ~ af_object |
+    "\"area\"" ~ ":" ~ area_object |
+    "\"kdf\"" ~ ":" ~ kdf_object |
+    json_property
+}
+
+// Anti-Forensic Object
+af_object = {
+    "{" ~ (af_property ~ ("," ~ af_property)*)? ~ "}"
+}
+
+af_property = {
+    "\"hash\"" ~ ":" ~ json_string |
+    "\"stripes\"" ~ ":" ~ json_integer |
+    "\"type\"" ~ ":" ~ json_string |
+    json_property
+}
+
+area_object = {
+    "{" ~ (area_property ~ ("," ~ area_property)*)? ~ "}"
+}
+
+area_property = {
+    "\"encryption\"" ~ ":" ~ json_string |
+    "\"hash\"" ~ ":" ~ json_string |
+    "\"key_size\"" ~ ":" ~ json_integer |
+    "\"offset\"" ~ ":" ~ json_string |
+    "\"sector_size\"" ~ ":" ~ json_integer |
+    "\"shift_size\"" ~ ":" ~ json_integer |
+    "\"size\"" ~ ":" ~ json_string |
+    "\"type\"" ~ ":" ~ json_string |
+    json_property
+}
+
+// Key Derivation Object
+kdf_object = {
+    "{" ~ (kdf_property ~ ("," ~ kdf_property)*)? ~ "}"
+}
+
+kdf_property = {
+    "\"cpus\"" ~ ":" ~ json_integer |
+    "\"hash\"" ~ ":" ~ json_string |
+    "\"iterations\"" ~ ":" ~ json_integer |
+    "\"memory\"" ~ ":" ~ json_integer |
+    "\"salt\"" ~ ":" ~ json_string |
+    "\"time\"" ~ ":" ~ json_integer |
+    "\"type\"" ~ ":" ~ json_string |
+    json_property
+}
+
+segments_object = {
+    "{" ~ (segments_property ~ ("," ~ segments_property)*)? ~ "}"
+}
+
+segments_property = {
+    json_string ~ ":" ~ segment_object
+}
+
+segment_object = {
+    "{" ~ (segment_property ~ ("," ~ segment_property)*)? ~ "}"
+}
+
+segment_property = {
+    "\"encryption\"" ~ ":" ~ json_string |
+    "\"iv_tweak\"" ~ ":" ~ json_string |
+    "\"offset\"" ~ ":" ~ json_string |
+    "\"sector_size\"" ~ ":" ~ json_integer |
+    "\"size\"" ~ ":" ~ json_string |
+    "\"type\"" ~ ":" ~ json_string |
+    json_property
+}
+
+tokens_object = {
+    "{" ~ (tokens_property ~ ("," ~ tokens_property)*)? ~ "}"
+}
+
+tokens_property = {
+    "\"type\"" ~ ":" ~ json_string |
+    "\"key_description\"" ~ ":" ~ json_string |
+    "\"keyslots\"" ~ ":" ~ json_object |
+    json_property
+}

@@ -36,14 +36,18 @@ mod storage_media_image;
 use crate::enums::{DisplayPathType, EncodingType, FormatType};
 use crate::info::{
     ApfsInfo, ApmInfo, BsdDiskLabelInfo, CdsaEncrInfo, EwfInfo, ExFatInfo, ExtInfo, FatInfo,
-    GptInfo, HfsInfo, LinuxLvmInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo, SparseBundleInfo,
-    SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
+    GptInfo, HfsInfo, LinuxLvmInfo, LuksInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo,
+    SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
 };
 use crate::storage_media_image::StorageMediaImage;
 
 #[derive(Parser)]
 #[command(version, about = "Provides information about file formats", long_about = None)]
 struct CommandLineArguments {
+    #[arg(long, default_value_t = false)]
+    /// Provides information about the contents of a storage media image or encrypted volume
+    contents: bool,
+
     #[cfg(feature = "debug-trace")]
     #[arg(long, default_value_t = false)]
     /// Enable debug output
@@ -57,11 +61,7 @@ struct CommandLineArguments {
     #[arg(long, value_enum)]
     format: Option<FormatType>,
 
-    #[arg(long, default_value_t = false)]
-    /// Process storage media image contents
-    image: bool,
-
-    #[arg(long, default_value_t = 0, requires = "image")]
+    #[arg(long, default_value_t = 0, requires = "contents")]
     /// Layer within the storage media image, where 1 represents the first layer
     image_layer: usize,
 
@@ -127,8 +127,8 @@ struct InfoTool {
     /// Character encoding.
     character_encoding: Option<CharacterEncoding>,
 
-    /// Image mode.
-    image_mode: bool,
+    /// Contents mode.
+    contents_mode: bool,
 
     /// Offset.
     offset: u64,
@@ -136,7 +136,7 @@ struct InfoTool {
 
 impl InfoTool {
     /// Creates a new info tool.
-    fn new(encoding_type: &Option<EncodingType>, image_mode: bool, offset: u64) -> InfoTool {
+    fn new(encoding_type: &Option<EncodingType>, contents_mode: bool, offset: u64) -> InfoTool {
         let character_encoding: Option<CharacterEncoding> = match encoding_type {
             Some(EncodingType::Ascii) => Some(CharacterEncoding::Ascii),
             Some(EncodingType::Iso8859_1) => Some(CharacterEncoding::Iso8859_1),
@@ -175,7 +175,7 @@ impl InfoTool {
         };
         InfoTool {
             character_encoding,
-            image_mode,
+            contents_mode,
             offset,
         }
     }
@@ -186,7 +186,7 @@ impl InfoTool {
         path: &PathBuf,
         image_layer: usize,
     ) -> Result<DataStreamReference, ErrorTrace> {
-        let data_stream: DataStreamReference = if self.image_mode {
+        let data_stream: DataStreamReference = if self.contents_mode {
             match StorageMediaImage::open(path, image_layer) {
                 Ok(storage_media_image) => match storage_media_image.get_data_stream() {
                     Some(data_stream) => data_stream,
@@ -292,7 +292,7 @@ impl InfoTool {
     ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
         let mut format_scanner: FormatScanner = FormatScanner::new();
 
-        if !self.image_mode {
+        if !self.contents_mode {
             format_scanner.add_cdsaencr_signatures();
             format_scanner.add_ewf_signatures();
             format_scanner.add_pdi_signatures();
@@ -315,6 +315,7 @@ impl InfoTool {
         format_scanner.add_hfs_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_linuxlvm_signatures();
+        format_scanner.add_luksde_signatures();
         format_scanner.add_ntfs_signatures();
 
         match format_scanner.build() {
@@ -461,8 +462,15 @@ fn main() -> ExitCode {
             }
         }
     }
-    let info_tool: InfoTool = InfoTool::new(&arguments.encoding, arguments.image, arguments.offset);
-
+    let info_tool: InfoTool =
+        InfoTool::new(&arguments.encoding, arguments.contents, arguments.offset);
+    #[cfg(feature = "debug-trace")]
+    {
+        Mediator {
+            debug_output: arguments.debug,
+        }
+        .make_current();
+    }
     let data_stream: DataStreamReference =
         match info_tool.get_data_stream(&arguments.source, arguments.image_layer) {
             Ok(data_stream) => data_stream,
@@ -483,6 +491,7 @@ fn main() -> ExitCode {
         Some(FormatType::Gpt) => FormatIdentifier::Gpt,
         Some(FormatType::Hfs) => FormatIdentifier::Hfs,
         Some(FormatType::LinuxLvm) => FormatIdentifier::LinuxLvm,
+        Some(FormatType::Luks) => FormatIdentifier::Luks,
         Some(FormatType::Mbr) => FormatIdentifier::Mbr,
         Some(FormatType::Ntfs) => FormatIdentifier::Ntfs,
         Some(FormatType::Pdi) => FormatIdentifier::Pdi,
@@ -494,7 +503,7 @@ fn main() -> ExitCode {
         Some(FormatType::Vhdx) => FormatIdentifier::Vhdx,
         Some(FormatType::Vmdk) => FormatIdentifier::Vmdk,
         None => {
-            if !arguments.image
+            if !arguments.contents
                 && arguments.source.is_dir()
                 && arguments.source.extension() == Some("sparsebundle".as_ref())
             {
@@ -517,13 +526,6 @@ fn main() -> ExitCode {
             }
         }
     };
-    #[cfg(feature = "debug-trace")]
-    {
-        Mediator {
-            debug_output: arguments.debug,
-        }
-        .make_current();
-    }
     let result: Result<(), ErrorTrace> = match arguments.command {
         Some(Commands::Entry(command_arguments)) => match &format_identifier {
             FormatIdentifier::Apfs => ApfsInfo::print_file_entry_by_identifier(
@@ -621,6 +623,7 @@ fn main() -> ExitCode {
             FormatIdentifier::Hfs => HfsInfo::print_file_system(&data_stream),
             FormatIdentifier::Gpt => GptInfo::print_volume_system(&data_stream),
             FormatIdentifier::LinuxLvm => LinuxLvmInfo::print_volume_system(&arguments.source),
+            FormatIdentifier::Luks => LuksInfo::print_encrypted_volume(&data_stream),
             FormatIdentifier::Mbr => MbrInfo::print_volume_system(&data_stream),
             FormatIdentifier::Ntfs => NtfsInfo::print_file_system(&data_stream),
             // TODO: add support for individual sparse Pdi file.

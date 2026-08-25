@@ -57,7 +57,6 @@ impl<'a> fmt::Display for LinuxLvmLogicalVolumeInfo<'a> {
             self.logical_volume.get_identifier()
         )?;
         let byte_size: ByteSize = ByteSize::new(self.logical_volume.get_volume_size(), 1024);
-
         writeln!(formatter, "        Size\t\t\t\t\t: {}", byte_size)?;
 
         writeln!(formatter)

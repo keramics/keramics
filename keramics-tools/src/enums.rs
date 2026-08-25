@@ -242,6 +242,10 @@ pub enum FormatType {
     #[value(name = "linuxlvm")]
     LinuxLvm,
 
+    /// Linux Unified Key Setup (LUKS) Disk Encryption
+    #[value(name = "luksde")]
+    Luks,
+
     /// Master Boot Record (MBR)
     Mbr,
 
