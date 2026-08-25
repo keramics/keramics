@@ -221,9 +221,9 @@ mod tests {
 
     #[test]
     fn test_format_as_hexdump_3bytes() {
-        let test_data: [u8; 3] = [0x00, 0x01, 0x02];
+        let test_data: [u8; 3] = [0x61, 0x62, 0x63];
         let expected_string = [
-            "00000000  00 01 02                                          ...",
+            "00000000  61 62 63                                          abc",
             "",
             "",
         ]
