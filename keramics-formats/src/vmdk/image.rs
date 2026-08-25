@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
 
@@ -23,7 +23,7 @@ use super::image_layer::VmdkImageLayer;
 /// VMware Virtual Disk (VMDK) storage media image.
 pub struct VmdkImage {
     /// Layers.
-    layers: Vec<Arc<RwLock<VmdkImageLayer>>>,
+    layers: Vec<Arc<VmdkImageLayer>>,
 
     /// Bytes per sector.
     pub bytes_per_sector: u16,
@@ -51,7 +51,7 @@ impl VmdkImage {
     pub fn get_layer_by_index(
         &self,
         layer_index: usize,
-    ) -> Result<Arc<RwLock<VmdkImageLayer>>, ErrorTrace> {
+    ) -> Result<Arc<VmdkImageLayer>, ErrorTrace> {
         match self.layers.get(layer_index) {
             Some(image_layer) => Ok(image_layer.clone()),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -115,7 +115,7 @@ impl VmdkImage {
                     }
                 }
             }
-            self.layers.push(Arc::new(RwLock::new(image_layer)));
+            self.layers.push(Arc::new(image_layer));
 
             image_layer_index += 1;
         }
