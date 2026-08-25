@@ -32,9 +32,7 @@ mod tests {
     use crate::os_file_resolver::open_os_file_resolver;
     use crate::tests::get_test_data_path;
     use crate::vmdk::descriptor_extent::VmdkDescriptorExtent;
-    use crate::vmdk::enums::{
-        VmdkDescriptorExtentAccessMode, VmdkDescriptorExtentType,
-    };
+    use crate::vmdk::enums::{VmdkDescriptorExtentAccessMode, VmdkDescriptorExtentType};
 
     fn get_block_stream() -> Result<VmdkBlockStream, ErrorTrace> {
         let path_string: String = get_test_data_path("vmdk");

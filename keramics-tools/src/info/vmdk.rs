@@ -177,7 +177,8 @@ impl VmdkInfo {
 
         image_layer_information.disk_type = vmdk_image_layer.get_disk_type().clone();
         image_layer_information.sectors_per_grain = vmdk_image_layer.get_sectors_per_grain();
-        image_layer_information.compression_method = vmdk_image_layer.get_compression_method().clone();
+        image_layer_information.compression_method =
+            vmdk_image_layer.get_compression_method().clone();
         image_layer_information.content_identifier = vmdk_image_layer.get_content_identifier();
         image_layer_information.parent_content_identifier =
             vmdk_image_layer.get_parent_content_identifier();
@@ -245,7 +246,8 @@ impl VmdkInfo {
                     return Err(error);
                 }
             };
-        let image_layer_information: VmdkImageLayerInfo = Self::get_image_layer_information(&vmdk_image_layer);
+        let image_layer_information: VmdkImageLayerInfo =
+            Self::get_image_layer_information(&vmdk_image_layer);
 
         print!("{}", image_layer_information);
 
@@ -266,7 +268,8 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from("../test_data/vmdk/ext2.vmdk");
         let vmdk_image: VmdkImage = VmdkInfo::open_image(&path_buf)?;
         let vmdk_image_layer: Arc<VmdkImageLayer> = vmdk_image.get_layer_by_index(0)?;
-        let test_struct: VmdkImageLayerInfo = VmdkInfo::get_image_layer_information(&vmdk_image_layer);
+        let test_struct: VmdkImageLayerInfo =
+            VmdkInfo::get_image_layer_information(&vmdk_image_layer);
 
         let expected_string: &str = concat!(
             "VMware Virtual Disk (VMDK) information:\n",
@@ -290,7 +293,8 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from("../test_data/vmdk/ext2.vmdk");
         let vmdk_image: VmdkImage = VmdkInfo::open_image(&path_buf)?;
         let vmdk_image_layer: Arc<VmdkImageLayer> = vmdk_image.get_layer_by_index(0)?;
-        let test_struct: VmdkImageLayerInfo = VmdkInfo::get_image_layer_information(&vmdk_image_layer);
+        let test_struct: VmdkImageLayerInfo =
+            VmdkInfo::get_image_layer_information(&vmdk_image_layer);
 
         assert_eq!(test_struct.disk_type, VmdkDiskType::MonolithicSparse);
         assert_eq!(test_struct.sectors_per_grain, 128);
