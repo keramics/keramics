@@ -177,6 +177,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_offset() -> Result<(), ErrorTrace> {
+        let mut data_stream: TestDataStream = get_test_data_stream();
+
+        let offset: u64 = data_stream.get_offset()?;
+        assert_eq!(offset, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let mut data_stream: TestDataStream = get_test_data_stream();
+
+        let size: u64 = data_stream.get_size()?;
+        assert_eq!(size, 6);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_read_at_position() -> Result<(), ErrorTrace> {
         let mut data_stream: TestDataStream = get_test_data_stream();
 
