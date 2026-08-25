@@ -472,6 +472,7 @@ impl PdiImage {
 
         for snapshot_descriptor in self.snapshots.iter() {
             let mut image_layer: PdiImageLayer = PdiImageLayer::new(
+                file_resolver,
                 &snapshot_descriptor.identifier,
                 snapshot_descriptor.parent_identifier.as_ref(),
                 self.media_size,
@@ -559,16 +560,6 @@ impl PdiImage {
                         keramics_core::error_trace_add_frame!(error, "Unable to set parent");
                         return Err(error);
                     }
-                }
-            }
-            match image_layer.open(file_resolver) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!("Unable to open layer: {}", layer_identifier)
-                    );
-                    return Err(error);
                 }
             }
             layer_indexes.insert(layer_identifier, self.layers.len());

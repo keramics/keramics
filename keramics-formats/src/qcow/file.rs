@@ -11,17 +11,14 @@
  * under the License.
  */
 
-use std::cmp::min;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::ByteString;
 
-use crate::block_tree::BlockTree;
-
-use super::block_range::{QcowBlockRange, QcowBlockRangeType};
-use super::cluster_table::{QcowClusterTable, QcowClusterTableEntry};
+use super::block_reader::QcowBlockReader;
+use super::block_stream::QcowBlockStream;
 use super::enums::{QcowCompressionMethod, QcowEncryptionMethod};
 use super::file_header::QcowFileHeader;
 
@@ -45,17 +42,17 @@ pub struct QcowFile {
     /// Level 1 index bit shift.
     level1_index_bit_shift: u32,
 
-    /// Level 1 cluster table.
-    level1_cluster_table: QcowClusterTable,
+    /// Level 1 table number of references.
+    level1_table_number_of_references: u32,
+
+    /// Level 1 table offset.
+    level1_table_offset: u64,
 
     /// Level 2 index bit mask.
     level2_index_bit_mask: u64,
 
     /// Level 2 table number of references.
     level2_table_number_of_references: u64,
-
-    /// Level 2 cluster table.
-    level2_cluster_table: QcowClusterTable,
 
     /// Number of cluster block bits.
     number_of_cluster_block_bits: u32,
@@ -81,14 +78,11 @@ pub struct QcowFile {
     /// Encryption method.
     encryption_method: QcowEncryptionMethod,
 
-    /// Block tree.
-    block_tree: BlockTree<QcowBlockRange>,
-
     /// Backing file name.
     backing_file_name: Option<ByteString>,
 
     /// Backing file.
-    backing_file: Option<Arc<RwLock<QcowFile>>>,
+    backing_file: Option<Arc<QcowFile>>,
 
     /// The current offset.
     current_offset: u64,
@@ -107,10 +101,10 @@ impl QcowFile {
             file_header_size: 0,
             offset_bit_mask: 0,
             level1_index_bit_shift: 0,
-            level1_cluster_table: QcowClusterTable::new(),
+            level1_table_number_of_references: 0,
+            level1_table_offset: 0,
             level2_index_bit_mask: 0,
             level2_table_number_of_references: 0,
-            level2_cluster_table: QcowClusterTable::new(),
             number_of_cluster_block_bits: 0,
             cluster_block_bit_mask: 0,
             cluster_block_size: 0,
@@ -119,7 +113,6 @@ impl QcowFile {
             compression_flag_bit_mask: 0,
             compression_method: QcowCompressionMethod::Zlib,
             encryption_method: QcowEncryptionMethod::None,
-            block_tree: BlockTree::<QcowBlockRange>::new(0, 0, 0),
             backing_file_name: None,
             backing_file: None,
             current_offset: 0,
@@ -140,6 +133,36 @@ impl QcowFile {
     /// Retrieves the compression method.
     pub fn get_compression_method(&self) -> &QcowCompressionMethod {
         &self.compression_method
+    }
+
+    /// Retrieves a data stream.
+    pub fn get_data_stream(&self) -> Option<DataStreamReference> {
+        match &self.data_stream {
+            Some(data_stream) => {
+                let backing_file_data_stream: Option<DataStreamReference> = match &self.backing_file
+                {
+                    Some(backing_file) => backing_file.get_data_stream(),
+                    None => None,
+                };
+                Some(Arc::new(RwLock::new(QcowBlockStream::new(
+                    QcowBlockReader::new(
+                        data_stream,
+                        self.offset_bit_mask,
+                        self.level1_index_bit_shift,
+                        self.level1_table_offset,
+                        self.level1_table_number_of_references,
+                        self.level2_index_bit_mask,
+                        self.level2_table_number_of_references,
+                        self.number_of_cluster_block_bits,
+                        self.cluster_block_size,
+                        self.compression_flag_bit_mask,
+                        backing_file_data_stream,
+                        self.media_size,
+                    ),
+                ))))
+            }
+            None => None,
+        }
     }
 
     /// Retrieves the encryption method.
@@ -221,6 +244,8 @@ impl QcowFile {
                 self.level1_index_bit_shift
             )));
         }
+        self.level1_table_offset = file_header.level1_table_offset;
+
         self.level2_index_bit_mask =
             !(u64::MAX << (file_header.number_of_level2_table_bits as u64));
         self.cluster_block_bit_mask = !(u64::MAX << self.number_of_cluster_block_bits);
@@ -263,17 +288,8 @@ impl QcowFile {
             self.level2_table_number_of_references,
             self.cluster_block_size,
         ));
-        self.level1_cluster_table.set_range(
-            file_header.level1_table_offset,
-            level1_table_number_of_references as u32,
-        );
-        let block_tree_data_size: u64 =
-            self.media_size.div_ceil(self.cluster_block_size) * self.cluster_block_size;
-        self.block_tree = BlockTree::<QcowBlockRange>::new(
-            block_tree_data_size,
-            self.level2_table_number_of_references,
-            self.cluster_block_size,
-        );
+        self.level1_table_number_of_references = level1_table_number_of_references as u32;
+
         if file_header.backing_file_name_offset > 0 && file_header.backing_file_name_size > 0 {
             match self.read_backing_file_name(
                 data_stream,
@@ -332,285 +348,11 @@ impl QcowFile {
         Ok(())
     }
 
-    /// Reads a specific cluster block entry and fills the block tree.
-    fn read_cluster_block_entry(&mut self, media_offset: u64) -> Result<(), ErrorTrace> {
-        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-        };
-        let level1_table_index: u64 = media_offset >> self.level1_index_bit_shift;
-
-        let level1_entry: QcowClusterTableEntry = match self
-            .level1_cluster_table
-            .read_entry(data_stream, level1_table_index as u32)
-        {
-            Ok(cluster_table_entry) => cluster_table_entry,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to read level 1 cluster table entry"
-                );
-                return Err(error);
-            }
-        };
-        let level1_media_offset: u64 = level1_table_index << self.level1_index_bit_shift;
-        let level2_table_offset: u64 = level1_entry.reference & self.offset_bit_mask;
-
-        if level2_table_offset == 0 {
-            let range_media_size: u64 = 1 << self.level1_index_bit_shift;
-
-            let block_range: QcowBlockRange = QcowBlockRange::new(
-                level1_media_offset,
-                0,
-                range_media_size,
-                QcowBlockRangeType::Sparse,
-            );
-            match self
-                .block_tree
-                .insert_value(level1_media_offset, range_media_size, block_range)
-            {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to insert block range into block tree"
-                    );
-                    return Err(error);
-                }
-            }
-        } else {
-            self.level2_cluster_table.set_range(
-                level2_table_offset,
-                self.level2_table_number_of_references as u32,
-            );
-            let level2_table_index: u64 =
-                (media_offset >> self.number_of_cluster_block_bits) & self.level2_index_bit_mask;
-
-            let level2_entry: QcowClusterTableEntry = match self
-                .level2_cluster_table
-                .read_entry(data_stream, level2_table_index as u32)
-            {
-                Ok(cluster_table_entry) => cluster_table_entry,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read level 2 cluster table entry"
-                    );
-                    return Err(error);
-                }
-            };
-            let level2_media_offset: u64 =
-                level1_media_offset + (level2_table_index * self.cluster_block_size);
-            let block_data_offset: u64 = level2_entry.reference & self.offset_bit_mask;
-            let range_type: QcowBlockRangeType = if block_data_offset == 0 {
-                if self.backing_file_name.is_some() {
-                    QcowBlockRangeType::InBackingFile
-                } else {
-                    QcowBlockRangeType::Sparse
-                }
-            } else {
-                if (level2_entry.reference & self.compression_flag_bit_mask) == 0 {
-                    QcowBlockRangeType::InFile
-                } else {
-                    if self.encryption_method != QcowEncryptionMethod::None {
-                        return Err(keramics_core::error_trace_new!(
-                            "Unsupported combined encryption and compression"
-                        ));
-                    }
-                    QcowBlockRangeType::Compressed
-                }
-            };
-            let block_range: QcowBlockRange = QcowBlockRange::new(
-                level2_media_offset,
-                block_data_offset,
-                self.cluster_block_size,
-                range_type,
-            );
-            match self.block_tree.insert_value(
-                level2_media_offset,
-                self.cluster_block_size,
-                block_range,
-            ) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to insert block range into block tree"
-                    );
-                    return Err(error);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Reads media data based on the level 1 and level 2 tables.
-    fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
-        let read_size: usize = data.len();
-        let mut data_offset: usize = 0;
-        let mut current_offset: u64 = offset;
-
-        while data_offset < read_size {
-            if current_offset >= self.media_size {
-                break;
-            }
-            let mut result: Result<Option<&QcowBlockRange>, ErrorTrace> =
-                self.block_tree.get_value(current_offset);
-
-            if result == Ok(None) {
-                match self.read_cluster_block_entry(current_offset) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read cluster block entry"
-                        );
-                        return Err(error);
-                    }
-                }
-                result = self.block_tree.get_value(current_offset);
-            }
-            let block_range: &QcowBlockRange = match result {
-                Ok(Some(block_range)) => block_range,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Missing block range for offset: {} (0x{:08x})",
-                        current_offset, current_offset
-                    )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve block range for offset: {} (0x{:08x})",
-                            current_offset, current_offset,
-                        )
-                    );
-                    return Err(error);
-                }
-            };
-            let range_relative_offset: u64 = current_offset - block_range.media_offset;
-            let range_remainder_size: u64 = block_range.size - range_relative_offset;
-
-            let range_read_size: usize =
-                min(read_size - data_offset, range_remainder_size as usize);
-            let data_end_offset: usize = data_offset + range_read_size;
-
-            let range_read_count: usize = match block_range.range_type {
-                QcowBlockRangeType::Compressed => {
-                    // TODO: add compression support.
-                    todo!();
-                }
-                QcowBlockRangeType::InBackingFile => match self.backing_file.as_ref() {
-                    Some(backing_file) => {
-                        keramics_core::data_stream_read_at_position!(
-                            backing_file,
-                            &mut data[data_offset..data_end_offset],
-                            SeekFrom::Start(current_offset)
-                        )
-                    }
-                    None => {
-                        return Err(keramics_core::error_trace_new!("Missing backing file"));
-                    }
-                },
-                QcowBlockRangeType::InFile => match self.data_stream.as_ref() {
-                    Some(data_stream) => {
-                        keramics_core::data_stream_read_at_position!(
-                            data_stream,
-                            &mut data[data_offset..data_end_offset],
-                            SeekFrom::Start(block_range.data_offset + range_relative_offset)
-                        )
-                    }
-                    None => {
-                        return Err(keramics_core::error_trace_new!("Missing data stream"));
-                    }
-                },
-                QcowBlockRangeType::Sparse => {
-                    data[data_offset..data_end_offset].fill(0);
-
-                    range_read_size
-                }
-            };
-            if range_read_count == 0 {
-                break;
-            }
-            data_offset += range_read_count;
-            current_offset += range_read_count as u64;
-        }
-        Ok(data_offset)
-    }
-
     /// Sets the backing file.
-    pub fn set_backing_file(
-        &mut self,
-        backing_file: &Arc<RwLock<QcowFile>>,
-    ) -> Result<(), ErrorTrace> {
+    pub fn set_backing_file(&mut self, backing_file: &Arc<QcowFile>) -> Result<(), ErrorTrace> {
         self.backing_file = Some(backing_file.clone());
 
         Ok(())
-    }
-}
-
-impl DataStream for QcowFile {
-    /// Retrieves the current position.
-    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
-        Ok(self.current_offset)
-    }
-
-    /// Retrieves the size of the data.
-    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
-        Ok(self.media_size)
-    }
-
-    /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
-        if self.current_offset >= self.media_size {
-            return Ok(0);
-        }
-        let remaining_media_size: u64 = self.media_size - self.current_offset;
-        let read_size: usize = min(buf.len(), remaining_media_size as usize);
-
-        let read_count: usize =
-            match self.read_data_from_blocks(&mut buf[..read_size], self.current_offset) {
-                Ok(read_count) => read_count,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
-                    return Err(error);
-                }
-            };
-        self.current_offset += read_count as u64;
-
-        Ok(read_count)
-    }
-
-    /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
-        self.current_offset = match pos {
-            SeekFrom::Current(relative_offset) => {
-                match self.current_offset.checked_add_signed(relative_offset) {
-                    Some(offset) => offset,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Invalid offset value out of bounds"
-                        ));
-                    }
-                }
-            }
-            SeekFrom::End(relative_offset) => {
-                match self.media_size.checked_add_signed(relative_offset) {
-                    Some(offset) => offset,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Invalid offset value out of bounds"
-                        ));
-                    }
-                }
-            }
-            SeekFrom::Start(offset) => offset,
-        };
-        Ok(self.current_offset)
     }
 }
 
@@ -724,147 +466,5 @@ mod tests {
     }
 
     // TODO: add tests for read_backing_file_name
-    // TODO: add tests for read_cluster_block_entry
-    // TODO: add tests for read_data_from_blocks
     // TODO: add tests for set_backing_file
-
-    #[test]
-    fn test_get_offset() -> Result<(), ErrorTrace> {
-        let mut file: QcowFile = get_file()?;
-
-        file.seek(SeekFrom::Start(1024))?;
-
-        let offset: u64 = file.get_offset()?;
-        assert_eq!(offset, 1024);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut file: QcowFile = get_file()?;
-
-        let size: u64 = file.get_size()?;
-        assert_eq!(size, 4194304);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_from_start() -> Result<(), ErrorTrace> {
-        let mut file: QcowFile = get_file()?;
-
-        let offset: u64 = file.seek(SeekFrom::Start(1024))?;
-        assert_eq!(offset, 1024);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let mut file: QcowFile = get_file()?;
-
-        let offset: u64 = file.seek(SeekFrom::End(-512))?;
-        assert_eq!(offset, file.media_size - 512);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let mut file: QcowFile = get_file()?;
-
-        let offset = file.seek(SeekFrom::Start(1024))?;
-        assert_eq!(offset, 1024);
-
-        let offset: u64 = file.seek(SeekFrom::Current(-512))?;
-        assert_eq!(offset, 512);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_before_zero() -> Result<(), ErrorTrace> {
-        let mut file: QcowFile = get_file()?;
-
-        let result: Result<u64, ErrorTrace> = file.seek(SeekFrom::Current(-512));
-        assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
-        let mut file: QcowFile = get_file()?;
-
-        let offset: u64 = file.seek(SeekFrom::End(512))?;
-        assert_eq!(offset, file.media_size + 512);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let mut file: QcowFile = get_file()?;
-        file.seek(SeekFrom::Start(1024))?;
-
-        let mut data: Vec<u8> = vec![0; 512];
-        let read_size: usize = file.read(&mut data)?;
-        assert_eq!(read_size, 512);
-
-        let expected_data: Vec<u8> = vec![
-            0x00, 0x04, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0xcc, 0x00, 0x00, 0x00, 0x43, 0x0f,
-            0x00, 0x00, 0xe3, 0x03, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x04,
-            0x00, 0x00, 0x0a, 0xea, 0x78, 0x67, 0x0a, 0xea, 0x78, 0x67, 0x02, 0x00, 0xff, 0xff,
-            0x53, 0xef, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0xea, 0x78, 0x67, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x0b, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x38, 0x00, 0x00, 0x00, 0x02, 0x00,
-            0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x57, 0x1e, 0x25, 0x97, 0x42, 0xa1, 0x4d, 0x6a,
-            0xad, 0xa9, 0xcd, 0xb1, 0x19, 0x1b, 0x5d, 0xea, 0x65, 0x78, 0x74, 0x32, 0x5f, 0x74,
-            0x65, 0x73, 0x74, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2f, 0x6d, 0x6e, 0x74,
-            0x2f, 0x6b, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x73, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2a, 0x43,
-            0x11, 0xae, 0xbe, 0xdb, 0x40, 0x41, 0xa4, 0xb6, 0xf5, 0x6b, 0x15, 0x34, 0xd6, 0x66,
-            0x01, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0xea,
-            0x78, 0x67, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2e, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-        assert_eq!(data, expected_data);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_and_read_beyond_media_size() -> Result<(), ErrorTrace> {
-        let mut file: QcowFile = get_file()?;
-        file.seek(SeekFrom::End(512))?;
-
-        let mut data: Vec<u8> = vec![0; 512];
-        let read_size: usize = file.read(&mut data)?;
-        assert_eq!(read_size, 0);
-
-        Ok(())
-    }
 }

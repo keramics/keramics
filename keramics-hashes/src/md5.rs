@@ -56,18 +56,6 @@ const MD5_VALUES_32BIT_INDEX: [usize; 64] = [
     8, 15, 6, 13, 4, 11, 2, 9,
 ];
 
-macro_rules! md5_transform_step {
-    ($initial_hash:expr, $block_hash0:expr, $block_hash1:expr, $values_32bit:expr, $index:expr) => {
-        let block_hash: u32 = $initial_hash
-            .wrapping_add($block_hash0)
-            .wrapping_add($values_32bit[MD5_VALUES_32BIT_INDEX[$index]])
-            .wrapping_add(MD5_SINES[$index])
-            .rotate_left(MD5_BIT_SHIFTS[$index]);
-
-        $block_hash0 = $block_hash1.wrapping_add(block_hash);
-    };
-}
-
 /// MD5 transform step for rounds 0 to 15
 macro_rules! md5_transform_step1 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {

@@ -12,6 +12,8 @@
  */
 
 mod block_range;
+mod block_reader;
+mod block_stream;
 mod cluster_table;
 mod constants;
 mod enums;

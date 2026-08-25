@@ -109,17 +109,8 @@ impl QcowFileSystem {
                         return Err(error);
                     }
                 };
-                let media_size: u64;
+                let media_size: u64 = image_layer.get_media_size();
 
-                match image_layer.read() {
-                    Ok(qcow_file) => media_size = qcow_file.get_media_size(),
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            format!("Unable to obtain read lock on image layer: {}", layer_index),
-                            error
-                        ));
-                    }
-                }
                 Ok(Some(QcowFileEntry::Layer {
                     name_index: layer_index,
                     layer: image_layer.clone(),

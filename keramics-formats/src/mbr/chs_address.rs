@@ -48,6 +48,7 @@ impl MbrChsAddress {
     }
 
     /// Calculates the LBA from the CHS address.
+    #[allow(dead_code)]
     pub fn calculate_lba(&self, heads_per_cylinder: u32, sectors_per_track: u32) -> u64 {
         ((((self.cylinder as u64) * (heads_per_cylinder as u64)) + (self.head as u64))
             * (sectors_per_track as u64))
@@ -55,6 +56,7 @@ impl MbrChsAddress {
     }
 
     /// Determines if the CHS address is empty.
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         return self.head == 0 && self.cylinder == 0 && self.sector == 0;
     }

@@ -16,7 +16,6 @@ use std::sync::{Arc, RwLock};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
-use crate::fake_file_resolver::FakeFileResolver;
 use crate::file_resolver::FileResolverReference;
 
 use super::block_reader::PdiBlockReader;
@@ -48,12 +47,13 @@ pub struct PdiImageLayer {
 impl PdiImageLayer {
     /// Creates a new image layer.
     pub(super) fn new(
+        file_resolver: &FileResolverReference,
         identifier: &Uuid,
         parent_identifier: Option<&Uuid>,
         media_size: u64,
     ) -> Self {
         Self {
-            file_resolver: FileResolverReference::new(Box::new(FakeFileResolver::new())),
+            file_resolver: file_resolver.clone(),
             identifier: identifier.clone(),
             parent_identifier: parent_identifier.cloned(),
             parent_layer: None,
@@ -98,13 +98,6 @@ impl PdiImageLayer {
         self.media_size
     }
 
-    /// Opens an image layer.
-    pub fn open(&mut self, file_resolver: &FileResolverReference) -> Result<(), ErrorTrace> {
-        self.file_resolver = file_resolver.clone();
-
-        Ok(())
-    }
-
     /// Sets the parent layer.
     pub fn set_parent(&mut self, parent_layer: &Arc<PdiImageLayer>) -> Result<(), ErrorTrace> {
         let parent_identifier: &Uuid = match &self.parent_identifier {
@@ -135,21 +128,20 @@ mod tests {
     use crate::tests::get_test_data_path;
 
     fn get_image_layer() -> Result<PdiImageLayer, ErrorTrace> {
+        let path_string: String = get_test_data_path("pdi/hfsplus.hdd");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+
         let identifier: Uuid = Uuid::from_string("{5fbaabe3-6958-40ff-92a7-860e329aab41}")?;
 
-        let mut image_layer: PdiImageLayer = PdiImageLayer::new(&identifier, None, 33554432);
+        let mut image_layer: PdiImageLayer =
+            PdiImageLayer::new(&file_resolver, &identifier, None, 33554432);
         image_layer.add_extent(
             0,
             33554432,
             "hfsplus.hdd.0.{5fbaabe3-6958-40ff-92a7-860e329aab41}.hds",
             PdiExtentType::Sparse,
         );
-        let path_string: String = get_test_data_path("pdi/hfsplus.hdd");
-        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
-
-        image_layer.open(&file_resolver)?;
-
         Ok(image_layer)
     }
 
@@ -178,6 +170,5 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add test for open
     // TODO: add test for set_parent
 }
