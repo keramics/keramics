@@ -27,6 +27,7 @@ use super::ext::constants::*;
 use super::gpt::constants::*;
 use super::hfs::constants::*;
 use super::linuxlvm::constants::*;
+use super::luksde::constants::*;
 use super::mbr::constants::*;
 use super::ntfs::constants::*;
 use super::sparseimage::constants::*;
@@ -241,6 +242,16 @@ impl FormatScanner {
         ));
     }
 
+    /// Linux Unified Key Setup (LUKS) Disk Encryption signature.
+    pub fn add_luksde_signatures(&mut self) {
+        self.signature_scanner.add_signature(Signature::new(
+            "luksde1",
+            PatternType::BoundToStart,
+            0,
+            LUKS_VOLUME_HEADER_SIGNATURE,
+        ));
+    }
+
     /// Adds Master Boot Record (MBR) signatures.
     pub fn add_mbr_signatures(&mut self) {
         self.signature_scanner.add_signature(Signature::new(
@@ -437,6 +448,7 @@ impl FormatScanner {
                 "gpt1" | "gpt2" | "gpt3" | "gpt4" => FormatIdentifier::Gpt,
                 "hfs1" | "hfs2" | "hfs3" => FormatIdentifier::Hfs,
                 "linuxlvm1" => FormatIdentifier::LinuxLvm,
+                "luksde1" => FormatIdentifier::Luks,
                 "mbr1" => FormatIdentifier::Mbr,
                 "ntfs1" => FormatIdentifier::Ntfs,
                 "pdi1" => FormatIdentifier::Pdi,
@@ -478,6 +490,7 @@ mod tests {
         format_scanner.add_gpt_signatures();
         format_scanner.add_hfs_signatures();
         format_scanner.add_linuxlvm_signatures();
+        format_scanner.add_luksde_signatures();
         format_scanner.add_ntfs_signatures();
         format_scanner.add_pdi_signatures();
         format_scanner.add_qcow_signatures();
@@ -504,6 +517,7 @@ mod tests {
         format_scanner.add_gpt_signatures();
         format_scanner.add_hfs_signatures();
         format_scanner.add_linuxlvm_signatures();
+        format_scanner.add_luksde_signatures();
         format_scanner.add_ntfs_signatures();
         format_scanner.add_pdi_signatures();
         format_scanner.add_qcow_signatures();

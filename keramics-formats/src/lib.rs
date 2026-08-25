@@ -52,6 +52,7 @@ pub mod apm;
 pub mod bsdlabel;
 pub mod gpt;
 pub mod linuxlvm;
+pub mod luksde;
 pub mod mbr;
 
 // Hybrid volume and file system formats

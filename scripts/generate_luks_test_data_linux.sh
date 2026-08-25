@@ -61,7 +61,7 @@ SECTOR_SIZE=512
 
 dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
 
-echo -n KeRaMiCs | cryptsetup --align-payload=1 --batch-mode --cipher aes-cbc-plain --hash sha1 --luks2-metadata-size=16k --luks2-keyslots-size=256k --type luks2 luksFormat ${IMAGE_FILE} -
+echo -n KeRaMiCs | cryptsetup --align-payload=1 --batch-mode --cipher aes-xts-plain64 --hash sha256 --iter-time 30 --luks2-metadata-size=16k --luks2-keyslots-size=256k --type luks2 luksFormat ${IMAGE_FILE} -
 
 echo -n KeRaMiCs | sudo cryptsetup luksOpen ${IMAGE_FILE} keramics_luks -
 

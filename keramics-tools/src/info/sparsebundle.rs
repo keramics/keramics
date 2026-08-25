@@ -15,76 +15,60 @@ use std::fmt;
 use std::path::PathBuf;
 
 use keramics_core::ErrorTrace;
-use keramics_formats::cdsaencr::{CdsaEncrCredential, CdsaEncrEncryptionType};
+use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 use keramics_vfs::{VfsCredential, VfsCredentialStore};
 
 use crate::formatters::ByteSize;
 
-/// Information about a Mac OS sparse bundle (.sparsebundle) directory.
-struct SparseBundleImageInfo {
-    /// Block size.
-    pub block_size: u32,
-
-    /// Value to indicate the (encrypted) image is locked.
-    pub is_locked: bool,
-
-    /// Encryption type.
-    pub encryption_type: Option<CdsaEncrEncryptionType>,
-
-    /// Media size.
-    pub media_size: u64,
-
-    /// Bytes per sector.
-    pub bytes_per_sector: u16,
+/// Information about a Mac OS sparse bundle (.sparsebundle) image.
+struct SparseBundleImageInfo<'a> {
+    /// Image.
+    image: &'a SparseBundleImage,
 }
 
-impl SparseBundleImageInfo {
+impl<'a> SparseBundleImageInfo<'a> {
     /// Creates new image information.
-    fn new() -> Self {
-        Self {
-            block_size: 0,
-            is_locked: false,
-            encryption_type: None,
-            media_size: 0,
-            bytes_per_sector: 0,
-        }
+    fn new(image: &'a SparseBundleImage) -> Self {
+        Self { image }
     }
 }
 
-impl fmt::Display for SparseBundleImageInfo {
+impl<'a> fmt::Display for SparseBundleImageInfo<'a> {
     /// Formats image information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Sparse bundle (.sparsebundle) information:")?;
 
-        let byte_size: ByteSize = ByteSize::new(self.block_size as u64, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.image.get_block_size() as u64, 1024);
         writeln!(formatter, "    Band size\t\t\t\t\t: {}", byte_size)?;
 
-        if let Some(encryption_type) = &self.encryption_type {
+        writeln!(formatter)?;
+
+        if let Some(encryption_type) = self.image.get_encryption_type() {
             writeln!(formatter, "    Encryption information:")?;
             writeln!(
                 formatter,
                 "        Encryption method\t\t\t: {}",
                 encryption_type
             )?;
-            // TODO: print human readable encryption method
             // TODO: print key protectors
             // TODO: print identifier
 
-            if self.is_locked {
+            if self.image.is_locked() {
                 writeln!(formatter, "        Is locked")?;
             }
+            writeln!(formatter)?;
         }
         writeln!(formatter, "    Media information:")?;
 
-        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.image.get_media_size(), 1024);
         writeln!(formatter, "        Media size\t\t\t\t: {}", byte_size)?;
 
         writeln!(
             formatter,
             "        Bytes per sector\t\t\t: {}",
-            self.bytes_per_sector
+            self.image.get_bytes_per_sector()
         )?;
         writeln!(formatter)
     }
@@ -94,19 +78,6 @@ impl fmt::Display for SparseBundleImageInfo {
 pub struct SparseBundleInfo {}
 
 impl SparseBundleInfo {
-    /// Retrieves the image information.
-    fn get_image_information(sparsebundle_image: &SparseBundleImage) -> SparseBundleImageInfo {
-        let mut image_information: SparseBundleImageInfo = SparseBundleImageInfo::new();
-
-        image_information.block_size = sparsebundle_image.get_block_size();
-        image_information.is_locked = sparsebundle_image.is_locked();
-        image_information.encryption_type = sparsebundle_image.get_encryption_type().cloned();
-        image_information.media_size = sparsebundle_image.get_media_size();
-        image_information.bytes_per_sector = sparsebundle_image.get_bytes_per_sector();
-
-        image_information
-    }
-
     /// Opens an image.
     fn open_image(path_buf: &PathBuf) -> Result<SparseBundleImage, ErrorTrace> {
         let file_resolver: FileResolverReference = match open_os_file_resolver(path_buf) {
@@ -159,7 +130,7 @@ impl SparseBundleInfo {
             }
         };
         let image_information: SparseBundleImageInfo =
-            Self::get_image_information(&sparsebundle_image);
+            SparseBundleImageInfo::new(&sparsebundle_image);
 
         print!("{}", image_information);
 
@@ -179,12 +150,12 @@ mod tests {
     fn test_image_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
         let sparsebundle_image: SparseBundleImage = SparseBundleInfo::open_image(&path_buf)?;
-        let test_struct: SparseBundleImageInfo =
-            SparseBundleInfo::get_image_information(&sparsebundle_image);
+        let test_struct: SparseBundleImageInfo = SparseBundleImageInfo::new(&sparsebundle_image);
 
         let expected_string: &str = concat!(
             "Sparse bundle (.sparsebundle) information:\n",
             "    Band size\t\t\t\t\t: 8.0 MiB (8388608 bytes)\n",
+            "\n",
             "    Media information:\n",
             "        Media size\t\t\t\t: 4.0 MiB (4194304 bytes)\n",
             "        Bytes per sector\t\t\t: 512\n",
@@ -192,22 +163,6 @@ mod tests {
         );
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_image_information() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
-        let sparsebundle_image: SparseBundleImage = SparseBundleInfo::open_image(&path_buf)?;
-        let test_struct: SparseBundleImageInfo =
-            SparseBundleInfo::get_image_information(&sparsebundle_image);
-
-        assert_eq!(test_struct.block_size, 8388608);
-        assert_eq!(test_struct.is_locked, false);
-        assert_eq!(test_struct.encryption_type, None);
-        assert_eq!(test_struct.media_size, 4194304);
-        assert_eq!(test_struct.bytes_per_sector, 512);
 
         Ok(())
     }

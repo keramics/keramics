@@ -253,7 +253,7 @@ impl CdsaEncrContainer {
         encrypted_data: &[u8],
         data: &mut [u8],
     ) -> Result<(), ErrorTrace> {
-        let block_number_data: [u8; 4] = (block_number as u32).to_be_bytes();
+        let block_number_data: [u8; 4] = block_number.to_be_bytes();
 
         let mut initialization_vector: Vec<u8> =
             match self.hmac_context.calculate_hmac(&block_number_data) {
@@ -307,7 +307,7 @@ impl CdsaEncrContainer {
         }
         let mut block_data: Vec<u8> = vec![0; self.block_size as usize];
 
-        match self.decrypt_block(block_number as u32, &encrypted_data, &mut block_data) {
+        match self.decrypt_block(block_number, &encrypted_data, &mut block_data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -321,22 +321,22 @@ impl CdsaEncrContainer {
     }
 
     /// Reads container data based on the encrypted blocks.
-    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
+    fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
         if self.is_locked {
             return Err(keramics_core::error_trace_new!("Container is locked"));
         }
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
-        let mut container_offset: u64 = self.current_offset;
+        let mut current_offset: u64 = offset;
 
-        let mut block_number: u64 = container_offset / (self.block_size as u64);
+        let mut block_number: u64 = current_offset / (self.block_size as u64);
         let mut block_offset: u64 = block_number * (self.block_size as u64);
 
         while data_offset < read_size {
-            if container_offset >= self.size {
+            if current_offset >= self.size {
                 break;
             }
-            let range_relative_offset: u64 = container_offset - block_offset;
+            let range_relative_offset: u64 = current_offset - block_offset;
             let range_remainder_size: u64 = (self.block_size as u64) - range_relative_offset;
 
             let range_read_size: usize =
@@ -384,7 +384,7 @@ impl CdsaEncrContainer {
 
             data_offset = data_end_offset;
 
-            container_offset += range_read_size as u64;
+            current_offset += range_read_size as u64;
             block_offset += self.block_size as u64;
             block_number += 1;
         }
@@ -634,13 +634,14 @@ impl DataStream for CdsaEncrContainer {
         if (read_size as u64) > remaining_size {
             read_size = remaining_size as usize;
         }
-        let read_count: usize = match self.read_data_from_blocks(&mut buf[..read_size]) {
-            Ok(read_count) => read_count,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
-                return Err(error);
-            }
-        };
+        let read_count: usize =
+            match self.read_data_from_blocks(&mut buf[..read_size], self.current_offset) {
+                Ok(read_count) => read_count,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
+                    return Err(error);
+                }
+            };
         self.current_offset += read_count as u64;
 
         Ok(read_count)

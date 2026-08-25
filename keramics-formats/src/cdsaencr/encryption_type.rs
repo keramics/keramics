@@ -17,18 +17,18 @@ use std::fmt;
 #[derive(Clone, Debug, PartialEq)]
 pub struct CdsaEncrEncryptionType {
     /// Method.
-    pub method: u32,
+    pub(crate) method: u32,
 
     /// Mode.
-    pub mode: u32,
+    pub(crate) mode: u32,
 
     /// Key size.
-    pub key_size: usize,
+    pub(crate) key_size: usize,
 }
 
 impl CdsaEncrEncryptionType {
     /// Creates a new encryption type.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             method: 0,
             mode: 0,
@@ -40,39 +40,43 @@ impl CdsaEncrEncryptionType {
 impl fmt::Display for CdsaEncrEncryptionType {
     /// Formats encryption type for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        let method_string: String = match &self.method {
-            0x00000011 => String::from("DES3"),
-            0x80000001 => String::from("AES"),
-            _ => format!("0x{:08x}", self.method),
-        };
-        let mode_string: String = match &self.mode {
-            2 | 3 => String::from("ECB"),
-            4 | 5 | 6 => String::from("CBC"),
-            7 | 8 | 9 => String::from("CFB"),
-            10 | 11 | 12 => String::from("OFB"),
-            _ => format!("0x{:08x}", self.method),
-        };
-        let suffix: Option<String> = match &self.mode {
-            5 | 8 | 11 => Some(String::from("IV8")),
-            6 | 9 | 12 => Some(String::from("PadIV8")),
-            _ => None,
-        };
-        match suffix {
-            Some(suffix) => write!(
-                formatter,
-                "{}-{}-{}-{}",
-                method_string,
-                self.key_size * 8,
-                mode_string,
-                suffix
-            ),
-            None => write!(
-                formatter,
-                "{}-{}-{}",
-                method_string,
-                self.key_size * 8,
-                mode_string
-            ),
+        if self.method == 0 {
+            write!(formatter, "N/A (not set)")
+        } else {
+            let method_string: String = match &self.method {
+                0x00000011 => String::from("DES3"),
+                0x80000001 => String::from("AES"),
+                _ => format!("0x{:08x}", self.method),
+            };
+            let mode_string: String = match &self.mode {
+                2 | 3 => String::from("ECB"),
+                4 | 5 | 6 => String::from("CBC"),
+                7 | 8 | 9 => String::from("CFB"),
+                10 | 11 | 12 => String::from("OFB"),
+                _ => format!("0x{:08x}", self.method),
+            };
+            let suffix: Option<String> = match &self.mode {
+                5 | 8 | 11 => Some(String::from("IV8")),
+                6 | 9 | 12 => Some(String::from("PadIV8")),
+                _ => None,
+            };
+            match suffix {
+                Some(suffix) => write!(
+                    formatter,
+                    "{}-{}-{}-{}",
+                    method_string,
+                    self.key_size * 8,
+                    mode_string,
+                    suffix
+                ),
+                None => write!(
+                    formatter,
+                    "{}-{}-{}",
+                    method_string,
+                    self.key_size * 8,
+                    mode_string
+                ),
+            }
         }
     }
 }

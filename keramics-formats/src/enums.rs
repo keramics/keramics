@@ -27,6 +27,7 @@ pub enum FormatIdentifier {
     Gpt,
     Hfs,
     LinuxLvm,
+    Luks,
     Mbr,
     Ntfs,
     Pdi,
@@ -76,6 +77,7 @@ impl fmt::Display for FormatIdentifier {
             FormatIdentifier::Gpt => "gpt",
             FormatIdentifier::Hfs => "hfs",
             FormatIdentifier::LinuxLvm => "linuxlvm",
+            FormatIdentifier::Luks => "luksde",
             FormatIdentifier::Mbr => "mbr",
             FormatIdentifier::Ntfs => "ntfs",
             FormatIdentifier::Pdi => "pdi",
@@ -142,6 +144,10 @@ mod tests {
         let format_identifier: FormatIdentifier = FormatIdentifier::LinuxLvm;
         let string: String = format_identifier.to_string();
         assert_eq!(string, "linuxlvm");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Luks;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "luksde");
 
         let format_identifier: FormatIdentifier = FormatIdentifier::Mbr;
         let string: String = format_identifier.to_string();

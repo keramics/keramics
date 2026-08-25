@@ -138,6 +138,7 @@ impl VfsScanner {
         self.phase1_volume_system_scanner.add_apm_signatures();
         self.phase1_volume_system_scanner.add_gpt_signatures();
         self.phase1_volume_system_scanner.add_linuxlvm_signatures();
+        self.phase1_volume_system_scanner.add_luksde_signatures();
 
         match self.phase1_volume_system_scanner.build() {
             Ok(_) => {}
@@ -1300,6 +1301,7 @@ impl VfsScanner {
             Some(FormatIdentifier::Apm) => return Ok(Some(FormatIdentifier::Apm)),
             Some(FormatIdentifier::Gpt) => return Ok(Some(FormatIdentifier::Gpt)),
             Some(FormatIdentifier::LinuxLvm) => return Ok(Some(FormatIdentifier::LinuxLvm)),
+            Some(FormatIdentifier::Luks) => return Ok(Some(FormatIdentifier::Luks)),
             Some(format_identifier) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Found unsupported non-overlapping volume system format signature: {}",

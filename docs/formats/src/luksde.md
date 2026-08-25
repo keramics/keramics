@@ -20,8 +20,8 @@ separate layout.
 
 A LUKS version 1 encrypted volume consist of:
 
-* volume header
-* 8 x key slots
+* [volume header](#volume_header_v1)
+* 8 x [key slots](#key_slot_v1)
 * split master key material
 * encrypted (volume) data
 
@@ -35,8 +35,8 @@ The number of bytes per sector is 512.
 A LUKS version 2 encrypted volume consist of:
 
 * metadata area
-  * volume header
-  * JSON area
+  * [volume header](#volume_header_v2)
+  * [JSON area](#json_area)
 * backup metadata area
   * backup volume header
   * backup JSON area
@@ -208,9 +208,9 @@ Size of initialization vector?
 
 ## Volume header
 
-### Volume header - format version 1
+### Volume header - format version 1 {#volume_header_v1}
 
-The volume header is 4096 bytes in size and consists of:
+The volume header - format version 1 is 4096 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -225,14 +225,14 @@ The volume header is 4096 bytes in size and consists of:
 | 132 | 32 | | Master key derivation salt |
 | 164 | 4 | | Master key derivation number of iterations |
 | 168 | 40 | | Volume identifier, which contains an ASCII string with an end-of-string character that consists of a lower-case UUID |
-| 208 | 8 x 48 | | Array of [key slots](#key_slot) |
+| 208 | 8 x 48 | | Array of [key slots](#key_slot_v1) |
 | 592 | 3504 | | Unknown (empty values) |
 
 The hashing method is used for the user key calculation and the anti-forensic (AF) diffuser.
 
 ### Volume header - format version 2 {#volume_header_v2}
 
-The volume header (or binary header) is 4096 bytes in size and consists of:
+The volume header - format version 2 (or binary header) is 4096 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -245,12 +245,12 @@ The volume header (or binary header) is 4096 bytes in size and consists of:
 | 104 | 64 | | Salt |
 | 168 | 40 | | Volume identifier, which contains an ASCII string with an end-of-string character that consists of a lower-case UUID |
 | 208 | 48 | | Unknown (subsystem), which contains an ASCII string with an end-of-string character |
-| 256 | 8 | | Header offset, which is relative from the start of the volume |
+| 256 | 8 | | Metadata area offset, which is relative from the start of the storage media in which the LUKS volume is stored |
 | 264 | 184 | | Unknown (padding), which according to "LUKS2 On-Disk Format Specification" this must be filled with 0-byte values |
 | 448 | 64 | | Metadata area checksum |
 | 512 | 7 x 512 = 3584 | | Unknown (padding), which according to "LUKS2 On-Disk Format Specification" this must be filled with 0-byte values |
 
-### JSON area
+## JSON area {#json_area}
 
 The JSON area is stored directly after the volume header and must be 4096-byte aligned. The JSON
 area is variable of size and constists of:
@@ -260,7 +260,7 @@ area is variable of size and constists of:
 | 0 | ... | | JSON string, which contains an ASCII string with an end-of-string character |
 | ... | ... | | Unknown (padding), which according to "LUKS2 On-Disk Format Specification" this must be filled with 0-byte values |
 
-#### Example
+### Example
 
 ```json
 {
@@ -322,54 +322,134 @@ area is variable of size and constists of:
 }
 ```
 
-#### Top level properties
+### Top level properties
 
 | Value | Description |
 | --- | --- |
 | "config" | [Config object](#metadata_config_object) |
-| "digests" | [Digests object](#metadata_digests_object) |
-| "keyslots" | [Keyslots object](#metadata_keyslots_object) |
-| "segments" | [Segments object](#metadata_segments_object) |
-| "tokens" | [Tokens object](#metadata_tokens_object) |
+| "digests" | One or more [digests object](#metadata_digests_object) |
+| "keyslots" | One or more [keyslots object](#metadata_keyslots_object) |
+| "segments" | One ore more [segments object](#metadata_segments_object) |
+| "tokens" | Zero or more [tokens object](#metadata_tokens_object) |
 
-#### Config object {#metadata_config_object}
+### Config object {#metadata_config_object}
 
 | Value | Description |
 | --- | --- |
 | "flags" | List of strings |
 | "json_size" | String containing an integer |
 | "keyslots_size" | String containing an integer |
+| "requirements" | |
 
-#### Digests object {#metadata_digests_object}
-
-TODO: complete section
-
-#### Keyslots object {#metadata_keyslots_object}
-
-Contains zero or more [keyslot object](#metadata_keyslot_object).
-
-#### Keyslot object {#metadata_keyslot_object}
+### Digests object {#metadata_digests_object}
 
 TODO: complete section
 
 | Value | Description |
 | --- | --- |
-| "af" | Anti-forensics (diffuser) object |
-| "area" | |
-| "kdf" | Key derivation object |
-| "key_size" | |
-| "priority" | |
+| "digest" | |
+| "hash" | type "pbkdf2" |
+| "iterations" | type "pbkdf2" |
+| "keyslots" | |
+| "salt" | |
+| "segments" | |
 | "type" | |
 
-#### Segments object {#metadata_segments_object}
+### Keyslots object {#metadata_keyslots_object}
+
+Contains zero or more [keyslot object](#metadata_keyslot_object).
+
+### Keyslot object {#metadata_keyslot_object}
 
 TODO: complete section
 
-#### Tokens object {#metadata_tokens_object}
+| Value | Description |
+| --- | --- |
+| "af" | [Anti-forensics (diffuser) object](#metadata_keyslot_af_object), which should only be present in type "luks2" |
+| "area" | [Key slot area object](#metadata_keyslot_area_object) |
+| "direction" | Re-encryption direction, which should only be present in type "reencrypt" |
+| "kdf" | [Key derivation object](#metadata_keyslot_kdf_object), which should only be present in type "luks2" |
+| "key_size" | Key size, in number of bytes |
+| "mode" | Re-encryption mode, which should only be present in type "reencrypt" |
+| "priority" | Priority, where 0 represents "ignore", 1 "normal" and 2 "high" |
+| "type" | Keyslot type, which can be "luks2" or "reencrypt" |
+
+#### Anti-forensics (diffuser) object {#metadata_keyslot_af_object}
 
 TODO: complete section
 
-### Backup metadata area
+| Value | Description |
+| --- | --- |
+| "hash" | type "luks1" |
+| "stripes" | type "luks1" |
+| "type" | Anti-forensics type, which can be "luks1" |
+
+#### Keyslot area object {#metadata_keyslot_area_object}
+
+TODO: complete section
+
+| Value | Description |
+| --- | --- |
+| "encryption" | type "raw" |
+| "hash" | types "checksum" and "datashift-checksum" |
+| "key_size" | type "raw" |
+| "offset" | |
+| "sector_size" | types "checksum" and "datashift-checksum" |
+| "shift_size" | types "datashift", "datashift-checksum" and "datashift-journal" |
+| "size" | |
+| "type" | Area type, which can be "raw", "checksum", "none", "journal" |
+
+#### Key derivation object {#metadata_keyslot_kdf_object}
+
+TODO: complete section
+
+| Value | Description |
+| --- | --- |
+| "cpus" | types "argon2i" and "argon2id" |
+| "hash" | type "pbkdf2" |
+| "iterations" | type "pbkdf2" |
+| "memory" | types "argon2i" and "argon2id" |
+| "salt" | |
+| "time" | types "argon2i" and "argon2id" |
+| "type" | The PBKDF type, which can be "pbkdf2", "argon2i" and "argon2id" |
+
+### Segments object {#metadata_segments_object}
+
+TODO: complete section
+
+| Value | Description |
+| --- | --- |
+| "encryption" | type "crypt" |
+| "flags" | |
+| "integrity" | type "crypt" |
+| "iv_tweak" | type "crypt" |
+| "offset" | |
+| "sector_size" | type "crypt" |
+| "size" | |
+| "type" | Segment type, which can be "linear" or "crypt" |
+
+#### Segment integrity object
+
+TODO: complete section
+
+| Value | Description |
+| --- | --- |
+| "journal_encryption" | |
+| "journal_integrity" | |
+| "key_size" | |
+| "type" | |
+
+### Tokens object {#metadata_tokens_object}
+
+TODO: complete section
+
+| Value | Description |
+| --- | --- |
+| "key_description" | type "luks2-keyring" |
+| "keyslots" | |
+| "type" | |
+
+## Backup metadata area
 
 To make recovery easier the backup metadata area starts at a fixed offset:
 
@@ -385,24 +465,34 @@ To make recovery easier the backup metadata area starts at a fixed offset:
 | 2097152 (0x200000) | 2044 KiB |
 | 4194304 (0x400000) | 4092 KiB |
 
-#### Backup volume header - format version 2
+### Backup volume header - format version 2
 
 The backup (or secondary) volume header - format version 2 is the same as the
 [Volume header - format version 2](#volume_header_v2) with a different signature: "SKUL\xba\xbe".
 
-### Keyslots area
+## Keyslots
 
-TODO: complete section
+### Key slot - format version 1 {#key_slot_v1}
+
+The key slot - format version 1 is 48 bytes in size and consists of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | State (of key slot), where 0x0000dead represents inactive (dead) and 0x00ac71f3 represents active |
+| 4 | 4 | | Key material number of iterations |
+| 8 | 32 | | Key material salt |
+| 40 | 4 | | Key material start sector |
+| 44 | 4 | | Key material number of (anti-forensic) stripes |
+
+## String identifiers
+
+LUKS uses various string values as identifiers.
+
+> Note that it is assumed that these identifiers are case insensitive.
 
 ### Encryption method {#encryption_method}
 
-The encryption mode consists of a string in the form:
-
-```text
-cipher
-```
-
-Where known values of cipher are:
+Known values of encryption method are:
 
 | Value | Description |
 | --- | --- |
@@ -416,17 +506,17 @@ Where known values of cipher are:
 | tnepres | Reversed variant of Serpent |
 | twofish | Twofish |
 
-> Note that it is assumed that these identifiers are case insensitive.
-
 ### Encryption mode {#encryption_mode}
 
-The encryption mode consists of a string in the form:
+The encryption mode consists of a string in the format:
 
 ```text
 chaining_mode[-initialization_vector_mode[:initialization_vector_options]]
 ```
 
-Where known values of chaining mode are:
+#### Chaining mode
+
+Known values of chaining mode are:
 
 | Value | Description |
 | --- | --- |
@@ -438,7 +528,9 @@ Where known values of chaining mode are:
 
 TODO: determine ctr and lrw
 
-And known values of initialization vector mode are:
+#### Initialization vector mode and options
+
+Known values of initialization vector mode and options are:
 
 | Value | Description |
 | --- | --- |
@@ -450,9 +542,9 @@ And known values of initialization vector mode are:
 | plain64 | The initialization vector is the 64-bit little-endian version of the sector number, padded with zeros if necessary |
 | plumb | Unknown |
 
-> Note that it is assumed that these identifiers are case insensitive.
-
 ### Hashing method {#hashing_method}
+
+Known values of hashing method are:
 
 | Value | Description |
 | --- | --- |
@@ -463,22 +555,8 @@ And known values of initialization vector mode are:
 | sha512 | SHA-512 |
 | wd256 | Unknown |
 
-> Note that it is assumed that these identifiers are case insensitive.
-
-The hashing method must at least produce 20 bytes of hash data. Therefore hashing methods like:
-ghash, MD5 are unsupported.
-
-### Key slot {#key_slot}
-
-The key slot is 48 bytes in size and consists of:
-
-| Offset | Size | Value | Description |
-| --- | --- | --- | --- |
-| 0 | 4 | | State (of key slot), where 0x0000dead represents inactive (dead) and 0x00ac71f3 represents active |
-| 4 | 4 | | Key material number of iterations |
-| 8 | 32 | | Key material salt |
-| 40 | 4 | | Key material start sector |
-| 44 | 4 | | Key material number of (anti-forensic) stripes |
+The hashing method must at least produce 20 bytes of hash data. Therefore hashing methods like
+ghash and MD5 are unsupported.
 
 ## Format edge cases and corruption scenarios
 

@@ -16,6 +16,7 @@ Supported data formats:
 * [GUID Partition Table (GPT) format](https://keramics.github.io/gpt.html)
 * [Hierarchical File System (HFS) format](https://keramics.github.io/hfs.html)
 * [Linux Logical Volume Manager (LVM) format](https://keramics.github.io/linuxlvm.html)
+* [Linux Unified Key Setup (LUKS) Disk Encryption](https://github.com/keramics/keramics/tree/main/keramics-formats/src/luksde/README.md)
 * [Mac OS sparse bundle (.sparsebundle) format](https://keramics.github.io/sparsebundle.html)
 * [Mac OS sparse image (.sparseimage) format](https://keramics.github.io/sparseimage.html)
 * [Master Boot Record (MBR) format](https://keramics.github.io/mbr.html)
