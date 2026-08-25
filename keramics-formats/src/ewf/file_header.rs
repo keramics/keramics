@@ -74,9 +74,9 @@ mod tests {
     use keramics_core::{DataStreamReference, open_fake_data_stream};
 
     fn get_test_data() -> Vec<u8> {
-        return vec![
+        vec![
             0x45, 0x56, 0x46, 0x09, 0x0d, 0x0a, 0xff, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00,
-        ];
+        ]
     }
 
     #[test]

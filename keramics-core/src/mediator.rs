@@ -70,4 +70,44 @@ mod tests {
 
         mediator.debug_print("test");
     }
+
+    #[test]
+    fn test_debug_print_enabled() {
+        let mediator: Arc<Mediator> = Arc::new(Mediator::new(true));
+
+        mediator.debug_print("test");
+    }
+
+    #[test]
+    fn test_debug_print_data() {
+        let mediator: Arc<Mediator> = Mediator::current();
+
+        let data: Vec<u8> = (0..16).collect();
+        mediator.debug_print_data(&data, false);
+    }
+
+    #[test]
+    fn test_debug_print_data_grouped() {
+        let mediator: Arc<Mediator> = Arc::new(Mediator::new(true));
+
+        let data: Vec<u8> = (0..32).collect();
+        mediator.debug_print_data(&data, true);
+    }
+
+    #[test]
+    fn test_make_current() {
+        let original_debug_output: bool = Mediator::current().debug_output;
+
+        let mediator: Mediator = Mediator::new(true);
+        mediator.make_current();
+
+        let current: Arc<Mediator> = Mediator::current();
+        assert!(current.debug_output);
+
+        let mediator: Mediator = Mediator::new(original_debug_output);
+        mediator.make_current();
+
+        let current: Arc<Mediator> = Mediator::current();
+        assert_eq!(current.debug_output, original_debug_output);
+    }
 }
