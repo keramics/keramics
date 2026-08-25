@@ -311,3 +311,328 @@ impl<'a> DebugTraceStaticScope<'a> {
             .debug_print(format!("{}: {}\n", description, value));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::cell::Cell;
+    use std::sync::Arc;
+
+    use crate::errors::ErrorTrace;
+    use crate::formatters::format_as_hexdump;
+
+    fn get_test_data() -> [u8; 16] {
+        [
+            0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad, 0xbe, 0xef, 0xde, 0xad,
+            0xbe, 0xef,
+        ]
+    }
+
+    fn test_debug_read_data(data: &[u8]) -> String {
+        format!("structure (size: {})", data.len())
+    }
+
+    #[test]
+    fn test_scope_with_debug_output_enabled() -> Result<(), ErrorTrace> {
+        Mediator::new(true).make_current();
+
+        let result: u64 = DebugTrace::scope(
+            |scope: &mut DebugTraceScope<'_>| -> Result<u64, ErrorTrace> {
+                scope.print_start("test");
+                scope.print_field("value", 42);
+                scope.print_end();
+                Ok(42)
+            },
+        )?;
+        assert_eq!(result, 42);
+
+        let result: u64 = DebugTrace::scope(
+            |scope: &mut DebugTraceScope<'_>| -> Result<u64, ErrorTrace> {
+                let _ = scope;
+                Ok(0)
+            },
+        )?;
+        assert_eq!(result, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scope_with_debug_output_disabled() -> Result<(), ErrorTrace> {
+        let result: u64 = DebugTrace::scope(
+            |scope: &mut DebugTraceScope<'_>| -> Result<u64, ErrorTrace> {
+                assert!(!scope.debug_output);
+                scope.print_start("test");
+                assert_eq!(scope.output, "");
+                Ok(42)
+            },
+        )?;
+        assert_eq!(result, 42);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scope_with_error() -> Result<(), ErrorTrace> {
+        Mediator::new(true).make_current();
+
+        let error: ErrorTrace = DebugTrace::scope(
+            |scope: &mut DebugTraceScope<'_>| -> Result<u64, ErrorTrace> {
+                scope.print("error\n");
+                Err(ErrorTrace::new(String::from("test error")))
+            },
+        )
+        .unwrap_err();
+
+        assert_eq!(error.to_string(), "#0 test error");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_static_scope_with_debug_output_enabled() {
+        Mediator::new(true).make_current();
+
+        DebugTrace::static_scope(|scope: &DebugTraceStaticScope<'_>| {
+            scope.print_start("test");
+            scope.print_field("value", 42);
+            scope.print_end();
+        });
+    }
+
+    #[test]
+    fn test_static_scope_with_debug_output_disabled() {
+        let was_called: Cell<bool> = Cell::new(false);
+
+        DebugTrace::static_scope(|scope: &DebugTraceStaticScope<'_>| {
+            _ = scope;
+            was_called.set(true);
+        });
+        assert!(!was_called.get());
+    }
+
+    #[test]
+    fn test_print_with_debug_output_enabled() {
+        Mediator::new(true).make_current();
+
+        DebugTrace::print("test\n");
+        DebugTrace::print(String::from("test\n"));
+        DebugTrace::print(42);
+    }
+
+    #[test]
+    fn test_print_with_debug_output_disabled() {
+        DebugTrace::print("test\n");
+        DebugTrace::print(String::from("test\n"));
+        DebugTrace::print(42);
+    }
+
+    #[test]
+    fn test_print_data_with_debug_output_enabled() {
+        Mediator::new(true).make_current();
+
+        let test_data: [u8; 16] = get_test_data();
+        DebugTrace::print_data("test", 0, &test_data, 16, false);
+        DebugTrace::print_data("test", 0, &test_data, 16, true);
+    }
+
+    #[test]
+    fn test_print_data_with_debug_output_disabled() {
+        let test_data: [u8; 16] = get_test_data();
+        DebugTrace::print_data("test", 0, &test_data, 16, false);
+        DebugTrace::print_data("test", 0, &test_data, 16, true);
+    }
+
+    #[test]
+    fn test_print_data_field_with_debug_output_enabled() {
+        Mediator::new(true).make_current();
+
+        let test_data: [u8; 16] = get_test_data();
+        DebugTrace::print_data_field("test", &test_data);
+    }
+
+    #[test]
+    fn test_print_data_field_with_debug_output_disabled() {
+        let test_data: [u8; 16] = get_test_data();
+        DebugTrace::print_data_field("test", &test_data);
+    }
+
+    #[test]
+    fn test_print_end_with_debug_output_enabled() {
+        Mediator::new(true).make_current();
+
+        DebugTrace::print_end();
+    }
+
+    #[test]
+    fn test_print_end_with_debug_output_disabled() {
+        DebugTrace::print_end();
+    }
+
+    #[test]
+    fn test_print_field_with_debug_output_enabled() {
+        Mediator::new(true).make_current();
+
+        DebugTrace::print_field("identifier", "value");
+        DebugTrace::print_field("identifier", 42);
+    }
+
+    #[test]
+    fn test_print_field_with_debug_output_disabled() {
+        DebugTrace::print_field("identifier", "value");
+        DebugTrace::print_field("identifier", 42);
+    }
+
+    #[test]
+    fn test_print_start_with_debug_output_enabled() {
+        Mediator::new(true).make_current();
+
+        DebugTrace::print_start("test");
+    }
+
+    #[test]
+    fn test_print_start_with_debug_output_disabled() {
+        DebugTrace::print_start("test");
+    }
+
+    #[test]
+    fn test_print_structure_with_debug_output_enabled() {
+        Mediator::new(true).make_current();
+
+        let test_data: [u8; 16] = get_test_data();
+        DebugTrace::print_structure(test_debug_read_data, &test_data);
+    }
+
+    #[test]
+    fn test_print_structure_with_debug_output_disabled() {
+        let test_data: [u8; 16] = get_test_data();
+        DebugTrace::print_structure(test_debug_read_data, &test_data);
+    }
+
+    #[test]
+    fn test_print_value_with_debug_output_enabled() {
+        Mediator::new(true).make_current();
+
+        DebugTrace::print_value("test", "value");
+        DebugTrace::print_value("test", 42);
+    }
+
+    #[test]
+    fn test_print_value_with_debug_output_disabled() {
+        DebugTrace::print_value("test", "value");
+        DebugTrace::print_value("test", 42);
+    }
+
+    #[test]
+    fn test_trace_scope_with_debug_output_enabled() -> Result<(), ErrorTrace> {
+        Mediator::new(true).make_current();
+
+        let mediator: Arc<Mediator> = Mediator::current();
+        let debug_output: bool = mediator.debug_output;
+
+        let mut scope = DebugTraceScope {
+            mediator: &mediator,
+            debug_output,
+            output: if debug_output {
+                String::with_capacity(1024)
+            } else {
+                String::new()
+            },
+        };
+        assert!(scope.debug_output);
+        assert_eq!(scope.output, "");
+
+        scope.print_start("test");
+        assert_eq!(scope.output, "test {\n");
+
+        scope.print_field("identifier", "value");
+        assert_eq!(scope.output, "test {\n    identifier: value,\n");
+
+        scope.print_field("identifier", 42);
+        assert_eq!(
+            scope.output,
+            "test {\n    identifier: value,\n    identifier: 42,\n"
+        );
+
+        scope.print_value("identifier", 42);
+        assert_eq!(
+            scope.output,
+            "test {\n    identifier: value,\n    identifier: 42,\nidentifier: 42\n"
+        );
+
+        scope.print("test\n");
+        assert_eq!(
+            scope.output,
+            "test {\n    identifier: value,\n    identifier: 42,\nidentifier: 42\ntest\n"
+        );
+
+        let test_data: [u8; 16] = get_test_data();
+        let test_data_hexdump: String = format_as_hexdump(&get_test_data(), true);
+        let mut expected_string: String = String::from(
+            "test {\n    identifier: value,\n    identifier: 42,\nidentifier: 42\ntest\n",
+        );
+
+        scope.print_data("test data", 0, &test_data, 16, true);
+        expected_string.push_str("test data data of size: 16 at offset: 0 (0x00000000)\n");
+        expected_string.push_str(&test_data_hexdump);
+        assert_eq!(scope.output, expected_string);
+
+        scope.print_data_field("test data", &test_data);
+        expected_string.push_str("    test data\n");
+        expected_string.push_str(&test_data_hexdump);
+        assert_eq!(scope.output, expected_string);
+
+        let structure_string: String = test_debug_read_data(&test_data);
+
+        scope.print_structure(test_debug_read_data, &test_data);
+        expected_string.push_str(&structure_string);
+        assert_eq!(scope.output, expected_string);
+
+        scope.print_end();
+        expected_string.push_str("}\n\n");
+        assert_eq!(scope.output, expected_string);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_trace_scope_with_debug_output_disabled() -> Result<(), ErrorTrace> {
+        let mediator: Arc<Mediator> = Mediator::current();
+
+        let mut scope = DebugTraceScope {
+            mediator: &mediator,
+            debug_output: false,
+            output: String::new(),
+        };
+        assert!(!scope.debug_output);
+
+        scope.print("test\n");
+        assert_eq!(scope.output, "");
+
+        scope.print_start("test");
+        assert_eq!(scope.output, "");
+
+        scope.print_end();
+        assert_eq!(scope.output, "");
+
+        scope.print_field("identifier", "value");
+        assert_eq!(scope.output, "");
+
+        scope.print_value("identifier", 42);
+        assert_eq!(scope.output, "");
+
+        let test_data: [u8; 16] = get_test_data();
+
+        scope.print_data("test data", 0, &test_data, 16, true);
+        assert_eq!(scope.output, "");
+
+        scope.print_data_field("test data", &test_data);
+        assert_eq!(scope.output, "");
+
+        scope.print_structure(test_debug_read_data, &test_data);
+        assert_eq!(scope.output, "");
+
+        Ok(())
+    }
+}
