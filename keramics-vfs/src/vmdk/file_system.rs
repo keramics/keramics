@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
 use keramics_formats::vmdk::{VmdkImage, VmdkImageLayer};
@@ -95,7 +95,7 @@ impl VmdkFileSystem {
                 }
                 layer_index -= 1;
 
-                let image_layer: Arc<RwLock<VmdkImageLayer>> =
+                let image_layer: Arc<VmdkImageLayer> =
                     match self.image.get_layer_by_index(layer_index) {
                         Ok(image_layer) => image_layer,
                         Err(mut error) => {
@@ -106,19 +106,9 @@ impl VmdkFileSystem {
                             return Err(error);
                         }
                     };
-                let media_size: u64 = match image_layer.read() {
-                    Ok(vmdk_file) => vmdk_file.media_size,
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain read lock on image layer",
-                            error
-                        ));
-                    }
-                };
                 Ok(Some(VmdkFileEntry::Layer {
                     name_index: layer_index,
                     layer: image_layer.clone(),
-                    size: media_size,
                 }))
             }
             None => {

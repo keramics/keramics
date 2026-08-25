@@ -12,6 +12,8 @@
  */
 
 mod block_range;
+mod block_reader;
+mod block_stream;
 mod compressed_grain_header;
 pub(crate) mod constants;
 mod descriptor_extent;

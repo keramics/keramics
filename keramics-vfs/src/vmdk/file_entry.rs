@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
@@ -27,10 +27,7 @@ pub enum VmdkFileEntry {
         name_index: usize,
 
         /// Layer.
-        layer: Arc<RwLock<VmdkImageLayer>>,
-
-        /// Size.
-        size: u64,
+        layer: Arc<VmdkImageLayer>,
     },
 
     /// Root file entry.
@@ -44,7 +41,7 @@ impl VmdkFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
-            VmdkFileEntry::Layer { layer, .. } => Ok(Some(layer.clone())),
+            VmdkFileEntry::Layer { layer, .. } => Ok(Some(layer.get_data_stream())),
             VmdkFileEntry::Root { .. } => Ok(None),
         }
     }
@@ -68,7 +65,7 @@ impl VmdkFileEntry {
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
-            VmdkFileEntry::Layer { size, .. } => *size,
+            VmdkFileEntry::Layer { layer, .. } => layer.get_media_size(),
             VmdkFileEntry::Root { .. } => 0,
         }
     }
@@ -91,22 +88,10 @@ impl VmdkFileEntry {
                 Err(keramics_core::error_trace_new!("No sub file entries"))
             }
             VmdkFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
-                Ok(image_layer) => {
-                    let media_size: u64 = match image_layer.read() {
-                        Ok(vhd_file) => vhd_file.media_size,
-                        Err(error) => {
-                            return Err(keramics_core::error_trace_new_with_error!(
-                                "Unable to obtain read lock on image layer",
-                                error
-                            ));
-                        }
-                    };
-                    Ok(VmdkFileEntry::Layer {
-                        name_index: sub_file_entry_index,
-                        layer: image_layer.clone(),
-                        size: media_size,
-                    })
-                }
+                Ok(image_layer) => Ok(VmdkFileEntry::Layer {
+                    name_index: sub_file_entry_index,
+                    layer: image_layer.clone(),
+                }),
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
@@ -150,12 +135,11 @@ mod tests {
     }
 
     fn get_layer_file_entry(image: &Arc<VmdkImage>) -> Result<VmdkFileEntry, ErrorTrace> {
-        let image_layer: Arc<RwLock<VmdkImageLayer>> = image.get_layer_by_index(0)?;
+        let image_layer: Arc<VmdkImageLayer> = image.get_layer_by_index(0)?;
 
         Ok(VmdkFileEntry::Layer {
             name_index: 0,
             layer: image_layer,
-            size: image.media_size,
         })
     }
 

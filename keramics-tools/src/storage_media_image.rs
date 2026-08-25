@@ -64,7 +64,7 @@ pub enum StorageMediaImage {
         vhdx_image_layer: VhdxImageLayer,
     },
     Vmdk {
-        vmdk_image_layer: Arc<RwLock<VmdkImageLayer>>,
+        vmdk_image_layer: Arc<VmdkImageLayer>,
     },
 }
 
@@ -117,7 +117,7 @@ impl StorageMediaImage {
             } => vhdx_image_layer.get_data_stream(),
             Self::Vmdk {
                 vmdk_image_layer, ..
-            } => Some(vmdk_image_layer.clone()),
+            } => Some(vmdk_image_layer.get_data_stream()),
         }
     }
 

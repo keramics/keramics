@@ -14,8 +14,7 @@
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_core::{DataStreamReference, DebugTrace, ErrorTrace};
 use keramics_types::{Ucs2String, Uuid, bytes_to_u32_le, bytes_to_u64_le};
 
 use super::block_reader::VhdxBlockReader;
@@ -31,9 +30,6 @@ use super::region_table_entry::VhdxRegionTableEntry;
 
 /// Virtual Hard Disk version 2 (VHDX) file.
 pub struct VhdxFile {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Data stream.
     data_stream: Option<DataStreamReference>,
 
@@ -81,7 +77,6 @@ impl VhdxFile {
     /// Creates a file.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             data_stream: None,
             format_version: 0,
             disk_type: VhdxDiskType::Fixed,
@@ -325,9 +320,8 @@ impl VhdxFile {
                 return Err(error);
             }
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print("VhdxMetadataValues {\n");
-        }
+        let file_parameters_flags: u32;
+
         match metadata_table.get_entry(&VHDX_FILE_PARAMETERS_METADATA_IDENTIFIER) {
             Some(metadata_table_entry) => {
                 if metadata_table_entry.item_size != 8 {
@@ -345,7 +339,7 @@ impl VhdxFile {
                     &mut data,
                     SeekFrom::Start(metadata_item_offset)
                 );
-                let file_parameters_flags: u32 = bytes_to_u32_le!(data, 4);
+                file_parameters_flags = bytes_to_u32_le!(data, 4);
 
                 self.block_size = bytes_to_u32_le!(data, 0);
                 self.disk_type = match file_parameters_flags & 0x00000003 {
@@ -354,16 +348,6 @@ impl VhdxFile {
                     2 => VhdxDiskType::Differential,
                     _ => VhdxDiskType::Unknown,
                 };
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
-                        "    file_parameters_block_size: {},\n",
-                        self.block_size
-                    ));
-                    self.mediator.debug_print(format!(
-                        "    file_parameters_flags: 0x{:08x},\n",
-                        file_parameters_flags
-                    ));
-                }
                 if self.block_size < 1024 * 1024 || self.block_size > 256 * 1024 * 1024 {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Invalid block size: {} value out of bounds",
@@ -395,11 +379,6 @@ impl VhdxFile {
                     SeekFrom::Start(metadata_item_offset)
                 );
                 self.media_size = bytes_to_u64_le!(data, 0);
-
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(format!("    virtual_disk_size: {},\n", self.media_size));
-                }
             }
             None => {
                 return Err(keramics_core::error_trace_new!(
@@ -426,12 +405,6 @@ impl VhdxFile {
                 );
                 let logical_sector_size: u32 = bytes_to_u32_le!(data, 0);
 
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
-                        "    logical_sector_size: {},\n",
-                        logical_sector_size
-                    ));
-                }
                 if logical_sector_size != 512 && logical_sector_size != 4096 {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Invalid logical sector size: {} value out of bounds",
@@ -446,6 +419,8 @@ impl VhdxFile {
                 ));
             }
         };
+        let mut physical_sector_size: u32 = 0;
+
         match metadata_table.get_entry(&VHDX_PHYSICAL_SECTOR_SIZE_METADATA_IDENTIFIER) {
             Some(metadata_table_entry) => {
                 if metadata_table_entry.item_size != 4 {
@@ -463,14 +438,8 @@ impl VhdxFile {
                     &mut data,
                     SeekFrom::Start(metadata_item_offset)
                 );
-                let physical_sector_size: u32 = bytes_to_u32_le!(data, 0);
+                physical_sector_size = bytes_to_u32_le!(data, 0);
 
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
-                        "    physical_sector_size: {},\n",
-                        physical_sector_size
-                    ));
-                }
                 if physical_sector_size != 512 && physical_sector_size != 4096 {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Invalid physical sector size: {} value out of bounds",
@@ -480,6 +449,8 @@ impl VhdxFile {
             }
             None => {}
         };
+        let virtual_disk_identifier: Uuid;
+
         match metadata_table.get_entry(&VHDX_VIRTUAL_DISK_IDENTIFIER_METADATA_IDENTIFIER) {
             Some(metadata_table_entry) => {
                 if metadata_table_entry.item_size != 16 {
@@ -497,24 +468,27 @@ impl VhdxFile {
                     &mut data,
                     SeekFrom::Start(metadata_item_offset)
                 );
-                let virtual_disk_identifier: Uuid = Uuid::from_le_bytes(&data);
-
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
-                        "    virtual_disk_identifier: {},\n",
-                        virtual_disk_identifier
-                    ));
-                }
+                virtual_disk_identifier = Uuid::from_le_bytes(&data);
             }
             None => {
                 return Err(keramics_core::error_trace_new!(
                     "Missing virtual disk identifier metadata item"
                 ));
             }
-        };
-        if self.mediator.debug_output {
-            self.mediator.debug_print("}\n\n");
         }
+        DebugTrace::static_scope(|debug_trace| {
+            debug_trace.print_start("VhdxMetadataValues");
+            debug_trace.print_field("file_parameters_block_size", self.block_size);
+            debug_trace.print_field(
+                "file_parameters_flags",
+                format!("0x{:08x},", file_parameters_flags),
+            );
+            debug_trace.print_field("virtual_disk_size", self.media_size);
+            debug_trace.print_field("logical_sector_size", self.bytes_per_sector);
+            debug_trace.print_field("physical_sector_size", physical_sector_size);
+            debug_trace.print_field("virtual_disk_identifier", virtual_disk_identifier);
+            debug_trace.print_end();
+        });
         match metadata_table.get_entry(&VHDX_PARENT_LOCATOR_METADATA_IDENTIFIER) {
             Some(metadata_table_entry) => {
                 let mut parent_locator: VhdxParentLocator = VhdxParentLocator::new();
