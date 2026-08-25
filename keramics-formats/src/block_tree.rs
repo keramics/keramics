@@ -35,8 +35,15 @@ pub(crate) struct BlockTree<T> {
 impl<T> BlockTree<T> {
     /// Creates a new block tree.
     pub fn new(data_size: u64, elements_per_node: u64, leaf_value_size: u64) -> Self {
+        let block_tree_size: u64 = if elements_per_node == 0 && leaf_value_size == 0 {
+            data_size
+        } else if elements_per_node == 0 {
+            data_size.next_multiple_of(leaf_value_size)
+        } else {
+            data_size.next_multiple_of(elements_per_node * leaf_value_size)
+        };
         Self {
-            data_size,
+            data_size: block_tree_size,
             elements_per_node,
             leaf_value_size,
             root_node: None,

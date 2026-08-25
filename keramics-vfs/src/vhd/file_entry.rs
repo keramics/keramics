@@ -29,12 +29,6 @@ pub enum VhdFileEntry {
 
         /// Layer.
         layer: VhdImageLayer,
-
-        /// Size.
-        size: u64,
-
-        /// Identifier.
-        identifier: Uuid,
     },
 
     /// Root file entry.
@@ -48,7 +42,7 @@ impl VhdFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
-            VhdFileEntry::Layer { layer, .. } => Ok(Some(layer.clone())),
+            VhdFileEntry::Layer { layer, .. } => Ok(layer.get_data_stream()),
             VhdFileEntry::Root { .. } => Ok(None),
         }
     }
@@ -64,7 +58,7 @@ impl VhdFileEntry {
     /// Retrieves the identifier.
     pub fn get_identifier(&self) -> Option<&Uuid> {
         match self {
-            VhdFileEntry::Layer { identifier, .. } => Some(&identifier),
+            VhdFileEntry::Layer { layer, .. } => Some(layer.get_identifier()),
             VhdFileEntry::Root { .. } => None,
         }
     }
@@ -90,7 +84,7 @@ impl VhdFileEntry {
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
-            VhdFileEntry::Layer { size, .. } => *size,
+            VhdFileEntry::Layer { layer, .. } => layer.get_media_size(),
             VhdFileEntry::Root { .. } => 0,
         }
     }
@@ -113,32 +107,10 @@ impl VhdFileEntry {
                 Err(keramics_core::error_trace_new!("No sub file entries"))
             }
             VhdFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
-                Ok(image_layer) => {
-                    let media_size: u64;
-                    let identifier: Uuid;
-
-                    match image_layer.read() {
-                        Ok(vhd_file) => {
-                            media_size = vhd_file.get_media_size();
-                            identifier = vhd_file.get_identifier().clone();
-                        }
-                        Err(error) => {
-                            return Err(keramics_core::error_trace_new_with_error!(
-                                format!(
-                                    "Unable to obtain read lock on image layer: {}",
-                                    sub_file_entry_index
-                                ),
-                                error
-                            ));
-                        }
-                    }
-                    Ok(VhdFileEntry::Layer {
-                        name_index: sub_file_entry_index,
-                        layer: image_layer.clone(),
-                        size: media_size,
-                        identifier,
-                    })
-                }
+                Ok(image_layer) => Ok(VhdFileEntry::Layer {
+                    name_index: sub_file_entry_index,
+                    layer: image_layer.clone(),
+                }),
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
@@ -184,26 +156,9 @@ mod tests {
     fn get_layer_file_entry(image: &Arc<VhdImage>) -> Result<VhdFileEntry, ErrorTrace> {
         let image_layer: VhdImageLayer = image.get_layer_by_index(0)?;
 
-        let media_size: u64;
-        let identifier: Uuid;
-
-        match image_layer.read() {
-            Ok(vhd_file) => {
-                media_size = vhd_file.get_media_size();
-                identifier = vhd_file.get_identifier().clone();
-            }
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain read lock on image layer",
-                    error
-                ));
-            }
-        }
         Ok(VhdFileEntry::Layer {
             name_index: 0,
             layer: image_layer.clone(),
-            size: media_size,
-            identifier,
         })
     }
 

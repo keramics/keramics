@@ -84,8 +84,6 @@ impl QcowBlockReader {
         backing_file_data_stream: Option<DataStreamReference>,
         size: u64,
     ) -> Self {
-        let block_tree_data_size: u64 = size.next_multiple_of(cluster_block_size);
-
         Self {
             data_stream: data_stream.clone(),
             offset_bit_mask,
@@ -102,7 +100,7 @@ impl QcowBlockReader {
             compression_flag_bit_mask,
             encryption_method: QcowEncryptionMethod::None,
             block_tree: BlockTree::<QcowBlockRange>::new(
-                block_tree_data_size,
+                size,
                 level2_table_number_of_references,
                 cluster_block_size,
             ),

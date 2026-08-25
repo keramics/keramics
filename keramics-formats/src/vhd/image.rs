@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
@@ -20,12 +20,12 @@ use crate::path_component::PathComponent;
 
 use super::file::VhdFile;
 
-pub type VhdImageLayer = Arc<RwLock<VhdFile>>;
+pub type VhdImageLayer = Arc<VhdFile>;
 
 /// Virtual Hard Disk (VHD) storage media image.
 pub struct VhdImage {
     /// Layers.
-    layers: Vec<Arc<RwLock<VhdFile>>>,
+    layers: Vec<Arc<VhdFile>>,
 
     /// Bytes per sector.
     bytes_per_sector: u16,
@@ -151,7 +151,7 @@ impl VhdImage {
                     }
                 }
             }
-            self.layers.push(Arc::new(RwLock::new(file)));
+            self.layers.push(Arc::new(file));
 
             file_index += 1;
         }
@@ -205,23 +205,13 @@ mod tests {
     fn test_get_layer_by_index() -> Result<(), ErrorTrace> {
         let image: VhdImage = get_image()?;
 
-        let layer: VhdImageLayer = image.get_layer_by_index(0)?;
+        let image_layer: VhdImageLayer = image.get_layer_by_index(0)?;
 
-        match layer.read() {
-            Ok(file) => {
-                assert_eq!(file.media_size, 4194304);
-                assert_eq!(
-                    file.identifier.to_string(),
-                    "e7ea9200-8493-954e-a816-9572339be931"
-                );
-            }
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain read lock on VHD layer",
-                    error
-                ));
-            }
-        };
+        assert_eq!(image_layer.media_size, 4194304);
+        assert_eq!(
+            image_layer.identifier.to_string(),
+            "e7ea9200-8493-954e-a816-9572339be931"
+        );
         Ok(())
     }
 
