@@ -84,7 +84,7 @@ mod tests {
         current_offset: u64,
 
         /// The size.
-        size: u64,
+        pub(super) size: u64,
 
         /// Value to indicate the test data stream is allowed to seek.
         allow_seek: bool,
@@ -197,6 +197,33 @@ mod tests {
     }
 
     #[test]
+    fn test_read() -> Result<(), ErrorTrace> {
+        let mut data_stream: TestDataStream = get_test_data_stream();
+
+        let mut data: [u8; 3] = [0; 3];
+        let read_count: usize = data_stream.read(&mut data)?;
+
+        assert_eq!(read_count, 3);
+        assert_eq!(&data, &[0x11, 0x22, 0x33]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_beyond_size() -> Result<(), ErrorTrace> {
+        let mut data_stream: TestDataStream = get_test_data_stream();
+
+        data_stream.seek(SeekFrom::Start(7))?;
+
+        let mut data: [u8; 3] = [0; 3];
+        let read_count: usize = data_stream.read(&mut data)?;
+
+        assert_eq!(read_count, 0);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_read_at_position() -> Result<(), ErrorTrace> {
         let mut data_stream: TestDataStream = get_test_data_stream();
 
@@ -247,6 +274,16 @@ mod tests {
     }
 
     #[test]
+    fn test_read_exact_with_empty_buffer() -> Result<(), ErrorTrace> {
+        let mut data_stream: TestDataStream = get_test_data_stream();
+
+        let mut data: [u8; 0] = [];
+        data_stream.read_exact(&mut data)?;
+
+        Ok(())
+    }
+
+    #[test]
     fn test_read_exact_beyond_size() {
         let mut data_stream: TestDataStream = get_test_data_stream();
 
@@ -291,11 +328,62 @@ mod tests {
     }
 
     #[test]
-    fn test_read_exact_with_empty_buffer() -> Result<(), ErrorTrace> {
+    fn test_seek_current() -> Result<(), ErrorTrace> {
         let mut data_stream: TestDataStream = get_test_data_stream();
 
-        let mut data: [u8; 0] = [];
-        data_stream.read_exact(&mut data)?;
+        let offset: u64 = data_stream.seek(SeekFrom::Current(1))?;
+        assert_eq!(offset, 1);
+
+        let offset: u64 = data_stream.seek(SeekFrom::Current(-1))?;
+        assert_eq!(offset, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_current_out_of_bounds() {
+        let mut data_stream: TestDataStream = get_test_data_stream();
+
+        let result: Result<u64, ErrorTrace> = data_stream.seek(SeekFrom::Current(-1));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_seek_end() -> Result<(), ErrorTrace> {
+        let mut data_stream: TestDataStream = get_test_data_stream();
+
+        let offset: u64 = data_stream.seek(SeekFrom::End(0))?;
+        assert_eq!(offset, 6);
+
+        let offset: u64 = data_stream.seek(SeekFrom::End(-2))?;
+        assert_eq!(offset, 4);
+
+        let offset: u64 = data_stream.seek(SeekFrom::End(1))?;
+        assert_eq!(offset, 7);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_end_out_of_bounds() -> Result<(), ErrorTrace> {
+        let mut data_stream: TestDataStream = get_test_data_stream();
+        data_stream.size = u64::MAX;
+
+        let result: Result<u64, ErrorTrace> = data_stream.seek(SeekFrom::End(1));
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_start() -> Result<(), ErrorTrace> {
+        let mut data_stream: TestDataStream = get_test_data_stream();
+
+        let offset: u64 = data_stream.seek(SeekFrom::Start(1))?;
+        assert_eq!(offset, 1);
+
+        let offset: u64 = data_stream.seek(SeekFrom::Start(7))?;
+        assert_eq!(offset, 7);
 
         Ok(())
     }

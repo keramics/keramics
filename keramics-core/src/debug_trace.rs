@@ -21,48 +21,6 @@ use super::mediator::Mediator;
 pub struct DebugTrace {}
 
 impl DebugTrace {
-    /// Creates a debug trace scope that caches output.
-    #[inline]
-    pub fn scope<F, R, E>(function: F) -> Result<R, E>
-    where
-        F: FnOnce(&mut DebugTraceScope) -> Result<R, E>,
-    {
-        let mediator = Mediator::current();
-        let debug_output: bool = mediator.debug_output;
-
-        let mut scope = DebugTraceScope {
-            mediator: &mediator,
-            debug_output,
-            output: if debug_output {
-                String::with_capacity(1024)
-            } else {
-                String::new()
-            },
-        };
-        let result = function(&mut scope);
-
-        if debug_output && !scope.output.is_empty() {
-            scope.mediator.debug_print(scope.output);
-        }
-        result
-    }
-
-    /// Creates a debug trace scope.
-    #[inline]
-    pub fn static_scope<F>(function: F)
-    where
-        F: FnOnce(&DebugTraceStaticScope),
-    {
-        let mediator = Mediator::current();
-
-        if mediator.debug_output {
-            let scope = DebugTraceStaticScope {
-                mediator: &mediator,
-            };
-            function(&scope);
-        }
-    }
-
     /// Prints text.
     #[inline(always)]
     pub fn print<T: Display>(text: T) {
@@ -145,6 +103,48 @@ impl DebugTrace {
 
         if mediator.debug_output {
             mediator.debug_print(format!("{}: {}\n", description, value));
+        }
+    }
+
+    /// Creates a debug trace scope that caches output.
+    #[inline]
+    pub fn scope<F, R, E>(function: F) -> Result<R, E>
+    where
+        F: FnOnce(&mut DebugTraceScope) -> Result<R, E>,
+    {
+        let mediator = Mediator::current();
+        let debug_output: bool = mediator.debug_output;
+
+        let mut scope = DebugTraceScope {
+            mediator: &mediator,
+            debug_output,
+            output: if debug_output {
+                String::with_capacity(1024)
+            } else {
+                String::new()
+            },
+        };
+        let result = function(&mut scope);
+
+        if debug_output && !scope.output.is_empty() {
+            scope.mediator.debug_print(scope.output);
+        }
+        result
+    }
+
+    /// Creates a debug trace scope.
+    #[inline]
+    pub fn static_scope<F>(function: F)
+    where
+        F: FnOnce(&DebugTraceStaticScope),
+    {
+        let mediator = Mediator::current();
+
+        if mediator.debug_output {
+            let scope = DebugTraceStaticScope {
+                mediator: &mediator,
+            };
+            function(&scope);
         }
     }
 }
@@ -334,85 +334,6 @@ mod tests {
     }
 
     #[test]
-    fn test_scope_with_debug_output_enabled() -> Result<(), ErrorTrace> {
-        Mediator::new(true).make_current();
-
-        let result: u64 = DebugTrace::scope(
-            |scope: &mut DebugTraceScope<'_>| -> Result<u64, ErrorTrace> {
-                scope.print_start("test");
-                scope.print_field("value", 42);
-                scope.print_end();
-                Ok(42)
-            },
-        )?;
-        assert_eq!(result, 42);
-
-        let result: u64 = DebugTrace::scope(
-            |scope: &mut DebugTraceScope<'_>| -> Result<u64, ErrorTrace> {
-                let _ = scope;
-                Ok(0)
-            },
-        )?;
-        assert_eq!(result, 0);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_scope_with_debug_output_disabled() -> Result<(), ErrorTrace> {
-        let result: u64 = DebugTrace::scope(
-            |scope: &mut DebugTraceScope<'_>| -> Result<u64, ErrorTrace> {
-                assert!(!scope.debug_output);
-                scope.print_start("test");
-                assert_eq!(scope.output, "");
-                Ok(42)
-            },
-        )?;
-        assert_eq!(result, 42);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_scope_with_error() -> Result<(), ErrorTrace> {
-        Mediator::new(true).make_current();
-
-        let error: ErrorTrace = DebugTrace::scope(
-            |scope: &mut DebugTraceScope<'_>| -> Result<u64, ErrorTrace> {
-                scope.print("error\n");
-                Err(ErrorTrace::new(String::from("test error")))
-            },
-        )
-        .unwrap_err();
-
-        assert_eq!(error.to_string(), "#0 test error");
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_static_scope_with_debug_output_enabled() {
-        Mediator::new(true).make_current();
-
-        DebugTrace::static_scope(|scope: &DebugTraceStaticScope<'_>| {
-            scope.print_start("test");
-            scope.print_field("value", 42);
-            scope.print_end();
-        });
-    }
-
-    #[test]
-    fn test_static_scope_with_debug_output_disabled() {
-        let was_called: Cell<bool> = Cell::new(false);
-
-        DebugTrace::static_scope(|scope: &DebugTraceStaticScope<'_>| {
-            _ = scope;
-            was_called.set(true);
-        });
-        assert!(!was_called.get());
-    }
-
-    #[test]
     fn test_print_with_debug_output_enabled() {
         Mediator::new(true).make_current();
 
@@ -525,6 +446,63 @@ mod tests {
     }
 
     #[test]
+    fn test_scope_with_debug_output_enabled() -> Result<(), ErrorTrace> {
+        Mediator::new(true).make_current();
+
+        let result: u64 = DebugTrace::scope(
+            |scope: &mut DebugTraceScope<'_>| -> Result<u64, ErrorTrace> {
+                scope.print_start("test");
+                scope.print_field("value", 42);
+                scope.print_end();
+                Ok(42)
+            },
+        )?;
+        assert_eq!(result, 42);
+
+        let result: u64 = DebugTrace::scope(
+            |scope: &mut DebugTraceScope<'_>| -> Result<u64, ErrorTrace> {
+                let _ = scope;
+                Ok(0)
+            },
+        )?;
+        assert_eq!(result, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scope_with_debug_output_disabled() -> Result<(), ErrorTrace> {
+        let result: u64 = DebugTrace::scope(
+            |scope: &mut DebugTraceScope<'_>| -> Result<u64, ErrorTrace> {
+                assert!(!scope.debug_output);
+                scope.print_start("test");
+                assert_eq!(scope.output, "");
+                Ok(42)
+            },
+        )?;
+        assert_eq!(result, 42);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scope_with_error() -> Result<(), ErrorTrace> {
+        Mediator::new(true).make_current();
+
+        let error: ErrorTrace = DebugTrace::scope(
+            |scope: &mut DebugTraceScope<'_>| -> Result<u64, ErrorTrace> {
+                scope.print("error\n");
+                Err(ErrorTrace::new(String::from("test error")))
+            },
+        )
+        .unwrap_err();
+
+        assert_eq!(error.to_string(), "#0 test error");
+
+        Ok(())
+    }
+
+    #[test]
     fn test_trace_scope_with_debug_output_enabled() -> Result<(), ErrorTrace> {
         Mediator::new(true).make_current();
 
@@ -634,5 +612,82 @@ mod tests {
         assert_eq!(scope.output, "");
 
         Ok(())
+    }
+
+    #[test]
+    fn test_static_scope_with_debug_output_enabled() {
+        Mediator::new(true).make_current();
+
+        DebugTrace::static_scope(|scope: &DebugTraceStaticScope<'_>| {
+            scope.print_start("test");
+            scope.print_field("value", 42);
+            scope.print_end();
+        });
+    }
+
+    #[test]
+    fn test_static_scope_with_debug_output_disabled() {
+        let was_called: Cell<bool> = Cell::new(false);
+
+        DebugTrace::static_scope(|scope: &DebugTraceStaticScope<'_>| {
+            _ = scope;
+            was_called.set(true);
+        });
+        assert!(!was_called.get());
+    }
+
+    #[test]
+    fn test_static_scope_print() {
+        Mediator::new(true).make_current();
+
+        DebugTrace::static_scope(|scope: &DebugTraceStaticScope<'_>| {
+            scope.print("test\n");
+            scope.print(String::from("test\n"));
+            scope.print(42);
+        });
+    }
+
+    #[test]
+    fn test_static_scope_print_data() {
+        Mediator::new(true).make_current();
+
+        let test_data: Vec<u8> = get_test_data();
+
+        DebugTrace::static_scope(|scope: &DebugTraceStaticScope<'_>| {
+            scope.print_data("test data", 0, &test_data, 16, false);
+            scope.print_data("test data", 0, &test_data, 16, true);
+        });
+    }
+
+    #[test]
+    fn test_static_scope_print_data_field() {
+        Mediator::new(true).make_current();
+
+        let test_data: Vec<u8> = get_test_data();
+
+        DebugTrace::static_scope(|scope: &DebugTraceStaticScope<'_>| {
+            scope.print_data_field("test data", &test_data);
+        });
+    }
+
+    #[test]
+    fn test_static_scope_print_structure() {
+        Mediator::new(true).make_current();
+
+        let test_data: Vec<u8> = get_test_data();
+
+        DebugTrace::static_scope(|scope: &DebugTraceStaticScope<'_>| {
+            scope.print_structure(test_debug_read_data, &test_data);
+        });
+    }
+
+    #[test]
+    fn test_static_scope_print_value() {
+        Mediator::new(true).make_current();
+
+        DebugTrace::static_scope(|scope: &DebugTraceStaticScope<'_>| {
+            scope.print_value("test", "value");
+            scope.print_value("test", 42);
+        });
     }
 }
