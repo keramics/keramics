@@ -12,6 +12,7 @@
  */
 
 use std::cmp::Ordering;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -232,17 +233,20 @@ impl NtfsDirectoryIndex {
                 }
             }
         };
+        let mut read_index_entries: HashSet<u64> = HashSet::new();
+
         match self.get_directory_entry_by_name_from_node(
             &self.root_node_data,
             16,
             data_stream,
             &lookup_name,
+            &mut read_index_entries,
         ) {
             Ok(directory_entry) => Ok(directory_entry),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    "Unable to retrieve directory entry from node"
+                    "Unable to retrieve directory entry from root node"
                 );
                 Err(error)
             }
@@ -256,6 +260,7 @@ impl NtfsDirectoryIndex {
         index_node_offset: usize,
         data_stream: &DataStreamReference,
         name: &Ucs2String,
+        read_index_entries: &mut HashSet<u64>,
     ) -> Result<Option<NtfsDirectoryEntry>, ErrorTrace> {
         let (index_node_size, index_values_offset): (usize, usize) = match self
             .read_index_node_header(data, index_node_offset)
@@ -378,30 +383,40 @@ impl NtfsDirectoryIndex {
             if !is_allocated {
                 Ok(None)
             } else {
-                let index_entry: NtfsIndexEntry = match self
-                    .index
-                    .get_entry_at_cluster_block(data_stream, sub_node_vcn)
-                {
-                    Ok(index_entry) => index_entry,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve index entry"
-                        );
-                        return Err(error);
-                    }
-                };
+                if read_index_entries.contains(&sub_node_vcn) {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Index entry: {} already read",
+                        sub_node_vcn
+                    )));
+                }
+                let index_entry: NtfsIndexEntry =
+                    match self.index.get_entry_for_vcn(data_stream, sub_node_vcn) {
+                        Ok(index_entry) => index_entry,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to retrieve index entry: {}", sub_node_vcn),
+                            );
+                            return Err(error);
+                        }
+                    };
+                read_index_entries.insert(sub_node_vcn);
+
                 match self.get_directory_entry_by_name_from_node(
                     &index_entry.data,
                     24,
                     data_stream,
                     name,
+                    read_index_entries,
                 ) {
                     Ok(result) => Ok(result),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to retrieve directory entry from node"
+                            format!(
+                                "Unable to retrieve directory entry from index entry: {}",
+                                sub_node_vcn
+                            ),
                         );
                         return Err(error);
                     }
@@ -517,19 +532,17 @@ impl NtfsDirectoryIndex {
                     None => true,
                 };
                 if is_allocated {
-                    let index_entry: NtfsIndexEntry = match self
-                        .index
-                        .get_entry_at_cluster_block(data_stream, sub_node_vcn)
-                    {
-                        Ok(index_entry) => index_entry,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to retrieve index entry"
-                            );
-                            return Err(error);
-                        }
-                    };
+                    let index_entry: NtfsIndexEntry =
+                        match self.index.get_entry_for_vcn(data_stream, sub_node_vcn) {
+                            Ok(index_entry) => index_entry,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!("Unable to retrieve index entry: {}", sub_node_vcn),
+                                );
+                                return Err(error);
+                            }
+                        };
                     match self.get_directory_entries_from_node(
                         &index_entry.data,
                         24,

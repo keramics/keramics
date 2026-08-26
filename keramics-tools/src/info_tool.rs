@@ -86,18 +86,18 @@ struct CommandLineArguments {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Show the information about a specific entry
-    Entry(EntryCommandArguments),
-
     /// Show the in-format hierarchy
     Hierarchy(HierarchyCommandArguments),
+
+    /// Show the information about a specific entry
+    Identifier(IdentifierCommandArguments),
 
     /// Show the information about a specific path
     Path(PathCommandArguments),
 }
 
 #[derive(Args, Debug)]
-struct EntryCommandArguments {
+struct IdentifierCommandArguments {
     /// Format specific entry identifier
     #[arg(value_parser=maybe_hex::<u64>)]
     entry: u64,
@@ -527,7 +527,7 @@ fn main() -> ExitCode {
         }
     };
     let result: Result<(), ErrorTrace> = match arguments.command {
-        Some(Commands::Entry(command_arguments)) => match &format_identifier {
+        Some(Commands::Identifier(command_arguments)) => match &format_identifier {
             FormatIdentifier::Apfs => ApfsInfo::print_file_entry_by_identifier(
                 &data_stream,
                 arguments.volume,

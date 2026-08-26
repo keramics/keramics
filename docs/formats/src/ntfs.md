@@ -1090,7 +1090,7 @@ The index entry header is 24 bytes in size and consists of:
 | 8 | 8 | | Metadata transaction journal sequence number, which contains a $LogFile Sequence Number (LSN) |
 | 16 | 8 | | Virtual Cluster Number (VCN) of the index entry |
 
-> Note that there can be more fix-up value than supported by the index entry data size.
+> Note that there can be more fix-up values than supported by the index entry data size.
 
 ### The index node header
 
