@@ -30,7 +30,7 @@ The elements are stored in 64 KiB (65536 bytes) aligned blocks
 
 The number of bytes per sector is 512 or 4096 depending on the logical sector size.
 
-## File hader
+## File header
 
 The file header of (file type identifier) is 64 KiB (65536 bytes) in size and
 consists of:

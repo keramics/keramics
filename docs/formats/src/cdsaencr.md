@@ -229,8 +229,8 @@ TODO: complete section
 
 | Value | Identifier | Description |
 | --- | --- | --- |
-| 0 | CSSM_ALGID_NONE | None |
-| 1 | CSSM_ALGID_CUSTOM | |
+| 0 | CSSM_ALGID_NONE | No algorithm (none) |
+| 1 | CSSM_ALGID_CUSTOM | Custom algorithm |
 | 2 | CSSM_ALGID_DH | Diffie Hellman key exchange |
 | 3 | CSSM_ALGID_PH | Pohlig Hellman key exchange |
 | 4 | CSSM_ALGID_KEA | Key Exchange Algorithm |
@@ -284,59 +284,59 @@ TODO: complete section
 | 52 | CSSM_ALGID_CDMF | CDMF |
 | 53 | CSSM_ALGID_CAST3 | CAST3 |
 | 54 | CSSM_ALGID_CAST5 | CAST5 |
-| 55 | CSSM_ALGID_GenericSecret | |
-| 56 | CSSM_ALGID_ConcatBaseAndKey | |
-| 57 | CSSM_ALGID_ConcatKeyAndBase | |
-| 58 | CSSM_ALGID_ConcatBaseAndData | |
-| 59 | CSSM_ALGID_ConcatDataAndBase | |
-| 60 | CSSM_ALGID_XORBaseAndData | |
-| 61 | CSSM_ALGID_ExtractFromKey | |
-| 62 | CSSM_ALGID_SSL3PreMasterGen | |
-| 63 | CSSM_ALGID_SSL3MasterDerive | |
-| 64 | CSSM_ALGID_SSL3KeyAndMacDerive | |
-| 65 | CSSM_ALGID_SSL3MD5_MAC | |
-| 66 | CSSM_ALGID_SSL3SHA1_MAC | |
-| 67 | CSSM_ALGID_PKCS5_PBKDF1_MD5 | |
-| 68 | CSSM_ALGID_PKCS5_PBKDF1_MD2 | |
-| 69 | CSSM_ALGID_PKCS5_PBKDF1_SHA1 | |
-| 70 | CSSM_ALGID_WrapLynks | |
-| 71 | CSSM_ALGID_WrapSET_OAEP | |
-| 72 | CSSM_ALGID_BATON | |
-| 73 | CSSM_ALGID_ECDSA | |
-| 74 | CSSM_ALGID_MAYFLY | |
-| 75 | CSSM_ALGID_JUNIPER | |
-| 76 | CSSM_ALGID_FASTHASH | |
-| 77 | CSSM_ALGID_3DES | |
-| 78 | CSSM_ALGID_SSL3MD5 | |
-| 79 | CSSM_ALGID_SSL3SHA1 | |
-| 80 | CSSM_ALGID_FortezzaTimestamp | |
-| 81 | CSSM_ALGID_SHA1WithDSA | |
-| 82 | CSSM_ALGID_SHA1WithECDSA | |
-| 83 | CSSM_ALGID_DSA_BSAFE | |
-| 84 | CSSM_ALGID_ECDH | |
-| 85 | CSSM_ALGID_ECMQV | |
-| 86 | CSSM_ALGID_PKCS12_SHA1_PBE | |
-| 87 | CSSM_ALGID_ECNRA | |
-| 88 | CSSM_ALGID_SHA1WithECNRA | |
-| 89 | CSSM_ALGID_ECES | |
-| 90 | CSSM_ALGID_ECAES | |
-| 91 | CSSM_ALGID_SHA1HMAC | |
-| 92 | CSSM_ALGID_FIPS186Random | |
-| 93 | CSSM_ALGID_ECC | |
-| 94 | CSSM_ALGID_MQV | |
-| 95 | CSSM_ALGID_NRA | |
-| 96 | CSSM_ALGID_IntelPlatformRandom | |
-| 97 | CSSM_ALGID_UTC | |
-| 98 | CSSM_ALGID_HAVAL3 | |
-| 99 | CSSM_ALGID_HAVAL4 | |
-| 100 | CSSM_ALGID_HAVAL5 | |
-| 101 | CSSM_ALGID_TIGER | |
-| 102 | CSSM_ALGID_MD5HMAC | |
-| 103 | CSSM_ALGID_PKCS5_PBKDF2 | PBKDF2-HMAC-SHA1 |
-| 104 | CSSM_ALGID_RUNNING_COUNTER | |
+| 55 | CSSM_ALGID_GenericSecret | Generic secret |
+| 56 | CSSM_ALGID_ConcatBaseAndKey | Concatenate base key with key |
+| 57 | CSSM_ALGID_ConcatKeyAndBase | Concatenate key with base key |
+| 58 | CSSM_ALGID_ConcatBaseAndData | Concatenate base key with data |
+| 59 | CSSM_ALGID_ConcatDataAndBase | Concatenate data with base key |
+| 60 | CSSM_ALGID_XORBaseAndData | XOR base key with data |
+| 61 | CSSM_ALGID_ExtractFromKey | Extract key from base key |
+| 62 | CSSM_ALGID_SSL3PreMasterGen | SSL 3 with 48 byte pre-master key |
+| 63 | CSSM_ALGID_SSL3MasterDerive | Derive an SSL 3 key from a pre-master key |
+| 64 | CSSM_ALGID_SSL3KeyAndMacDerive | Derive SSL3 key and MAC |
+| 65 | CSSM_ALGID_SSL3MD5_MAC | SSL 3 with MD5 MAC |
+| 66 | CSSM_ALGID_SSL3SHA1_MAC | SSL 3 with SHA-1 MAC  |
+| 67 | CSSM_ALGID_PKCS5_PBKDF1_MD5 | PKCS5 key derivation using PBKDF1 with MD5 |
+| 68 | CSSM_ALGID_PKCS5_PBKDF1_MD2 | PKCS5 key derivation using PBKDF1 with MD2 |
+| 69 | CSSM_ALGID_PKCS5_PBKDF1_SHA1 | PKCS5 key derivation using PBKDF1 with SHA-1 |
+| 70 | CSSM_ALGID_WrapLynks | Spyrus LYNKS DES based wrapping scheme with checksum |
+| 71 | CSSM_ALGID_WrapSET_OAEP | SET key wrapping |
+| 72 | CSSM_ALGID_BATON | Fortezza BATON |
+| 73 | CSSM_ALGID_ECDSA | Elliptic Curve DSA |
+| 74 | CSSM_ALGID_MAYFLY | Fortezza MAYFLY |
+| 75 | CSSM_ALGID_JUNIPER | Fortezza JUNIPER |
+| 76 | CSSM_ALGID_FASTHASH | Fortezza FASTHASH |
+| 77 | CSSM_ALGID_3DES | Generix 3DES |
+| 78 | CSSM_ALGID_SSL3MD5 | SSL 3 with MD5 |
+| 79 | CSSM_ALGID_SSL3SHA1 | SSL 3 with SHA-1 |
+| 80 | CSSM_ALGID_FortezzaTimestamp | Fortezza with timestamp |
+| 81 | CSSM_ALGID_SHA1WithDSA | SHA-1 with DSA |
+| 82 | CSSM_ALGID_SHA1WithECDSA | SHA-1 with Elliptic Curve DSA |
+| 83 | CSSM_ALGID_DSA_BSAFE | DSA with BSAFE Key |
+| 84 | CSSM_ALGID_ECDH | Elliptic Curve DiffieHellman Key Exchange |
+| 85 | CSSM_ALGID_ECMQV | Elliptic Curve MQV key exchange |
+| 86 | CSSM_ALGID_PKCS12_SHA1_PBE | PKCS12 SHA-1 PBE key derivation |
+| 87 | CSSM_ALGID_ECNRA | Elliptic Curve Nyberg-Rueppel |
+| 88 | CSSM_ALGID_SHA1WithECNRA | SHA-1 with Elliptic Curve Nyberg-Rueppel |
+| 89 | CSSM_ALGID_ECES | Elliptic Curve Encryption Scheme |
+| 90 | CSSM_ALGID_ECAES | Elliptic Curve Authenticate Encryption Scheme |
+| 91 | CSSM_ALGID_SHA1HMAC | SHA1-MAC |
+| 92 | CSSM_ALGID_FIPS186Random | FIPS186 Random |
+| 93 | CSSM_ALGID_ECC | Elliptic Curve Encryption (ECC) |
+| 94 | CSSM_ALGID_MQV | Discrete-Log MQV key exchange |
+| 95 | CSSM_ALGID_NRA | Discrete-Log Nyberg-Rueppel Signature scheme |
+| 96 | CSSM_ALGID_IntelPlatformRandom | Intel Platform Random Number Generator |
+| 97 | CSSM_ALGID_UTC | Date and time value in the form: "YYYYMMDDhhmmss" |
+| 98 | CSSM_ALGID_HAVAL3 | HAVAL3 Digest |
+| 99 | CSSM_ALGID_HAVAL4 | HAVAL4 Digest |
+| 100 | CSSM_ALGID_HAVAL5 | HAVAL5 Digest |
+| 101 | CSSM_ALGID_TIGER | TIGER Digest |
+| 102 | CSSM_ALGID_MD5HMAC | HMAC-MD5 |
+| 103 | CSSM_ALGID_PKCS5_PBKDF2 | PKCS5 key derivation using PBKDF2 with SHA-1 (PBKDF2-HMAC-SHA1) |
+| 104 | CSSM_ALGID_RUNNING_COUNTER | Running hardware counter |
 | | | |
-| 0x80000000 | CSSM_ALGID_VENDOR_DEFINED | |
-| 0x80000001 | CSSM_ALGID_AES | |
+| 0x80000000 | CSSM_ALGID_VENDOR_DEFINED | Vendor defined algorithm |
+| 0x80000001 | CSSM_ALGID_AES | Advanced Encryption Standard (AES) |
 
 ### Padding types {#padding_types}
 
@@ -352,7 +352,7 @@ TODO: complete section
 | 7 | CSSM_PADDING_PKCS7 | Pad using Public-Key Cryptography Standard (PKCS) 7 (RFC 2315) |
 | 8 | CSSM_PADDING_CIPHERSTEALING | Unknown |
 | 9 | CSSM_PADDING_RANDOM | Unknown |
-| 10 | CSSM_PADDING_PKCS1 | Pad using Public-Key Cryptography Standard (PKCS) 1 |
+| 10 | CSSM_PADDING_PKCS1 | Pad using Public-Key Cryptography Standard (PKCS) 1 (RFC 2437) |
 
 ### Encryption modes {#encryption_modes}
 
