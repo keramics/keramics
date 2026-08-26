@@ -6,28 +6,28 @@ Data formats for Keramics.
 
 Supported data formats:
 
-* [Apple File System (APFS) format](https://keramics.github.io/apfs.html)
+* [Apple File System (APFS) format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/apfs/README.md)
 * [Apple File System Compression (decmpfs) format](https://keramics.github.io/decmpfs.html)
 * [Apple Partition Map (APM) format](https://keramics.github.io/apm.html)
 * [BSD disklabel format](https:////keramics.github.io/bsdlabel.html)
-* [Expert Witness Compression Format (EWF)](https://keramics.github.io/ewf.html)
-* [Extended File System (ext) format](https://keramics.github.io/ext.html)
+* [Expert Witness Compression Format (EWF)](https://github.com/keramics/keramics/tree/main/keramics-formats/src/ewf/README.md)
+* [Extended File System (ext) format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/ext/README.md)
 * [File Allocation Table (FAT) file system format](https://keramics.github.io/fat.html)
 * [GUID Partition Table (GPT) format](https://keramics.github.io/gpt.html)
-* [Hierarchical File System (HFS) format](https://keramics.github.io/hfs.html)
-* [Linux Logical Volume Manager (LVM) format](https://keramics.github.io/linuxlvm.html)
-* [Linux Unified Key Setup (LUKS) Disk Encryption](https://github.com/keramics/keramics/tree/main/keramics-formats/src/luksde/README.md)
-* [Mac OS sparse bundle (.sparsebundle) format](https://keramics.github.io/sparsebundle.html)
-* [Mac OS sparse image (.sparseimage) format](https://keramics.github.io/sparseimage.html)
+* [Hierarchical File System (HFS) format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/hfs/README.md)
+* [Linux Logical Volume Manager (LVM) format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/linuxlvm/README.md)
+* [Linux Unified Key Setup (LUKS) Disk Encryption format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/luksde/README.md)
+* [Mac OS sparse bundle (.sparsebundle) format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/sparsebundle/README.md)
+* [Mac OS sparse image (.sparseimage) format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/sparseimage/README.md)
 * [Master Boot Record (MBR) format](https://keramics.github.io/mbr.html)
-* [New Technologies File System (NTFS) format](https://keramics.github.io/ntfs.html)
-* [Parallels Disk Image (PDI) format](https://keramics.github.io/pdi.html)
-* [QEMU Copy-On-Write (QCOW) image file format](https://keramics.github.io/qcow.html)
+* [New Technologies File System (NTFS) format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/ntfs/README.md)
+* [Parallels Disk Image (PDI) format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/pdi/README.md)
+* [QEMU Copy-On-Write (QCOW) image file format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/qcow/README.md)
 * Split (or segmented) RAW storage media image format
-* [Universal Disk Image Format (UDIF)](https://keramics.github.io/udif.html)
-* [Virtual Hard Disk (VHD) image format](https://keramics.github.io/vhd.html)
-* [Virtual Hard Disk version 2 (VHDX) image format](https://keramics.github.io/vhdx.html)
-* [VMWare Virtual Disk Format (VMDK)](https://keramics.github.io/vmdk.html)
+* [Universal Disk Image Format (UDIF)](https://github.com/keramics/keramics/tree/main/keramics-formats/src/udif/README.md)
+* [Virtual Hard Disk (VHD) image format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/vhd/README.md)
+* [Virtual Hard Disk version 2 (VHDX) image format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/vhdx/README.md)
+* [VMWare Virtual Disk Format (VMDK)](https://github.com/keramics/keramics/tree/main/keramics-formats/src/vmdk/README.md)
 
 ## License
 

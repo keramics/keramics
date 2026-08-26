@@ -351,40 +351,42 @@ Each segment object contains the following properties:
 
 | Value | Description |
 | --- | --- |
-| cache | |
-| cache-pool | |
-| error | |
-| free | |
-| linear | |
-| mirror | |
-| raid0 | |
-| raid0_meta | |
-| raid1 | |
-| raid10 | |
-| raid10_near | |
-| raid4 | |
-| raid5 | |
-| raid5_la | |
-| raid5_ls | |
-| raid5_n | |
-| raid5_ra | |
-| raid5_rs | |
-| raid6 | |
-| raid6_la_6 | |
-| raid6_n_6 | |
-| raid6_nc | |
-| raid6_nr | |
-| raid6_ra_6 | |
-| raid6_rs_6 | |
-| raid6_zr | |
-| snapshot | |
-| striped | Is striped |
-| thin | |
-| thin-pool | |
-| vdo | |
-| vdo-pool | |
-| writecache | |
-| zero | |
+| cache | Segment that is used as a cache, e.g. SSD for a HDD |
+| cache-pool | Segment used as a cache for both data and metadata |
+| error | Segment that fails read and write operations, intended for testing |
+| free | Unallocated segment |
+| integrity | Segment with integrity checksum |
+| linear | Linear physical volume |
+| mirror | Segment that mirrors data across multiple physical volumes (comparable to RAID1) |
+| raid0 | Segment that contains a stripe of data (RAID0) |
+| raid0_meta | RAID0 physical volume that contains data and metadata |
+| raid1 | Segment that mirrors data across multiple physical volumes (RAID1) |
+| raid10 | Segment that contains a stripe of data (RAID0) that mirrors data across multiple physical volumes (RAID1) |
+| raid10_near | RAID10 segment that copies data sectors near each other |
+| raid4 | Segment with stripes across multiple physical volumes with parity data (RAID4) |
+| raid5 | Segment with stripes across multiple physical volumes with parity data (RAID5) |
+| raid5_la | RAID5 variant that uses left asymmetric layout |
+| raid5_ls | RAID5 variant that uses left symmetric layout |
+| raid5_n | RAID5 variant with dedicated parity layout |
+| raid5_ra | RAID5 variant that uses right asymmetric layout |
+| raid5_rs | RAID5 variant that uses right symmetric layout |
+| raid6 | Segment with stripes across multiple physical volumes with dual parity data (RAID6) |
+| raid6_la_6 | RAID6 variant that uses left asymmetric layout |
+| raid6_ls_6 | RAID6 variant that uses left symmetric layout |
+| raid6_n_6 | RAID6 variant with dedicated parity layout |
+| raid6_nc | RAID6 variant that uses no-change layout |
+| raid6_nr | RAID6 variant that uses non-rotating layout |
+| raid6_ra_6 | RAID6 variant that uses right asymmetric layout |
+| raid6_rs_6 | RAID6 variant that uses right symmetric layout |
+| raid6_zr | RAID6 variant that uses zero-restart layout |
+| snapshot | Segment that contains a snapshot |
+| striped | Segment that contains a stripe of data (comparable to RAID0) |
+| thin | Segment that allocated on write |
+| thin-pool | Segment that manages a shared pool of data and metadata |
+| vdo | Virtual Data Optimizer (VDO) physical volume |
+| vdo-pool | Virtual Data Optimizer (VDO) pool |
+| writecache | Segment that is used as a write-only cache |
+| zero | Segment that is sparse (filled with 0-byte values) |
 
 > Note that a comparable list can be retrieved using `lvm segtypes`.
 

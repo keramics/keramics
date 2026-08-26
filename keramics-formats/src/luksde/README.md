@@ -10,7 +10,7 @@ Supported features:
 | Format versions | 1 |
 | Encryption methods | AES (AES-CBC, AES-ECB, AES-XTS) |
 | Initialization Vector (IV) modes | benbi, ESSIV (SHA1, SHA256), null, plain, plain64 |
-| Key derivation method | PBKDF2 |
+| Key derivation methods | PBKDF2 |
 | Hashing methods | SHA-1, SHA-224, SHA-256, SHA-512 |
 | Unlock credentials | Passphrase |
 
