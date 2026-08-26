@@ -142,15 +142,16 @@ impl ExtAttributesBlock {
         }
         let mut data: Vec<u8> = vec![0; data_size];
 
-        keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
-            "ExtAttributesBlock",
-            data_stream,
-            &mut data,
-            data_size,
-            position,
-        );
-        keramics_core::debug_trace_structure!(ExtAttributesBlockHeader::debug_read_data(&data));
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
 
+        keramics_core::debug_trace_data_and_structure!(
+            "ExtAttributesBlock",
+            offset,
+            &data,
+            data_size,
+            ExtAttributesBlockHeader::debug_read_data(&data),
+        );
         let mut header: ExtAttributesBlockHeader = ExtAttributesBlockHeader::new();
 
         match header.read_data(&data) {
@@ -158,7 +159,10 @@ impl ExtAttributesBlock {
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    "Unable to read attributes block header"
+                    format!(
+                        "Unable to read attributes block at offset: {} (0x{:08x})",
+                        offset, offset
+                    ),
                 );
                 return Err(error);
             }
@@ -166,7 +170,10 @@ impl ExtAttributesBlock {
         match self.read_entries(&data, 32, data_size, entries) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read extended attributes");
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read attributes block entries"
+                );
                 return Err(error);
             }
         }

@@ -106,7 +106,10 @@ impl FatShortNameDirectoryEntry {
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read FAT-32 short name directory entry"
+                        format!(
+                            "Unable to read FAT-32 short name directory entry at offset: {} (0x{:08x})",
+                            offset, offset
+                        ),
                     );
                     return Err(error);
                 }
@@ -120,7 +123,10 @@ impl FatShortNameDirectoryEntry {
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read FAT-12 or FAT-16 short name directory entry"
+                        format!(
+                            "Unable to read FAT-12 or FAT-16 short name directory entr at offset: {} (0x{:08x})",
+                            offset, offset
+                        ),
                     );
                     return Err(error);
                 }

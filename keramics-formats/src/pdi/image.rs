@@ -163,13 +163,13 @@ impl PdiImage {
         }
         let mut data: Vec<u8> = vec![0; data_stream_size as usize];
 
-        keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
-            "PdiImageXml",
+        keramics_core::data_stream_read_exact_at_position!(
             data_stream,
             &mut data,
-            data_stream_size,
             SeekFrom::Start(0)
         );
+        keramics_core::debug_trace_data!("PdiImageXml", 0, &data, data_stream_size);
+
         let string: String = match String::from_utf8(data) {
             Ok(string) => string,
             Err(error) => {

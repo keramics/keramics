@@ -291,7 +291,7 @@ impl LuksEncryption {
                 return Err(error);
             }
         }
-        let mut intialization_vector_context: LuksInitializationVectorContext =
+        let intialization_vector_context: LuksInitializationVectorContext =
             match Self::get_initialization_vector_context(encryption_type, key) {
                 Ok(Some(context)) => context,
                 Ok(None) => return Ok(None),

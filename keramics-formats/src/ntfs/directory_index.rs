@@ -547,12 +547,10 @@ impl NtfsDirectoryIndex {
                     }
                 }
             } else if value_data_size > 0 {
-                let value_data_end_offset: usize = index_value_offset + value_data_size;
-
                 keramics_core::debug_trace_data!(
                     "NtfsDirectoryIndexLeafValueData",
                     index_value_offset,
-                    &data[index_value_offset..value_data_end_offset],
+                    &data[index_value_offset..index_value_offset + value_data_size],
                     value_data_size
                 );
             }

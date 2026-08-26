@@ -19,6 +19,9 @@ use keramics_core::mediator::Mediator;
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u32_be;
 
+#[cfg(feature = "debug-trace")]
+use keramics_core::DebugTrace;
+
 use crate::block_tree::BlockTree;
 use crate::cdsaencr::constants::*;
 use crate::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential, CdsaEncrEncryptionType};
@@ -178,15 +181,19 @@ impl SparseImageFile {
                 number_of_bands
             )));
         }
-        let array_data_size: usize = (number_of_bands as usize) * 4;
-        let array_data_end_offset: usize = 64 + array_data_size;
+        #[cfg(feature = "debug-trace")]
+        DebugTrace::static_scope(|debug_trace| {
+            let array_data_size: usize = (number_of_bands as usize) * 4;
+            let array_data_end_offset: usize = 64 + array_data_size;
 
-        keramics_core::debug_trace_data!(
-            "SparseImageBandNumbersArray",
-            64,
-            &data[64..array_data_end_offset],
-            array_data_size
-        );
+            debug_trace.print_data(
+                "SparseImageBandNumbersArray",
+                64,
+                &data[64..array_data_end_offset],
+                array_data_size,
+                true,
+            );
+        });
         if file_header.sectors_per_band > u32::MAX / 512 {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid sectors per band: {} value out of bounds",

@@ -91,13 +91,11 @@ impl QcowFileHeader {
     ) -> Result<(), ErrorTrace> {
         let mut data: [u8; 112] = [0; 112];
 
-        keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
-            "QcowFileHeader",
-            data_stream,
-            &mut data,
-            112,
-            position,
-        );
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
+
+        keramics_core::debug_trace_data!("QcowFileHeader", offset, &data, 112);
+
         if &data[0..4] != QCOW_FILE_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
@@ -112,7 +110,10 @@ impl QcowFileHeader {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read version 1 file header"
+                            format!(
+                                "Unable to read version 1 file header at offset: {} (0x{:08x})",
+                                offset, offset
+                            ),
                         );
                         return Err(error);
                     }
@@ -127,7 +128,10 @@ impl QcowFileHeader {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read version 2 file header"
+                            format!(
+                                "Unable to read version 2 file header at offset: {} (0x{:08x})",
+                                offset, offset
+                            ),
                         );
                         return Err(error);
                     }
@@ -143,7 +147,10 @@ impl QcowFileHeader {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read version 3 file header"
+                            format!(
+                                "Unable to read version 3 file header at offset: {} (0x{:08x})",
+                                offset, offset
+                            ),
                         );
                         return Err(error);
                     }

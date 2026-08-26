@@ -406,7 +406,10 @@ impl HfsFileSystem {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read master directory block"
+                            format!(
+                                "Unable to read master directory block at offset: {} (0x{:08x}",
+                                offset, offset
+                            ),
                         );
                         return Err(error);
                     }
@@ -481,7 +484,10 @@ impl HfsFileSystem {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read volume header"
+                            format!(
+                                "Unable to read volume heade at offset: {} (0x{:08x}",
+                                offset, offset
+                            ),
                         );
                         return Err(error);
                     }
