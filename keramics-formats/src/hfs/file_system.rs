@@ -417,6 +417,11 @@ impl HfsFileSystem {
                 let data_area_start_offset: u32 =
                     (master_directory_block.data_area_start_sector as u32) * 512;
 
+                if master_directory_block.block_size == 0 {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid block size value out of bounds",
+                    ));
+                }
                 if data_area_start_offset % master_directory_block.block_size != 0 {
                     return Err(keramics_core::error_trace_new!(
                         "Unsupported data area start sector not a multitude of block size"

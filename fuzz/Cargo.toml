@@ -66,6 +66,13 @@ doc = false
 required-features = ["fuzzing"]
 
 [[bin]]
+name = "exfat"
+path = "fuzz_targets/exfat.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
 name = "ext"
 path = "fuzz_targets/ext.rs"
 test = false
