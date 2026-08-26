@@ -27,7 +27,7 @@ impl WindowsFileAttributeFlagsInfo {
 }
 
 impl fmt::Display for WindowsFileAttributeFlagsInfo {
-    /// Formats partition file attribute flags information for display.
+    /// Formats file attribute flags information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         if self.flags & 0x0001 != 0 {
             writeln!(
