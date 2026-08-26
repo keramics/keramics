@@ -143,10 +143,12 @@ impl TablesPreprocessor {
 }
 
 impl Preprocessor for TablesPreprocessor {
+    /// Retrieves the name of the preprocessor.
     fn name(&self) -> &str {
         "tables"
     }
 
+    /// Runs the preprocessor.
     fn run(&self, _context: &PreprocessorContext, mut book: Book) -> Result<Book, Error> {
         book.for_each_chapter_mut(|chapter| {
             match self.preprocess_tables(chapter) {
@@ -160,15 +162,13 @@ impl Preprocessor for TablesPreprocessor {
     }
 }
 
-pub fn handle_preprocessing() -> Result<(), Error> {
+pub fn handle_preprocessing(reader: impl io::Read) -> Result<String, Error> {
     let preprocessor: TablesPreprocessor = TablesPreprocessor::new();
 
-    let (context, book) = mdbook_preprocessor::parse_input(io::stdin())?;
+    let (context, book): (PreprocessorContext, Book) = mdbook_preprocessor::parse_input(reader)?;
 
-    let processed_book = preprocessor.run(&context, book)?;
-    serde_json::to_writer(io::stdout(), &processed_book)?;
-
-    Ok(())
+    let processed_book: Book = preprocessor.run(&context, book)?;
+    serde_json::to_string(&processed_book).map_err(Error::msg)
 }
 
 fn main() -> ExitCode {
@@ -185,7 +185,7 @@ fn main() -> ExitCode {
         }
         None => {}
     }
-    if let Err(error) = handle_preprocessing() {
+    if let Err(error) = handle_preprocessing(io::stdin()) {
         eprintln!("{}", error);
         return ExitCode::FAILURE;
     }
@@ -196,20 +196,25 @@ fn main() -> ExitCode {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
+    use mdbook_preprocessor::book::BookItem;
+    use mdbook_preprocessor::config::Config;
+
     #[test]
-    fn test_preprocess_tables() {
+    fn test_preprocess_tables() -> Result<(), Error> {
         let preprocessor: TablesPreprocessor = TablesPreprocessor::new();
 
         let mut chapter: Chapter = Chapter::new("test", String::new(), "empty.md", vec![]);
 
-        let result: String = preprocessor.preprocess_tables(&mut chapter).unwrap();
+        let result: String = preprocessor.preprocess_tables(&mut chapter)?;
 
         assert_eq!(result, "");
 
         let content: &str = "### Characteristics\n\n";
         let mut chapter: Chapter = Chapter::new("test", content.to_string(), "test.md", vec![]);
 
-        let result: String = preprocessor.preprocess_tables(&mut chapter).unwrap();
+        let result: String = preprocessor.preprocess_tables(&mut chapter)?;
 
         assert_eq!(result, "### Characteristics");
 
@@ -224,7 +229,7 @@ mod tests {
         );
         let mut chapter: Chapter = Chapter::new("test", content.to_string(), "test.md", vec![]);
 
-        let result: String = preprocessor.preprocess_tables(&mut chapter).unwrap();
+        let result: String = preprocessor.preprocess_tables(&mut chapter)?;
 
         let expected_result: &str = concat!(
             "### Characteristics  \n",
@@ -236,10 +241,12 @@ mod tests {
             "</table></div>"
         );
         assert_eq!(result, expected_result);
+
+        Ok(())
     }
 
     #[test]
-    fn test_preprocess_tables_with_colspan() {
+    fn test_preprocess_tables_with_colspan() -> Result<(), Error> {
         let preprocessor: TablesPreprocessor = TablesPreprocessor::new();
 
         let content: &str = concat!(
@@ -252,7 +259,7 @@ mod tests {
         );
         let mut chapter: Chapter = Chapter::new("test", content.to_string(), "test.md", vec![]);
 
-        let result: String = preprocessor.preprocess_tables(&mut chapter).unwrap();
+        let result: String = preprocessor.preprocess_tables(&mut chapter)?;
 
         let expected_result: &str = concat!(
             "  \n",
@@ -265,5 +272,131 @@ mod tests {
             "</table></div>"
         );
         assert_eq!(result, expected_result);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_handle_preprocessing() -> Result<(), Error> {
+        let input: &str = r####"
+        [
+          {
+            "root": ".",
+            "config": {},
+            "renderer": "html",
+            "mdbook_version": "0.5.2"
+          },
+          {
+            "items": [
+              {
+                "Chapter": {
+                  "name": "Characteristics",
+                  "content": "### Characteristics\n\n| Characteristics | Description |\n| --- | --- |\n| Byte order | big-endian |\n",
+                  "path": "intro.md",
+                  "sub_items": [],
+                  "parent_names": []
+                }
+              }
+            ]
+          }
+        ]
+        "####;
+
+        let result: String = handle_preprocessing(input.as_bytes())?;
+
+        let output: Book = serde_json::from_str(&result)?;
+
+        let mut sections = output.items.iter();
+
+        if let Some(BookItem::Chapter(chapter)) = sections.next() {
+            assert_eq!(chapter.name, "Characteristics");
+
+            assert!(
+                chapter
+                    .content
+                    .contains("<div class=\"table-wrapper\"><table>")
+            );
+            assert!(
+                chapter
+                    .content
+                    .contains("<thead><th>Characteristics</th><th>Description</th></thead>")
+            );
+            assert!(
+                chapter
+                    .content
+                    .contains("<td>Byte order</td><td>big-endian</td>")
+            );
+            assert!(chapter.content.contains("</table></div>"));
+
+            assert!(!chapter.content.contains("| Byte order | big-endian |"));
+        } else {
+            panic!("No chapter found");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_name() {
+        let preprocessor: TablesPreprocessor = TablesPreprocessor::new();
+
+        assert_eq!(preprocessor.name(), "tables");
+    }
+
+    #[test]
+    fn test_preprocessor_run() -> Result<(), Error> {
+        let context: PreprocessorContext =
+            PreprocessorContext::new(PathBuf::from("."), Config::default(), "html".to_string());
+        let mut book: Book = Book::new();
+
+        let chapter: Chapter = Chapter::new(
+            "Characteristics",
+            concat!(
+                "### Characteristics\n",
+                "\n",
+                "| Characteristics | Description |\n",
+                "| --- | --- |\n",
+                "| Byte order | big-endian |\n",
+                "| Date and time values | N/A |\n"
+            )
+            .to_string(),
+            std::path::PathBuf::from("intro.md"),
+            vec![],
+        );
+        book.push_item(chapter);
+
+        let preprocessor: TablesPreprocessor = TablesPreprocessor::new();
+
+        let processed_book: Book = preprocessor.run(&context, book)?;
+
+        let mut chapters = processed_book.iter();
+
+        if let Some(BookItem::Chapter(ch)) = chapters.next() {
+            assert_eq!(ch.name, "Characteristics");
+
+            assert!(ch.content.contains("<div class=\"table-wrapper\"><table>"));
+            assert!(
+                ch.content
+                    .contains("<thead><th>Characteristics</th><th>Description</th></thead>")
+            );
+            assert!(
+                ch.content
+                    .contains("<td>Byte order</td><td>big-endian</td>")
+            );
+            assert!(ch.content.contains("</table></div>"));
+
+            assert!(!ch.content.contains("| Byte order | big-endian |"));
+        } else {
+            panic!("No chapter found");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_handle_preprocessing_with_invalid_input() {
+        let input: &str = "invalid json";
+
+        let result: Result<String, Error> = handle_preprocessing(input.as_bytes());
+
+        assert!(result.is_err());
     }
 }
