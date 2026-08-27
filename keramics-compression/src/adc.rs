@@ -166,8 +166,10 @@ mod tests {
 
     #[test]
     fn test_decompress() -> Result<(), ErrorTrace> {
-        let test_data: [u8; 10] = [0x83, 0xfe, 0xed, 0xfa, 0xce, 0x00, 0x00, 0x40, 0x00, 0x06];
         let mut test_context: AdcContext = AdcContext::new();
+
+        // Test with compressed data.
+        let test_data: [u8; 10] = [0x83, 0xfe, 0xed, 0xfa, 0xce, 0x00, 0x00, 0x40, 0x00, 0x06];
 
         let mut uncompressed_data: Vec<u8> = vec![0; 11];
         test_context.decompress(&test_data, &mut uncompressed_data)?;
@@ -176,8 +178,117 @@ mod tests {
         let expected_data: [u8; 11] = [
             0xfe, 0xed, 0xfa, 0xce, 0xce, 0xce, 0xce, 0xfe, 0xed, 0xfa, 0xce,
         ];
-        assert_eq!(uncompressed_data, expected_data);
+        assert_eq!(&uncompressed_data, &expected_data);
+
+        // Test with literals only.
+        let test_data: [u8; 4] = [0x80, 0x9f, 0x80, 0x9e];
+
+        let mut uncompressed_data: [u8; 2] = [0, 0];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 2);
+
+        let expected_data: [u8; 2] = [0x9f, 0x9e];
+        assert_eq!(&uncompressed_data, &expected_data);
+
+        // Test with uncompressed data buffer smaller than uncompressed data.
+        let mut uncompressed_data: [u8; 1] = [0];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+
+        assert_eq!(test_context.uncompressed_data_size, 1);
+        assert_eq!(&uncompressed_data, &[0x9f]);
+
+        // Test with empty uncompressed data buffer.
+        let test_data: [u8; 2] = [0x80, 0x9f];
+
+        let mut uncompressed_data: [u8; 0] = [];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+
+        assert_eq!(test_context.uncompressed_data_size, 0);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_literal_size_exceeds_compressed_data_size() {
+        let test_data: [u8; 2] = [0x82, 0x9f];
+        let mut test_context: AdcContext = AdcContext::new();
+
+        let mut uncompressed_data: [u8; 1] = [0];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_literal_size_exceeds_uncompressed_data_size() {
+        let test_data: [u8; 5] = [0x83, 0x9f, 0x9e, 0x9d, 0x9c];
+        let mut test_context: AdcContext = AdcContext::new();
+
+        let mut uncompressed_data: [u8; 2] = [0, 0];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_insufficient_data_for_distance() {
+        let test_data: [u8; 1] = [0x00];
+        let mut test_context: AdcContext = AdcContext::new();
+
+        let mut uncompressed_data: [u8; 1] = [0];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_insufficient_data_for_match_size() {
+        let test_data: [u8; 2] = [0x40, 0x00];
+        let mut test_context: AdcContext = AdcContext::new();
+
+        let mut uncompressed_data: [u8; 1] = [0];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_invalid_uncompressed_data_offset() {
+        let test_data: [u8; 2] = [0x00, 0x01];
+        let mut test_context: AdcContext = AdcContext::new();
+
+        let mut uncompressed_data: [u8; 5] = [0, 0, 0, 0, 0];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_invalid_distance_value() {
+        let test_data: [u8; 4] = [0x80, 0x9f, 0x04, 0x05];
+        let mut test_context: AdcContext = AdcContext::new();
+
+        let mut uncompressed_data: [u8; 3] = [0, 0, 0];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_invalid_match_size_value() {
+        let test_data: [u8; 4] = [0x80, 0x9f, 0x04, 0x00];
+        let mut test_context: AdcContext = AdcContext::new();
+
+        let mut uncompressed_data: [u8; 3] = [0, 0, 0];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
     }
 }

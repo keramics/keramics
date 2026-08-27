@@ -855,6 +855,33 @@ mod tests {
     }
 
     #[test]
+    fn test_read_stream_header_with_invalid_size() {
+        let mut stream_header: Bzip2StreamHeader = Bzip2StreamHeader::new();
+
+        let test_data: [u8; 3] = [0x42, 0x5a, 0x68];
+        let result: Result<(), ErrorTrace> = stream_header.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_stream_header_with_invalid_signature() {
+        let mut stream_header: Bzip2StreamHeader = Bzip2StreamHeader::new();
+
+        let test_data: [u8; 4] = [0x58, 0x41, 0x68, 0x31];
+        let result: Result<(), ErrorTrace> = stream_header.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_stream_header_with_unsupported_level() {
+        let mut stream_header: Bzip2StreamHeader = Bzip2StreamHeader::new();
+
+        let test_data: [u8; 4] = [0x42, 0x5a, 0x68, 0x3a];
+        let result: Result<(), ErrorTrace> = stream_header.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_read_block_header() -> Result<(), ErrorTrace> {
         let mut block_header: Bzip2BlockHeader = Bzip2BlockHeader::new();
 
@@ -868,6 +895,16 @@ mod tests {
         assert_eq!(block_header.origin_pointer, 0x000018);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_read_block_header_with_invalid_signature() {
+        let mut block_header: Bzip2BlockHeader = Bzip2BlockHeader::new();
+
+        let test_data: [u8; 6] = [0x12, 0x34, 0x56, 0x78, 0x90, 0xab];
+        let mut bitstream: Bzip2Bitstream = Bzip2Bitstream::new(&test_data, 0);
+        let result: Result<(), ErrorTrace> = block_header.read_from_bitstream(&mut bitstream);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1181,7 +1218,35 @@ mod tests {
             &uncompressed_data[0..test_context.uncompressed_data_size],
             expected_uncompressed_data
         );
-
         Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_invalid_compressed_data_size() {
+        let mut test_context: Bzip2Context = Bzip2Context::new();
+
+        let test_data: [u8; 13] = [
+            0x42, 0x5a, 0x68, 0x31, 0x31, 0x41, 0x59, 0x26, 0x53, 0x59, 0x5a, 0x55, 0xc4,
+        ];
+        let mut uncompressed_data: Vec<u8> = vec![0; 16];
+
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_invalid_stream_header() {
+        let mut test_context: Bzip2Context = Bzip2Context::new();
+
+        let test_data: [u8; 16] = [
+            0x42, 0x5a, 0x68, 0x3a, 0x31, 0x41, 0x59, 0x26, 0x53, 0x59, 0x5a, 0x55, 0xc4, 0x1e,
+            0x00, 0x00,
+        ];
+        let mut uncompressed_data: Vec<u8> = vec![0; 16];
+
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
     }
 }
