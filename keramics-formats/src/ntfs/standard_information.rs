@@ -41,28 +41,28 @@ use super::mft_attribute::NtfsMftAttribute;
 /// New Technologies File System (NTFS) standard information ($STANDARD_INFORMATION).
 pub struct NtfsStandardInformation {
     /// Creation time.
-    pub creation_time: DateTime,
+    pub(super) creation_time: DateTime,
 
     /// Modification time.
-    pub modification_time: DateTime,
+    pub(super) modification_time: DateTime,
 
     /// Entry modification time.
-    pub entry_modification_time: DateTime,
+    pub(super) entry_modification_time: DateTime,
 
     /// Access time.
-    pub access_time: DateTime,
+    pub(super) access_time: DateTime,
 
     /// File attribute flags.
-    pub file_attribute_flags: u32,
+    pub(super) file_attribute_flags: u32,
 
     /// Maximum number of versions.
-    pub maximum_number_of_versions: u32,
+    pub(super) maximum_number_of_versions: u32,
 
     /// Version number.
-    pub version_number: u32,
+    pub(super) version_number: u32,
 
     /// Owner identifier.
-    pub owner_identifier: Option<u32>,
+    pub(super) owner_identifier: Option<u32>,
 }
 
 impl NtfsStandardInformation {
@@ -78,6 +78,56 @@ impl NtfsStandardInformation {
             version_number: 0,
             owner_identifier: None,
         }
+    }
+
+    /// Reads the standard information from a MFT attribute.
+    pub fn from_attribute(mft_attribute: &NtfsMftAttribute) -> Result<Self, ErrorTrace> {
+        if mft_attribute.attribute_type != NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported attribute type: 0x{:08x}",
+                mft_attribute.attribute_type
+            )));
+        }
+        if !mft_attribute.is_resident() {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported non-resident $STANDARD_INFORMATION attribute"
+            ));
+        }
+        let mut standard_information: NtfsStandardInformation = NtfsStandardInformation::new();
+
+        match standard_information.read_data(&mft_attribute.resident_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read standard information");
+                return Err(error);
+            }
+        }
+        Ok(standard_information)
+    }
+
+    /// Retrieves the access time.
+    pub fn get_access_time(&self) -> &DateTime {
+        &self.access_time
+    }
+
+    /// Retrieves the creation time.
+    pub fn get_creation_time(&self) -> &DateTime {
+        &self.creation_time
+    }
+
+    /// Retrieves the entry modification time.
+    pub fn get_entry_modification_time(&self) -> &DateTime {
+        &self.entry_modification_time
+    }
+
+    /// Retrieves the file attribute flags.
+    pub fn get_file_attribute_flags(&self) -> u32 {
+        self.file_attribute_flags
+    }
+
+    /// Retrieves the modification time.
+    pub fn get_modification_time(&self) -> &DateTime {
+        &self.modification_time
     }
 
     /// Reads the standard information from a buffer.
@@ -124,31 +174,6 @@ impl NtfsStandardInformation {
         }
         Ok(())
     }
-
-    /// Reads the standard information from a MFT attribute.
-    pub fn from_attribute(mft_attribute: &NtfsMftAttribute) -> Result<Self, ErrorTrace> {
-        if mft_attribute.attribute_type != NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported attribute type: 0x{:08x}",
-                mft_attribute.attribute_type
-            )));
-        }
-        if !mft_attribute.is_resident() {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported non-resident $STANDARD_INFORMATION attribute"
-            ));
-        }
-        let mut standard_information: NtfsStandardInformation = NtfsStandardInformation::new();
-
-        match standard_information.read_data(&mft_attribute.resident_data) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read standard information");
-                return Err(error);
-            }
-        }
-        Ok(standard_information)
-    }
 }
 
 #[cfg(test)]
@@ -165,6 +190,37 @@ mod tests {
             0x00, 0x00,
         ]
     }
+
+    #[test]
+    fn test_from_attribute() -> Result<(), ErrorTrace> {
+        let mut mft_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+
+        let test_data: Vec<u8> = vec![
+            0x10, 0x00, 0x00, 0x00, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0xad, 0xca, 0xbc, 0x0c,
+            0xdc, 0x8e, 0xd0, 0x01, 0xad, 0xca, 0xbc, 0x0c, 0xdc, 0x8e, 0xd0, 0x01, 0xad, 0xca,
+            0xbc, 0x0c, 0xdc, 0x8e, 0xd0, 0x01, 0xad, 0xca, 0xbc, 0x0c, 0xdc, 0x8e, 0xd0, 0x01,
+            0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        mft_attribute.read_data(&test_data)?;
+
+        let test_struct: NtfsStandardInformation =
+            NtfsStandardInformation::from_attribute(&mft_attribute)?;
+
+        assert_eq!(test_struct.file_attribute_flags, 0x00000006);
+        assert_eq!(test_struct.maximum_number_of_versions, 0);
+        assert_eq!(test_struct.version_number, 0);
+
+        Ok(())
+    }
+
+    // TODO: add tests for get_access_time
+    // TODO: add tests for get_creation_time
+    // TODO: add tests for get_entry_modification_time
+    // TODO: add tests for get_file_attribute_flags
+    // TODO: add tests for get_modification_time
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
@@ -211,30 +267,5 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let result = test_struct.read_data(&test_data[0..47]);
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_from_attribute() -> Result<(), ErrorTrace> {
-        let mut mft_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
-
-        let test_data: Vec<u8> = vec![
-            0x10, 0x00, 0x00, 0x00, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0xad, 0xca, 0xbc, 0x0c,
-            0xdc, 0x8e, 0xd0, 0x01, 0xad, 0xca, 0xbc, 0x0c, 0xdc, 0x8e, 0xd0, 0x01, 0xad, 0xca,
-            0xbc, 0x0c, 0xdc, 0x8e, 0xd0, 0x01, 0xad, 0xca, 0xbc, 0x0c, 0xdc, 0x8e, 0xd0, 0x01,
-            0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-        mft_attribute.read_data(&test_data)?;
-
-        let test_struct: NtfsStandardInformation =
-            NtfsStandardInformation::from_attribute(&mft_attribute)?;
-
-        assert_eq!(test_struct.file_attribute_flags, 0x00000006);
-        assert_eq!(test_struct.maximum_number_of_versions, 0);
-        assert_eq!(test_struct.version_number, 0);
-
-        Ok(())
     }
 }

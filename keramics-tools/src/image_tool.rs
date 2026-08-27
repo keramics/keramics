@@ -26,6 +26,7 @@ use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
 use keramics_formats::ntfs::NtfsAttribute;
+use keramics_formats::ntfs::constants::NTFS_NAME_SPACE_DOS;
 use keramics_hashes::{DigestHashContext, Md5Context, Sha1Context};
 use keramics_types::Ucs2String;
 use keramics_vfs::{
@@ -635,17 +636,17 @@ impl ImageTool {
                         };
                         match attribute {
                             NtfsAttribute::FileName { file_name } => {
-                                if file_name.parent_file_reference != parent_file_reference
-                                    || Some(&file_name.name) != name
+                                if file_name.get_parent_file_reference() != parent_file_reference
+                                    || Some(file_name.get_name()) != name
                                 {
                                     continue;
                                 }
-                                if file_name.name_space == 0x02 {
+                                if file_name.get_name_space() == NTFS_NAME_SPACE_DOS {
                                     continue;
                                 }
                                 let file_name_access_time: String =
                                     match Bodyfile::format_as_timestamp(Some(
-                                        &file_name.access_time,
+                                        file_name.get_access_time(),
                                     )) {
                                         Ok(timestamp_string) => timestamp_string,
                                         Err(mut error) => {
@@ -658,7 +659,7 @@ impl ImageTool {
                                     };
                                 let file_name_modification_time: String =
                                     match Bodyfile::format_as_timestamp(Some(
-                                        &file_name.modification_time,
+                                        file_name.get_modification_time(),
                                     )) {
                                         Ok(timestamp_string) => timestamp_string,
                                         Err(mut error) => {
@@ -671,7 +672,7 @@ impl ImageTool {
                                     };
                                 let file_name_change_time: String =
                                     match Bodyfile::format_as_timestamp(Some(
-                                        &file_name.entry_modification_time,
+                                        file_name.get_entry_modification_time(),
                                     )) {
                                         Ok(timestamp_string) => timestamp_string,
                                         Err(mut error) => {
@@ -684,7 +685,7 @@ impl ImageTool {
                                     };
                                 let file_name_creation_time: String =
                                     match Bodyfile::format_as_timestamp(Some(
-                                        &file_name.creation_time,
+                                        file_name.get_creation_time(),
                                     )) {
                                         Ok(timestamp_string) => timestamp_string,
                                         Err(mut error) => {

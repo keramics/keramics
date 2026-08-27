@@ -15,65 +15,49 @@ use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::qcow::{QcowCompressionMethod, QcowEncryptionMethod, QcowFile};
-use keramics_types::ByteString;
 
 use crate::formatters::ByteSize;
 
 /// Information about a QEMU Copy-On-Write (QCOW) file.
-struct QcowFileInfo {
-    /// Format version.
-    pub format_version: u32,
-
-    /// Compression method.
-    pub compression_method: QcowCompressionMethod,
-
-    /// Encryption method.
-    pub encryption_method: QcowEncryptionMethod,
-
-    /// Backing file name.
-    pub backing_file_name: Option<ByteString>,
-
-    /// Media size.
-    pub media_size: u64,
+struct QcowFileInfo<'a> {
+    /// File.
+    file: &'a QcowFile,
 }
 
-impl QcowFileInfo {
-    const COMPRESSION_METHODS: &[(QcowCompressionMethod, &'static str); 1] =
+impl<'a> QcowFileInfo<'a> {
+    const COMPRESSION_METHODS: &'static [(QcowCompressionMethod, &'static str); 1] =
         &[(QcowCompressionMethod::Zlib, "zlib")];
 
-    const ENCRYPTION_METHODS: &[(QcowEncryptionMethod, &'static str); 3] = &[
+    const ENCRYPTION_METHODS: &'static [(QcowEncryptionMethod, &'static str); 3] = &[
         (QcowEncryptionMethod::AesCbc128, "AES-CBC 128-bit"),
         (QcowEncryptionMethod::Luks, "Linux Unified Key Setup (LUKS)"),
         (QcowEncryptionMethod::None, "None"),
     ];
 
     /// Creates new file information.
-    fn new() -> Self {
-        Self {
-            format_version: 0,
-            compression_method: QcowCompressionMethod::Unknown,
-            encryption_method: QcowEncryptionMethod::Unknown,
-            backing_file_name: None,
-            media_size: 0,
-        }
+    fn new(file: &'a QcowFile) -> Self {
+        Self { file }
     }
 
     /// Retrieves the compression method as a string.
-    pub fn get_compression_method_string(&self) -> &str {
+    pub fn get_compression_method_string(
+        &self,
+        compression_method: &QcowCompressionMethod,
+    ) -> &str {
         Self::COMPRESSION_METHODS
-            .binary_search_by(|(key, _)| key.cmp(&self.compression_method))
+            .binary_search_by(|(key, _)| key.cmp(compression_method))
             .map_or_else(|_| "Unknown", |index| Self::COMPRESSION_METHODS[index].1)
     }
 
     /// Retrieves the encryption method as a string.
-    pub fn get_encryption_method_string(&self) -> &str {
+    pub fn get_encryption_method_string(&self, encryption_method: &QcowEncryptionMethod) -> &str {
         Self::ENCRYPTION_METHODS
-            .binary_search_by(|(key, _)| key.cmp(&self.encryption_method))
+            .binary_search_by(|(key, _)| key.cmp(encryption_method))
             .map_or_else(|_| "Unknown", |index| Self::ENCRYPTION_METHODS[index].1)
     }
 }
 
-impl fmt::Display for QcowFileInfo {
+impl<'a> fmt::Display for QcowFileInfo<'a> {
     /// Formats file information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "QEMU Copy-On-Write (QCOW) information:")?;
@@ -81,23 +65,25 @@ impl fmt::Display for QcowFileInfo {
         writeln!(
             formatter,
             "    Format version\t\t\t\t: {}",
-            self.format_version
+            self.file.get_format_version()
         )?;
-        let compression_method_string: &str = self.get_compression_method_string();
+        let compression_method_string: &str =
+            self.get_compression_method_string(self.file.get_compression_method());
         writeln!(
             formatter,
             "    Compression method\t\t\t\t: {}",
             compression_method_string
         )?;
 
-        let encryption_method_string: &str = self.get_encryption_method_string();
+        let encryption_method_string: &str =
+            self.get_encryption_method_string(self.file.get_encryption_method());
         writeln!(
             formatter,
             "    Encryption method\t\t\t\t: {}",
             encryption_method_string
         )?;
 
-        if let Some(backing_file_name) = &self.backing_file_name {
+        if let Some(backing_file_name) = &self.file.get_backing_file_name() {
             writeln!(
                 formatter,
                 "    Backing file name\t\t\t\t: {}",
@@ -108,7 +94,7 @@ impl fmt::Display for QcowFileInfo {
 
         writeln!(formatter, "    Media information:")?;
 
-        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.file.get_media_size(), 1024);
         writeln!(formatter, "        Media size\t\t\t\t: {}", byte_size)?;
 
         // TODO: print snapshot information.
@@ -121,19 +107,6 @@ impl fmt::Display for QcowFileInfo {
 pub struct QcowInfo {}
 
 impl QcowInfo {
-    /// Retrieves the file information.
-    fn get_file_information(qcow_file: &QcowFile) -> QcowFileInfo {
-        let mut file_information: QcowFileInfo = QcowFileInfo::new();
-
-        file_information.format_version = qcow_file.get_format_version();
-        file_information.compression_method = qcow_file.get_compression_method().clone();
-        file_information.encryption_method = qcow_file.get_encryption_method().clone();
-        file_information.backing_file_name = qcow_file.get_backing_file_name().cloned();
-        file_information.media_size = qcow_file.get_media_size();
-
-        file_information
-    }
-
     /// Opens a file.
     fn open_file(data_stream: &DataStreamReference) -> Result<QcowFile, ErrorTrace> {
         let mut qcow_file: QcowFile = QcowFile::new();
@@ -157,7 +130,7 @@ impl QcowInfo {
                 return Err(error);
             }
         };
-        let file_information: QcowFileInfo = Self::get_file_information(&qcow_file);
+        let file_information: QcowFileInfo = QcowFileInfo::new(&qcow_file);
 
         print!("{}", file_information);
 
@@ -180,7 +153,7 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let qcow_file: QcowFile = QcowInfo::open_file(&data_stream)?;
-        let test_struct: QcowFileInfo = QcowInfo::get_file_information(&qcow_file);
+        let test_struct: QcowFileInfo = QcowFileInfo::new(&qcow_file);
 
         let expected_string: &str = concat!(
             "QEMU Copy-On-Write (QCOW) information:\n",
@@ -193,21 +166,6 @@ mod tests {
         );
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_information() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let qcow_file: QcowFile = QcowInfo::open_file(&data_stream)?;
-        let test_struct: QcowFileInfo = QcowInfo::get_file_information(&qcow_file);
-
-        assert_eq!(test_struct.format_version, 3);
-        assert_eq!(test_struct.compression_method, QcowCompressionMethod::Zlib);
-        assert_eq!(test_struct.backing_file_name, None);
-        assert_eq!(test_struct.media_size, 4194304);
 
         Ok(())
     }

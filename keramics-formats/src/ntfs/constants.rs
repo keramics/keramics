@@ -90,7 +90,7 @@ pub(super) const NTFS_INDEX_VALUE_FLAG_IS_LAST: u32 = 0x00000002;
 pub(super) const NTFS_NAME_SPACE_WINDOWS: u8 = 0x01;
 
 /// NTFS DOS name space.
-pub(super) const NTFS_NAME_SPACE_DOS: u8 = 0x02;
+pub const NTFS_NAME_SPACE_DOS: u8 = 0x02;
 
 /// NTFS symbolic link reparse point tag.
 pub const NTFS_REPARSE_POINT_TAG_SYMBOLIC_LINK: u32 = 0xa000000c;

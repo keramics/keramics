@@ -115,17 +115,26 @@ impl NtfsFileEntry {
     }
 
     /// Retrieves the change time from the $STANDARD_INFORMATION attribute.
+    #[deprecated(
+        since = "0.0.1",
+        note = "Please use `get_entry_modification_time` instead."
+    )]
     pub fn get_change_time(&self) -> Option<&DateTime> {
-        match &self.mft_attributes.standard_information {
-            Some(standard_information) => Some(&standard_information.entry_modification_time),
-            _ => None,
-        }
+        self.get_entry_modification_time()
     }
 
     /// Retrieves the creation time from the $STANDARD_INFORMATION attribute.
     pub fn get_creation_time(&self) -> Option<&DateTime> {
         match &self.mft_attributes.standard_information {
             Some(standard_information) => Some(&standard_information.creation_time),
+            _ => None,
+        }
+    }
+
+    /// Retrieves the entry modification time from the $STANDARD_INFORMATION attribute.
+    pub fn get_entry_modification_time(&self) -> Option<&DateTime> {
+        match &self.mft_attributes.standard_information {
+            Some(standard_information) => Some(&standard_information.entry_modification_time),
             _ => None,
         }
     }
@@ -785,23 +794,6 @@ mod tests {
     // TODO: add tests for get_base_record_file_reference
 
     #[test]
-    fn test_get_change_time() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
-
-        let path: Path = Path::from("/testdir1/testfile1");
-        let ntfs_file_entry: NtfsFileEntry =
-            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
-
-        assert_eq!(
-            ntfs_file_entry.get_change_time(),
-            Some(&DateTime::Filetime(Filetime {
-                timestamp: 0x1db5e8ba689275d
-            }))
-        );
-        Ok(())
-    }
-
-    #[test]
     fn test_get_creation_time() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
@@ -813,6 +805,23 @@ mod tests {
             ntfs_file_entry.get_creation_time(),
             Some(&DateTime::Filetime(Filetime {
                 timestamp: 0x1db5e8ba6892474
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_entry_modification_time() -> Result<(), ErrorTrace> {
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(
+            ntfs_file_entry.get_entry_modification_time(),
+            Some(&DateTime::Filetime(Filetime {
+                timestamp: 0x1db5e8ba689275d
             }))
         );
         Ok(())

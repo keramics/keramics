@@ -78,7 +78,7 @@ The following metadata files are predefined and use a fixed MFT entry number.
 | 3 | "$Volume" | Volume information |
 | 4 | "$AttrDef" | MFT entry attribute definitions |
 | 5 | "." | Root directory |
-| 6 | "$Bitmap" | Cluster block allocation bitmap |
+| 6 | "$Bitmap" | [Cluster block allocation bitmap](#cluster_block_allocation_bitmap) |
 | 7 | "$Boot" | Boot record (or boot code) |
 | 8 | "$BadClus" | Bad clusters |
 | <td colspan="3">*Used in NTFS version 1.2 and earlier*</td> |
@@ -1015,7 +1015,8 @@ that index branch are smaller than "textfile.txt".
 
 The index allocation attribute is accompanied by a bitmap attribute with the corresponding
 attribute name. The bitmap attribute defines the allocation of virtual cluster blocks within the
-index allocation attribute data stream.
+index allocation attribute data stream. Every bit in the bitmap represents a block the size of an
+index entry.
 
 > Note that the index allocation attribute can be present even though it is not used.
 
@@ -1514,9 +1515,9 @@ of:
 | 24 | 2 | | Name size in bytes |
 | 26 | ... | | Name, which contains an UCS-2 little-endian string without end-of-string character |
 
-## The allocation bitmap
+## The cluster block allocation bitmap {#cluster_block_allocation_bitmap}
 
-The metadata file $Bitmap contains the allocation bitmap.
+The metadata file $Bitmap contains the cluster block allocation bitmap.
 
 Every bit in the allocation bitmap represents a block the size of the cluster block, where the LSB
 is the first bit in a byte.

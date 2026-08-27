@@ -127,9 +127,8 @@ impl<'a> fmt::Display for ApfsContainerInfo<'a> {
             "    Read-only compatible features\t\t: 0x{:016x}",
             flags
         )?;
-        let flags_info: ApfsContainerReadOnlyCompatibilityFeatureFlagsInfo =
-            ApfsContainerReadOnlyCompatibilityFeatureFlagsInfo::new(flags);
-        writeln!(formatter, "{}", flags_info)?;
+        // Note that currently there are no known read-only compatible features.
+        writeln!(formatter)?;
 
         let flags: u64 = self.container.get_incompatible_feature_flags();
         writeln!(
@@ -155,29 +154,6 @@ impl<'a> fmt::Display for ApfsContainerInfo<'a> {
             self.container.get_number_of_volumes()
         )?;
         writeln!(formatter)
-    }
-}
-
-/// Apple File System (APFS) container read-only compatibility feature flags information.
-struct ApfsContainerReadOnlyCompatibilityFeatureFlagsInfo {
-    /// Flags.
-    flags: u64,
-}
-
-impl ApfsContainerReadOnlyCompatibilityFeatureFlagsInfo {
-    /// Creates new container read-only compatibility feature flags information.
-    fn new(flags: u64) -> Self {
-        Self { flags }
-    }
-}
-
-impl fmt::Display for ApfsContainerReadOnlyCompatibilityFeatureFlagsInfo {
-    /// Formats container read-only compatibility feature flags information for display.
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        _ = formatter;
-        _ = self.flags;
-
-        Ok(())
     }
 }
 

@@ -101,7 +101,7 @@ impl ExtDirectoryTree {
                     "    parent_inode_number: {},\n",
                     "}}\n\n"
                 ),
-                bytes_to_u32_le!(data, 0)
+                parent_inode_number,
             ));
         });
         match self.read_node_data(&data, 4, data_size, entries) {

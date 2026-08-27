@@ -25,33 +25,19 @@ use keramics_types::Uuid;
 use crate::formatters::ByteSize;
 
 /// Information about a Parallels Disk Image (PDI) image.
-struct PdiImageInfo {
-    /// Media size.
-    pub media_size: u64,
-
-    /// Bytes per sector.
-    pub bytes_per_sector: u16,
-
-    /// Number of segments.
-    pub number_of_segments: usize,
-
-    /// Number of snapshots.
-    pub number_of_snapshots: usize,
+struct PdiImageInfo<'a> {
+    /// Image.
+    image: &'a PdiImage,
 }
 
-impl PdiImageInfo {
+impl<'a> PdiImageInfo<'a> {
     /// Creates new image information.
-    fn new() -> Self {
-        Self {
-            media_size: 0,
-            bytes_per_sector: 0,
-            number_of_segments: 0,
-            number_of_snapshots: 0,
-        }
+    fn new(image: &'a PdiImage) -> Self {
+        Self { image }
     }
 }
 
-impl fmt::Display for PdiImageInfo {
+impl<'a> fmt::Display for PdiImageInfo<'a> {
     /// Formats image information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Parallels Disk Image (PDI) information:")?;
@@ -59,24 +45,24 @@ impl fmt::Display for PdiImageInfo {
         writeln!(
             formatter,
             "    Number of segments\t\t\t\t: {}",
-            self.number_of_segments
+            self.image.get_number_of_segments()
         )?;
         writeln!(
             formatter,
             "    Number of snapshots\t\t\t\t: {}",
-            self.number_of_snapshots
+            self.image.get_number_of_snapshots()
         )?;
         writeln!(formatter)?;
 
         writeln!(formatter, "    Media information:")?;
 
-        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.image.get_media_size(), 1024);
         writeln!(formatter, "        Media size\t\t\t\t: {}", byte_size)?;
 
         writeln!(
             formatter,
             "        Bytes per sector\t\t\t: {}",
-            self.bytes_per_sector
+            self.image.get_bytes_per_sector()
         )?;
 
         // TODO: print additional information
@@ -85,22 +71,47 @@ impl fmt::Display for PdiImageInfo {
     }
 }
 
+/// Information about a Parallels Disk Image (PDI) snapshot.
+struct PdiSnapshotInfo<'a> {
+    /// Snapshot index.
+    index: usize,
+
+    /// Snapshot.
+    snapshot: &'a PdiSnapshotDescriptor,
+}
+
+impl<'a> PdiSnapshotInfo<'a> {
+    /// Creates new snapshot information.
+    fn new(index: usize, snapshot: &'a PdiSnapshotDescriptor) -> Self {
+        Self { index, snapshot }
+    }
+}
+
+impl<'a> fmt::Display for PdiSnapshotInfo<'a> {
+    /// Formats snapshot information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(formatter, "    Snapshot: {}", self.index + 1)?;
+
+        writeln!(
+            formatter,
+            "        Identifier\t\t\t\t: {}",
+            self.snapshot.get_identifier()
+        )?;
+        if let Some(parent_identifier) = self.snapshot.get_parent_identifier() {
+            writeln!(
+                formatter,
+                "        Parent identifier\t\t\t: {}",
+                parent_identifier
+            )?;
+        }
+        writeln!(formatter)
+    }
+}
+
 /// Information about a Parallels Disk Image (PDI) image.
 pub struct PdiInfo {}
 
 impl PdiInfo {
-    /// Retrieves the image information.
-    fn get_image_information(pdi_image: &PdiImage) -> PdiImageInfo {
-        let mut image_information: PdiImageInfo = PdiImageInfo::new();
-
-        image_information.media_size = pdi_image.get_media_size();
-        image_information.bytes_per_sector = pdi_image.get_bytes_per_sector();
-        image_information.number_of_segments = pdi_image.get_number_of_segments();
-        image_information.number_of_snapshots = pdi_image.get_number_of_snapshots();
-
-        image_information
-    }
-
     /// Opens an image.
     fn open_image(path_buf: &PathBuf) -> Result<PdiImage, ErrorTrace> {
         let mut base_path: PathBuf = path_buf.clone();
@@ -134,11 +145,12 @@ impl PdiInfo {
                 return Err(error);
             }
         };
-        let image_information: PdiImageInfo = Self::get_image_information(&pdi_image);
+        let image_information: PdiImageInfo = PdiImageInfo::new(&pdi_image);
 
         print!("{}", image_information);
 
-        for segment_index in 0..image_information.number_of_segments {
+        for segment_index in 0..pdi_image.get_number_of_segments() {
+            // TODO: refactor into SegmentInfo
             let segment: &PdiSegmentDescriptor = match pdi_image.get_segment_by_index(segment_index)
             {
                 Some(segment) => segment,
@@ -191,8 +203,8 @@ impl PdiInfo {
                 println!();
             }
         }
-        for snapshot_index in 0..image_information.number_of_snapshots {
-            let snapshot: &PdiSnapshotDescriptor =
+        for snapshot_index in 0..pdi_image.get_number_of_snapshots() {
+            let pdi_snapshot: &PdiSnapshotDescriptor =
                 match pdi_image.get_snapshot_by_index(snapshot_index) {
                     Some(snapshot) => snapshot,
                     None => {
@@ -202,15 +214,10 @@ impl PdiInfo {
                         )));
                     }
                 };
-            println!("    Snapshot: {}", snapshot_index + 1);
+            let snapshot_information: PdiSnapshotInfo =
+                PdiSnapshotInfo::new(snapshot_index, &pdi_snapshot);
 
-            let identifier: &Uuid = snapshot.get_identifier();
-            println!("            Identifier\t\t\t\t: {}", identifier);
-
-            if let Some(parent_identifier) = snapshot.get_parent_identifier() {
-                println!("            Parent identifier\t\t\t: {}", parent_identifier);
-            }
-            println!();
+            print!("{}", snapshot_information);
         }
         Ok(())
     }
@@ -228,7 +235,7 @@ mod tests {
     fn test_image_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/pdi/hfsplus.hdd/DiskDescriptor.xml");
         let pdi_image: PdiImage = PdiInfo::open_image(&path_buf)?;
-        let test_struct: PdiImageInfo = PdiInfo::get_image_information(&pdi_image);
+        let test_struct: PdiImageInfo = PdiImageInfo::new(&pdi_image);
 
         let expected_string: &str = concat!(
             "Parallels Disk Image (PDI) information:\n",
@@ -246,19 +253,7 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_get_image_information() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/pdi/hfsplus.hdd/DiskDescriptor.xml");
-        let pdi_image: PdiImage = PdiInfo::open_image(&path_buf)?;
-        let test_struct: PdiImageInfo = PdiInfo::get_image_information(&pdi_image);
-
-        assert_eq!(test_struct.media_size, 33554432);
-        assert_eq!(test_struct.bytes_per_sector, 512);
-        assert_eq!(test_struct.number_of_segments, 1);
-        assert_eq!(test_struct.number_of_snapshots, 1);
-
-        Ok(())
-    }
+    // TODO: add tests for PdiSnapshotInfo
 
     // TODO: add tests for open_image
     // TODO: add tests for print_image

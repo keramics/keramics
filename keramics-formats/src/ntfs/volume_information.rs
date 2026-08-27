@@ -32,13 +32,13 @@ use super::mft_attribute::NtfsMftAttribute;
 /// New Technologies File System (NTFS) volume information ($VOLUME_INFORMATION).
 pub struct NtfsVolumeInformation {
     /// Major format version
-    pub major_format_version: u8,
+    pub(super) major_format_version: u8,
 
     /// Minor format version
-    pub minor_format_version: u8,
+    pub(super) minor_format_version: u8,
 
     /// Volume flags.
-    pub volume_flags: u16,
+    pub(super) volume_flags: u16,
 }
 
 impl NtfsVolumeInformation {
@@ -49,18 +49,6 @@ impl NtfsVolumeInformation {
             minor_format_version: 0,
             volume_flags: 0,
         }
-    }
-
-    /// Reads the volume information from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 12 {
-            return Err(keramics_core::error_trace_new!("Unsupported data size"));
-        }
-        self.major_format_version = data[8];
-        self.minor_format_version = data[9];
-        self.volume_flags = bytes_to_u16_le!(data, 10);
-
-        Ok(())
     }
 
     /// Reads the volume information from a MFT attribute.
@@ -92,6 +80,28 @@ impl NtfsVolumeInformation {
         }
         Ok(volume_information)
     }
+
+    /// Retrieves the format version.
+    pub fn get_format_version(&self) -> (u8, u8) {
+        (self.major_format_version, self.minor_format_version)
+    }
+
+    /// Retrieves the volume flags.
+    pub fn get_volume_flags(&self) -> u16 {
+        self.volume_flags
+    }
+
+    /// Reads the volume information from a buffer.
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        if data.len() < 12 {
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
+        }
+        self.major_format_version = data[8];
+        self.minor_format_version = data[9];
+        self.volume_flags = bytes_to_u16_le!(data, 10);
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -103,6 +113,30 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x01, 0x80, 0x00,
         ]
     }
+
+    #[test]
+    fn test_from_attribute() -> Result<(), ErrorTrace> {
+        let mut mft_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+
+        let test_data: Vec<u8> = vec![
+            0x70, 0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00,
+            0x05, 0x00, 0x0c, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x03, 0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        mft_attribute.read_data(&test_data)?;
+
+        let test_struct: NtfsVolumeInformation =
+            NtfsVolumeInformation::from_attribute(&mft_attribute)?;
+
+        assert_eq!(test_struct.major_format_version, 3);
+        assert_eq!(test_struct.minor_format_version, 1);
+        assert_eq!(test_struct.volume_flags, 0x0080);
+
+        Ok(())
+    }
+
+    // TODO: add tests for get_format_version
+    // TODO: add tests for get_volume_flags
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
@@ -126,26 +160,5 @@ mod tests {
         let result = test_struct.read_data(&test_data[0..11]);
 
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_from_attribute() -> Result<(), ErrorTrace> {
-        let mut mft_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
-
-        let test_data: Vec<u8> = vec![
-            0x70, 0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00,
-            0x05, 0x00, 0x0c, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x03, 0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-        mft_attribute.read_data(&test_data)?;
-
-        let test_struct: NtfsVolumeInformation =
-            NtfsVolumeInformation::from_attribute(&mft_attribute)?;
-
-        assert_eq!(test_struct.major_format_version, 3);
-        assert_eq!(test_struct.minor_format_version, 1);
-        assert_eq!(test_struct.volume_flags, 0x0080);
-
-        Ok(())
     }
 }

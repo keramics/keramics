@@ -168,6 +168,94 @@ impl fmt::Display for NtfsFileAttributeFlagsInfo {
     }
 }
 
+/// New Technologies File System (NTFS) $FILE_NAME attribute information.
+struct NtfsFileNameAttributeInfo<'a> {
+    /// Attribute
+    attribute: &'a NtfsAttribute<'a>,
+}
+
+impl<'a> NtfsFileNameAttributeInfo<'a> {
+    /// Creates new attribute information.
+    fn new(attribute: &'a NtfsAttribute<'a>) -> Self {
+        Self { attribute }
+    }
+}
+
+impl<'a> fmt::Display for NtfsFileNameAttributeInfo<'a> {
+    /// Formats attribute information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        if let NtfsAttribute::FileName { file_name } = self.attribute {
+            let name_spaces = HashMap::<u8, &'static str>::from([
+                (0, "POSIX"),
+                (1, "Windows"),
+                (2, "DOS"),
+                (3, "DOS and Windows"),
+            ]);
+            let name_space: u8 = file_name.get_name_space();
+
+            match name_spaces.get(&name_space) {
+                Some(name_space_string) => writeln!(
+                    formatter,
+                    "    Name space\t\t\t\t\t: {} ({})",
+                    name_space_string, name_space
+                )?,
+                None => writeln!(formatter, "    Name space\t\t\t\t\t: {}", name_space)?,
+            };
+            writeln!(formatter, "    Name\t\t\t\t\t: {}", file_name.get_name())?;
+
+            let parent_file_reference: u64 = file_name.get_parent_file_reference();
+
+            if parent_file_reference == 0 {
+                writeln!(
+                    formatter,
+                    "    Parent file reference\t\t\t: {}",
+                    NOT_SET_VALUE
+                )?;
+            } else {
+                writeln!(
+                    formatter,
+                    "    Parent file reference\t\t\t: {}-{}",
+                    parent_file_reference & 0x0000ffffffffffff,
+                    parent_file_reference >> 48
+                )?;
+            }
+            let date_time_info: NtfsDateTimeInfo =
+                NtfsDateTimeInfo::new(file_name.get_creation_time());
+            writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
+
+            let date_time_info: NtfsDateTimeInfo =
+                NtfsDateTimeInfo::new(file_name.get_modification_time());
+            writeln!(
+                formatter,
+                "    Modification time\t\t\t\t: {}",
+                date_time_info
+            )?;
+
+            let date_time_info: NtfsDateTimeInfo =
+                NtfsDateTimeInfo::new(file_name.get_access_time());
+            writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_info)?;
+
+            let date_time_info: NtfsDateTimeInfo =
+                NtfsDateTimeInfo::new(file_name.get_entry_modification_time());
+            writeln!(
+                formatter,
+                "    Entry modification time\t\t\t: {}",
+                date_time_info
+            )?;
+
+            let flags: u32 = file_name.get_file_attribute_flags();
+            let flags_info: NtfsFileAttributeFlagsInfo = NtfsFileAttributeFlagsInfo::new(flags);
+            writeln!(formatter, "    File attribute flags\t\t\t: 0x{:08x}", flags)?;
+            writeln!(formatter, "{}", flags_info)?;
+
+            if flags == 0 {
+                writeln!(formatter)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// New Technologies File System (NTFS) file entry information.
 struct NtfsFileEntryInfo<'a> {
     /// File entry.
@@ -226,7 +314,7 @@ impl<'a> fmt::Display for NtfsFileEntryInfo<'a> {
             }
             None => {}
         };
-        match self.file_entry.get_change_time() {
+        match self.file_entry.get_entry_modification_time() {
             Some(date_time) => {
                 let date_time_info: NtfsDateTimeInfo = NtfsDateTimeInfo::new(date_time);
                 writeln!(
@@ -324,6 +412,61 @@ impl<'a> fmt::Display for NtfsFileSystemInfo<'a> {
     }
 }
 
+/// New Technologies File System (NTFS) $STANDARD_INFORMATION attribute information.
+struct NtfsStandardInformationAttributeInfo<'a> {
+    /// Attribute
+    attribute: &'a NtfsAttribute<'a>,
+}
+
+impl<'a> NtfsStandardInformationAttributeInfo<'a> {
+    /// Creates new attribute information.
+    fn new(attribute: &'a NtfsAttribute<'a>) -> Self {
+        Self { attribute }
+    }
+}
+
+impl<'a> fmt::Display for NtfsStandardInformationAttributeInfo<'a> {
+    /// Formats attribute information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        if let NtfsAttribute::StandardInformation {
+            standard_information,
+        } = self.attribute
+        {
+            let date_time_info: NtfsDateTimeInfo =
+                NtfsDateTimeInfo::new(standard_information.get_creation_time());
+            writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
+
+            let date_time_info: NtfsDateTimeInfo =
+                NtfsDateTimeInfo::new(standard_information.get_modification_time());
+            writeln!(
+                formatter,
+                "    Modification time\t\t\t\t: {}",
+                date_time_info
+            )?;
+            let date_time_info: NtfsDateTimeInfo =
+                NtfsDateTimeInfo::new(standard_information.get_access_time());
+            writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_info)?;
+
+            let date_time_info: NtfsDateTimeInfo =
+                NtfsDateTimeInfo::new(standard_information.get_entry_modification_time());
+            writeln!(
+                formatter,
+                "    Entry modification time\t\t\t: {}",
+                date_time_info
+            )?;
+            let flags: u32 = standard_information.get_file_attribute_flags();
+            let flags_info: NtfsFileAttributeFlagsInfo = NtfsFileAttributeFlagsInfo::new(flags);
+            writeln!(formatter, "    File attribute flags\t\t\t: 0x{:08x}", flags)?;
+            writeln!(formatter, "{}", flags_info)?;
+
+            if flags == 0 {
+                writeln!(formatter)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// New Technologies File System (NTFS) volume flags information.
 pub struct NtfsVolumeFlagsInfo {
     /// Flags.
@@ -382,6 +525,41 @@ impl fmt::Display for NtfsVolumeFlagsInfo {
                 formatter,
                 "        0x8000: Modified by chkdsk (VOLUME_MODIFIED_BY_CHKDSK)"
             )?;
+        }
+        Ok(())
+    }
+}
+
+/// New Technologies File System (NTFS) $VOLUME_INFORMATION attribute information.
+struct NtfsVolumeInformationAttributeInfo<'a> {
+    /// Attribute
+    attribute: &'a NtfsAttribute<'a>,
+}
+
+impl<'a> NtfsVolumeInformationAttributeInfo<'a> {
+    /// Creates new attribute information.
+    fn new(attribute: &'a NtfsAttribute<'a>) -> Self {
+        Self { attribute }
+    }
+}
+
+impl<'a> fmt::Display for NtfsVolumeInformationAttributeInfo<'a> {
+    /// Formats attribute information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        if let NtfsAttribute::VolumeInformation { volume_information } = self.attribute {
+            let (major_version, minor_version): (u8, u8) = volume_information.get_format_version();
+            writeln!(
+                formatter,
+                "    Format version\t\t\t\t: {}.{}",
+                major_version, minor_version
+            )?;
+            let flags: u16 = volume_information.get_volume_flags();
+            let flags_info: NtfsVolumeFlagsInfo = NtfsVolumeFlagsInfo::new(flags);
+
+            writeln!(formatter, "    Volume flags\t\t\t\t: 0x{:04x}", flags)?;
+            flags_info.fmt(formatter)?;
+
+            writeln!(formatter)?;
         }
         Ok(())
     }
@@ -486,15 +664,6 @@ impl NtfsInfo {
             .map_or_else(|_| None, |index| Some(Self::ATTRIBUTE_TYPES[index].1))
     }
 
-    /// Retrieves the string representation of a date and time value.
-    fn get_date_time_string(date_time: &DateTime) -> Result<String, ErrorTrace> {
-        match date_time {
-            DateTime::Filetime(filetime) => Ok(filetime.to_iso8601_string()),
-            DateTime::NotSet => Ok(String::from(NOT_SET_VALUE)),
-            _ => return Err(keramics_core::error_trace_new!("Unsupported date time")),
-        }
-    }
-
     /// Retrieves the reparse (point) tag as a string.
     pub fn get_reparse_tag_string(reparse_tag: &u32) -> Option<&'static str> {
         Self::REPARSE_TAGS
@@ -531,6 +700,7 @@ impl NtfsInfo {
         };
         match attribute {
             NtfsAttribute::AttributeList { attribute_list } => {
+                // TODO: refactor into AttributeListAttributeInfo
                 let number_of_entries: usize = attribute_list.entries.len();
                 println!("    Number of entries\t\t\t\t: {}", number_of_entries);
 
@@ -563,60 +733,15 @@ impl NtfsInfo {
             }
             // TODO: add support for $EA
             // TODO: add support for $EA_INFORMATION
-            NtfsAttribute::FileName { file_name } => {
-                let name_spaces = HashMap::<u8, &'static str>::from([
-                    (0, "POSIX"),
-                    (1, "Windows"),
-                    (2, "DOS"),
-                    (3, "DOS and Windows"),
-                ]);
-                match name_spaces.get(&file_name.name_space) {
-                    Some(name_space_string) => println!(
-                        "    Name space\t\t\t\t\t: {} ({})",
-                        name_space_string, file_name.name_space
-                    ),
-                    None => println!("    Name space\t\t\t\t\t: {}", file_name.name_space),
-                };
-                println!("    Name\t\t\t\t\t: {}", file_name.name);
+            NtfsAttribute::FileName { .. } => {
+                let attribute_information: NtfsFileNameAttributeInfo =
+                    NtfsFileNameAttributeInfo::new(attribute);
 
-                if file_name.parent_file_reference == 0 {
-                    println!("    Parent file reference\t\t\t: {}", NOT_SET_VALUE);
-                } else {
-                    println!(
-                        "    Parent file reference\t\t\t: {}-{}",
-                        file_name.parent_file_reference & 0x0000ffffffffffff,
-                        file_name.parent_file_reference >> 48
-                    );
-                }
-                let date_time_string: String =
-                    Self::get_date_time_string(&file_name.creation_time)?;
-                println!("    Creation time\t\t\t\t: {}", date_time_string);
-
-                let date_time_string: String =
-                    Self::get_date_time_string(&file_name.modification_time)?;
-                println!("    Modification time\t\t\t\t: {}", date_time_string);
-
-                let date_time_string: String = Self::get_date_time_string(&file_name.access_time)?;
-                println!("    Access time\t\t\t\t\t: {}", date_time_string);
-
-                let date_time_string: String =
-                    Self::get_date_time_string(&file_name.entry_modification_time)?;
-                println!("    Entry modification time\t\t\t: {}", date_time_string);
-
-                let flags_info: NtfsFileAttributeFlagsInfo =
-                    NtfsFileAttributeFlagsInfo::new(file_name.file_attribute_flags);
-                println!(
-                    "    File attribute flags\t\t\t: 0x{:08x}",
-                    file_name.file_attribute_flags
-                );
-                println!("{}", flags_info);
-
-                if file_name.file_attribute_flags != 0 {
-                    println!();
-                }
+                print!("{}", attribute_information);
             }
             // TODO: add support for $BITMAP, $DATA, $INDEX_ALLOCATION, $INDEX_ROOT
             NtfsAttribute::Generic { mft_attribute } => {
+                // TODO: refactor into AttributeInfo
                 match &mft_attribute.name {
                     Some(name) => println!("    Attribute name\t\t\t\t: {}", name),
                     None => {}
@@ -646,6 +771,7 @@ impl NtfsInfo {
             // TODO: add support for $OBJECT_ID
             // TODO: add support for $PROPERTY_SET
             NtfsAttribute::ReparsePoint { reparse_point } => {
+                // TODO: refactor into ReparsePointAttributeInfo
                 let reparse_tag: u32 = reparse_point.get_reparse_tag();
 
                 match Self::get_reparse_tag_string(&reparse_tag) {
@@ -662,48 +788,17 @@ impl NtfsInfo {
                 println!();
             }
             // TODO: add support for $SECURITY_DESCRIPTOR
-            NtfsAttribute::StandardInformation {
-                standard_information,
-            } => {
-                let date_time_string: String =
-                    Self::get_date_time_string(&standard_information.creation_time)?;
-                println!("    Creation time\t\t\t\t: {}", date_time_string);
+            NtfsAttribute::StandardInformation { .. } => {
+                let attribute_information: NtfsStandardInformationAttributeInfo =
+                    NtfsStandardInformationAttributeInfo::new(attribute);
 
-                let date_time_string: String =
-                    Self::get_date_time_string(&standard_information.modification_time)?;
-                println!("    Modification time\t\t\t\t: {}", date_time_string);
-
-                let date_time_string: String =
-                    Self::get_date_time_string(&standard_information.access_time)?;
-                println!("    Access time\t\t\t\t\t: {}", date_time_string);
-
-                let date_time_string: String =
-                    Self::get_date_time_string(&standard_information.entry_modification_time)?;
-                println!("    Entry modification time\t\t\t: {}", date_time_string);
-
-                let flags_info: NtfsFileAttributeFlagsInfo =
-                    NtfsFileAttributeFlagsInfo::new(standard_information.file_attribute_flags);
-                println!(
-                    "    File attribute flags\t\t\t: 0x{:08x}",
-                    standard_information.file_attribute_flags
-                );
-                println!("{}", flags_info);
-
-                if standard_information.file_attribute_flags != 0 {
-                    println!();
-                }
+                print!("{}", attribute_information);
             }
-            NtfsAttribute::VolumeInformation { volume_information } => {
-                println!(
-                    "    Format version\t\t\t\t: {}.{}",
-                    volume_information.major_format_version,
-                    volume_information.minor_format_version
-                );
-                println!(
-                    "    Volume flags\t\t\t\t: 0x{:04x}",
-                    volume_information.volume_flags
-                );
-                println!();
+            NtfsAttribute::VolumeInformation { .. } => {
+                let attribute_information: NtfsVolumeInformationAttributeInfo =
+                    NtfsVolumeInformationAttributeInfo::new(attribute);
+
+                print!("{}", attribute_information);
             }
             NtfsAttribute::VolumeName { volume_name } => {
                 println!("    Volume name\t\t\t\t\t: {}", volume_name);
@@ -747,6 +842,7 @@ impl NtfsInfo {
             ntfs_entry_identifier
         );
 
+        // TODO: refactor into MftEntryInfo
         if file_entry.is_empty() {
             println!("    Is empty");
         } else {
@@ -1027,19 +1123,6 @@ mod tests {
     use crate::assert_lines_eq;
 
     #[test]
-    fn test_get_date_time_string() -> Result<(), ErrorTrace> {
-        let date_time: DateTime = DateTime::Filetime(Filetime::new(0x01cb3a623d0a17ce));
-        let timestamp: String = NtfsInfo::get_date_time_string(&date_time)?;
-        assert_eq!(timestamp, "2010-08-12T21:06:31.5468750");
-
-        let date_time: DateTime = DateTime::NotSet;
-        let timestamp: String = NtfsInfo::get_date_time_string(&date_time)?;
-        assert_eq!(timestamp, NOT_SET_VALUE);
-
-        Ok(())
-    }
-
-    #[test]
     fn test_date_time_information_fmt() {
         let date_time: DateTime = DateTime::Filetime(Filetime::new(0x01cb3a623d0a17ce));
         let test_struct: NtfsDateTimeInfo = NtfsDateTimeInfo::new(&date_time);
@@ -1063,15 +1146,7 @@ mod tests {
         assert_lines_eq!(string.as_str(), expected_string);
     }
 
-    #[test]
-    fn test_volume_flags_information_fmt() {
-        let test_struct: NtfsVolumeFlagsInfo = NtfsVolumeFlagsInfo::new(0x0001);
-
-        let expected_string: &str = "        0x0001: Is dirty (VOLUME_IS_DIRTY)\n";
-
-        let string: String = test_struct.to_string();
-        assert_lines_eq!(string.as_str(), expected_string);
-    }
+    // TODO: add tests for NtfsFileNameAttributeInfo
 
     #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
@@ -1129,6 +1204,20 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for NtfsStandardInformationAttributeInfo
+
+    #[test]
+    fn test_volume_flags_information_fmt() {
+        let test_struct: NtfsVolumeFlagsInfo = NtfsVolumeFlagsInfo::new(0x0001);
+
+        let expected_string: &str = "        0x0001: Is dirty (VOLUME_IS_DIRTY)\n";
+
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
+    }
+
+    // TODO: add tests for NtfsVolumeInformationAttributeInfo
 
     // TODO: add tests for open_file_system
     // TODO: add tests for print_attribute

@@ -23,6 +23,35 @@ use crate::formatters::ByteSize;
 use super::constants::*;
 use super::windows::WindowsFileAttributeFlagsInfo;
 
+/// Extensible File Allocation Table (exFAT) date and time information.
+struct ExFatDateTimeInfo<'a> {
+    /// Flags.
+    date_time: &'a DateTime,
+}
+
+impl<'a> ExFatDateTimeInfo<'a> {
+    /// Creates new date and time information.
+    fn new(date_time: &'a DateTime) -> Self {
+        Self { date_time }
+    }
+}
+
+impl<'a> fmt::Display for ExFatDateTimeInfo<'a> {
+    /// Formats date and time information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        match self.date_time {
+            DateTime::FatTimeDate(fat_date_time) => {
+                write!(formatter, "{}", fat_date_time.to_iso8601_string())
+            }
+            DateTime::FatTimeDate10Ms(fat_date_time_10ms) => {
+                write!(formatter, "{}", fat_date_time_10ms.to_iso8601_string())
+            }
+            DateTime::NotSet => write!(formatter, "{}", NOT_SET_VALUE),
+            _ => write!(formatter, "Unsupported date time"),
+        }
+    }
+}
+
 /// Extensible File Allocation Table (exFAT) file entry information.
 struct ExFatFileEntryInfo<'a> {
     /// File entry.
@@ -33,16 +62,6 @@ impl<'a> ExFatFileEntryInfo<'a> {
     /// Creates new file entry information.
     fn new(file_entry: &'a ExFatFileEntry) -> Self {
         Self { file_entry }
-    }
-
-    /// Retrieves the string representation of a date and time value.
-    fn get_date_time_string(date_time: &DateTime) -> String {
-        match date_time {
-            DateTime::FatTimeDate(fat_date_time) => fat_date_time.to_iso8601_string(),
-            DateTime::FatTimeDate10Ms(fat_date_time_10ms) => fat_date_time_10ms.to_iso8601_string(),
-            DateTime::NotSet => String::from(NOT_SET_VALUE),
-            _ => return String::from("Unsupported date time"),
-        }
     }
 }
 
@@ -62,32 +81,25 @@ impl<'a> fmt::Display for ExFatFileEntryInfo<'a> {
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
         if let Some(date_time) = self.file_entry.get_creation_time() {
-            // TODO: convert to formatter.
-            let date_time_string: String = Self::get_date_time_string(date_time);
-
-            writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_string)?;
+            let date_time_info: ExFatDateTimeInfo = ExFatDateTimeInfo::new(date_time);
+            writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
         }
         if let Some(date_time) = self.file_entry.get_modification_time() {
-            // TODO: convert to formatter.
-            let date_time_string: String = Self::get_date_time_string(date_time);
-
+            let date_time_info: ExFatDateTimeInfo = ExFatDateTimeInfo::new(date_time);
             writeln!(
                 formatter,
                 "    Modification time\t\t\t\t: {}",
-                date_time_string
+                date_time_info
             )?;
         }
         if let Some(date_time) = self.file_entry.get_access_time() {
-            // TODO: convert to formatter.
-            let date_time_string: String = Self::get_date_time_string(date_time);
-
-            writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_string)?;
+            let date_time_info: ExFatDateTimeInfo = ExFatDateTimeInfo::new(date_time);
+            writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_info)?;
         }
         let flags: u16 = self.file_entry.get_file_attribute_flags();
-
-        writeln!(formatter, "    File attribute flags\t\t\t: 0x{:04x}", flags)?;
         let flags_info: WindowsFileAttributeFlagsInfo = WindowsFileAttributeFlagsInfo::new(flags);
 
+        writeln!(formatter, "    File attribute flags\t\t\t: 0x{:04x}", flags)?;
         flags_info.fmt(formatter)?;
 
         writeln!(formatter)
@@ -360,8 +372,33 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
+    use keramics_datetime::{FatTimeDate, FatTimeDate10Ms};
 
     use crate::assert_lines_eq;
+
+    #[test]
+    fn test_date_time_information_fmt() {
+        let mut fat_date_time: FatTimeDate = FatTimeDate::new(0x3d0c, 0xa8d0);
+        fat_date_time.set_utc_offset(0x88);
+
+        let date_time: DateTime = DateTime::FatTimeDate(fat_date_time);
+        let test_struct: ExFatDateTimeInfo = ExFatDateTimeInfo::new(&date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "2010-08-12T21:06:32+02:00");
+
+        let mut fat_date_time: FatTimeDate10Ms = FatTimeDate10Ms::new(0x3d0c, 0xa8d0, 0x7d);
+        fat_date_time.set_utc_offset(0x88);
+
+        let date_time: DateTime = DateTime::FatTimeDate10Ms(fat_date_time);
+        let test_struct: ExFatDateTimeInfo = ExFatDateTimeInfo::new(&date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "2010-08-12T21:06:33.25+02:00");
+
+        let date_time: DateTime = DateTime::NotSet;
+        let test_struct: ExFatDateTimeInfo = ExFatDateTimeInfo::new(&date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, NOT_SET_VALUE);
+    }
 
     #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
