@@ -23,39 +23,18 @@ use keramics_types::ByteString;
 use crate::formatters::ByteSize;
 
 /// Information about a VMware Virtual Disk (VMDK) image layer.
-struct VmdkImageLayerInfo {
-    /// Disk type.
-    pub disk_type: VmdkDiskType,
-
-    /// Sectors per grain.
-    pub sectors_per_grain: u64,
-
-    /// Compression method.
-    pub compression_method: VmdkCompressionMethod,
-
-    /// Content identifier.
-    pub content_identifier: u32,
-
-    /// Parent content identifier.
-    pub parent_content_identifier: Option<u32>,
-
-    /// Parent name.
-    pub parent_name: Option<ByteString>,
-
-    /// Media size.
-    pub media_size: u64,
-
-    /// Bytes per sector.
-    pub bytes_per_sector: u16,
+struct VmdkImageLayerInfo<'a> {
+    /// Image layer.
+    image_layer: &'a VmdkImageLayer,
 }
 
-impl VmdkImageLayerInfo {
-    const COMPRESSION_METHODS: &[(VmdkCompressionMethod, &'static str); 2] = &[
+impl<'a> VmdkImageLayerInfo<'a> {
+    const COMPRESSION_METHODS: &'static [(VmdkCompressionMethod, &'static str); 2] = &[
         (VmdkCompressionMethod::None, "Uncompressed"),
         (VmdkCompressionMethod::Zlib, "zlib"),
     ];
 
-    const DISK_TYPES: &[(VmdkDiskType, &'static str); 16] = &[
+    const DISK_TYPES: &'static [(VmdkDiskType, &'static str); 16] = &[
         (VmdkDiskType::Custom, "Custom"),
         (VmdkDiskType::Device, "Device"),
         (VmdkDiskType::DevicePartitioned, "Device partitioned"),
@@ -78,48 +57,43 @@ impl VmdkImageLayerInfo {
     ];
 
     /// Creates new image information.
-    fn new() -> Self {
-        Self {
-            disk_type: VmdkDiskType::Unknown,
-            sectors_per_grain: 0,
-            compression_method: VmdkCompressionMethod::None,
-            content_identifier: 0,
-            parent_content_identifier: None,
-            parent_name: None,
-            media_size: 0,
-            bytes_per_sector: 0,
-        }
+    fn new(image_layer: &'a VmdkImageLayer) -> Self {
+        Self { image_layer }
     }
 
     /// Retrieves the compression method as a string.
-    pub fn get_compression_method_string(&self) -> &str {
+    pub fn get_compression_method_string(
+        &self,
+        compression_method: &VmdkCompressionMethod,
+    ) -> &str {
         Self::COMPRESSION_METHODS
-            .binary_search_by(|(key, _)| key.cmp(&self.compression_method))
+            .binary_search_by(|(key, _)| key.cmp(compression_method))
             .map_or_else(|_| "Unknown", |index| Self::COMPRESSION_METHODS[index].1)
     }
 
     /// Retrieves the disk type as a string.
-    pub fn get_disk_type_string(&self) -> &str {
+    pub fn get_disk_type_string(&self, disk_type: &VmdkDiskType) -> &str {
         Self::DISK_TYPES
-            .binary_search_by(|(key, _)| key.cmp(&self.disk_type))
+            .binary_search_by(|(key, _)| key.cmp(disk_type))
             .map_or_else(|_| "Unknown", |index| Self::DISK_TYPES[index].1)
     }
 }
 
-impl fmt::Display for VmdkImageLayerInfo {
+impl<'a> fmt::Display for VmdkImageLayerInfo<'a> {
     /// Formats image information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "VMware Virtual Disk (VMDK) information:")?;
 
-        let disk_type_string: &str = self.get_disk_type_string();
+        let disk_type_string: &str = self.get_disk_type_string(self.image_layer.get_disk_type());
         writeln!(formatter, "    Disk type\t\t\t\t\t: {}", disk_type_string)?;
 
         writeln!(
             formatter,
             "    Sectors per grain\t\t\t\t: {}",
-            self.sectors_per_grain
+            self.image_layer.get_sectors_per_grain()
         )?;
-        let compression_method_string: &str = self.get_compression_method_string();
+        let compression_method_string: &str =
+            self.get_compression_method_string(self.image_layer.get_compression_method());
         writeln!(
             formatter,
             "    Compression method\t\t\t\t: {}",
@@ -128,31 +102,35 @@ impl fmt::Display for VmdkImageLayerInfo {
         writeln!(
             formatter,
             "    Content identifier\t\t\t\t: 0x{:08x}",
-            self.content_identifier
+            self.image_layer.get_content_identifier()
         )?;
-        if self.parent_content_identifier.is_some() || self.parent_name.is_some() {
+        let parent_content_identifier: Option<u32> =
+            self.image_layer.get_parent_content_identifier();
+        let parent_name: Option<&ByteString> = self.image_layer.get_parent_name();
+
+        if parent_content_identifier.is_some() || parent_name.is_some() {
             writeln!(formatter, "    Parent information:")?;
 
-            if let Some(parent_content_identifier) = self.parent_content_identifier {
+            if let Some(content_identifier) = parent_content_identifier {
                 writeln!(
                     formatter,
                     "        Content identifier\t\t\t: 0x{:08x}",
-                    parent_content_identifier
+                    content_identifier
                 )?;
             }
-            if let Some(parent_name) = &self.parent_name {
-                writeln!(formatter, "        Name\t\t\t\t\t: {}", parent_name)?;
+            if let Some(name) = parent_name {
+                writeln!(formatter, "        Name\t\t\t\t\t: {}", name)?;
             }
         }
         writeln!(formatter, "    Media information:")?;
 
-        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.image_layer.get_media_size(), 1024);
         writeln!(formatter, "        Media size\t\t\t\t: {}", byte_size)?;
 
         writeln!(
             formatter,
             "        Bytes per sector\t\t\t: {}",
-            self.bytes_per_sector
+            self.image_layer.get_bytes_per_sector()
         )?;
 
         // TODO: print number of extents
@@ -171,24 +149,6 @@ impl fmt::Display for VmdkImageLayerInfo {
 pub struct VmdkInfo {}
 
 impl VmdkInfo {
-    /// Retrieves the image layer information.
-    fn get_image_layer_information(vmdk_image_layer: &VmdkImageLayer) -> VmdkImageLayerInfo {
-        let mut image_layer_information: VmdkImageLayerInfo = VmdkImageLayerInfo::new();
-
-        image_layer_information.disk_type = vmdk_image_layer.get_disk_type().clone();
-        image_layer_information.sectors_per_grain = vmdk_image_layer.get_sectors_per_grain();
-        image_layer_information.compression_method =
-            vmdk_image_layer.get_compression_method().clone();
-        image_layer_information.content_identifier = vmdk_image_layer.get_content_identifier();
-        image_layer_information.parent_content_identifier =
-            vmdk_image_layer.get_parent_content_identifier();
-        image_layer_information.parent_name = vmdk_image_layer.get_parent_name().cloned();
-        image_layer_information.media_size = vmdk_image_layer.get_media_size();
-        image_layer_information.bytes_per_sector = vmdk_image_layer.get_bytes_per_sector();
-
-        image_layer_information
-    }
-
     /// Opens an image.
     fn open_image(path_buf: &PathBuf) -> Result<VmdkImage, ErrorTrace> {
         let mut base_path: PathBuf = path_buf.clone();
@@ -247,7 +207,7 @@ impl VmdkInfo {
                 }
             };
         let image_layer_information: VmdkImageLayerInfo =
-            Self::get_image_layer_information(&vmdk_image_layer);
+            VmdkImageLayerInfo::new(&vmdk_image_layer);
 
         print!("{}", image_layer_information);
 
@@ -268,8 +228,7 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from("../test_data/vmdk/ext2.vmdk");
         let vmdk_image: VmdkImage = VmdkInfo::open_image(&path_buf)?;
         let vmdk_image_layer: Arc<VmdkImageLayer> = vmdk_image.get_layer_by_index(0)?;
-        let test_struct: VmdkImageLayerInfo =
-            VmdkInfo::get_image_layer_information(&vmdk_image_layer);
+        let test_struct: VmdkImageLayerInfo = VmdkImageLayerInfo::new(&vmdk_image_layer);
 
         let expected_string: &str = concat!(
             "VMware Virtual Disk (VMDK) information:\n",
@@ -284,26 +243,6 @@ mod tests {
         );
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_image_layer_information() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/vmdk/ext2.vmdk");
-        let vmdk_image: VmdkImage = VmdkInfo::open_image(&path_buf)?;
-        let vmdk_image_layer: Arc<VmdkImageLayer> = vmdk_image.get_layer_by_index(0)?;
-        let test_struct: VmdkImageLayerInfo =
-            VmdkInfo::get_image_layer_information(&vmdk_image_layer);
-
-        assert_eq!(test_struct.disk_type, VmdkDiskType::MonolithicSparse);
-        assert_eq!(test_struct.sectors_per_grain, 128);
-        assert_eq!(test_struct.compression_method, VmdkCompressionMethod::None);
-        assert_eq!(test_struct.content_identifier, 0x4c069322);
-        assert_eq!(test_struct.parent_content_identifier, None);
-        assert_eq!(test_struct.parent_name, None);
-        assert_eq!(test_struct.media_size, 4194304);
-        assert_eq!(test_struct.bytes_per_sector, 512);
 
         Ok(())
     }

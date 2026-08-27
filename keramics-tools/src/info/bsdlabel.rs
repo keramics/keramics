@@ -40,22 +40,18 @@ impl<'a> fmt::Display for BsdDiskLabelPartitionInfo<'a> {
         writeln!(formatter, "Partition: {}", self.index + 1)?;
 
         let partition_index: u16 = self.partition.get_partition_index();
-
         writeln!(
             formatter,
             "    Label\t\t\t\t\t: {}",
             (b'a' + (partition_index as u8)) as char
         )?;
-
         let partition_offset: u64 = self.partition.get_partition_offset();
-
         writeln!(
             formatter,
             "    Offset\t\t\t\t\t: {} (0x{:08x})",
             partition_offset, partition_offset,
         )?;
         let byte_size: ByteSize = ByteSize::new(self.partition.get_partition_size(), 1024);
-
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
         writeln!(formatter)

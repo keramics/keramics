@@ -46,23 +46,19 @@ impl<'a> fmt::Display for ApmPartitionInfo<'a> {
             self.partition.get_type_identifier()
         )?;
         let name: &ByteString = self.partition.get_name();
-
         if !name.is_empty() {
             writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?;
         }
         let partition_offset: u64 = self.partition.get_partition_offset();
-
         writeln!(
             formatter,
             "    Offset\t\t\t\t\t: {} (0x{:08x})",
             partition_offset, partition_offset,
         )?;
         let byte_size: ByteSize = ByteSize::new(self.partition.get_partition_size(), 1024);
-
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
         let status_flags: u32 = self.partition.get_status_flags();
-
         writeln!(
             formatter,
             "    Status flags\t\t\t\t: 0x{:08x}",

@@ -20,88 +20,68 @@ use keramics_types::{Ucs2String, Uuid};
 use crate::formatters::ByteSize;
 
 /// Information about a Virtual Hard Disk (VHD) file.
-struct VhdFileInfo {
-    /// Disk type.
-    pub disk_type: VhdDiskType,
-
-    /// Identifier.
-    pub identifier: Uuid,
-
-    /// Parent identifier.
-    pub parent_identifier: Option<Uuid>,
-
-    /// Parent name.
-    pub parent_name: Option<Ucs2String>,
-
-    /// Media size.
-    pub media_size: u64,
-
-    /// Bytes per sector.
-    pub bytes_per_sector: u16,
+struct VhdFileInfo<'a> {
+    /// File.
+    file: &'a VhdFile,
 }
 
-impl VhdFileInfo {
-    const DISK_TYPES: &[(VhdDiskType, &'static str); 3] = &[
+impl<'a> VhdFileInfo<'a> {
+    const DISK_TYPES: &'static [(VhdDiskType, &'static str); 3] = &[
         (VhdDiskType::Differential, "Differential"),
         (VhdDiskType::Dynamic, "Dynamic"),
         (VhdDiskType::Fixed, "Fixed"),
     ];
 
     /// Creates new file information.
-    fn new() -> Self {
-        Self {
-            disk_type: VhdDiskType::Unknown,
-            identifier: Uuid::new(),
-            parent_identifier: None,
-            parent_name: None,
-            media_size: 0,
-            bytes_per_sector: 0,
-        }
+    fn new(file: &'a VhdFile) -> Self {
+        Self { file }
     }
 
     /// Retrieves the disk type as a string.
-    pub fn get_disk_type_string(&self) -> &str {
+    pub fn get_disk_type_string(&self, disk_type: &VhdDiskType) -> &str {
         Self::DISK_TYPES
-            .binary_search_by(|(key, _)| key.cmp(&self.disk_type))
+            .binary_search_by(|(key, _)| key.cmp(disk_type))
             .map_or_else(|_| "Unknown", |index| Self::DISK_TYPES[index].1)
     }
 }
 
-impl fmt::Display for VhdFileInfo {
+impl<'a> fmt::Display for VhdFileInfo<'a> {
     /// Formats file information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Virtual Hard Disk (VHD) information:")?;
 
         writeln!(formatter, "    Format version\t\t\t\t: 1.0")?;
 
-        let disk_type_string: &str = self.get_disk_type_string();
+        let disk_type_string: &str = self.get_disk_type_string(self.file.get_disk_type());
         writeln!(formatter, "    Disk type\t\t\t\t\t: {}", disk_type_string)?;
 
-        writeln!(formatter, "    Identifier\t\t\t\t\t: {}", self.identifier)?;
+        writeln!(
+            formatter,
+            "    Identifier\t\t\t\t\t: {}",
+            self.file.get_identifier()
+        )?;
+        let parent_identifier: Option<&Uuid> = self.file.get_parent_identifier();
+        let parent_name: Option<&Ucs2String> = self.file.get_parent_name();
 
-        if self.parent_identifier.is_some() || self.parent_name.is_some() {
+        if parent_identifier.is_some() || parent_name.is_some() {
             writeln!(formatter, "    Parent information:")?;
 
-            if let Some(parent_identifier) = &self.parent_identifier {
-                writeln!(
-                    formatter,
-                    "        Identifier\t\t\t\t: {}",
-                    parent_identifier
-                )?;
+            if let Some(identifier) = parent_identifier {
+                writeln!(formatter, "        Identifier\t\t\t\t: {}", identifier)?;
             }
-            if let Some(parent_name) = &self.parent_name {
-                writeln!(formatter, "        Name\t\t\t\t\t: {}", parent_name)?;
+            if let Some(name) = parent_name {
+                writeln!(formatter, "        Name\t\t\t\t\t: {}", name)?;
             }
         }
         writeln!(formatter, "    Media information:")?;
 
-        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.file.get_media_size(), 1024);
         writeln!(formatter, "        Media size\t\t\t\t: {}", byte_size)?;
 
         writeln!(
             formatter,
             "        Bytes per sector\t\t\t: {}",
-            self.bytes_per_sector
+            self.file.get_bytes_per_sector()
         )?;
         writeln!(formatter)
     }
@@ -111,20 +91,6 @@ impl fmt::Display for VhdFileInfo {
 pub struct VhdInfo {}
 
 impl VhdInfo {
-    /// Retrieves the file information.
-    fn get_file_information(vhd_file: &VhdFile) -> VhdFileInfo {
-        let mut file_information: VhdFileInfo = VhdFileInfo::new();
-
-        file_information.disk_type = vhd_file.get_disk_type().clone();
-        file_information.identifier = vhd_file.get_identifier().clone();
-        file_information.parent_identifier = vhd_file.get_parent_identifier().cloned();
-        file_information.parent_name = vhd_file.get_parent_name().cloned();
-        file_information.media_size = vhd_file.get_media_size();
-        file_information.bytes_per_sector = vhd_file.get_bytes_per_sector();
-
-        file_information
-    }
-
     /// Opens a file.
     fn open_file(data_stream: &DataStreamReference) -> Result<VhdFile, ErrorTrace> {
         let mut vhd_file: VhdFile = VhdFile::new();
@@ -148,7 +114,7 @@ impl VhdInfo {
                 return Err(error);
             }
         };
-        let file_information: VhdFileInfo = Self::get_file_information(&vhd_file);
+        let file_information: VhdFileInfo = VhdFileInfo::new(&vhd_file);
 
         print!("{}", file_information);
 
@@ -171,7 +137,7 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ext2.vhd");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let vhd_file: VhdFile = VhdInfo::open_file(&data_stream)?;
-        let test_struct: VhdFileInfo = VhdInfo::get_file_information(&vhd_file);
+        let test_struct: VhdFileInfo = VhdFileInfo::new(&vhd_file);
 
         let expected_string: &str = concat!(
             "Virtual Hard Disk (VHD) information:\n",
@@ -185,26 +151,6 @@ mod tests {
         );
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_information() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ext2.vhd");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let vhd_file: VhdFile = VhdInfo::open_file(&data_stream)?;
-        let test_struct: VhdFileInfo = VhdInfo::get_file_information(&vhd_file);
-
-        assert_eq!(test_struct.disk_type, VhdDiskType::Dynamic);
-        assert_eq!(
-            test_struct.identifier.to_string(),
-            "4f75d18f-d5ef-438e-b326-d60da6c9ed67"
-        );
-        assert_eq!(test_struct.parent_identifier, None);
-        assert_eq!(test_struct.parent_name, None);
-        assert_eq!(test_struct.media_size, 4212736);
-        assert_eq!(test_struct.bytes_per_sector, 512);
 
         Ok(())
     }

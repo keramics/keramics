@@ -9,11 +9,11 @@ Supported features:
 | --- | --- |
 | Format versions | 3.0, 3.1 |
 | Compression | LZNT1, Windows Overlay Filter (WOF) (LZX and LZXPRESS-Huffman) |
+| | Case sensitive directories |
 
 Unsupported features:
 
 | Category | Feature(s) |
 | --- | --- |
 | Format versions | 1.0, 1.1, 1.2 |
-| | Case sensitive directories |
 | | Encrypted File System (EFS) |

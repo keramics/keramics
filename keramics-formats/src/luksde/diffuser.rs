@@ -56,7 +56,7 @@ impl<T: DigestHashContext, const HASH_SIZE: usize> LuksDiffuser<T, HASH_SIZE> {
     pub fn merge(&mut self, number_of_stripes: u32, split_data: &[u8], data: &mut [u8]) {
         let mut split_data_offset: usize = 0;
 
-        for index in 0..(number_of_stripes - 1) {
+        for _ in 0..(number_of_stripes - 1) {
             for byte_value in data.iter_mut() {
                 *byte_value ^= split_data[split_data_offset];
                 split_data_offset += 1;

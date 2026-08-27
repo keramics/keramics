@@ -19,6 +19,9 @@ use keramics_checksums::Adler32Context;
 use keramics_core::ErrorTrace;
 use keramics_types::bytes_to_u32_be;
 
+#[cfg(feature = "debug-trace")]
+use keramics_core::DebugTrace;
+
 use super::deflate::{DeflateBitstream, DeflateContext};
 
 /// Data header used by ZLIB compressed data.
@@ -131,15 +134,19 @@ impl ZlibContext {
         if compressed_data.len() < 2 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        let header_size: usize = if compressed_data[1] & 0x20 == 0 { 2 } else { 6 };
+        #[cfg(feature = "debug-trace")]
+        DebugTrace::static_scope(|debug_trace| {
+            let header_size: usize = if compressed_data[1] & 0x20 == 0 { 2 } else { 6 };
 
-        keramics_core::debug_trace_data_and_structure!(
-            "ZlibDataHeader",
-            0,
-            &compressed_data[0..header_size],
-            header_size,
-            ZlibDataHeader::debug_read_data(compressed_data)
-        );
+            debug_trace.print_data(
+                "ZlibDataHeader",
+                0,
+                &compressed_data[0..header_size],
+                header_size,
+                true,
+            );
+            debug_trace.print_structure(ZlibDataHeader::debug_read_data, compressed_data);
+        });
         let mut data_header: ZlibDataHeader = ZlibDataHeader::new();
 
         match data_header.read_data(compressed_data) {

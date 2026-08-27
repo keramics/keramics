@@ -406,7 +406,10 @@ impl HfsFileSystem {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read master directory block"
+                            format!(
+                                "Unable to read master directory block at offset: {} (0x{:08x}",
+                                offset, offset
+                            ),
                         );
                         return Err(error);
                     }
@@ -414,6 +417,11 @@ impl HfsFileSystem {
                 let data_area_start_offset: u32 =
                     (master_directory_block.data_area_start_sector as u32) * 512;
 
+                if master_directory_block.block_size == 0 {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid block size value out of bounds",
+                    ));
+                }
                 if data_area_start_offset % master_directory_block.block_size != 0 {
                     return Err(keramics_core::error_trace_new!(
                         "Unsupported data area start sector not a multitude of block size"
@@ -481,7 +489,10 @@ impl HfsFileSystem {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read volume header"
+                            format!(
+                                "Unable to read volume heade at offset: {} (0x{:08x}",
+                                offset, offset
+                            ),
                         );
                         return Err(error);
                     }

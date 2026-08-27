@@ -15,8 +15,11 @@ use std::cmp::{Ordering, min};
 use std::collections::HashMap;
 use std::io::SeekFrom;
 
-use keramics_core::{DataStream, DataStreamReference, DebugTrace, ErrorTrace};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
+
+#[cfg(feature = "debug-trace")]
+use keramics_core::DebugTrace;
 
 use crate::fake_file_resolver::FakeFileResolver;
 use crate::file_resolver::FileResolverReference;

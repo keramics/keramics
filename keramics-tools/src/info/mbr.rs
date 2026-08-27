@@ -80,6 +80,43 @@ impl<'a> fmt::Display for MbrPartitionInfo<'a> {
     }
 }
 
+/// Master Boot Record (MBR) volume system information.
+struct MbrVolumeSystemInfo<'a> {
+    /// Volume system.
+    volume_system: &'a MbrVolumeSystem,
+}
+
+impl<'a> MbrVolumeSystemInfo<'a> {
+    /// Creates new volume system information.
+    fn new(volume_system: &'a MbrVolumeSystem) -> Self {
+        Self { volume_system }
+    }
+}
+
+impl<'a> fmt::Display for MbrVolumeSystemInfo<'a> {
+    /// Formats volume system information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(formatter, "Master Boot Record (MBR) information:")?;
+
+        writeln!(
+            formatter,
+            "    Disk identity\t\t\t\t: 0x{:x}",
+            self.volume_system.get_disk_identity()
+        )?;
+        writeln!(
+            formatter,
+            "    Bytes per sector\t\t\t\t: {}",
+            self.volume_system.get_bytes_per_sector(),
+        )?;
+        writeln!(
+            formatter,
+            "    Number of partitions\t\t\t: {}",
+            self.volume_system.get_number_of_partitions()
+        )?;
+        writeln!(formatter)
+    }
+}
+
 /// Information about a Master Boot Record (MBR).
 pub struct MbrInfo {}
 
@@ -122,20 +159,9 @@ impl MbrInfo {
                 }
             }
         }
-        println!("Master Boot Record (MBR) information:");
+        let volume_system_info: MbrVolumeSystemInfo = MbrVolumeSystemInfo::new(&mbr_volume_system);
 
-        println!(
-            "    Disk identity\t\t\t\t: 0x{:x}",
-            mbr_volume_system.get_disk_identity()
-        );
-        println!(
-            "    Bytes per sector\t\t\t\t: {}",
-            mbr_volume_system.get_bytes_per_sector()
-        );
-        let number_of_partitions: usize = mbr_volume_system.get_number_of_partitions();
-        println!("    Number of partitions\t\t\t: {}", number_of_partitions);
-
-        println!();
+        print!("{}", volume_system_info);
 
         for (partition_index, result) in mbr_volume_system.partitions().enumerate() {
             let mbr_partition: MbrPartition = match result {
@@ -182,6 +208,27 @@ mod tests {
             "    Offset\t\t\t\t\t: 512 (0x00000200)\n",
             "    Size\t\t\t\t\t: 1.0 MiB (1049088 bytes)\n",
             "    Flags\t\t\t\t\t: 0x00\n",
+            "\n"
+        );
+        let string: String = test_struct.to_string();
+        assert_lines_eq!(string.as_str(), expected_string);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_volume_system_information_fmt() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/mbr/mbr.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let mbr_volume_system: MbrVolumeSystem = MbrInfo::open_volume_system(&data_stream)?;
+
+        let test_struct: MbrVolumeSystemInfo = MbrVolumeSystemInfo::new(&mbr_volume_system);
+
+        let expected_string: &str = concat!(
+            "Master Boot Record (MBR) information:\n",
+            "    Disk identity\t\t\t\t: 0x5f91b271\n",
+            "    Bytes per sector\t\t\t\t: 512\n",
+            "    Number of partitions\t\t\t: 2\n",
             "\n"
         );
         let string: String = test_struct.to_string();

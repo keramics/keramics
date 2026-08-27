@@ -40,37 +40,37 @@ use super::mft_attribute::NtfsMftAttribute;
 /// New Technologies File System (NTFS) file name ($FILE_NAME).
 pub struct NtfsFileName {
     /// Parent file reference.
-    pub parent_file_reference: u64,
+    pub(super) parent_file_reference: u64,
 
     /// Creation time.
-    pub creation_time: DateTime,
+    pub(super) creation_time: DateTime,
 
     /// Modification time.
-    pub modification_time: DateTime,
+    pub(super) modification_time: DateTime,
 
     /// Entry modification time.
-    pub entry_modification_time: DateTime,
+    pub(super) entry_modification_time: DateTime,
 
     /// Access time.
-    pub access_time: DateTime,
+    pub(super) access_time: DateTime,
 
     /// Data size.
-    pub data_size: u64,
+    pub(super) data_size: u64,
 
     /// File attribute flags.
-    pub file_attribute_flags: u32,
+    pub(super) file_attribute_flags: u32,
 
     /// Name size.
-    pub name_size: u8,
+    pub(super) name_size: u8,
 
     /// Name space.
-    pub name_space: u8,
+    pub(super) name_space: u8,
 
     /// Name.
-    pub name: Ucs2String,
+    pub(super) name: Ucs2String,
 
     /// Reparse point tag.
-    pub reparse_point_tag: Option<u32>,
+    pub(super) reparse_point_tag: Option<u32>,
 }
 
 impl NtfsFileName {
@@ -89,6 +89,71 @@ impl NtfsFileName {
             name: Ucs2String::new(),
             reparse_point_tag: None,
         }
+    }
+
+    /// Reads the file name from a MFT attribute.
+    pub fn from_attribute(mft_attribute: &NtfsMftAttribute) -> Result<Self, ErrorTrace> {
+        if mft_attribute.attribute_type != NTFS_ATTRIBUTE_TYPE_FILE_NAME {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported attribute type: 0x{:08x}",
+                mft_attribute.attribute_type
+            )));
+        }
+        if !mft_attribute.is_resident() {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported non-resident $FILE_NAME attribute"
+            ));
+        }
+        let mut file_name: NtfsFileName = NtfsFileName::new();
+
+        match file_name.read_data(&mft_attribute.resident_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read file name");
+                return Err(error);
+            }
+        }
+        Ok(file_name)
+    }
+
+    /// Retrieves the access time.
+    pub fn get_access_time(&self) -> &DateTime {
+        &self.access_time
+    }
+
+    /// Retrieves the creation time.
+    pub fn get_creation_time(&self) -> &DateTime {
+        &self.creation_time
+    }
+
+    /// Retrieves the entry modification time.
+    pub fn get_entry_modification_time(&self) -> &DateTime {
+        &self.entry_modification_time
+    }
+
+    /// Retrieves the file attribute flags.
+    pub fn get_file_attribute_flags(&self) -> u32 {
+        self.file_attribute_flags
+    }
+
+    /// Retrieves the modification time.
+    pub fn get_modification_time(&self) -> &DateTime {
+        &self.modification_time
+    }
+
+    /// Retrieves the name.
+    pub fn get_name(&self) -> &Ucs2String {
+        &self.name
+    }
+
+    /// Retrieves the name space.
+    pub fn get_name_space(&self) -> u8 {
+        self.name_space
+    }
+
+    /// Retrieves the parent file reference.
+    pub fn get_parent_file_reference(&self) -> u64 {
+        self.parent_file_reference
     }
 
     /// Reads the file name from a buffer.
@@ -146,31 +211,6 @@ impl NtfsFileName {
         }
         Ok(())
     }
-
-    /// Reads the file name from a MFT attribute.
-    pub fn from_attribute(mft_attribute: &NtfsMftAttribute) -> Result<Self, ErrorTrace> {
-        if mft_attribute.attribute_type != NTFS_ATTRIBUTE_TYPE_FILE_NAME {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported attribute type: 0x{:08x}",
-                mft_attribute.attribute_type
-            )));
-        }
-        if !mft_attribute.is_resident() {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported non-resident $FILE_NAME attribute"
-            ));
-        }
-        let mut file_name: NtfsFileName = NtfsFileName::new();
-
-        match file_name.read_data(&mft_attribute.resident_data) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read file name");
-                return Err(error);
-            }
-        }
-        Ok(file_name)
-    }
 }
 
 #[cfg(test)]
@@ -187,6 +227,16 @@ mod tests {
             0x46, 0x00, 0x54, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ]
     }
+
+    // TODO: add tests for from_attribute
+    // TODO: add tests for get_access_time
+    // TODO: add tests for get_creation_time
+    // TODO: add tests for get_entry_modification_time
+    // TODO: add tests for get_file_attribute_flags
+    // TODO: add tests for get_modification_time
+    // TODO: add tests for get_name
+    // TODO: add tests for get_name_space
+    // TODO: add tests for get_parent_file_reference
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
@@ -236,6 +286,4 @@ mod tests {
         let result = test_struct.read_data(&test_data[0..65]);
         assert!(result.is_err());
     }
-
-    // TODO: add tests for from_attribute
 }

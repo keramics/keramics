@@ -15,7 +15,12 @@ use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_encodings::CharacterEncoding;
-use keramics_types::{ByteString, bytes_to_u32_le};
+use keramics_types::ByteString;
+
+#[cfg(feature = "debug-trace")]
+use keramics_core::DebugTrace;
+#[cfg(feature = "debug-trace")]
+use keramics_types::bytes_to_u32_le;
 
 use super::block_range::{ExtBlockRange, ExtBlockRangeType};
 use super::directory_entries::ExtDirectoryEntries;
@@ -85,20 +90,30 @@ impl ExtDirectoryTree {
     ) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
-        keramics_core::debug_trace_data!("ExtDirectoryTreeInline", 0, &data, data_size);
+        #[cfg(feature = "debug-trace")]
+        DebugTrace::static_scope(|debug_trace| {
+            let parent_inode_number: u32 = bytes_to_u32_le!(data, 0);
 
-        let parent_inode_number: u32 = bytes_to_u32_le!(data, 0);
-
-        keramics_core::debug_trace_structure!(format!(
-            concat!(
-                "ExtDirectoryTreeInline {{\n",
-                "    parent_inode_number: {},\n",
-                "}}\n\n"
-            ),
-            parent_inode_number
-        ));
-
-        self.read_node_data(&data, 4, data_size, entries)
+            debug_trace.print_data("ExtDirectoryTreeInline", 0, &data, data_size, true);
+            debug_trace.print(format!(
+                concat!(
+                    "ExtDirectoryTreeInline {{\n",
+                    "    parent_inode_number: {},\n",
+                    "}}\n\n"
+                ),
+                parent_inode_number,
+            ));
+        });
+        match self.read_node_data(&data, 4, data_size, entries) {
+            Ok(_) => Ok(()),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read node from inline data",
+                );
+                Err(error)
+            }
+        }
     }
 
     /// Reads the directory tree node from a buffer.

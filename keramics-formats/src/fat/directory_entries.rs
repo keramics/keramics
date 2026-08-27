@@ -252,15 +252,19 @@ impl FatDirectoryEntries {
                 + (((cluster_block_number - 2) as u64)
                     * (block_allocation_table.cluster_block_size as u64));
 
-            keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
+            keramics_core::data_stream_read_exact_at_position!(
+                data_stream,
+                &mut data,
+                SeekFrom::Start(offset),
+            );
+            keramics_core::debug_trace_data!(
                 format!(
                     "FatDirectoryEntries cluster block: {}",
                     cluster_block_number
                 ),
-                data_stream,
-                &mut data,
+                offset,
+                &data,
                 block_allocation_table.cluster_block_size,
-                SeekFrom::Start(offset)
             );
             match self.read_data(
                 &data,

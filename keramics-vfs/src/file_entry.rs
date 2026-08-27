@@ -161,7 +161,7 @@ impl VfsFileEntry {
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_change_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_change_time(),
             VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_change_time(),
-            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_change_time(),
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_entry_modification_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_change_time(),
         }
     }

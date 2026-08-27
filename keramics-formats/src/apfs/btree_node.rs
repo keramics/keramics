@@ -285,17 +285,21 @@ impl ApfsBtreeNode {
     ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; 4096];
 
-        keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
-            "ApfsBtreeNode",
-            data_stream,
-            &mut data,
-            4096,
-            position,
-        );
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
+
+        keramics_core::debug_trace_data!("ApfsBtreeNode", offset, &data, 4096);
+
         match self.read_data(&data) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read B-tree node data");
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read B-tree node data at offset: {} (0x{:08x})",
+                        offset, offset
+                    )
+                );
                 return Err(error);
             }
         }

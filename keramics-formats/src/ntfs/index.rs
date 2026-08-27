@@ -44,7 +44,7 @@ impl NtfsIndex {
     }
 
     /// Retrieves a specific index entry.
-    pub fn get_entry_at_cluster_block(
+    pub fn get_entry_for_vcn(
         &self,
         data_stream: &DataStreamReference,
         virtual_cluster_number: u64,
@@ -197,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_entry_at_cluster_block() -> Result<(), ErrorTrace> {
+    fn test_get_entry_for_vcn() -> Result<(), ErrorTrace> {
         let path_string: String = get_test_data_path("ntfs/ntfs.raw");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
@@ -209,7 +209,7 @@ mod tests {
         let mut index: NtfsIndex = NtfsIndex::new(4096);
         index.initialize(4096, &index_allocation_attribute)?;
 
-        index.get_entry_at_cluster_block(&data_stream, 0)?;
+        index.get_entry_for_vcn(&data_stream, 0)?;
 
         Ok(())
     }

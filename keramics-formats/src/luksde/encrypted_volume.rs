@@ -158,13 +158,13 @@ impl LuksEncryptedVolume {
 
         let mut data: [u8; 4096] = [0; 4096];
 
-        keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
-            "LuksVolumeHeader",
+        let offset: u64 = keramics_core::data_stream_read_exact_at_position!(
             data_stream,
             &mut data,
-            4096,
             SeekFrom::Start(0),
         );
+        keramics_core::debug_trace_data!("LuksVolumeHeader", offset, &data, 4096);
+
         if &data[0..6] != LUKS_VOLUME_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
@@ -184,7 +184,10 @@ impl LuksEncryptedVolume {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read version 1 volume header"
+                            format!(
+                                "Unable to read version 1 volume header at offset: {} (0x{:08x})",
+                                offset, offset
+                            ),
                         );
                         return Err(error);
                     }
@@ -225,7 +228,10 @@ impl LuksEncryptedVolume {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read version 2 volume header"
+                            format!(
+                                "Unable to read version 2 volume header at offset: {} (0x{:08x})",
+                                offset, offset
+                            ),
                         );
                         return Err(error);
                     }

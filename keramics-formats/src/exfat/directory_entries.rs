@@ -21,16 +21,20 @@ use keramics_types::{Ucs2CharacterMappings, Ucs2String};
 use crate::indexed_hash_map::IndexedHashMap;
 use crate::path_component::PathComponent;
 
-use super::allocation_bitmap_record::ExFatAllocationBitmapRecord;
 use super::block_allocation_table::ExFatBlockAllocationTable;
-use super::case_folding_mappings_record::ExFatCaseFoldingMappingsRecord;
 use super::constants::*;
 use super::data_stream_record::ExFatDataStreamRecord;
 use super::directory_entry::ExFatDirectoryEntry;
 use super::directory_entry_type::ExFatDirectoryEntryType;
-use super::file_entry_record::ExFatFileEntryRecord;
 use super::file_name_record::ExFatFileNameRecord;
 use super::volume_label_record::ExFatVolumeLabelRecord;
+
+#[cfg(feature = "debug-trace")]
+use super::allocation_bitmap_record::ExFatAllocationBitmapRecord;
+#[cfg(feature = "debug-trace")]
+use super::case_folding_mappings_record::ExFatCaseFoldingMappingsRecord;
+#[cfg(feature = "debug-trace")]
+use super::file_entry_record::ExFatFileEntryRecord;
 
 /// Extensible File Allocation Table (exFAT) directory entries.
 pub struct ExFatDirectoryEntries {
@@ -303,15 +307,19 @@ impl ExFatDirectoryEntries {
                 + (((cluster_block_number - 2) as u64)
                     * (block_allocation_table.cluster_block_size as u64));
 
-            keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
+            keramics_core::data_stream_read_exact_at_position!(
+                data_stream,
+                &mut data,
+                SeekFrom::Start(offset),
+            );
+            keramics_core::debug_trace_data!(
                 format!(
                     "ExFatDirectoryEntries cluster block: {}",
                     cluster_block_number
                 ),
-                data_stream,
-                &mut data,
+                offset,
+                &data,
                 block_allocation_table.cluster_block_size,
-                SeekFrom::Start(offset)
             );
             match self.read_data(&data, offset, &mut entries) {
                 Ok(_) => {}

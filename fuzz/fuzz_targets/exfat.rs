@@ -16,14 +16,14 @@
 use libfuzzer_sys::fuzz_target;
 
 use keramics_core::{DataStreamReference, open_fake_data_stream};
-use keramics_formats::fat::FatFileSystem;
+use keramics_formats::exfat::ExFatFileSystem;
 
-// File Allocation Table (FAT) file system fuzz target.
+// Extensible File Allocation Table (exFAT) file system fuzz target.
 fuzz_target!(|data: &[u8]| {
-    let mut fat_file_system: FatFileSystem = FatFileSystem::new();
+    let mut exfat_file_system: ExFatFileSystem = ExFatFileSystem::new();
 
     let data_stream: DataStreamReference = open_fake_data_stream(&data);
-    _ = fat_file_system.read_data_stream(&data_stream);
+    _ = exfat_file_system.read_data_stream(&data_stream);
 
-    _ = fat_file_system.get_root_directory();
+    _ = exfat_file_system.get_root_directory();
 });
