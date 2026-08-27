@@ -946,7 +946,7 @@ The directory (leaf) block entry (xfs_dir_leaf_entry_t) is 8 bytes of size and c
 | 6 | 1 | | Name size, which does not include the end-of-string character |
 | 7 | 1 | | Unknown (padding) |
 
-> Note that s directory (leaf) block entry version 2 (xfs_dir2_leaf_entry_t) is equivalent to
+> Note that a directory (leaf) block entry version 2 (xfs_dir2_leaf_entry_t) is equivalent to
 > version 1.
 
 #### Directory (leaf) block values
@@ -966,7 +966,7 @@ A directory (leaf) block footer version 1 (xfs_dir_leaf_tail_t) is 4 bytes of si
 | --- | --- | --- | --- |
 | 0 | 4 | | Unknown (bestcount) |
 
-> Note that s directory (leaf) block footer version 2 (xfs_dir2_leaf_tail_t) is equivalent to
+> Note that a directory (leaf) block footer version 2 (xfs_dir2_leaf_tail_t) is equivalent to
 > version 1.
 
 ### Block directory {#block_directory}
