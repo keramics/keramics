@@ -1,8 +1,8 @@
 # Property list (plist) format
 
-The property list (plist) formats are used to store various kinds of data, for
-example configuration data. The format is know to be used stand-alone as well
-as embedded in other data formats.
+The property list (plist) formats are used to store various kinds of data, for example
+configuration data. The format is know to be used stand-alone as well as embedded in other data
+formats.
 
 ## Overview
 
@@ -48,8 +48,7 @@ A binary plist file consists of:
 
 ### Binary plist header
 
-The binary plist header (CFBinaryPlistHeader) is 8 bytes in size and consists
-of:
+The binary plist header (CFBinaryPlistHeader) is 8 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -111,8 +110,8 @@ The array object consists of:
 * array of object references that identify the element objects.
 * the element object data
 
-The byte size of the object reference is defined in the trailer. An object
-reference of 1 will refer to the first object in the (object) offset table.
+The byte size of the object reference is defined in the trailer. An object reference of 1 will
+refer to the first object in the (object) offset table.
 
 #### Set object
 
@@ -122,8 +121,8 @@ The set object consists of:
 * array of object references that identify the element objects.
 * the element object data
 
-The byte size of the object reference is defined in the trailer. An object
-reference of 1 will refer to the first object in the (object) offset table.
+The byte size of the object reference is defined in the trailer. An object reference of 1 will
+refer to the first object in the (object) offset table.
 
 #### Dictionary object
 
@@ -134,9 +133,8 @@ The dictionary object consists of:
 * array of object references that identify the value objects.
 * the key/value object data
 
-The byte size of the key and object reference is defined in the trailer. A key
-and object reference of 1 will refer to the first object in the (object) offset
-table.
+The byte size of the key and object reference is defined in the trailer. A key and object reference
+of 1 will refer to the first object in the (object) offset table.
 
 ### (Object) offset table
 
@@ -150,8 +148,7 @@ The offset values are relative from the start of the file.
 
 ### Binary plist trailer
 
-The binary plist trailer (CFBinaryPlistTrailer) is 32 bytes in size and
-consists of:
+The binary plist trailer (CFBinaryPlistTrailer) is 32 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |

@@ -55,7 +55,7 @@ The boot block header is 138 or 144 bytes in size and consists of:
 | 11 | 15 | | System file name |
 | 26 | 1 | | Finder (or shell) file name size, with a maximum of 15 |
 | 27 | 15 | | Finder (or shell) file name, typically "Finder" |
-| 42 | 1 | | Debugger file name size, with a maximum of 15  |
+| 42 | 1 | | Debugger file name size, with a maximum of 15 |
 | 43 | 15 | | Debugger file name, typically "Macsbug" |
 | 58 | 1 | | Disassembler (or second debugger) file name size, with a maximum of 15 |
 | 59 | 15 | | Disassembler (or second debugger) file name, typically "Disassembler" |

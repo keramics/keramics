@@ -1,7 +1,7 @@
 # VMware Virtual Disk (VMDK) format
 
-The VMware Virtual Disk (VMDK) format is used by VMware virtualization products
-as one of its image format.
+The VMware Virtual Disk (VMDK) format is used by VMware virtualization products as one of its image
+format.
 
 ## Overview
 
@@ -30,14 +30,14 @@ There are multiple types of VMKD images, namely:
 The 2GbMaxExtentFlat (or twoGbMaxExtentFlat) disk image, which consists of:
 
 * a descriptor file (&lt;name&gt;.vmdk)
-* raw data extent files (&lt;name&gt;-f###.vmdk), where ### is contains a
-  decimal value starting with 1.
+* raw data extent files (&lt;name&gt;-f###.vmdk), where ### is contains a decimal value starting
+with 1.
 
 The 2GbMaxExtentSparse (or twoGbMaxExtentSparse) disk image, which consists of:
 
 * a descriptor file (&lt;name&gt;.vmdk)
-* VMDK sparse data extent files (&lt;name&gt;-s###.vmdk), where ### is contains
-  a decimal value starting with 1.
+* VMDK sparse data extent files (&lt;name&gt;-s###.vmdk), where ### is contains a decimal value
+starting with 1.
 
 The monolithicFlat disk image, which consists of:
 
@@ -46,8 +46,7 @@ The monolithicFlat disk image, which consists of:
 
 The monolithicSparse disk image, which consists of:
 
-* VMDK sparse data extent file (&lt;name&gt;.vmdk) also contains the descriptor
-  file data.
+* VMDK sparse data extent file (&lt;name&gt;.vmdk) also contains the descriptor file data.
 
 The vmfs disk image, which consists of:
 
@@ -63,16 +62,15 @@ TODO: describe more disk types
 
 ### Delta links
 
-A delta link is similar to a differential image where the image contains the
-changes (or delta) in comparison of a parent image. According to the Virtual
-Disk Format 5.0 specification one delta image can chain to another delta image.
+A delta link is similar to a differential image where the image contains the changes (or delta) in
+comparison of a parent image. According to the Virtual Disk Format 5.0 specification one delta
+image can chain to another delta image.
 
 TODO: Name &lt;name&gt;-delta.vmdk
 
 ## Descriptor file {#descriptor_file}
 
-The descriptor file is a case-insensitive text based file that contains the
-following information:
+The descriptor file is a case-insensitive text based file that contains the following information:
 
 * optional comment and empty lines
 * header
@@ -80,9 +78,8 @@ following information:
 * optional change tracking file
 * disk data base (DDB)
 
-> Note that the descriptor file can contains leading and trailing whitespace.
-> Lines are separated by a line feed character (0x0a). And leading comment
-> (starting with #) and empty lines.
+> Note that the descriptor file can contains leading and trailing whitespace. Lines are separated
+> by a line feed character (0x0a). And leading comment (starting with #) and empty lines.
 
 ### Header
 
@@ -109,8 +106,8 @@ The header consists of the following values:
 | createType | [Disk type](#descriptor_file_disk_types) |
 | parentFileNameHint | Contains the path to the parent image, which is only present if the image is a differential image (delta link) |
 
-TODO: confirm if a content identifier of 'fffffffe' (-2) represents that the
-long content identifier should be used
+TODO: confirm if a content identifier of 'fffffffe' (-2) represents that the long content
+identifier should be used
 
 #### Format versions {#descriptor_file_format_versions}
 
@@ -122,9 +119,8 @@ long content identifier should be used
 
 #### Encodings {#descriptor_file_encodings}
 
-> Note that it is currently unknown which encodings are supported, currently it
-> is assumed that at least the Windows codepages are supported and that the
-> default is UTF-8.
+> Note that it is currently unknown which encodings are supported, currently it is assumed that at
+> least the Windows codepages are supported and that the default is UTF-8.
 
 | Value | Description |
 | --- | --- |
@@ -198,10 +194,9 @@ The extent descriptor consists of the following values:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-The extent offset is specified only for flat extents and corresponds to the
-offset in the file or device where the extent data is located. For
-device-backed virtual disks (physical or raw disks) the extent offset can be
-non-zero. For raw extent data files the extent offset should be zero.
+The extent offset is specified only for flat extents and corresponds to the offset in the file or
+device where the extent data is located. For device-backed virtual disks (physical or raw disks)
+the extent offset can be non-zero. For raw extent data files the extent offset should be zero.
 
 #### Extent access mode {#extent_access_mode}
 
@@ -311,22 +306,21 @@ VirtualBox has been observed to use a different case for "disk" in the section h
 | lsilogic | TODO: add description |
 | legacyESX | TODO: add description |
 
-The buslogic and lsilogic values are for SCSI disks and show which virtual SCSI
-adapter is configured for the virtual machine. The legacyESX value is for older
-ESX Server virtual machines when the adapter type used in creating the virtual
-machine is not known.
+The buslogic and lsilogic values are for SCSI disks and show which virtual SCSI adapter is
+configured for the virtual machine. The legacyESX value is for older ESX Server virtual machines
+when the adapter type used in creating the virtual machine is not known.
 
 ## The raw extent data file
 
-The raw extent data file contains the actual disk data. The raw extent data
-file can be a file or a device.
+The raw extent data file contains the actual disk data. The raw extent data file can be a file or a
+device.
 
 This type of extent data file is also known as "Simple" or "Flat Extent".
 
 ## The VMDK sparse extent data file
 
-The VMDK sparse extent data file contains the actual disk data. A VMDK sparse
-extent data file consists of:
+The VMDK sparse extent data file contains the actual disk data. A VMDK sparse extent data file
+consists of:
 
 * file header
 * optional embedded descriptor file
@@ -337,11 +331,11 @@ extent data file consists of:
 * grains
 * optional backup file header
 
-This type of extent data file is also known as "Hosted Sparse Extent" or
-"Stream-Optimized Compressed Sparse Extent" when markers are used.
+This type of extent data file is also known as "Hosted Sparse Extent" or "Stream-Optimized
+Compressed Sparse Extent" when markers are used.
 
-> Note that the actual layout can vary per file, Stream-Optimized Compressed
-> Sparse Extent have been observed to use secondary file headers.
+> Note that the actual layout can vary per file, Stream-Optimized Compressed Sparse Extent have
+> been observed to use secondary file headers.
 
 Changes in format version 2:
 
@@ -352,8 +346,8 @@ Changes in format version 3:
 * the size of extent files is no longer limited to 2 GiB;
 * added support for persistent changed block tracking (CBT).
 
-> Note that "CBT", the changeTrackPath value in the descriptor file references
-> a file that describes changed areas on the virtual disk.
+> Note that "CBT", the changeTrackPath value in the descriptor file references a file that
+> describes changed areas on the virtual disk.
 
 ### File header
 
@@ -380,17 +374,16 @@ The file header is 512 bytes in size and consists of:
 | 77 | 2 | | [Compression method](#vmdk_compression_method) |
 | 79 | 433 | 0 | Unknown (Padding) |
 
-The end of line characters are used to detect corruption due to file transfers
-that alter line end characters.
+The end of line characters are used to detect corruption due to file transfers that alter line end
+characters.
 
-> According to Virtual Disk Format 5.0 specification the maximum data number of
-> sectors (capacity) should be a multitude of the sectors per grain. Note that
-> it has been observed that this is not always the case.
+> According to Virtual Disk Format 5.0 specification the maximum data number of sectors (capacity)
+> should be a multitude of the sectors per grain. Note that it has been observed that this is not
+> always the case.
 
-If the primary grain directory start sector is 0xffffffffffffffff (GD_AT_END)
-in a Stream-Optimized Compressed Sparse Extent there should be a secondary
-file header stored at offset -1024 relative from the end of the file (stream)
-that contains the correct grain directory start sector.
+If the primary grain directory start sector is 0xffffffffffffffff (GD_AT_END) in a Stream-Optimized
+Compressed Sparse Extent there should be a secondary file header stored at offset -1024 relative
+from the end of the file (stream) that contains the correct grain directory start sector.
 
 #### Flags {#vmdk_extent_file_flags}
 
@@ -399,7 +392,7 @@ The flags consist of the following values:
 <!-- rumdl-disable MD033 MD056 -->
 
 | Value | Identifier | Description |
-| --- | --- | ---  |
+| --- | --- | --- |
 | 0x00000001 | | Valid new line detection test |
 | 0x00000002 | | Use secondary grain directory. The secondary (redundant) grain directory should be used instead of the primary grain directory |
 | <td colspan="3">*As of format version 2*</td> |
@@ -421,9 +414,9 @@ The compression method consist of the following values:
 
 ### Markers
 
-The markers are used in Stream-Optimized Compressed Sparse Extents. The
-corresponding flag must be set for markers to be present. An example of the
-layout of a Stream-Optimized Compressed Sparse Extent that uses markers is:
+The markers are used in Stream-Optimized Compressed Sparse Extents. The corresponding flag must be
+set for markers to be present. An example of the layout of a Stream-Optimized Compressed Sparse
+Extent that uses markers is:
 
 * file header
 * embedded descriptor
@@ -485,8 +478,8 @@ The compressed grain marker indicates that compressed data follows.
 
 #### End of stream marker
 
-The end-of-stream marker indicates the end of the virtual disk. Basically the
-end-of-stream marker is an empty sector block.
+The end-of-stream marker indicates the end of the virtual disk. Basically the end-of-stream marker
+is an empty sector block.
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -509,8 +502,7 @@ The grain table marker indicates that a grain table follows the marker sector bl
 
 #### Grain directory marker
 
-The grain directory marker indicates that a grain directory follows the marker
-sector block.
+The grain directory marker indicates that a grain directory follows the marker sector block.
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -536,16 +528,15 @@ The footer marker indicates that a footer follows the marker sector block.
 
 The grain directory is also referred to as level 0 metadata.
 
-The size of the grain directory is dependent on the number of grains in the
-extent data file. The number of entries in the grain directory can be
-determined as following:
+The size of the grain directory is dependent on the number of grains in the extent data file. The
+number of entries in the grain directory can be determined as following:
 
 ```python
-grain table size = number of grain table entries * grain size
+grain_table_size = number_of_grain_table_entries * grain_size
 
-number of grain directory entries = maximum data size / grain table size
-if maximum data size % grain table size > 0:
-	number of grain directory entries += 1
+number_of_grain_directory_entries = maximum_data_size / grain_table_size
+if maximum_data_size % grain_table_size > 0:
+	number_of_grain_directory_entries += 1
 ```
 
 The grain directory consists of 32-bit grain table offsets:
@@ -556,18 +547,16 @@ The grain directory consists of 32-bit grain table offsets:
 
 The grain directory is stored in a multitude of 512 byte sized blocks.
 
-> Note that as of VMDK sparse extent data file version 2 if the "use
-> zeroed-grain table entry" flag is set, a start sector of 1 indicates the
-> grain table is sparse.
+> Note that as of VMDK sparse extent data file version 2 if the "use zeroed-grain table entry" flag
+> is set, a start sector of 1 indicates the grain table is sparse.
 
 ### Grain table {#vmdk_extent_file_grain_table}
 
 The grain table is also referred to as level 1 metadata.
 
-The size of the grain table is of variable size. The number of entries in the
-grain table is stored in the file header. Note that the number of entries in
-the last grain table is dependent on the maximum data size and not necessarily
-the same as the value stored in the file header.
+The size of the grain table is of variable size. The number of entries in the grain table is stored
+in the file header. Note that the number of entries in the last grain table is dependent on the
+maximum data size and not necessarily the same as the value stored in the file header.
 
 The grain directory consists of 32-bit grain table offsets:
 
@@ -575,22 +564,19 @@ The grain directory consists of 32-bit grain table offsets:
 | --- | --- | --- | --- |
 | 0 | 4 | | Grain data sector number, which is relative from the start of the file or 0 if sparse or the sector is stored in the parent image |
 
-The number of entries in a grain table and should be 512, therefore the size of
-the grain table is 512 x 4 = 2048 bytes.
+The number of entries in a grain table and should be 512, therefore the size of the grain table is
+512 x 4 = 2048 bytes.
 
 The grain table is stored in a multitude of 512 byte sized blocks.
 
-> Note that as of VMDK sparse extent data file version 2 if the "use
-> zeroed-grain table entry" flag is set, a sector number of 1 indicates the
-> grain table is sparse.
+> Note that as of VMDK sparse extent data file version 2 if the "use zeroed-grain table entry" flag
+> is set, a sector number of 1 indicates the grain table is sparse.
 
 ### Grain data
 
-In an uncompressed sparse extent data file the data is stored at the grain data
-sector number.
+In an uncompressed sparse extent data file the data is stored at the grain data sector number.
 
-In a compressed sparse extent data file every non-sparse grain is assumed to be
-stored compressed.
+In a compressed sparse extent data file every non-sparse grain is assumed to be stored compressed.
 
 #### Compressed grain data
 
@@ -613,14 +599,12 @@ The uncompressed data size should be the grain size or less for the last grain.
 
 ### Footer {#vmdk_extent_file_footer}
 
-The footer is only used in Stream-Optimized Compressed Sparse Extents. The
-footer is the same as the file header. The footer should be the last block of
-the disk and immediately followed by the end-of-stream marker so that they
-together make up the last two sectors of the disk.
+The footer is only used in Stream-Optimized Compressed Sparse Extents. The footer is the same as
+the file header. The footer should be the last block of the disk and immediately followed by the
+end-of-stream marker so that they together make up the last two sectors of the disk.
 
-The header and footer differ in that the grain directory offset value in the
-header is set to 0xffffffffffffffff (GD_AT_END) and in the footer to the correct
-value.
+The header and footer differ in that the grain directory offset value in the header is set to
+0xffffffffffffffff (GD_AT_END) and in the footer to the correct value.
 
 ### Changed block tracking (CBT)
 
@@ -628,8 +612,8 @@ TODO: complete section
 
 ## The COWD sparse extent data file
 
-The copy-on-write disk (COWD) sparse extent data file contains the actual disk
-data. The COW sparse extent data file consists of:
+The copy-on-write disk (COWD) sparse extent data file contains the actual disk data. The COW sparse
+extent data file consists of:
 
 * file header
 * grain directory
@@ -673,16 +657,14 @@ The file header is 2048 bytes in size and consists of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-> Note that the parent file name seems not to be set in recent delta sparse
-> extent files.
+> Note that the parent file name seems not to be set in recent delta sparse extent files.
 
 ### Grain directory
 
 The grain directory is also referred to as level 0 metadata.
 
-The size of the grain directory is dependent on the number of grains in the
-extent data file. The number of entries in the grain directory is stored in the
-file header.
+The size of the grain directory is dependent on the number of grains in the extent data file. The
+number of entries in the grain directory is stored in the file header.
 
 The grain directory consists of 32-bit grain table offsets:
 
@@ -690,15 +672,14 @@ The grain directory consists of 32-bit grain table offsets:
 | --- | --- | --- | --- |
 | 0 | 4 | | Grain table start sector, which is relative from the start of the file or 0 if not set |
 
-The grain directory is stored in a multitude of 512 byte sized blocks. Unused
-bytes are set to 0.
+The grain directory is stored in a multitude of 512 byte sized blocks. Unused bytes are set to 0.
 
 ### Grain table
 
 The grain table is also referred to as level 1 metadata.
 
-The size of the grain table is of variable size. The number of entries in a
-grain table is the fixed value of 4096.
+The size of the grain table is of variable size. The number of entries in a grain table is the
+fixed value of 4096.
 
 The grain directory consists of 32-bit grain table offsets:
 
@@ -706,8 +687,7 @@ The grain directory consists of 32-bit grain table offsets:
 | --- | --- | --- | --- |
 | 0 | 4 | | Grain sector number, which is relative from the start of the file or 0 if not set |
 
-The grain table is stored in a multitude of 512 byte sized blocks. Unused bytes
-are set to 0.
+The grain table is stored in a multitude of 512 byte sized blocks. Unused bytes are set to 0.
 
 ## Change tracking file
 
@@ -729,15 +709,13 @@ TODO: complete section
 
 ## Format edge cases and corruption scenarios
 
-The total size specified by the number of grain table entries is lager than
-size specified by the maximum number of sectors. Seen in VMDK images generated
-by qemu-img.
+The total size specified by the number of grain table entries is lager than size specified by the
+maximum number of sectors. Seen in VMDK images generated by qemu-img.
 
 ## Notes
 
-The markers can be used to scan for the individual parts of the VMDK sparse
-extent data file if the stream has been truncated, but not that this can be
-very expensive process IO-wise.
+The markers can be used to scan for the individual parts of the VMDK sparse extent data file if the
+stream has been truncated, but not that this can be very expensive process IO-wise.
 
 ## References
 

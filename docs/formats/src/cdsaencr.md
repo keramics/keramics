@@ -295,7 +295,7 @@ TODO: complete section
 | 63 | CSSM_ALGID_SSL3MasterDerive | Derive an SSL 3 key from a pre-master key |
 | 64 | CSSM_ALGID_SSL3KeyAndMacDerive | Derive SSL3 key and MAC |
 | 65 | CSSM_ALGID_SSL3MD5_MAC | SSL 3 with MD5 MAC |
-| 66 | CSSM_ALGID_SSL3SHA1_MAC | SSL 3 with SHA-1 MAC  |
+| 66 | CSSM_ALGID_SSL3SHA1_MAC | SSL 3 with SHA-1 MAC |
 | 67 | CSSM_ALGID_PKCS5_PBKDF1_MD5 | PKCS5 key derivation using PBKDF1 with MD5 |
 | 68 | CSSM_ALGID_PKCS5_PBKDF1_MD2 | PKCS5 key derivation using PBKDF1 with MD2 |
 | 69 | CSSM_ALGID_PKCS5_PBKDF1_SHA1 | PKCS5 key derivation using PBKDF1 with SHA-1 |

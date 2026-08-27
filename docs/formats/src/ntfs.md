@@ -409,8 +409,7 @@ TODO: provide examples on applying the fix-up values.
 
 ### The file reference {#file_reference}
 
-The file reference (FILE_REFERENCE or MFT_SEGMENT_REFERENCE) is 8 bytes in size
-and consists of:
+The file reference (FILE_REFERENCE or MFT_SEGMENT_REFERENCE) is 8 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1255,8 +1254,7 @@ TODO: link to LZNT1 documentation
 
 ### Windows Overlay Filter (WOF) compressed data
 
-A MFT entry that contains Windows Overlay Filter (WOF) compressed data has the
-following attributes:
+A MFT entry that contains Windows Overlay Filter (WOF) compressed data has the following attributes:
 
 * reparse point attribute with tag 0x80000017, which defines the compression method
 * a nameless data attribute that is sparse and contains the uncompressed data size

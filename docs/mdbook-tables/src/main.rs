@@ -12,7 +12,7 @@
  */
 
 use std::env;
-use std::io;
+use std::io::{Read, Write, stdin, stdout};
 use std::iter;
 use std::process::ExitCode;
 
@@ -162,7 +162,7 @@ impl Preprocessor for TablesPreprocessor {
     }
 }
 
-pub fn handle_preprocessing(reader: impl io::Read) -> Result<String, Error> {
+pub fn handle_preprocessing(reader: impl Read) -> Result<String, Error> {
     let preprocessor: TablesPreprocessor = TablesPreprocessor::new();
 
     let (context, book): (PreprocessorContext, Book) = mdbook_preprocessor::parse_input(reader)?;
@@ -185,9 +185,21 @@ fn main() -> ExitCode {
         }
         None => {}
     }
-    if let Err(error) = handle_preprocessing(io::stdin()) {
-        eprintln!("{}", error);
-        return ExitCode::FAILURE;
+    let output: String = match handle_preprocessing(stdin()) {
+        Ok(string) => string,
+        Err(error) => {
+            eprintln!("{}", error);
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut stdout = stdout();
+
+    match stdout.write_all(output.as_bytes()) {
+        Ok(_) => {}
+        Err(error) => {
+            eprintln!("{}", error);
+            return ExitCode::FAILURE;
+        }
     }
     ExitCode::SUCCESS
 }

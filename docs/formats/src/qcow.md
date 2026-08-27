@@ -1,7 +1,7 @@
 # QEMU Copy-On-Write (QCOW) image file format
 
-The QEMU Copy-On-Write (QCOW) image file format is used by the QEMU Open Source
-Process Emulator to store disk images (storage media)
+The QEMU Copy-On-Write (QCOW) image file format is used by the QEMU Open Source Process Emulator to
+store disk images (storage media)
 
 ## Overview
 
@@ -17,14 +17,13 @@ A QCOW image file consists of:
   * level 2 tables
   * storage media data
 
-The storage media data is stored in clusters. Each cluster is a multitude of
-512 bytes. The level 1 (L1) table contains level 1 reference of level 2 (L2)
-tables. The level 2 tables contain level 2 references of the storage media
-clusters.
+The storage media data is stored in clusters. Each cluster is a multitude of 512 bytes. The level 1
+(L1) table contains level 1 reference of level 2 (L2) tables. The level 2 tables contain level 2
+references of the storage media clusters.
 
-There are multiple versions of the QCOW image file format. QCOW (version 1)
-and QCOW2 (version 2 and later) are sometimes considered even as separate image
-formats. Version 3 is considered as an extended version of QCOW2.
+There are multiple versions of the QCOW image file format. QCOW (version 1) and QCOW2 (version 2
+and later) are sometimes considered even as separate image formats. Version 3 is considered as an
+extended version of QCOW2.
 
 ### Characteristics
 
@@ -40,17 +39,16 @@ The number of bytes per sector is 512.
 
 ### Encryption
 
-The QCOW image format can encrypted the media data stored in the image format.
-Currently supported encryption methods are:
+The QCOW image format can encrypted the media data stored in the image format. Currently supported
+encryption methods are:
 
 * AES-CBC 128-bit
 * Linux Unified Key Setup (LUKS)
 
-If no encryption is used the encryption method in the file header is set to
-none (0).
+If no encryption is used the encryption method in the file header is set to none (0).
 
-> Note it is currently unknown if the format supports compression and encryption
-> at the same time. It does not appear to be supported by qemu-img.
+> Note it is currently unknown if the format supports compression and encryption at the same time.
+> It does not appear to be supported by qemu-img.
 
 #### AES-CBC 128-bit
 
@@ -58,18 +56,16 @@ Both encryption and decryption use:
 
 * AES-CBC with a 128-bits key decryption of sector data
 
-The key is direct copy of the first 16 characters of a user provided (narrow
-character) password. If the password is smaller than 16 characters. The
-remaining key data is set to 0-byte values.
+The key is direct copy of the first 16 characters of a user provided (narrow character) password.
+If the password is smaller than 16 characters. The remaining key data is set to 0-byte values.
 
-> Note that it is currently unclear which character sets are allowed and how
-> characters outside the 7-bit ASCII set should be handled.
+> Note that it is currently unclear which character sets are allowed and how characters outside the
+7-bit ASCII set should be handled.
 
-The initialization vector of the AES-CBC is using media data sector number
-(relative to the start of the disk) in little-endian format as the first 64
-bits of the 128 bit initialization vector. The remaining initialization vector
-data is set to 0-byte values. The first sector number is 0 and the bytes per
-sector are 512.
+The initialization vector of the AES-CBC is using media data sector number (relative to the start
+of the disk) in little-endian format as the first 64 bits of the 128 bit initialization vector. The
+remaining initialization vector data is set to 0-byte values. The first sector number is 0 and the
+bytes per sector are 512.
 
 #### Linux Unified Key Setup (LUKS)
 
@@ -119,8 +115,7 @@ if media_size % level1_table_entry_size != 0:
 level1_table_size *= 8
 ```
 
-The backing file name is set in snapshot image files and is normally stored
-after the file header.
+The backing file name is set in snapshot image files and is normally stored after the file header.
 
 ### File header – version 2
 
@@ -166,8 +161,7 @@ The level 1 table size is calculated as:
 level1_table_size = number_of_level1_table_references * 8
 ```
 
-The backing file name is set in snapshot image files and is normally stored
-after the file header.
+The backing file name is set in snapshot image files and is normally stored after the file header.
 
 ### File header – version 3
 
@@ -225,8 +219,7 @@ The level 1 table size is calculated as:
 level1_table_size = number_of_level1_table_references * 8
 ```
 
-The backing file name is set in snapshot image files and is normally stored
-after the file header.
+The backing file name is set in snapshot image files and is normally stored after the file header.
 
 ### Encryption methods
 
@@ -293,8 +286,7 @@ The file header extension header is 8 bytes in size and consist of:
 
 #### Backing format file header extension
 
-The backing format file header extension header is of variable size and consist
-of:
+The backing format file header extension header is of variable size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -306,8 +298,7 @@ TODO: complete section
 
 #### Crypto header file header extension
 
-The crypto header file header extension header is 16 bytes in size and consist
-of:
+The crypto header file header extension header is 16 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -330,8 +321,8 @@ TODO: complete section
 
 The level 1 table contains level 2 table references.
 
-A reference value of 0 represents unused or unallocated and is considered as
-sparse or stored in a corresponding backing file.
+A reference value of 0 represents unused or unallocated and is considered as sparse or stored in a
+corresponding backing file.
 
 ### Level 2 table reference – version 1
 
@@ -352,8 +343,8 @@ The level 2 table reference is 8-bytes in size and consists of:
 | 7.6 | 1 bit | QCOW_OFLAG_COMPRESSED | Is compressed flag |
 | 7.7 | 1 bit | QCOW_OFLAG_COPIED | Is copied flag |
 
-The is copied flag indicates that the reference count of the corresponding
-level 2 table is exactly one.
+The is copied flag indicates that the reference count of the corresponding level 2 table is exactly
+one.
 
 ## Level 2 table
 
@@ -365,8 +356,8 @@ The level 2 table size is calculated as:
 level2_table_size = (1 << number_of_level2_table_bits) * 8
 ```
 
-A reference value of 0 represents unused or unallocated and is considered as
-sparse or stored in a corresponding backing file.
+A reference value of 0 represents unused or unallocated and is considered as sparse or stored in a
+corresponding backing file.
 
 ### Cluster block reference – version 1
 
@@ -387,38 +378,18 @@ The cluster block reference - version 2 or 3 is 8-bytes in size and consists of:
 | 7.6 | 1 bit | QCOW_OFLAG_COMPRESSED | Is compressed flag |
 | 7.7 | 1 bit | QCOW_OFLAG_COPIED | Is copied flag |
 
-The is copied flag indicates that the reference count of the corresponding
-cluster block is exactly one.
+The is copied flag indicates that the reference count of the corresponding cluster block is exactly
+one.
 
 ## Reference count table
 
-The cluster data blocks are referenced counted. For every cluster data block a
-16-bit reference count is stored in the reference count table.
+The cluster data blocks are referenced counted. For every cluster data block a 16-bit reference
+count is stored in the reference count table.
 
-The reference count table is stored in cluster block sizes. The file header
-contains the number of blocks (or reference count table clusters).
+The reference count table is stored in cluster block sizes. The file header contains the number of
+blocks (or reference count table clusters).
 
 TODO: complete section
-
-### Notes
-
-```text
-reference count cluster block offset = cluster data block offset /
-reference count table offset = cluster data block /
-
-In order to obtain the reference count of a given cluster, you split the
-cluster offset into a refcount table offset and refcount block offset.
-
-Since a refcount block is a single cluster of 2 byte entries, the lower
-cluster_size - 1 bits is used as the block offset and the rest of the bits are
-used as the table offset.
-
-One optimization is that if any cluster pointed to by an L1 or L2 table entry
-has a refcount exactly equal to one, the most significant bit of the L1/L2
-entry is set as a "copied" flag. This indicates that no snapshots are using
-this cluster and it can be immediately written to without having to make a copy
-for any snapshots referencing it.
-```
 
 ## Cluster data block
 
@@ -442,9 +413,9 @@ For version 2 and 3:
 level1_table_index = (offset & 0x3fffffffffffffff) >> level1_table_index_bit_shift
 ```
 
-Retrieve the level 2 table offset from the level 1 table. If the level 2 table
-offset is 0 and the image has a backing file the cluster data block is stored
-in the backing file otherwise the cluster block is considered sparse.
+Retrieve the level 2 table offset from the level 1 table. If the level 2 table offset is 0 and the
+image has a backing file the cluster data block is stored in the backing file otherwise the cluster
+block is considered sparse.
 
 Read the corresponding level 2 table.
 
@@ -458,9 +429,9 @@ level2_table_index_bit_mask = ~(0xffffffffffffffff << number_of_level2_table_bit
 level2_table_index = (offset >> number_of_cluster_block_bits) >> level2_table_index_bit_mask
 ```
 
-Retrieve the cluster block offset from the level 2 table. If the cluster block
-offset is 0 and the image has a backing file the cluster data block is stored
-in the backing file otherwise the cluster block is considered sparse.
+Retrieve the cluster block offset from the level 2 table. If the cluster block offset is 0 and the
+image has a backing file the cluster data block is stored in the backing file otherwise the cluster
+block is considered sparse.
 
 ### Uncompressed cluster data block
 
@@ -474,18 +445,17 @@ cluster_block_bit_mask = ~(0xffffffffffffffff << number_of_cluster_block_bits)
 cluster_block_data_offset = (offset & cluster_block_bit_mask) + cluster_block_offset
 ```
 
-Note that in version 2 or 3 the last cluster block in the file can be smaller than
-the cluster block size defined by the number of cluster block bits in the file
-header. This does not seem to be the case for version 1.
+> Note that in version 2 or 3 the last cluster block in the file can be smaller than the cluster
+> block size defined by the number of cluster block bits in the file header. This does not seem to
+> be the case for version 1.
 
 ### Compressed cluster data block
 
-If the is compressed flag (QCOW_OFLAG_COMPRESSED) is set the cluster block data
-is stored using the compression method defined by the file header or DEFLATE by
-default.
+If the is compressed flag (QCOW_OFLAG_COMPRESSED) is set the cluster block data is stored using the
+compression method defined by the file header or DEFLATE by default.
 
-Multiple compressed cluster data blocks are stored together in cluster block
-sizes. The compressed cluster data blocks are sector (512 bytes) aligned.
+Multiple compressed cluster data blocks are stored together in cluster block sizes. The compressed
+cluster data blocks are sector (512 bytes) aligned.
 
 The compressed data uses a DEFLATE (inflate) window bits value of -12
 
@@ -518,11 +488,10 @@ compressed_block_size = (
     (((cluster_block_offset & 0x3fffffffffffffff) >> compressed_size_bit_shift) + 1) * 512)
 ```
 
-Since the compressed block size is stored in 512 byte sectors this value does
-not contain the exact byte size of the compressed cluster block data. It
-sometimes lacks the size of the last partially filled sector and one sector
-should be added if possible within the bounds of the cluster blocks size and
-the file size.
+Since the compressed block size is stored in 512 byte sectors this value does not contain the exact
+byte size of the compressed cluster block data. It sometimes lacks the size of the last partially
+filled sector and one sector should be added if possible within the bounds of the cluster blocks
+size and the file size.
 
 ```python
 cluster_block_offset &= ~(0xffffffffffffffff << compressed_size_bit_shift)
@@ -530,16 +499,14 @@ cluster_block_offset &= ~(0xffffffffffffffff << compressed_size_bit_shift)
 
 ## Snapshots
 
-As of version 1 QCOW can use the backing file name in the file header to point
-to a backing file (or parent image) that contains the snapshot image where the
-current image only contains the modifications. Version 2 adds support to store
-snapshot inside the image.
+As of version 1 QCOW can use the backing file name in the file header to point to a backing file
+(or parent image) that contains the snapshot image where the current image only contains the
+modifications. Version 2 adds support to store snapshot inside the image.
 
 ### Snapshot header - version 2 or 3
 
-An in-image snapshot is created by adding a snapshot header, copying the L1
-table and incrementing the reference counts of all L2 tables and data clusters
-referenced by the L1 table.
+An in-image snapshot is created by adding a snapshot header, copying the L1 table and incrementing
+the reference counts of all L2 tables and data clusters referenced by the L1 table.
 
 The snapshot header is of variable size and consists of:
 
@@ -554,9 +521,9 @@ The snapshot header is of variable size and consists of:
 | 24 | 8 | | VM clock in nano seconds |
 | 32 | 4 | | VM state size |
 | 36 | 4 | | Extra data size |
-| 40 | ...  | | Extra data |
-| ...  | ...  | | Identifier string size |
-| ...  | ...  | | Name |
+| 40 | ... | | Extra data |
+| ... | ... | | Identifier string size |
+| ... | ... | | Name |
 
 TODO: complete section
 

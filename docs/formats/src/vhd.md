@@ -159,7 +159,7 @@ The maximum number of block allocation table entries should match the maximum po
 blocks in the disk.
 
 > Note that the parent name can also contain a full path, e.g. in .avhd files. The part segments
-are separated by the \ character.
+> are separated by the \ character.
 
 ### Parent locator entry
 

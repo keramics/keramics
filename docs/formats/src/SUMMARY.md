@@ -30,6 +30,7 @@
   * [Hierarchical File System (HFS)](hfs.md)
   * [Macintosh File System (MFS)](mfs.md)
   * [New Technologies File System (NTFS)](ntfs.md)
+  * [X File System (XFS)](xfs.md)
 * [Hybrid volume and file system formats](hybrid.md)
   * [Apple File System (APFS)](apfs.md)
 * [Assorted formats](assorted.md)

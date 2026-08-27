@@ -12,10 +12,10 @@ A BSD disklabel consists of one or more partition entries, labeled alphabeticall
 
 Labels "a", "b", "c" and "d" have a predefined meaning:
 
-* "a" is the "root" partition;
-* "b" is the "swap" partition;
-* "c" is the volume used by disklabel;
-* "d" is the entire physical disk.
+* "a" is the "root" partition
+* "b" is the "swap" partition
+* "c" is the volume used by disklabel
+* "d" is the entire physical disk
 
 > Note that information about partition "d" is not stored in the corresponding BSD disklabel
 > partition entry and typically filled with 0-byte values.

@@ -1,13 +1,11 @@
 # Parallels Disk Image (PDI) format
 
-The Parallels Disk Image format used in Parallels virtualization products as
-one of its image formats. It is both used the store hard disk images and
-snapshots.
+The Parallels Disk Image format used in Parallels virtualization products as one of its image
+formats. It is both used the store hard disk images and snapshots.
 
 ## Overview
 
-A Parallels Disk Image consists of a directory, typically named "{NAME}.hdd"
-containing:
+A Parallels Disk Image consists of a directory, typically named "{NAME}.hdd" containing:
 
 * Descriptor file (DiskDescriptor.xml) and backup (DiskDescriptor.xml.Backup)
 * {NAME}.hdd file
@@ -37,8 +35,8 @@ The number of bytes per sector is 512.
 
 ## Descriptor file
 
-The DiskDescriptor.xml and its backup (DiskDescriptor.xml.Backup) contain
-the "Parallels_disk_image" XML element tha consists of the following values:
+The DiskDescriptor.xml and its backup (DiskDescriptor.xml.Backup) contain the
+"Parallels_disk_image" XML element tha consists of the following values:
 
 | Identifier | Description |
 | --- | --- |
@@ -96,8 +94,8 @@ the "Parallels_disk_image" XML element tha consists of the following values:
 
 ### Disk parameters
 
-The disk parameters are stored in the "Disk_Parameters" XML element and
-contains the following values.
+The disk parameters are stored in the "Disk_Parameters" XML element and contains the following
+values.
 
 | Identifier | Description |
 | --- | --- |
@@ -207,13 +205,11 @@ The "Shot" XML element contains the following values.
 
 ## Raw storage data file
 
-The raw (or plain) storage data file contains the disk image data including
-free space.
+The raw (or plain) storage data file contains the disk image data including free space.
 
 ### Sparse storage data file
 
-The sparse storage data file contains the actual disk image data without free
-space.
+The sparse storage data file contains the actual disk image data without free space.
 
 A sparse storage data file consists of:
 
@@ -241,10 +237,8 @@ The sparse storage data file header is 64 bytes in size and consists of:
 
 #### Block allocation table (BAT)
 
-The block allocation table consists of 32-bit entries. An entry contains the
-sector number where the data block starts is set to 0 if the block is sparse or
-stored in the parent disk image.
+The block allocation table consists of 32-bit entries. An entry contains the sector number where
+the data block starts is set to 0 if the block is sparse or stored in the parent disk image.
 
-For example block allocation table entry 0 corresponds to disk image offset 0.
-If contains a value of 0x800 the corresponding data block is stored at file
-offset 0x100000 (0x800 x 512).
+For example block allocation table entry 0 corresponds to disk image offset 0. If contains a value
+of 0x800 the corresponding data block is stored at file offset 0x100000 (0x800 x 512).
