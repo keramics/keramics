@@ -119,4 +119,25 @@ mod tests {
         let test_checksum: u32 = test_context.finalize();
         assert_eq!(test_checksum, 0x3222f597);
     }
+
+    #[test]
+    fn test_update_and_finalize_with_empty_data() {
+        let mut test_context: Adler32Context = Adler32Context::new(1);
+
+        test_context.update(&[]);
+
+        let test_checksum: u32 = test_context.finalize();
+        assert_eq!(test_checksum, 0x000000001);
+    }
+
+    #[test]
+    fn test_update_and_finalize_with_multitude_of_chunk_size() {
+        let mut test_context: Adler32Context = Adler32Context::new(1);
+
+        let test_data: Vec<u8> = get_test_data(11104);
+        test_context.update(&test_data);
+
+        let test_checksum: u32 = test_context.finalize();
+        assert_eq!(test_checksum, 0xbe847d8c);
+    }
 }
