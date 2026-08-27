@@ -1,7 +1,6 @@
 # Extended File System (ext) format
 
-The Extended File System (ext) is one of the more common file system used in
-Linux.
+The Extended File System (ext) is one of the more common file system used in Linux.
 
 There are multiple version of ext.
 
@@ -37,46 +36,41 @@ A block group consists of:
 * inode bitmap
 * allocated and unallocated blocks
 
-The primary superblock is stored at offset 1024 relative from the start of the
-volume. Backup superblocks are stored at offset 1024 relative from the start of
-the block group if block size <= 1024 or otherwise at offset 0 from the start
-of the block group.
+The primary superblock is stored at offset 1024 relative from the start of the volume. Backup
+superblocks are stored at offset 1024 relative from the start of the block group if block
+size <= 1024 or otherwise at offset 0 from the start of the block group.
 
 The group descriptor table is stored in the block after the superblock.
 
-An ext2 file system with revision 0 stores a copy at the start of every block
-group, along with backups of the group descriptor table. Later revisions reduce
-the number of backup copies by only putting backups in specific groups (sparse
-superblock feature EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER).
+An ext2 file system with revision 0 stores a copy at the start of every block group, along with
+backups of the group descriptor table. Later revisions reduce the number of backup copies by only
+putting backups in specific groups (sparse superblock feature EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER).
 
-Not all values in a backup superblock and backup group descriptor tables match
-those of the primary superblock and group descriptor table.
+Not all values in a backup superblock and backup group descriptor tables match those of the primary
+superblock and group descriptor table.
 
-> Note that backup superblocks can be empty (filled with 0-byte values) or
-> contain remnant data on an Android ext file system with sparse_super.
+> Note that backup superblocks can be empty (filled with 0-byte values) or contain remnant data on
+> an Android ext file system with sparse_super.
 
 ### Flex block groups
 
-Flex (or flexible) block groups are a set of block groups that treated as
-a single logical block group. Metadata such as the superblock, group
-descriptors, data block bitmaps spans the entire logical block group and
-not the individual block groups part of the set.
+Flex (or flexible) block groups are a set of block groups that treated as a single logical block
+group. Metadata such as the superblock, group descriptors, data block bitmaps spans the entire
+logical block group and not the individual block groups part of the set.
 
 ### Meta block groups
 
-Meta block groups (META_BG) are a set (or cluster) of block groups, for which
-its group descriptor structures can be stored in a single block.
+Meta block groups (META_BG) are a set (or cluster) of block groups, for which its group descriptor
+structures can be stored in a single block.
 
-The first meta block group value in the superblock indicates what the first
+The first meta block group value in the superblock indicates what the first meta block group is to
+cluster as a meta block group. For example if the first meta block group value is 256, and the
+number of group descriptors that can be stored in a single block 64, then the group descriptors for
+the block groups \[0, 16383\] are stored in the group descriptor table after the primary superblock
+and corresponding locations of backups.
 
-meta block group value is 256, and the number of group descriptors that can be
-stored in a single block 64, then the group descriptors for the block groups
-\[0, 16383\] are stored in the group descriptor table after the primary
-superblock and corresponding locations of backups.
-
-Successive group descriptor tables, for example \[16384, 16447\], are stored in
-the first block group of a meta block group and backups in the second and last
-block groups of the meta block group.
+Successive group descriptor tables, for example \[16384, 16447\], are stored in the first block
+group of a meta block group and backups in the second and last block groups of the meta block group.
 
 ### Blocks
 
@@ -327,35 +321,35 @@ The superblock is 1024 bytes in size and consists of:
 
 If checksum type is CRC-32C, the checksum is stored as 0xffffffff - CRC-32C.
 
-> Note that some versions of mkfs.ext set the file system creation time even for
-> ext2 and when EXT3_FEATURE_COMPAT_HAS_JOURNAL is not set.
+> Note that some versions of mkfs.ext set the file system creation time even for ext2 and when
+> EXT3_FEATURE_COMPAT_HAS_JOURNAL is not set.
 
 TODO: Is the only way to determine the file system version the compatibility and equivalent flags?
 
 ### Checksum calculation
 
-If checksum type is CRC-32C, the CRC32-C algorithm with the Castagnoli
-polynomial (0x1edc6f41) and initial value of 0 is used to calculate the
-checksum.
+If checksum type is CRC-32C, the CRC32-C algorithm with the Castagnoli polynomial (0x1edc6f41) and
+initial value of 0 is used to calculate the checksum.
 
 The checksum is calculated over the 1020 bytes of data of the suberblock.
 
 ### Metadata checksum seed calculation
 
-If checksum type is CRC-32C, the CRC32-C algorithm with the Castagnoli
-polynomial (0x1edc6f41) and initial value of 0 is used to calculate the
-checksum.
+If checksum type is CRC-32C, the CRC32-C algorithm with the Castagnoli polynomial (0x1edc6f41) and
+initial value of 0 is used to calculate the checksum.
 
 The checksum is calculated over:
 
 * the 16 byte file system identifier in the superblock
 
-If EXT4_FEATURE_INCOMPAT_CSUM_SEED is set the metadata checksum seed value
-stored in the superblock should be used instead of calculating it based on the
-file system identifier.
+If EXT4_FEATURE_INCOMPAT_CSUM_SEED is set the metadata checksum seed value stored in the superblock
+should be used instead of calculating it based on the file system identifier.
 
-If checksum type is CRC-32C, the metadata checksum seed is stored as
-0xffffffff - CRC-32C.
+If checksum type is CRC-32C, the metadata checksum seed is stored as:
+
+```text
+0xffffffff - CRC-32C
+```
 
 ### File system state flags {#file_system_state_flags}
 
@@ -408,8 +402,8 @@ If checksum type is CRC-32C, the metadata checksum seed is stored as
 | 0x00000800 | EXT4_FEATURE_COMPAT_STABLE_INODES | Unknown (stable inodes) |
 | 0x00001000 | EXT4_FEATURE_COMPAT_ORPHAN_FILE | Has orphan file |
 
-> Note that EXT2_FEATURE_COMPAT_, EXT3_FEATURE_COMPAT_, EXT4_FEATURE_COMPAT_ and
-> COMPAT_ can be used interchangeably.
+> Note that EXT2_FEATURE_COMPAT_, EXT3_FEATURE_COMPAT_, EXT4_FEATURE_COMPAT_ and COMPAT_ can be
+> used interchangeably.
 
 ### Incompatible feature flags {#incompatible_feature_flags}
 
@@ -434,8 +428,8 @@ If checksum type is CRC-32C, the metadata checksum seed is stored as
 | 0x00010000 | EXT4_FEATURE_INCOMPAT_ENCRYPT | Has encrypted inodes |
 | 0x00020000 | EXT4_FEATURE_INCOMPAT_CASEFOLD | Hash case folding |
 
-> Note that EXT2_FEATURE_INCOMPAT_, EXT3_FEATURE_INCOMPAT_,
-> EXT4_FEATURE_INCOMPAT_ and INCOMPAT_ can be used interchangeably.
+> Note that EXT2_FEATURE_INCOMPAT_, EXT3_FEATURE_INCOMPAT_, EXT4_FEATURE_INCOMPAT_ and INCOMPAT_
+> can be used interchangeably.
 
 ### Read-only compatible feature flags {#read_only_compatible_feature_flags}
 
@@ -459,12 +453,12 @@ If checksum type is CRC-32C, the metadata checksum seed is stored as
 | 0x00008000 | EXT4_FEATURE_RO_COMPAT_VERITY | Unknown (Verity inodes may be present on the filesystem) |
 | 0x00010000 | EXT4_FEATURE_RO_COMPAT_ORPHAN_PRESENT | Orphan file may be non-empty |
 
-EXT2_FEATURE_RO_COMPAT_, EXT3_FEATURE_RO_COMPAT_, EXT4_FEATURE_RO_COMPAT_ and
-RO_COMPAT_ are used interchangeably.
+> Note that EXT2_FEATURE_RO_COMPAT_, EXT3_FEATURE_RO_COMPAT_, EXT4_FEATURE_RO_COMPAT_ and
+> RO_COMPAT_ are used interchangeably.
 
-> Note that in some ext file systems used by ChromeOS it has been observed that
-> the upper 8-bits of the read-only compatible feature flags are set as in
-> 0xff000003. debugfs identifies these as FEATURE_R24 - FEATURE_R31.
+In some ext file systems, such as those used by ChromeOS, it has been observed that the upper
+8-bits of the read-only compatible feature flags are set as in 0xff000003. debugfs identifies these
+as FEATURE_R24 - FEATURE_R31.
 
 ### Checksum types {#checksum_types}
 
@@ -495,9 +489,8 @@ The ext2 and ext3 group descriptor is 32 bytes in size and consists of:
 | 18 | 2 | | Unknown (padding) |
 | 20 | 3 x 4 | | Unknown (reserved) |
 
-> Note that it has been observed that implementations that support ext4 can set
-> a value in the padding. It is currently assumed that this value contains
-> [block group flags](#block_group_flags).
+> Note that it has been observed that implementations that support ext4 can set a value in the
+> padding. It is currently assumed that this value contains [block group flags](#block_group_flags).
 
 ### The ext4 group descriptor
 
@@ -534,14 +527,13 @@ The ext4 group descriptor is 68 bytes in size and consists of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-If checksum type is CRC-32C, the checksum is stored as the lower 16-bits of
-0xffffffff - CRC-32C, otherwise the checksum is stored as a CRC-16.
+If checksum type is CRC-32C, the checksum is stored as the lower 16-bits of 0xffffffff - CRC-32C,
+otherwise the checksum is stored as a CRC-16.
 
 ### Checksum calculation
 
-If checksum type is CRC-32C, the CRC32-C algorithm with the Castagnoli
-polynomial (0x1edc6f41) and initial value of 0 is used to calculate the
-checksum.
+If checksum type is CRC-32C, the CRC32-C algorithm with the Castagnoli polynomial (0x1edc6f41) and
+initial value of 0 is used to calculate the checksum.
 
 The checksum is calculated over:
 
@@ -565,23 +557,20 @@ TODO: describe the inode bitmap checksum calculation: crc32c(s_uuid+grp_num+ibit
 
 Direct blocks are blocks that part of the data stream of a file entry.
 
-A direct block number is 0 that is part of the data stream represents a sparse
-data block.
+A direct block number is 0 that is part of the data stream represents a sparse data block.
 
-Indirect blocks are blocks that refer to blocks containing direct or indirect
-block numbers. There are multiple levels of indirect block:
+Indirect blocks are blocks that refer to blocks containing direct or indirect block numbers. There
+are multiple levels of indirect block:
 
 * indirect blocks (level 1), that refer to direct blocks
 * double indirect blocks (level 2), that refer to indirect blocks
 * triple indirect blocks (level 3), that refer to double indirect blocks
 
-An indirect block number is 0 that is part of the data stream represents sparse
-data blocks.
+An indirect block number is 0 that is part of the data stream represents sparse data blocks.
 
 ## Extents
 
-Extents were introduced in ext4 and are controlled by
-EXT4_FEATURE_INCOMPAT_EXTENTS.
+Extents were introduced in ext4 and are controlled by EXT4_FEATURE_INCOMPAT_EXTENTS.
 
 Extents form an extent B-Tree, where:
 
@@ -594,9 +583,8 @@ An extents B-tree node consists of:
 * extents entries
 * extents footer
 
-> Note that inodes can have an implicit last sparse extent if the the inode
-> data size is greater than the total data size defined by the extent
-> descriptors.
+> Note that inodes can have an implicit last sparse extent if the the inode data size is greater
+> than the total data size defined by the extent descriptors.
 
 ### The ext4 extents header {#ext4_extents_header}
 
@@ -621,20 +609,19 @@ The ext4 extent descriptor (ext4_extent) is 12 bytes in size and consists of:
 | 6 | 2 | | Upper 16-bits of physical block number |
 | 8 | 4 | | Lower 32-bits of physical block number |
 
-If number of blocks > 32768 the extent is considered "uninitialized" which is
-(as far as currently known) comparable to extent being sparse. The number of
-blocks of the sparse extent can be determined as following:
+If number of blocks > 32768 the extent is considered "uninitialized" which is (as far as currently
+known) comparable to extent being sparse. The number of blocks of the sparse extent can be
+determined as following:
 
 ```python
 sparse_number_of_blocks = number_of_blocks - 32768
 ```
 
-Sparse extents can exist between the extent descriptors. In such a case the
-logical block number will not align with the information from the previous
-extent descriptors.
+Sparse extents can exist between the extent descriptors. In such a case the logical block number
+will not align with the information from the previous extent descriptors.
 
-> Note that the native Linux ext implementation expects the extents to be stored
-> in order of logical block number.
+> Note that the native Linux ext implementation expects the extents to be stored in order of
+> logical block number.
 
 ### The ext4 extents index {#ext4_extent_index}
 
@@ -657,12 +644,10 @@ The ext4 extents footer (ext4_extent_tail) is 4 bytes in size and consists of:
 
 ## The inode
 
-The size of the inode is defined in the superblock when dynamic inode
-information is present.
+The size of the inode is defined in the superblock when dynamic inode information is present.
 
-> Note that the ext4 inode format can be used on ext2 formatted file system.
-> This was observed in combination with format revision 1 and inode size > 128
-> created by mkfs.ext2.
+> Note that the ext4 inode format can be used on ext2 formatted file system. This was observed in
+> combination with format revision 1 and inode size > 128 created by mkfs.ext2.
 
 ### The ext2 inode
 
@@ -697,11 +682,11 @@ The ext2 inode is 128 bytes in size and consists of:
 | 122 | 2 | | Upper 16-bits of group identifier (GID) |
 | 124 | 4 | | Unknown (reserved) |
 
-> Note that for a character and block device the first 2 bytes of the array of
-> direct block numbers contain the minor and major device number respectively.
+> Note that for a character and block device the first 2 bytes of the array of direct block numbers
+> contain the minor and major device number respectively.
 
-If the inode size is larger than 128 bytes, the additional data can be stored
-using an ext4 inode extension.
+If the inode size is larger than 128 bytes, the additional data can be stored using an ext4 inode
+extension.
 
 ### The ext3 inode
 
@@ -743,11 +728,11 @@ The ext3 inode is 132 bytes in size and consists of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-> Note that for a character and block device the first 2 bytes of the array of
-> direct block numbers contain the minor and major device number respectively.
+> Note that for a character and block device the first 2 bytes of the array of direct block numbers
+> contain the minor and major device number respectively.
 
-If the inode size is larger than 128 bytes, the additional data can be stored
-using an ext4 inode extension.
+If the inode size is larger than 128 bytes, the additional data can be stored using an ext4 inode
+extension.
 
 ### The ext4 inode
 
@@ -814,14 +799,13 @@ The ext4 inode is 160 bytes in size and consists of:
 
 If checksum type is CRC-32C, the checksum is stored as 0xffffffff - CRC-32C.
 
-> Note that for a character and block device the first 2 bytes of the array of
-> direct block numbers contain the minor and major device number respectively.
+> Note that for a character and block device the first 2 bytes of the array of direct block numbers
+> contain the minor and major device number respectively.
 
 #### Checksum calculation
 
-If checksum type is CRC-32C, the CRC32-C algorithm with the Castagnoli
-polynomial (0x1edc6f41) and initial value of 0 is used to calculate the
-checksum.
+If checksum type is CRC-32C, the CRC32-C algorithm with the Castagnoli polynomial (0x1edc6f41) and
+initial value of 0 is used to calculate the checksum.
 
 The checksum is calculated from:
 
@@ -848,8 +832,8 @@ extra_precision_timestamp = (extra_epoch_value * 0x100000000) + timestamp
 
 #### Notes
 
-It has been observed that when EXT4_EA_INODE_FL is set the (last) modification
-time can contain a valid timestamp.
+It has been observed that when EXT4_EA_INODE_FL is set the (last) modification time can contain a
+valid timestamp.
 
 <!-- rumdl-disable MD013 -->
 
@@ -956,11 +940,10 @@ According to [The Linux Kernel documentation](https://docs.kernel.org/filesystem
 
 ## Inline data
 
-ext4 supports storing file entry data inline when the inode flag
-EXT4_INLINE_DATA_FL is set.
+ext4 supports storing file entry data inline when the inode flag EXT4_INLINE_DATA_FL is set.
 
-> Note that inodes can have an implicit last sparse extent if the the inode
-> data size is greater than 60 bytes.
+> Note that inodes can have an implicit last sparse extent if the the inode data size is greater
+> than 60 bytes.
 
 ## Huge files {#huge_files}
 
@@ -968,8 +951,8 @@ TODO: complete section
 
 ## Directory entries
 
-Directories entries are stored in the data blocks of a directory inode. The
-directory entries can be stored in multiple ways:
+Directories entries are stored in the data blocks of a directory inode. The directory entries can
+be stored in multiple ways:
 
 * as linear directory entries
 * as inline data directory entries
@@ -997,11 +980,11 @@ The directory entry is of variable size, at most 263 bytes, and consists of:
 | 7 | 1 | | [File type](#file_types) |
 | 8 | ... | | Name, which contains a narrow character string without end-of-string character |
 
-Older directory entry structures considered the name size a 16-bit value, but
-the upper byte was never used.
+Older directory entry structures considered the name size a 16-bit value, but the upper byte was
+never used.
 
-The name can contain any character value except the path segment separator ('/')
-and the NUL-character ('\0').
+The name can contain any character value except the path segment separator ('/') and the
+NUL-character ('\0').
 
 #### File types {#file_types}
 
@@ -1018,11 +1001,10 @@ and the NUL-character ('\0').
 
 ### Inline data directory entries
 
-ext4 supports storing the directory entries as inline data when the inode flag
-EXT4_INLINE_DATA_FL is set.
+ext4 supports storing the directory entries as inline data when the inode flag EXT4_INLINE_DATA_FL
+is set.
 
-The inline data directory entries is of variable size, at most 60 bytes, and
-consists of:
+The inline data directory entries is of variable size, at most 60 bytes, and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1031,9 +1013,9 @@ consists of:
 
 ### Hash tree directory entries
 
-The data of the hash tree (HTree) is stored in the data blocs or extent defined
-by the directory inode. The hash-indexed directory entries are read-compatible
-with the [linear directory entry](#directory_entry).
+The data of the hash tree (HTree) is stored in the data blocs or extent defined by the directory
+inode. The hash-indexed directory entries are read-compatible with the
+[linear directory entry](#directory_entry).
 
 #### Hash tree root
 
@@ -1070,11 +1052,10 @@ struct dx_entry
 
 ## Symbolic links
 
-If the target path of a symbolic link is less than 60 characters long, it is
-stored in the 60 bytes in the inode that are normally used for the 12 direct
-and 3 indirect block numbers. If the target path is longer than 60 characters,
-a block is allocated, and the block contains the target path. The inode data
-size contains the length of the target path.
+If the target path of a symbolic link is less than 60 characters long, it is stored in the 60 bytes
+in the inode that are normally used for the 12 direct and 3 indirect block numbers. If the target
+path is longer than 60 characters, a block is allocated, and the block contains the target path.
+The inode data size contains the length of the target path.
 
 ## Extended attributes {#extended_attributes}
 
@@ -1092,9 +1073,8 @@ Extended attributes consists of:
 
 ### The extended attributes inode header
 
-The extended attributes inode header (ext2_xattr_ibody_header,
-ext3_xattr_ibody_header, ext4_xattr_ibody_header) is 4 bytes in size and
-consists of:
+The extended attributes inode header (ext2_xattr_ibody_header, ext3_xattr_ibody_header,
+ext4_xattr_ibody_header) is 4 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1104,8 +1084,8 @@ consists of:
 
 #### The ext2 and ext3 extended attributes block header
 
-The ext2 and ext3 extended attributes block header (ext2_xattr_header,
-ext3_xattr_header) is 32 bytes in size and consists of:
+The ext2 and ext3 extended attributes block header (ext2_xattr_header, ext3_xattr_header) is 32
+bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1117,8 +1097,7 @@ ext3_xattr_header) is 32 bytes in size and consists of:
 
 #### The ext4 extended attributes block header
 
-The ext4 extended attributes block header (ext4_xattr_header) is 32 bytes of
-size and consists of:
+The ext4 extended attributes block header (ext4_xattr_header) is 32 bytes of size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1131,8 +1110,8 @@ size and consists of:
 
 ### The extended attributes entry
 
-The extended attributes entry (ext2_xattr_entry, ext3_xattr_entry,
-ext4_xattr_entry) is of variable size and consists of:
+The extended attributes entry (ext2_xattr_entry, ext3_xattr_entry, ext4_xattr_entry) is of variable
+size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1145,11 +1124,11 @@ ext4_xattr_entry) is of variable size and consists of:
 | 16 | ... | | Name string, which contains an ASCII string without end-of-string character and can be empty, for example in combination with a prefix or with an encrypted file |
 | ... | ... | | 32-bit alignment padding |
 
-The last extended attributes entry has the first 4 values set to 0 (8 bytes)
-and is used as a terminator.
+The last extended attributes entry has the first 4 values set to 0 (8 bytes) and is used as a
+terminator.
 
-> Note that some implementations of older Android versions of ext appear to
-> only set the first 4 bytes to 0 for the terminator.
+> Note that some implementations of older Android versions of ext appear to only set the first 4
+> bytes to 0 for the terminator.
 
 ### The extended attribute name index
 
@@ -1183,8 +1162,7 @@ TODO: complete section
 
 ### File entry with invalid extents header signature
 
-File content inaccessible but file entry metadata and extended attributes
-accessible.
+File content inaccessible but file entry metadata and extended attributes accessible.
 
 ## References
 

@@ -771,8 +771,8 @@ The HFS+ and HFSX catalog key is of variable size and consists of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-> Note that the characters ':' and U+2400 are stored as '/' and U+0 respectively
-> and must be converted before comparision.
+> Note that the characters ':' and U+2400 are stored as '/' and U+0 respectively and must be
+> converted before comparision.
 
 ### The catalog data
 
@@ -1109,10 +1109,9 @@ Finding a file or directory by its CNID is a two-step process:
 
 ### File forks
 
-Forks in HFS and HFS+ can be compared to data streams in NTFS. In HFS+ the fork
-values are grouped in a separate fork descriptor structure. HFS+ also defines
-extended attributes (named forks). These are not stored in the catalog file but
-in the attributes file.
+Forks in HFS and HFS+ can be compared to data streams in NTFS. In HFS+ the fork values are grouped
+in a separate fork descriptor structure. HFS+ also defines extended attributes (named forks). These
+are not stored in the catalog file but in the attributes file.
 
 #### HFS+ fork descriptor structure {#hfs_plus_fork_descriptor_structure}
 
@@ -1360,8 +1359,8 @@ The attributes file data record header is 4 bytes in size and consists of:
 | 0x00000020 | kHFSPlusAttrForkData | Attribute record with fork descriptor |
 | 0x00000030 | kHFSPlusAttrExtents | Attribute record with extents overflow |
 
-> Note that at the moment it is unclear when an attribute record of type
-> kHFSPlusAttrExtents is created and how it should be handled.
+> Note that at the moment it is unclear when an attribute record of type kHFSPlusAttrExtents is
+> created and how it should be handled.
 
 #### The inline data attribute record
 

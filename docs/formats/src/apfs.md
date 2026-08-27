@@ -642,8 +642,8 @@ The object map value (omap_val_t) is 16 bytes in size and consists of:
 
 #### Notes
 
-TODO document omap_snapshot_t
-TODO document Object Map Reaper Phases
+TODO: document omap_snapshot_t
+TODO: document Object Map Reaper Phases
 
 ### Space manager
 

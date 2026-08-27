@@ -187,8 +187,8 @@ Some sections contain additional data, refer to paragraph section types for more
 
 > Note Expert Witness 1.35 (for Windows) does not set the section size.
 
-> Note that in EnCase 2 DOS version the padding itself does not contains 0-byte
-> values but data, probably the memory is not filled with 0-byte values.
+> Note that in EnCase 2 DOS version the padding itself does not contains 0-byte values but data,
+> probably the memory is not filled with 0-byte values.
 
 <!-- rumdl-enable MD028 -->
 
@@ -386,8 +386,7 @@ Line 9 consists of 2 values, namely the values are "0 0".
 
 Line 10 contains the values defined by line 8.
 
-> Note the default values of some of these values has changed around EnCase
-> 6.12.
+> Note the default values of some of these values has changed around EnCase 6.12.
 
 If the "ha" value contains "00000000000000000000000000000000" this means the MD5 hash is not set.
 The same applies for the "sha" value when it contains "0000000000000000000000000000000000000000"
@@ -556,8 +555,8 @@ Some aspects of this section are:
 * The header data is always processed by zlib, however the same compression level is used as for
   the chunks. This could mean compression level 0 which is no compression.
 
-> The SMART format uses the FTK Imager (EWF-E01) specification for this section.
-> Note that this could be something FTK Imager specific.
+> The SMART format uses the FTK Imager (EWF-E01) specification for this section. Note that this
+> could be something FTK Imager specific.
 
 #### EnCase 2 and 3 (EWF-E01)
 
@@ -696,8 +695,8 @@ The 3rd and the 4th line consist of the following tab (0x09) separated values.
 | 15 | dc | Unknown (Introduced in linen 6) |
 | 16 | ext | Extents, which contains the extents of the process memory acquired (Introduced in linen 6.19 or earlier) |
 
-> Note as of linen 6.19 the acquire date and time is in UTC and the system date
-> and time is in local time. Where as before both values were in local time.
+> Note as of linen 6.19 the acquire date and time is in UTC and the system date and time is in
+> local time. Where as before both values were in local time.
 
 Also see [header values](#header_values)
 
@@ -787,8 +786,8 @@ Also see [header values](#header_values)
 
 #### EnCase 5 to 7 (EWF-L01)
 
-The EnCase 4 to 7 (EWF-E01) header section specification is also used for the
-EnCase 5 to 7 (EWF-L01) format, with the following aspects:
+The EnCase 4 to 7 (EWF-E01) header section specification is also used for the EnCase 5 to 7
+(EWF-L01) format, with the following aspects:
 
 * In EnCase 5 both the acquired and system date and time are set to 0.
 * In EnCase 6 and 7 both the acquired and system date and time are set to Jan 1, 1970 00:00:00 (the
@@ -1031,8 +1030,8 @@ The data section is a copy of the [volume section](#volume_section).
 
 ### Sectors section
 
-The sectors section is identified in the section data type field as "sectors".
-Some aspects of this section are:
+The sectors section is identified in the section data type field as "sectors". Some aspects of this
+section are:
 
 * Not defined in "ASR Data - E01 Compression Format".
 * Found in EWF-E01 in EnCase 2 to 7, or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7. Not
@@ -1396,8 +1395,8 @@ section header).
 
 ### Ltypes section
 
-The ltypes section is identifier in the section data type field as "ltypes".
-Some aspects of this section are:
+The ltypes section is identifier in the section data type field as "ltypes". Some aspects of this
+section are:
 
 * Found in EWF-L01 in of EnCase 7
 * Found in the last segment file after table2 section before tree section.

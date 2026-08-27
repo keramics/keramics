@@ -1,8 +1,7 @@
 # Virtual Hard Disk version 2 (VHDX) image format
 
-The Virtual Hard Disk version 2 (VHDX) format is used by Microsoft vitualization
-products as one of its image formats. It is both used the store hard disk images
-and snapshots.
+The Virtual Hard Disk version 2 (VHDX) format is used by Microsoft vitualization products as one of
+its image formats. It is both used the store hard disk images and snapshots.
 
 ## Overview
 
@@ -32,8 +31,7 @@ The number of bytes per sector is 512 or 4096 depending on the logical sector si
 
 ## File header
 
-The file header of (file type identifier) is 64 KiB (65536 bytes) in size and
-consists of:
+The file header of (file type identifier) is 64 KiB (65536 bytes) in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -61,11 +59,11 @@ The image header is 4 KiB (4096 bytes) in size and consists of:
 
 ### Checksum calculation
 
-The CRC32-C algorithm with the Castagnoli polynomial (0x1edc6f41) and initial
-value of 0 is used to calculate the checksum.
+The CRC32-C algorithm with the Castagnoli polynomial (0x1edc6f41) and initial value of 0 is used to
+calculate the checksum.
 
-The checksum is calculated over the 4 KiB bytes of data of the image header,
-where the image header checkum value is considered to be 0 during calculation.
+The checksum is calculated over the 4 KiB bytes of data of the image header, where the image header
+checkum value is considered to be 0 during calculation.
 
 ## Region table
 
@@ -88,11 +86,11 @@ The region table header is 16 bytes in size and consists of:
 | 8 | 4 | | Number of table entries, which according to MS-VHDX this value must be less than or equal to 2047 |
 | 12 | 4 | 0 | Unknown (reserved), which according to MS-VHDX this value must be set to 0 |
 
-The CRC32-C algorithm with the Castagnoli polynomial (0x1edc6f41) and initial
-value of 0 is used to calculate the checksum.
+The CRC32-C algorithm with the Castagnoli polynomial (0x1edc6f41) and initial value of 0 is used to
+calculate the checksum.
 
-The checksum is calculated over the 64 KiB bytes of data of the region table
-where the image header checkum value is considered to be 0 during calculation.
+The checksum is calculated over the 64 KiB bytes of data of the region table where the image header
+checkum value is considered to be 0 during calculation.
 
 ### Region table entry
 
@@ -224,8 +222,8 @@ The parent locator entry is 12 bytes in size and consists of:
 
 ##### Parent locator key and value data
 
-A parent locator key or value is stored as UCS-2 little-endian string without
-end-of-string character.
+A parent locator key or value is stored as UCS-2 little-endian string without end-of-string
+character.
 
 Known keys are:
 
@@ -253,9 +251,8 @@ The virtual disk identifier metadata item is 16 bytes in size and consists of:
 | --- | --- | --- | --- |
 | 0 | 16 | | Virtual disk identifier, which contains a GUID |
 
-> Note that in contrast to VHD (version 1) the virtual disk identifier does
-> not change between a differential image and its parent. The data write
-> identifier seems to be used instead.
+> Note that in contrast to VHD (version 1) the virtual disk identifier does not change between a
+> differential image and its parent. The data write identifier seems to be used instead.
 
 #### Virtual disk size metadata item
 
@@ -267,15 +264,15 @@ The virtual disk size metadata item is 8 bytes in size and consists of:
 
 ## Block allocation table (BAT) region
 
-The block allocation table (BAT) region contains the block allocation table.
-The entries of this table describe the location of either blocks containing
-image content data (or payload blocks) or blocks containing a sector bitmap.
+The block allocation table (BAT) region contains the block allocation table. The entries of this
+table describe the location of either blocks containing image content data (or payload blocks) or
+blocks containing a sector bitmap.
 
-The size of an individual sector bitmap block is 1 MiB which allows for `2^23`
-sectors to be represented by the bitmap.
+The size of an individual sector bitmap block is 1 MiB which allows for `2^23` sectors to be
+represented by the bitmap.
 
-Block allocation table (BAT) entries are grouped in chunks. The size of a chunk
-can be calculated as following:
+Block allocation table (BAT) entries are grouped in chunks. The size of a chunk can be calculated
+as following:
 
 ```python
 number_of_entries_per_chunk = (2^23 * logical_sector_size) / block_size
@@ -330,20 +327,19 @@ The block allocation table (BAT) entry is 64 bits in size and consists of:
 
 ### Sector bitmap
 
-In differential disk images the sector bitmap indicates which sectors are stored
-within the image (bit set to 1) or in the parent (bit set to 0).
+In differential disk images the sector bitmap indicates which sectors are stored within the image
+(bit set to 1) or in the parent (bit set to 0).
 
 The bitmap is stored in a 1 MiB block.
 
-The bitmap is stored on a per-byte basis with the LSB represents the first bit
-in the bitmap.
+The bitmap is stored on a per-byte basis with the LSB represents the first bit in the bitmap.
 
 ## Log (metadata journal)
 
 TODO: complete section
 
-The log serves as metadata journal is of variable size and consist of contiguous
-circular (ring) buffer that contains log entries.
+The log serves as metadata journal is of variable size and consist of contiguous circular (ring)
+buffer that contains log entries.
 
 ### Log entry
 

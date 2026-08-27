@@ -1,8 +1,8 @@
 # Zlib compressed data
 
-Zlib compression is commonly used in file formats. The zlib compressed data
-format, as defined in RFC1950, allows for multiple techniques but only the
-Deflate compression method, a variation of LZ77, is used.
+Zlib compression is commonly used in file formats. The zlib compressed data format, as defined in
+RFC1950, allows for multiple techniques but only the Deflate compression method, a variation of
+LZ77, is used.
 
 ## Overview
 
@@ -15,7 +15,7 @@ Zlib compressed data consist of:
 ### Characteristics
 
 | Characteristics | Description |
-| --- | ---  |
+| --- | --- |
 | Byte order | big-endian |
 
 ## Data header
@@ -41,9 +41,8 @@ The data header is 2 or 6 bytes in size and consist of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-The check bits value must be such that when the first 2 bytes are represented
-as a 16-bit unsigned integer in big-endian byte order the value is a multiple
-of 31, such that:
+The check bits value must be such that when the first 2 bytes are represented as a 16-bit unsigned
+integer in big-endian byte order the value is a multiple of 31, such that:
 
 ```python
 ((first * 256) + second) % 31 = 0
@@ -65,8 +64,8 @@ The value of the compression information is dependent on the compression method.
 
 #### Compression information - compression method 8 (Deflate)
 
-For compression method 8 (Deflate) the compression information contains the
-base-2 logarithm of the LZ77 window size minus 8.
+For compression method 8 (Deflate) the compression information contains the base-2 logarithm of the
+LZ77 window size minus 8.
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -78,9 +77,8 @@ To determine the corresponding window size:
 1 << (7 + 8)
 ```
 
-E.g. a compression information value of 7 indicates a 32768 bytes window size.
-Values larger than 7 are not allowed according to RFC1950 and thus the maximum
-window size is 32768 bytes.
+E.g. a compression information value of 7 indicates a 32768 bytes window size. Values larger than 7
+are not allowed according to RFC1950 and thus the maximum window size is 32768 bytes.
 
 ### Compression level {#compression_level}
 
@@ -95,14 +93,13 @@ window size is 32768 bytes.
 
 ### Deflate compressed data {#deflate_compressed_data}
 
-The deflate compressed data consists of one or more deflate compressed blocks.
-Each block consists of:
+The deflate compressed data consists of one or more deflate compressed blocks. Each block consists
+of:
 
 * block header
 * block data
 
-> Note that a block can reference uncompressed data that is stored in a previous
-> block.
+> Note that a block can reference uncompressed data that is stored in a previous block.
 
 #### Block header
 
@@ -156,8 +153,8 @@ The dynamic Huffman table consists of:
 | ... | ... | | Huffman encoded stream of the Huffman codes for the literals |
 | ... | ... | | Huffman encoded stream of the Huffman codes for the distances |
 
-A single code size value is 3 bits of size. A value of 0 means the code size is
-not used in the Huffman encoding of the literal and distance codes.
+A single code size value is 3 bits of size. A value of 0 means the code size is not used in the
+Huffman encoding of the literal and distance codes.
 
 The codes size values are stored in the following sequence:
 
@@ -165,12 +162,12 @@ The codes size values are stored in the following sequence:
 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15
 ```
 
-The first value applies to a code size of 16, the second to 17, etc. Code sizes
-that are not stored default to 0.
+The first value applies to a code size of 16, the second to 17, etc. Code sizes that are not stored
+default to 0.
 
-The code size values are used to construct the code sizes Huffman table. This
-must be a complete Huffman table which is used to decode the literal and
-distance codes. The corresponding codes size Huffman encoding is defined as:
+The code size values are used to construct the code sizes Huffman table. This must be a complete
+Huffman table which is used to decode the literal and distance codes. The corresponding codes size
+Huffman encoding is defined as:
 
 | Value | Identifier | Description |
 | --- | --- | --- |
@@ -179,17 +176,15 @@ distance codes. The corresponding codes size Huffman encoding is defined as:
 | 17 | | Repeat a code length of 0 for 3 - 10 times (3 bits of length) |
 | 18 | | Repeat a code length of 0 for 11 - 138 times (7 bits of length) |
 
-Both the literal and distance Huffman codes are stored Huffman encoded using
-the code sizes Huffman table. Code sizes that are not stored default to 0.
-The code size for the literal code 256 (end-of-block) should be set and thus
-not 0.
+Both the literal and distance Huffman codes are stored Huffman encoded using the code sizes Huffman
+table. Code sizes that are not stored default to 0. The code size for the literal code 256
+(end-of-block) should be set and thus not 0.
 
 ##### Encoded bit-stream
 
-The encoded bit-stream is stored in 8-bit integers, where bit values are stored
-back-to-front. So that 3 least-significant bits (LSB) would represent a 3-bit
-value at the start of the -stream. Note that the LSB of the 3-bit value is the
-LSB of the byte value.
+The encoded bit-stream is stored in 8-bit integers, where bit values are stored back-to-front. So
+that 3 least-significant bits (LSB) would represent a 3-bit value at the start of the -stream. Note
+that the LSB of the 3-bit value is the LSB of the byte value.
 
 Deflate uses a Huffman tree of 288 Huffman codes (or symbols) where the values:
 
@@ -202,15 +197,14 @@ Deflate uses a Huffman tree of 288 Huffman codes (or symbols) where the values:
 
 This document refers to this Huffman tree as the literals Huffman tree.
 
-The bits in the encoded bit-stream correspond to values in the literals
-Huffman tree. If a symbol is found that represents a compression size and
-offset tuple (or match length code) the bits following the literals symbol
-contains a distance (Huffman) code. The match length coedes might require
-additional (or extra) bits to store the length (or size).
+The bits in the encoded bit-stream correspond to values in the literals Huffman tree. If a symbol
+is found that represents a compression size and offset tuple (or match length code) the bits
+following the literals symbol contains a distance (Huffman) code. The match length coedes might
+require additional (or extra) bits to store the length (or size).
 
-The distances Huffman tree contains space for 32 symbols. See section
-[Distance codes](#deflate_distance_codes). The distance code might require
-additional (or extra) bits to store the distance.
+The distances Huffman tree contains space for 32 symbols. The
+[distance codes](#deflate_distance_codes) might require additional (or extra) bits to store the
+distance.
 
 ##### Literal codes
 
@@ -321,8 +315,8 @@ TODO: complete this section
 
 #### Additional bits
 
-The additional bits are stored in big-endian (MSB first) and indicate the index
-into the corresponding array of size values (or base size + additional size).
+The additional bits are stored in big-endian (MSB first) and indicate the index into the
+corresponding array of size values (or base size + additional size).
 
 <!-- rumdl-disable MD033 MD056 -->
 
