@@ -297,9 +297,49 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_core::open_os_data_stream;
+    use keramics_core::{open_fake_data_stream, open_os_data_stream};
 
     use crate::tests::get_test_data_path;
+
+    const TEST_PARTITION_TABLE_HEADER: [u8; 92] = [
+        0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54, 0x00, 0x00, 0x01, 0x00, 0x5c, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x66, 0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x11, 0x11, 0x11,
+        0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x02, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00,
+    ];
+
+    const TEST_PARTITION_TABLE_ENTRY: [u8; 128] = [
+        0xaf, 0x3d, 0xc6, 0x0f, 0x83, 0x84, 0x72, 0x47, 0x8e, 0x79, 0x3d, 0x69, 0xd8, 0x47, 0x7d,
+        0xe4, 0x8c, 0x58, 0x25, 0x1e, 0xa9, 0x27, 0x94, 0x40, 0x86, 0x8c, 0x2f, 0x25, 0x70, 0x21,
+        0xf8, 0x7b, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7f, 0x08, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4c, 0x00, 0x69, 0x00,
+        0x6e, 0x00, 0x75, 0x00, 0x78, 0x00, 0x20, 0x00, 0x66, 0x00, 0x69, 0x00, 0x6c, 0x00, 0x65,
+        0x00, 0x73, 0x00, 0x79, 0x00, 0x73, 0x00, 0x74, 0x00, 0x65, 0x00, 0x6d, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ];
+
+    fn get_test_data() -> Vec<u8> {
+        let mut test_data: Vec<u8> = vec![0; 4096];
+
+        test_data[512..604].copy_from_slice(&TEST_PARTITION_TABLE_HEADER[..]);
+        test_data[544..552].copy_from_slice(&3584_u64.to_le_bytes());
+        test_data[592..596].copy_from_slice(&1_u32.to_le_bytes());
+        test_data[596..600].copy_from_slice(&128_u32.to_le_bytes());
+
+        test_data[1024..1152].copy_from_slice(&TEST_PARTITION_TABLE_ENTRY[..]);
+        test_data[1056..1064].copy_from_slice(&2048_u64.to_le_bytes());
+        test_data[1064..1072].copy_from_slice(&4095_u64.to_le_bytes());
+
+        test_data[3584..3676].copy_from_slice(&TEST_PARTITION_TABLE_HEADER[..]);
+        test_data[3616..3624].copy_from_slice(&1_u64.to_le_bytes());
+
+        test_data
+    }
 
     fn get_volume_system() -> Result<GptVolumeSystem, ErrorTrace> {
         let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
@@ -400,5 +440,151 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for set_bytes_per_sector
+    #[test]
+    fn test_read_partition_table_with_invalid_backup_header() -> Result<(), ErrorTrace> {
+        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[544..552].copy_from_slice(&3_u64.to_le_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data.as_slice());
+        volume_system.read_partition_table(&data_stream)?;
+
+        assert_eq!(volume_system.get_number_of_partitions(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_stream_with_invalid_backup_header() -> Result<(), ErrorTrace> {
+        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[544..552].copy_from_slice(&3_u64.to_le_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data.as_slice());
+        volume_system.read_data_stream(&data_stream)?;
+
+        assert_eq!(volume_system.get_number_of_partitions(), 1);
+        assert_eq!(volume_system.get_bytes_per_sector(), 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_partition_table_with_invalid_backup_fallback() {
+        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[3584..3676].fill(0);
+
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data.as_slice());
+
+        let result = volume_system.read_partition_table(&data_stream);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_partition_by_index_with_invalid_index() {
+        let volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+        let result: Result<GptPartition, ErrorTrace> = volume_system.get_partition_by_index(0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_partition_table_with_invalid_entry_start() {
+        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[1056..1064].copy_from_slice(&2047_u64.to_le_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data.as_slice());
+
+        let result = volume_system.read_partition_table(&data_stream);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_partition_table_with_invalid_entry_end() {
+        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[1064..1072].copy_from_slice(&2047_u64.to_le_bytes());
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data.as_slice());
+
+        let result = volume_system.read_partition_table(&data_stream);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_partition_table_with_invalid_entry_checksum() {
+        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[600..604].copy_from_slice(&0xdeadbeef_u32.to_le_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data.as_slice());
+
+        let result = volume_system.read_partition_table(&data_stream);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_partition_table_with_invalid_entry_size() {
+        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[596..600].copy_from_slice(&129_u32.to_le_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data.as_slice());
+
+        let result = volume_system.read_partition_table(&data_stream);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_partition_table_with_invalid_number_of_entries() {
+        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[592..596].copy_from_slice(&257_u32.to_le_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data.as_slice());
+
+        let result = volume_system.read_partition_table(&data_stream);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_partition_table_with_invalid_bytes_per_sector() {
+        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+        let test_data: Vec<u8> = vec![0; 4096];
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data.as_slice());
+
+        let result = volume_system.read_partition_table(&data_stream);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_set_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+        volume_system.set_bytes_per_sector(512)?;
+        assert_eq!(volume_system.get_bytes_per_sector(), 512);
+
+        volume_system.set_bytes_per_sector(4096)?;
+        assert_eq!(volume_system.get_bytes_per_sector(), 4096);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_bytes_per_sector_with_unsupported_value() {
+        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+        let result = volume_system.set_bytes_per_sector(256);
+        assert!(result.is_err());
+    }
 }

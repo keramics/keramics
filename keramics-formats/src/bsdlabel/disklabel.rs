@@ -225,6 +225,16 @@ mod tests {
     }
 
     #[test]
+    fn test_read_data_with_unsupported_number_of_entries() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[138] = 17;
+
+        let mut test_struct = BsdDiskLabel::new();
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);

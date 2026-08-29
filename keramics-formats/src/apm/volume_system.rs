@@ -184,7 +184,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_core::open_os_data_stream;
+    use keramics_core::{open_fake_data_stream, open_os_data_stream};
 
     use crate::tests::get_test_data_path;
 
@@ -197,6 +197,26 @@ mod tests {
         volume_system.read_data_stream(&data_stream)?;
 
         Ok(volume_system)
+    }
+
+    fn get_test_partition_map_data(number_of_entries: u32, partition_type: &[u8]) -> Vec<u8> {
+        let mut test_data: Vec<u8> = vec![0; 2048];
+
+        let entry: Vec<u8> = get_test_partition_map_entry_data(number_of_entries, partition_type);
+        test_data[512..1024].copy_from_slice(&entry);
+
+        test_data
+    }
+
+    fn get_test_partition_map_entry_data(number_of_entries: u32, partition_type: &[u8]) -> Vec<u8> {
+        let mut test_data: Vec<u8> = vec![0; 512];
+
+        test_data[0] = 0x50;
+        test_data[1] = 0x4d;
+        test_data[4..8].copy_from_slice(&number_of_entries.to_be_bytes());
+        test_data[48..48 + partition_type.len()].copy_from_slice(partition_type);
+
+        test_data
     }
 
     #[test]
@@ -232,6 +252,28 @@ mod tests {
     }
 
     #[test]
+    fn test_get_partition_by_index_without_data_stream() {
+        let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
+        volume_system
+            .partition_map_entries
+            .push(ApmPartitionMapEntry::new());
+
+        let result = volume_system.get_partition_by_index(0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_partition_by_index_with_unsupported_partition_index() {
+        let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
+        volume_system
+            .partition_map_entries
+            .push(ApmPartitionMapEntry::new());
+
+        let result = volume_system.get_partition_by_index(1);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_partitions() -> Result<(), ErrorTrace> {
         let volume_system: ApmVolumeSystem = get_volume_system()?;
 
@@ -262,6 +304,17 @@ mod tests {
     }
 
     #[test]
+    fn test_read_data_stream_with_unsupported_bytes_per_sector() {
+        let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
+
+        let test_data: Vec<u8> = vec![0; 2048];
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let result = volume_system.read_data_stream(&data_stream);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_read_partition_map() -> Result<(), ErrorTrace> {
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
@@ -273,5 +326,74 @@ mod tests {
         assert_eq!(volume_system.get_number_of_partitions(), 2);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_read_partition_map_with_2048_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
+
+        let mut test_data: Vec<u8> = vec![0; 16384];
+        let entry: Vec<u8> =
+            get_test_partition_map_entry_data(1, APM_PARTITION_MAP_TYPE.as_slice());
+        test_data[2048..2560].copy_from_slice(&entry);
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+        volume_system.read_partition_map(&data_stream)?;
+
+        assert_eq!(volume_system.get_bytes_per_sector(), 2048);
+        assert_eq!(volume_system.get_number_of_partitions(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_partition_map_with_unsupported_bytes_per_sector() {
+        let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
+
+        let test_data: Vec<u8> = vec![0; 2048];
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let result = volume_system.read_partition_map(&data_stream);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_partition_map_with_unsupported_partition_type() {
+        let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
+
+        let test_data: Vec<u8> = get_test_partition_map_data(2, b"Apple_HFS");
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let result = volume_system.read_partition_map(&data_stream);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_partition_map_with_inconsistent_number_of_entries() {
+        let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
+
+        let mut test_data: Vec<u8> =
+            get_test_partition_map_data(2, APM_PARTITION_MAP_TYPE.as_slice());
+        let entry: Vec<u8> = get_test_partition_map_entry_data(3, b"Apple_HFS");
+        test_data[1024..1536].copy_from_slice(&entry);
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let result = volume_system.read_partition_map(&data_stream);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_partition_map_with_truncated_partition_map_entry() {
+        let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
+
+        let mut test_data: Vec<u8> =
+            get_test_partition_map_data(2, APM_PARTITION_MAP_TYPE.as_slice());
+        test_data.truncate(1024);
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let result = volume_system.read_partition_map(&data_stream);
+        assert!(result.is_err());
     }
 }

@@ -192,6 +192,16 @@ mod tests {
     }
 
     #[test]
+    fn test_read_data_with_unsupported_signature() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[0] = 0xff;
+
+        let mut test_struct = GptPartitionTableHeader::new();
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_read_data_with_unsupported_format_version() {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[8] = 0xff;
