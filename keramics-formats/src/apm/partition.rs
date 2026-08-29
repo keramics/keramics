@@ -97,6 +97,7 @@ impl ApmPartition {
 mod tests {
     use super::*;
 
+    use std::io::SeekFrom;
     use std::path::PathBuf;
 
     use keramics_core::{ErrorTrace, open_os_data_stream};
@@ -118,8 +119,42 @@ mod tests {
         Ok(ApmPartition::new(&data_stream, 512, &partition_entry))
     }
 
-    // TODO: add tests for get_data_stream
-    // TODO: add tests for get_name
+    #[test]
+    fn test_get_data_stream() -> Result<(), ErrorTrace> {
+        let partition: ApmPartition = get_partition()?;
+
+        let data_stream: DataStreamReference = partition.get_data_stream();
+        match data_stream.write() {
+            Ok(mut data_stream) => {
+                let size: u64 = data_stream.get_size()?;
+                assert_eq!(size, 4153344);
+
+                let offset: u64 = data_stream.seek(SeekFrom::Start(0))?;
+                assert_eq!(offset, 0);
+
+                let mut buffer: [u8; 8] = [0; 8];
+                let bytes_read: usize = data_stream.read(&mut buffer)?;
+                assert_eq!(bytes_read, 8);
+            }
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on data stream",
+                    error
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name() -> Result<(), ErrorTrace> {
+        let partition: ApmPartition = get_partition()?;
+
+        let name: &ByteString = partition.get_name();
+        assert_eq!(name, &ByteString::from("identifier"));
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_partition_offset() -> Result<(), ErrorTrace> {
@@ -151,5 +186,13 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_type_identifier
+    #[test]
+    fn test_get_type_identifier() -> Result<(), ErrorTrace> {
+        let partition: ApmPartition = get_partition()?;
+
+        let type_identifier: &ByteString = partition.get_type_identifier();
+        assert_eq!(type_identifier, &ByteString::from("type_identifier"));
+
+        Ok(())
+    }
 }

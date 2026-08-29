@@ -78,6 +78,7 @@ impl BsdDiskLabelPartition {
 mod tests {
     use super::*;
 
+    use std::io::SeekFrom;
     use std::path::PathBuf;
 
     use keramics_core::{ErrorTrace, open_os_data_stream};
@@ -90,6 +91,7 @@ mod tests {
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let mut disklabel_entry: BsdDiskLabelEntry = BsdDiskLabelEntry::new();
+        disklabel_entry.entry_index = 0;
         disklabel_entry.number_of_sectors = 8176;
         disklabel_entry.start_sector = 16;
 
@@ -100,7 +102,42 @@ mod tests {
         ))
     }
 
-    // TODO: add tests for get_data_stream
+    #[test]
+    fn test_get_data_stream() -> Result<(), ErrorTrace> {
+        let partition: BsdDiskLabelPartition = get_partition()?;
+
+        let data_stream: DataStreamReference = partition.get_data_stream();
+        match data_stream.write() {
+            Ok(mut data_stream) => {
+                let size: u64 = data_stream.get_size()?;
+                assert_eq!(size, 4186112);
+
+                let offset: u64 = data_stream.seek(SeekFrom::Start(0))?;
+                assert_eq!(offset, 0);
+
+                let mut buffer: [u8; 512] = [0; 512];
+                let bytes_read: usize = data_stream.read(&mut buffer)?;
+                assert_eq!(bytes_read, 512);
+            }
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on data stream",
+                    error
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_partition_index() -> Result<(), ErrorTrace> {
+        let partition: BsdDiskLabelPartition = get_partition()?;
+
+        let partition_index: u16 = partition.get_partition_index();
+        assert_eq!(partition_index, 0);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_partition_offset() -> Result<(), ErrorTrace> {
