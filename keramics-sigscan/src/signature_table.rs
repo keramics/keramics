@@ -398,16 +398,105 @@ mod tests {
 
         let mut signatures: Vec<Arc<Signature>> = Vec::new();
         signatures.push(Arc::new(Signature::new(
-            "vdh",
+            "vhd",
             PatternType::BoundToStart,
             0,
             "conectix".as_bytes(),
         )));
         let offsets_to_ignore: Vec<usize> = Vec::new();
         signature_table.fill(&signatures, &offsets_to_ignore, 8);
+
+        assert!(signature_table.byte_value_weights.offset_groups.is_empty());
+        assert!(signature_table.occurrence_weights.offset_groups.is_empty());
+        assert!(signature_table.similarity_weights.offset_groups.is_empty());
+
         signature_table.calculate_weights();
 
-        // TODO: check weights.
+        // "conectix" contains only common byte values, no offsets share a signature or signature group.
+        for pattern_offset in 0..8 {
+            assert_eq!(
+                signature_table
+                    .byte_value_weights
+                    .get_weight(&pattern_offset),
+                1
+            );
+        }
+        assert!(signature_table.occurrence_weights.offset_groups.is_empty());
+        assert!(signature_table.similarity_weights.offset_groups.is_empty());
+    }
+
+    #[test]
+    fn test_calculate_weights_with_two_signatures() {
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
+        signatures.push(Arc::new(Signature::new(
+            "vhd1",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        )));
+        signatures.push(Arc::new(Signature::new(
+            "vhd2",
+            PatternType::BoundToStart,
+            0,
+            "connectx".as_bytes(),
+        )));
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+
+        // Offsets 3 through 6 contain different byte values in both signatures.
+        assert_eq!(signature_table.occurrence_weights.get_weight(&3), 2);
+        assert_eq!(signature_table.occurrence_weights.get_weight(&6), 2);
+        assert_eq!(signature_table.occurrence_weights.largest_weight, 2);
+        assert_eq!(signature_table.similarity_weights.get_weight(&0), 2);
+        assert_eq!(signature_table.similarity_weights.get_weight(&7), 2);
+        assert_eq!(signature_table.similarity_weights.largest_weight, 2);
+        for pattern_offset in 0..8 {
+            assert_eq!(
+                signature_table
+                    .byte_value_weights
+                    .get_weight(&pattern_offset),
+                1
+            );
+        }
+    }
+
+    #[test]
+    fn test_calculate_weights_with_three_signatures() {
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
+        signatures.push(Arc::new(Signature::new(
+            "vhd1",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        )));
+        signatures.push(Arc::new(Signature::new(
+            "vhd2",
+            PatternType::BoundToStart,
+            0,
+            "connectx".as_bytes(),
+        )));
+        signatures.push(Arc::new(Signature::new(
+            "vhd3",
+            PatternType::BoundToStart,
+            0,
+            "conectiz".as_bytes(),
+        )));
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+
+        // Offsets 0, 1 and 2 have the same byte value in all three signatures.
+        assert_eq!(signature_table.similarity_weights.get_weight(&0), 3);
+        assert_eq!(signature_table.similarity_weights.get_weight(&1), 3);
+        assert_eq!(signature_table.similarity_weights.largest_weight, 3);
+        assert_eq!(signature_table.occurrence_weights.get_weight(&3), 2);
+        assert_eq!(signature_table.occurrence_weights.get_weight(&7), 2);
+        assert_eq!(signature_table.occurrence_weights.largest_weight, 2);
     }
 
     #[test]
@@ -452,11 +541,282 @@ mod tests {
         assert_eq!(signature_table.signatures.len(), 1);
     }
 
-    // TODO: add tests for get_most_significant_pattern_offset
-    // TODO: add tests for get_pattern_offset_by_byte_value_weights
-    // TODO: add tests for get_pattern_offset_by_occurrence_weights
-    // TODO: add tests for get_pattern_offset_by_similarity_weights
-    // TODO: add tests for get_signatures_by_pattern_offset
-    // TODO: add tests for insert_signature
-    // TODO: add tests for is_empty
+    #[test]
+    fn test_get_most_significant_pattern_offset() {
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        assert_eq!(signature_table.get_most_significant_pattern_offset(), None);
+
+        let empty_signatures: Vec<Arc<Signature>> = Vec::new();
+        signature_table.fill(&empty_signatures, &offsets_to_ignore, 8);
+        assert_eq!(signature_table.get_most_significant_pattern_offset(), None);
+
+        let signatures1: Vec<Arc<Signature>> = vec![Arc::new(Signature::new(
+            "vhd1",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        ))];
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        signature_table.fill(&signatures1, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+
+        // A single signature uses the byte value weights, offset 0 is added first.
+        assert_eq!(
+            signature_table.get_most_significant_pattern_offset(),
+            Some(0)
+        );
+
+        let signatures2: Vec<Arc<Signature>> = vec![
+            Arc::new(Signature::new(
+                "vhd1",
+                PatternType::BoundToStart,
+                0,
+                "conectix".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "vhd2",
+                PatternType::BoundToStart,
+                0,
+                "connectx".as_bytes(),
+            )),
+        ];
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        signature_table.fill(&signatures2, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+
+        // Two signatures use the occurrence weights, offset 3 is added first.
+        assert_eq!(
+            signature_table.get_most_significant_pattern_offset(),
+            Some(3)
+        );
+
+        let signatures3: Vec<Arc<Signature>> = vec![
+            Arc::new(Signature::new(
+                "vhd1",
+                PatternType::BoundToStart,
+                0,
+                "conectix".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "vhd2",
+                PatternType::BoundToStart,
+                0,
+                "connectx".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "vhd3",
+                PatternType::BoundToStart,
+                0,
+                "conectiz".as_bytes(),
+            )),
+        ];
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        signature_table.fill(&signatures3, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+
+        // Three or more signatures use the similarity weights, offset 0 is added first.
+        assert_eq!(
+            signature_table.get_most_significant_pattern_offset(),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn test_get_pattern_offset_by_byte_value_weights() {
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
+        assert_eq!(
+            signature_table.get_pattern_offset_by_byte_value_weights(),
+            None
+        );
+
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
+        signatures.push(Arc::new(Signature::new(
+            "vdh",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        )));
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+
+        assert_eq!(signature_table.byte_value_weights.largest_weight, 1);
+        assert_eq!(
+            signature_table.get_pattern_offset_by_byte_value_weights(),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn test_get_pattern_offset_by_occurrence_weights() {
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
+        assert_eq!(
+            signature_table.get_pattern_offset_by_occurrence_weights(),
+            None
+        );
+
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
+        signatures.push(Arc::new(Signature::new(
+            "vhd1",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        )));
+        signatures.push(Arc::new(Signature::new(
+            "vhd2",
+            PatternType::BoundToStart,
+            0,
+            "connectx".as_bytes(),
+        )));
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+
+        assert_eq!(signature_table.occurrence_weights.largest_weight, 2);
+        assert_eq!(
+            signature_table.get_pattern_offset_by_occurrence_weights(),
+            Some(3)
+        );
+    }
+
+    #[test]
+    fn test_get_pattern_offset_by_similarity_weights() {
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
+        assert_eq!(
+            signature_table.get_pattern_offset_by_similarity_weights(),
+            None
+        );
+
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
+        signatures.push(Arc::new(Signature::new(
+            "vhd1",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        )));
+        signatures.push(Arc::new(Signature::new(
+            "vhd2",
+            PatternType::BoundToStart,
+            0,
+            "connectx".as_bytes(),
+        )));
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+
+        assert_eq!(signature_table.similarity_weights.largest_weight, 2);
+        assert_eq!(
+            signature_table.get_pattern_offset_by_similarity_weights(),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn test_get_signatures_by_pattern_offset() {
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
+        signatures.push(Arc::new(Signature::new(
+            "vdh",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        )));
+        signature_table.insert_signature(0, 0x63, &signatures[0]);
+
+        assert_eq!(signature_table.get_signatures_by_pattern_offset(1).len(), 0);
+
+        let table_signatures: Vec<Arc<Signature>> =
+            signature_table.get_signatures_by_pattern_offset(0);
+        assert_eq!(table_signatures.len(), 1);
+        assert_eq!(table_signatures[0].identifier.as_str(), "vdh");
+    }
+
+    #[test]
+    fn test_insert_signature() {
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
+        assert_eq!(signature_table.byte_value_groups.len(), 0);
+        assert!(signature_table.byte_value_groups.get(&0).is_none());
+
+        let signature: Arc<Signature> = Arc::new(Signature::new(
+            "vdh",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        ));
+        signature_table.insert_signature(0, 0x63, &signature);
+
+        let byte_value_group: &ByteValueGroup = signature_table.byte_value_groups.get(&0).unwrap();
+        assert_eq!(byte_value_group.pattern_offset, 0);
+        assert_eq!(byte_value_group.signature_groups.len(), 1);
+        assert_eq!(
+            byte_value_group
+                .signature_groups
+                .get(&0x63)
+                .unwrap()
+                .signatures
+                .len(),
+            1
+        );
+
+        let signature_other: Arc<Signature> = Arc::new(Signature::new(
+            "vdh2",
+            PatternType::BoundToStart,
+            0,
+            "connectx".as_bytes(),
+        ));
+        signature_table.insert_signature(0, 0x63, &signature_other);
+
+        let byte_value_group: &ByteValueGroup = signature_table.byte_value_groups.get(&0).unwrap();
+        assert_eq!(byte_value_group.signature_groups.len(), 1);
+        assert_eq!(
+            byte_value_group
+                .signature_groups
+                .get(&0x63)
+                .unwrap()
+                .signatures
+                .len(),
+            2
+        );
+
+        signature_table.insert_signature(1, 0x6f, &signature);
+
+        assert_eq!(signature_table.byte_value_groups.len(), 2);
+        let byte_value_group: &ByteValueGroup = signature_table.byte_value_groups.get(&1).unwrap();
+        assert_eq!(byte_value_group.pattern_offset, 1);
+        assert_eq!(
+            byte_value_group
+                .signature_groups
+                .get(&0x6f)
+                .unwrap()
+                .signatures
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_is_empty() {
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
+        assert!(signature_table.is_empty());
+
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
+        signatures.push(Arc::new(Signature::new(
+            "vdh",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        )));
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 8);
+
+        assert!(!signature_table.is_empty());
+    }
 }

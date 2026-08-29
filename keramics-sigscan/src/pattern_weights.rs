@@ -77,9 +77,35 @@ mod tests {
         pattern_weights.append_weight(3, 5);
 
         assert_eq!(pattern_weights.offset_groups.len(), 1);
-        // TODO: test if offset_groups contains an offset group for weight 5
+        assert_eq!(
+            pattern_weights.offset_groups.get(&5).unwrap().offsets,
+            vec![3]
+        );
         assert_eq!(pattern_weights.weights.len(), 1);
-        // TODO: test if weights contains a weight for pattern offset 3
+        assert_eq!(pattern_weights.weights.get(&3), Some(&5));
         assert_eq!(pattern_weights.largest_weight, 5);
+
+        pattern_weights.append_weight(7, 5);
+        assert_eq!(
+            pattern_weights.offset_groups.get(&5).unwrap().offsets,
+            vec![3, 7]
+        );
+        assert_eq!(pattern_weights.largest_weight, 5);
+
+        pattern_weights.append_weight(1, 9);
+        assert_eq!(pattern_weights.offset_groups.len(), 2);
+        assert_eq!(pattern_weights.largest_weight, 9);
+    }
+
+    #[test]
+    fn test_get_weight() {
+        let mut pattern_weights: PatternWeights = PatternWeights::new();
+
+        assert_eq!(pattern_weights.get_weight(&3), 0);
+
+        pattern_weights.append_weight(3, 5);
+
+        assert_eq!(pattern_weights.get_weight(&3), 5);
+        assert_eq!(pattern_weights.get_weight(&4), 0);
     }
 }

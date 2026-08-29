@@ -264,6 +264,7 @@ mod tests {
             "conectix".as_bytes(),
         )));
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
         let offsets_to_ignore: Vec<usize> = Vec::new();
         signature_table.fill(&signatures, &offsets_to_ignore, 8);
         signature_table.calculate_weights();
@@ -271,6 +272,115 @@ mod tests {
         scan_tree_node.build(&signature_table, &offsets_to_ignore, 8)?;
 
         assert_eq!(scan_tree_node.scan_objects.len(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_with_empty_signature_table() {
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
+        let signatures: Vec<Arc<Signature>> = Vec::new();
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+
+        let result: Result<(), ErrorTrace> =
+            scan_tree_node.build(&signature_table, &offsets_to_ignore, 8);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_with_multiple_signatures() -> Result<(), ErrorTrace> {
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
+        signatures.push(Arc::new(Signature::new(
+            "vhd1",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        )));
+        signatures.push(Arc::new(Signature::new(
+            "vhd2",
+            PatternType::BoundToStart,
+            0,
+            "connectx".as_bytes(),
+        )));
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+
+        scan_tree_node.build(&signature_table, &offsets_to_ignore, 8)?;
+
+        // The signatures share the first 3 bytes, therefore the root node branches on the 4th
+        // byte value and both branches resolve to a single signature.
+        assert_eq!(scan_tree_node.pattern_offset, 3);
+        assert_eq!(scan_tree_node.scan_objects.len(), 2);
+        assert!(scan_tree_node.scan_objects.contains_key(&0x65));
+        assert!(scan_tree_node.scan_objects.contains_key(&0x6e));
+
+        for object in scan_tree_node.scan_objects.values() {
+            match object {
+                ScanObject::Signature(signature) => {
+                    assert_eq!(signature.pattern_size, 8)
+                }
+                _ => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported scan object type"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_buffer() -> Result<(), ErrorTrace> {
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
+        signatures.push(Arc::new(Signature::new(
+            "vdh",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        )));
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+        scan_tree_node
+            .build(&signature_table, &offsets_to_ignore, 8)
+            .unwrap();
+
+        let data: [u8; 8] = [0x63, 0x6f, 0x6e, 0x65, 0x63, 0x74, 0x69, 0x78];
+
+        let scan_result: ScanResult = scan_tree_node.scan_buffer(0, 64, &data, 0, 8);
+        match scan_result {
+            ScanResult::Signature(signature) => {
+                assert_eq!(signature.identifier.as_str(), "vdh")
+            }
+            _ => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported scan result type"
+                ));
+            }
+        };
+
+        // Test no match.
+        let data: [u8; 8] = [0x78, 0x69, 0x74, 0x63, 0x65, 0x6e, 0x6f, 0x63];
+        let scan_result: ScanResult = scan_tree_node.scan_buffer(0, 64, &data, 0, 8);
+        assert!(matches!(scan_result, ScanResult::None));
+
+        // Test data offset beyond data size.
+        let scan_result: ScanResult = scan_tree_node.scan_buffer(64, 64, &data, 0, 8);
+        assert!(matches!(scan_result, ScanResult::None));
 
         Ok(())
     }

@@ -117,7 +117,24 @@ mod tests {
         byte_value_group.insert_signature(0x63, &signature);
 
         assert_eq!(byte_value_group.signature_groups.len(), 1);
-        // TODO: test if signature_groups contains 0x63
+        assert!(byte_value_group.signature_groups.contains_key(&0x63));
+
+        byte_value_group.insert_signature(0x6f, &signature);
+        assert_eq!(byte_value_group.signature_groups.len(), 2);
+        assert!(byte_value_group.signature_groups.contains_key(&0x6f));
+
+        let signature_other: Arc<Signature> = Arc::new(Signature::new(
+            "vhd2",
+            PatternType::BoundToStart,
+            0,
+            "connectx".as_bytes(),
+        ));
+        byte_value_group.insert_signature(0x63, &signature_other);
+
+        let signature_group: &SignatureGroup =
+            byte_value_group.signature_groups.get(&0x63).unwrap();
+        assert_eq!(signature_group.byte_value, 0x63);
+        assert_eq!(signature_group.signatures.len(), 2);
     }
 
     #[test]
@@ -127,9 +144,11 @@ mod tests {
         assert_eq!(offset_group.offsets.len(), 0);
 
         offset_group.append_offset(5);
+        offset_group.append_offset(10);
 
-        assert_eq!(offset_group.offsets.len(), 1);
-        // TODO: test if offsets contains 5
+        assert_eq!(offset_group.offsets.len(), 2);
+        assert!(offset_group.offsets.contains(&5));
+        assert!(offset_group.offsets.contains(&10));
     }
 
     #[test]
@@ -147,6 +166,17 @@ mod tests {
         signature_group.append_signature(&signature);
 
         assert_eq!(signature_group.signatures.len(), 1);
-        // TODO: test if offsets contains signature
+        assert!(signature_group.signatures.contains(&signature));
+
+        let signature_other: Arc<Signature> = Arc::new(Signature::new(
+            "vhd2",
+            PatternType::BoundToStart,
+            0,
+            "connectx".as_bytes(),
+        ));
+        signature_group.append_signature(&signature_other);
+
+        assert_eq!(signature_group.signatures.len(), 2);
+        assert!(signature_group.signatures.contains(&signature_other));
     }
 }

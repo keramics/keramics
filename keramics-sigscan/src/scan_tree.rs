@@ -151,7 +151,31 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for scan_tree get_spanning_range
+    #[test]
+    fn test_get_spanning_range() {
+        let scan_tree: ScanTree = ScanTree::new(PatternType::BoundToStart);
+
+        assert_eq!(scan_tree.get_spanning_range(), (0, 0));
+
+        let mut scan_tree: ScanTree = ScanTree::new(PatternType::BoundToStart);
+
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
+        signatures.push(Arc::new(Signature::new(
+            "vhd1",
+            PatternType::BoundToStart,
+            56,
+            "connectx".as_bytes(),
+        )));
+        signatures.push(Arc::new(Signature::new(
+            "vhd2",
+            PatternType::BoundToStart,
+            8,
+            "conectix".as_bytes(),
+        )));
+        scan_tree.build(&signatures).unwrap();
+
+        assert_eq!(scan_tree.get_spanning_range(), (0, 64));
+    }
 
     #[test]
     fn test_scan_buffer_with_bound_to_start_signature() -> Result<(), ErrorTrace> {

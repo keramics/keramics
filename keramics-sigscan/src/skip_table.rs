@@ -108,5 +108,26 @@ mod tests {
         assert_eq!(skip_table.smallest_skip_value, 1);
     }
 
-    // TODO: add test for get_skip_value
+    #[test]
+    fn test_get_skip_value() {
+        let mut skip_table: SkipTable = SkipTable::new();
+
+        assert_eq!(skip_table.get_skip_value(&0x63), 0);
+
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
+        signatures.push(Arc::new(Signature::new(
+            "vdh",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        )));
+        skip_table.fill(&signatures);
+
+        assert_eq!(skip_table.get_skip_value(&0x63), 3);
+        assert_eq!(skip_table.get_skip_value(&0x6f), 6);
+        assert_eq!(skip_table.get_skip_value(&0x6e), 5);
+        assert_eq!(skip_table.get_skip_value(&0x65), 4);
+        assert_eq!(skip_table.get_skip_value(&0x00), 0);
+        assert_eq!(skip_table.get_skip_value(&0x61), 0);
+    }
 }
