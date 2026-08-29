@@ -78,10 +78,10 @@ impl ExtFileEntry {
     pub(super) fn new(
         data_stream: &DataStreamReference,
         inode_table: &Arc<ExtInodeTable>,
+        character_encoding: &CharacterEncoding,
         inode_number: u32,
         inode: ExtInode,
         name: Option<ByteString>,
-        character_encoding: &CharacterEncoding,
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
@@ -318,10 +318,10 @@ impl ExtFileEntry {
             );
             Ok(Arc::new(RwLock::new(data_stream)))
         } else {
-            let inode: ExtInode = match self
-                .inode_table
-                .get_inode(&self.data_stream, attributes_entry.value_data_inode_number)
-            {
+            let inode: ExtInode = match self.inode_table.get_inode_by_identifier(
+                &self.data_stream,
+                attributes_entry.value_data_inode_number,
+            ) {
                 Ok(inode) => inode,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -500,7 +500,7 @@ impl ExtFileEntry {
             Some((name, directory_entry)) => {
                 let inode: ExtInode = match self
                     .inode_table
-                    .get_inode(&self.data_stream, directory_entry.inode_number)
+                    .get_inode_by_identifier(&self.data_stream, directory_entry.inode_number)
                 {
                     Ok(inode) => inode,
                     Err(mut error) => {
@@ -514,10 +514,10 @@ impl ExtFileEntry {
                 Ok(Some(Self::new(
                     &self.data_stream,
                     &self.inode_table,
+                    &self.character_encoding,
                     directory_entry.inode_number,
                     inode,
                     Some(name.clone()),
-                    &self.character_encoding,
                 )))
             }
             None => Ok(None),
@@ -664,27 +664,26 @@ impl FileEntryIterator for ExtFileEntry {
             .get_key_value_by_index(sub_file_entry_index)
         {
             Some((name, directory_entry)) => {
-                let inode: ExtInode = match self
+                match self
                     .inode_table
-                    .get_inode(&self.data_stream, directory_entry.inode_number)
+                    .get_inode_by_identifier(&self.data_stream, directory_entry.inode_number)
                 {
-                    Ok(inode) => inode,
+                    Ok(inode) => Ok(Self::new(
+                        &self.data_stream,
+                        &self.inode_table,
+                        &self.character_encoding,
+                        directory_entry.inode_number,
+                        inode,
+                        Some(name.clone()),
+                    )),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
                             format!("Unable to retrieve inode: {}", directory_entry.inode_number)
                         );
-                        return Err(error);
+                        Err(error)
                     }
-                };
-                Ok(Self::new(
-                    &self.data_stream,
-                    &self.inode_table,
-                    directory_entry.inode_number,
-                    inode,
-                    Some(name.clone()),
-                    &self.character_encoding,
-                ))
+                }
             }
             None => Err(keramics_core::error_trace_new!(format!(
                 "Missing directory entry: {}",

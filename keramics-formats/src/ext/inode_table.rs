@@ -50,7 +50,7 @@ impl ExtInodeTable {
     /// Creates a new inode table.
     pub fn new() -> Self {
         Self {
-            format_version: 2,
+            format_version: 0,
             metadata_checksum_seed: None,
             block_size: 0,
             inode_size: 0,
@@ -62,7 +62,7 @@ impl ExtInodeTable {
     }
 
     /// Retrieves a specific inode.
-    pub fn get_inode(
+    pub fn get_inode_by_identifier(
         &self,
         data_stream: &DataStreamReference,
         inode_number: u32,
@@ -179,5 +179,5 @@ impl ExtInodeTable {
 mod tests {
     use super::*;
 
-    // TODO: add tests for get_inode.
+    // TODO: add tests for get_inode_by_identifier.
 }

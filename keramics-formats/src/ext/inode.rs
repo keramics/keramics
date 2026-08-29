@@ -44,19 +44,19 @@ pub struct ExtInode {
     pub data_size: u64,
 
     /// Access timestamp.
-    pub(super) access_timestamp: i32,
+    pub access_timestamp: i32,
 
     /// Access date and time.
     pub access_time: Option<DateTime>,
 
     /// Change timestamp.
-    pub(super) change_timestamp: i32,
+    pub change_timestamp: i32,
 
     /// Change date and time.
     pub change_time: Option<DateTime>,
 
     /// Modification timestamp.
-    pub(super) modification_timestamp: i32,
+    pub modification_timestamp: i32,
 
     /// Modification date and time.
     pub modification_time: Option<DateTime>,

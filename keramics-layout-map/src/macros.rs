@@ -149,7 +149,8 @@ impl Parse for StructureMember {
                                 DataType::BitField8
                                 | DataType::BitField16
                                 | DataType::BitField32
-                                | DataType::BitField64 => StructureMember::BitField(field_options),
+                                | DataType::BitField64
+                                | DataType::BitField128 => StructureMember::BitField(field_options),
                                 _ => StructureMember::Field(field_options),
                             };
                             Ok(structure_member)
@@ -243,7 +244,8 @@ impl Parse for StructureOptions {
                                         DataType::BitField8
                                         | DataType::BitField16
                                         | DataType::BitField32
-                                        | DataType::BitField64 => {
+                                        | DataType::BitField64
+                                        | DataType::BitField128 => {
                                             StructureMember::BitField(field_options)
                                         }
                                         _ => StructureMember::Field(field_options),
@@ -401,7 +403,8 @@ fn parse_structure_layout_member(
         DataType::BitField8
         | DataType::BitField16
         | DataType::BitField32
-        | DataType::BitField64 => Err(ParseError::new(format!(
+        | DataType::BitField64
+        | DataType::BitField128 => Err(ParseError::new(format!(
             "Unsupported data type of field: {}",
             field_options.name
         ))),

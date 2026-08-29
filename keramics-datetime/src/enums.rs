@@ -18,6 +18,7 @@ use super::fat::{FatDate, FatTimeDate, FatTimeDate10Ms};
 use super::filetime::Filetime;
 use super::hfs::HfsTime;
 use super::posix::{PosixTime32, PosixTime64Ns};
+use super::xfs::XfsBigtime;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum DateTime {
@@ -31,4 +32,5 @@ pub enum DateTime {
     NotSet,
     PosixTime32(PosixTime32),
     PosixTime64Ns(PosixTime64Ns),
+    XfsBigtime(XfsBigtime),
 }

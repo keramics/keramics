@@ -10,10 +10,7 @@ given.
 | --- | --- |
 | Byte order | big-endian |
 | Date and time values | number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) and fraction of second in number of nanoseconds, or in bigtime (number of nanoseconds since December 13, 1901 20:45:52 UTC) |
-| Character strings | UTF-8 |
-
-TODO: to confirm if on older systems the character strings is a narrow character (Single Byte
-Character (SBC) or Multi Byte Character (MBC)) stored using a system defined codepage.
+| Character strings | UTF-8 or a narrow character (Single Byte Character (SBC) or Multi Byte Character (MBC)) stored using a system defined codepage |
 
 ## Terminology
 
@@ -62,7 +59,7 @@ An allocation group consists of:
 
 ## The superblock
 
-The XFS superblock (xfs_sb_t) is 208 bytes of size and consists of:
+The XFS superblock (xfs_sb_t) is (at least) 512 bytes of size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -75,7 +72,7 @@ The XFS superblock (xfs_sb_t) is 208 bytes of size and consists of:
 | 24 | 8 | | Number of real-time (device) extents |
 | 32 | 16 | | File system (or volume) identifier, which contains an UUID |
 | 48 | 8 | | Journal block number, which contains a [file system block number](#file_system_block_number) or 0 if the journal is stored on a separate device |
-| 56 | 8 | | Root directory inode number, which contains -1 (0xffffffffffffffff) if not set |
+| 56 | 8 | | Root directory (absolute) inode number, which contains -1 (0xffffffffffffffff) if not set |
 | 64 | 8 | | Real-time bitmap extents inode number, which contains -1 (0xffffffffffffffff) if not set |
 | 72 | 8 | | Real-time bitmap summary inode number, which contains -1 (0xffffffffffffffff) if not set |
 | 80 | 4 | | Real-time extent size, in number of blocks |
@@ -83,7 +80,7 @@ The XFS superblock (xfs_sb_t) is 208 bytes of size and consists of:
 | 88 | 4 | | Number of allocation groups |
 | 92 | 4 | | Real-time bitmap size, in number of blocks |
 | 96 | 4 | | Journal size, in number of blocks |
-| 100 | 2 | | [Version and feature flags](#version_and_feature_flags) |
+| 100 | 2 | | [Format version and feature flags](#format_version_and_feature_flags) |
 | 102 | 2 | | Sector size (in bytes) |
 | 104 | 2 | | Inode size (in bytes), which can range from 256 to 2048 |
 | 106 | 2 | | Number of inodes per block |
@@ -129,20 +126,19 @@ The XFS superblock (xfs_sb_t) is 208 bytes of size and consists of:
 | 224 | 4 | | Checksum of the superblock |
 | 228 | 4 | | Unknown (Sparse inode chunk alignment in number of blocks) |
 | 232 | 4 | | Project quota inode number |
-| 240 | 8 | | Journal log sequence number (LSN) of the last superblock update |
+| 236 | 8 | | Journal log sequence number (LSN) of the last superblock update |
 | <td colspan="4">*Only used if the XFS_SB_FEAT_INCOMPAT_META_UUID incompatible feature flag is set*</td> |
-| 248 | 16 | | Metadata identifier, which contains an UUID |
+| 244 | 16 | | Metadata identifier, which contains an UUID |
 | <td colspan="4">*Only used if the XFS_SB_FEAT_RO_COMPAT_RMAPBT incompatible feature flag is set*</td> |
-| 264 | 8 | | Real-time Reverse Mapping B+tree inode number |
+| 260 | 8 | | Real-time Reverse Mapping B+tree inode number |
+| 268 | 244 | | Unknown (empty values) |
 
 <!-- rumdl-enable MD033 MD056 -->
 
 > Note that the allocation group size and allocation group size in log2 are not necessarily
 > equivalent.
 
-TODO: Determine if superblock format version 1 152 bytes in size?
-
-### Version and feature flags {#version_and_feature_flags}
+### Format version and feature flags {#format_version_and_feature_flags}
 
 The 4 LSB contain the version the remaining bits are used to store feature flags.
 
@@ -157,7 +153,7 @@ The 4 LSB contain the version the remaining bits are used to store feature flags
 | <td colspan="3">*Second generation*</td> |
 | 4 | XFS_SB_VERSION_4 | Introduced in Irix 6.2, added directory version 2 support |
 | <td colspan="3">*Third generation*</td> |
-| 5 | XFS_SB_VERSION_5 | Intoduces in Linux 3.10 |
+| 5 | XFS_SB_VERSION_5 | Intoduced in Linux 3.10 |
 
 | Value | Identifier | Description |
 | --- | --- | --- |
@@ -314,7 +310,7 @@ TODO: describe sb_uuid or sb_meta_uuid
 
 ## Inode information
 
-The inode information (xfs_agi_t) is 296 or 336 bytes of size and consists of:
+The inode information (xfs_agi_t) is (at least) 512 bytes of size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -330,7 +326,7 @@ The inode information (xfs_agi_t) is 296 or 336 bytes of size and consists of:
 | 28 | 4 | | Number of unused (free) inodes in the allocation group |
 | 32 | 4 | | First inode number of the last allocated inode chunk, which contains an inode number relative to the allocation group |
 | 36 | 4 | -1 (0xffffffff) | Unknown |
-| 40 | 64 x 4 | | Hash table of unlinked (deleted) inodes that are still being referenced, which contains -1 (0xffffffff) if not set |
+| 40 | 64 x 4 | | Hash table of 32-bit unlinked (deleted) inode numbers that are still being referenced, which contains -1 (0xffffffff) if not set |
 | <td colspan="4">*If superblock format version >= 5 (XFS_SB_VERSION_5)*</td> |
 | 296 | 16 | | Block type identifier, which contains an UUID that should correspond to sb_uuid or sb_meta_uuid |
 | 312 | 4 | | Checksum |
@@ -338,6 +334,9 @@ The inode information (xfs_agi_t) is 296 or 336 bytes of size and consists of:
 | 320 | 8 | | Log sequence number |
 | 328 | 4 | | Free inode B+ tree root block number, which contains a block number relative to the start of the allocation group |
 | 332 | 4 | | Free inode B+ tree height/depth |
+| 336 | 4 | | Unknown |
+| 340 | 4 | | Unknown |
+| 344 | 168 | | Unknown (empty values) |
 
 <!-- rumdl-enable MD033 MD056 -->
 
@@ -371,8 +370,8 @@ size and consist of:
 | 0 | 4 | | Signature |
 | 4 | 2 | | Level (or depth/height), which contains 0 for a leaf block |
 | 6 | 2 | | Number of records |
-| 8 | 4 | | Previous B+ tree block number, which contains a block number relative to the start of the allocation group or -1 (0xffffffff) if not set |
-| 12 | 4 | | Next B+ tree block number, which contains a block number relative to the start of the allocation group or -1 (0xffffffff) if not set |
+| 8 | 4 | | Previous B+ tree block number, which is relative to the start of the allocation group or contains -1 (0xffffffff) if not set |
+| 12 | 4 | | Next B+ tree block number, which is relative to the start of the allocation group or contains -1 (0xffffffff) if not set |
 | <td colspan="4">*If superblock format version >= 5 (XFS_SB_VERSION_5)*</td> |
 | 16 | 8 | | Block number |
 | 24 | 8 | | Log sequence number |
@@ -393,8 +392,8 @@ The B+ tree block header 64-bit (xfs_btree_lblock_t) is 24 or 68 bytes of size a
 | 0 | 4 | | Signature |
 | 4 | 2 | | Level (or depth/height), where 0 represents a leaf block |
 | 6 | 2 | | Number of records |
-| 8 | 8 | | Previous B+ tree block number, which contains -1 (0xffffffff) if not set |
-| 16 | 8 | | Next B+ tree block number, which contains -1 (0xffffffff) if not set |
+| 8 | 8 | | Previous B+ tree block number, which is relative to the start of the allocation group or contains -1 (0xffffffffffffffff) if not set |
+| 16 | 8 | | Next B+ tree block number, which is relative to the start of the allocation group or contains -1 (0xffffffffffffffff) if not set |
 | <td colspan="4">*If superblock format version >= 5 (XFS_SB_VERSION_5)*</td> |
 | 24 | 8 | | Block number |
 | 32 | 8 | | Log sequence number |
@@ -415,15 +414,15 @@ TODO: determine where this is defined, it seems to be represented in the example
 
 | Signature | Description |
 | --- | --- |
-| "AB3B" | File system version 5 free space block offset B+ tree |
-| "AB3C" | File system version 5 free space block count B+ tree |
+| "AB3B" | Free space block offset B+ tree (file system version 5) |
+| "AB3C" | Free space block count B+ tree (file system version 5) |
 | "ABTB" | Free space block offset B+ tree |
 | "ABTC" | Free space block count B+ tree |
-| "FIB3" | File system version 5 free inode B+tree |
+| "FIB3" | Free inode B+tree (file system version 5) |
 | "FIBT" | Free inode B+tree |
-| "IAB3" | File system version 5 (allocated) inode B+tree |
+| "IAB3" | (Allocated) inode B+tree (file system version 5) |
 | "IABT" | (Allocated) inode B+tree |
-| "R3FC" | File system version 5 reference count B+ tree |
+| "R3FC" | Reference count B+ tree (file system version 5) |
 
 ### Free space B+ tree
 
@@ -704,7 +703,7 @@ The inode version 3 (xfs_dinode_core_t) is 176 bytes of size and consist of:
 | 0 | XFS_DINODE_FMT_DEV | Device identifier is stored inline (in the inode) |
 | 1 | XFS_DINODE_FMT_LOCAL | Data is stored inline (in the inode) |
 | 2 | XFS_DINODE_FMT_EXTENTS | Data is referrenced by extents stored in [an extent list](#extent_list) |
-| 3 | XFS_DINODE_FMT_BTREE | Data is referrence by extents stored in [an extents B+ tree](#extent_btree) |
+| 3 | XFS_DINODE_FMT_BTREE | Data is referrence by extents stored in [an extent B+ tree](#extent_btree) |
 | 4 | XFS_DINODE_FMT_UUID | Unknown (currently not used) |
 | 5 | XFS_DINODE_FMT_RMAP | Data is referrence by a reverse mapping |
 
@@ -749,7 +748,7 @@ The packed extent (xfs_bmbt_rec_t) is 128 bits of size and consist of:
 
 #### Extent B+ tree root node
 
-The root node of the extents B+ tree is stored in the inode and equivalent to
+The root node of the extent B+ tree is stored in the inode and equivalent to
 [an extent B+ tree branch node](#extent_btree_branch_node).
 
 The number of key-value pairs is calculated as following:
@@ -912,11 +911,11 @@ A directory (leaf) block (xfs_dir_leafblock_t) consist of:
 * array of block values
 * a block footer
 
-If the XFS_SB_VERSION_DIRV2BIT flag in the superblock is set the directory is stored using
-[a block directory](#block_directory).
-
-If more than one block is needed to store the extended attributes
+If more than one block is needed to store the directory entries
 [a directory B+ tree](#directory_btree) is used.
+
+> Note that if the XFS_SB_VERSION_DIRV2BIT flag in the superblock is set the directory is stored
+> using [a block directory](#block_directory) instead.
 
 #### Directory (leaf) block header version 1
 
@@ -978,8 +977,8 @@ A block directory (xfs_dir2_block_t) consist of one or more blocks that consist 
 * hash values of the entries
 * a block directory footer
 
-If the XFS_SB_VERSION_DIRV2BIT flag in the superblock is not set the directory is stored using
-[a directory (leaf) block](#directory_leaf_block).
+> Note that if the XFS_SB_VERSION_DIRV2BIT flag in the superblock is not set the directory is
+> stored using [a directory (leaf) block](#directory_leaf_block) instead.
 
 #### Block directory header
 
@@ -994,13 +993,13 @@ The block directory header version 2 (xfs_dir2_data_hdr_t) is 16 bytes of size a
 
 ##### Block directory header version 3
 
-The block directory header version 3 (xfs_dir3_data_hdr_t) is 48 bytes of size and consist of:
+The block directory header version 3 (xfs_dir3_data_hdr_t) is 64 bytes of size and consist of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| <td colspan="4">*Block header*</td> |
+| <td colspan="4">*Block header (xfs_dir3_blk_hdr_t)*</td> |
 | 0 | 4 | "XDB3" or "XDD3" | Signature |
 | 4 | 4 | | Checksum |
 | 8 | 8 | | Block number |
@@ -1020,9 +1019,9 @@ The block directory header version 3 (xfs_dir3_data_hdr_t) is 48 bytes of size a
 | "XD2B" | Version 2 directory entries B+ tree (single block) |
 | "XD2D" | Version 2 directory entries B+ tree (multi block) |
 | "XD2F" | Version 2 directory free space B+ tree |
-| "XDB3" | Version 3 Directory entries B+ tree (single block) |
-| "XDD3" | Version 3 Directory entries B+ tree (multi block) |
-| "XDF3" | Version 3 Directory free space B+ tree |
+| "XDB3" | Version 3 directory entries B+ tree (single block) |
+| "XDD3" | Version 3 directory entries B+ tree (multi block) |
+| "XDF3" | Version 3 directory free space B+ tree |
 
 ##### Block free region version 2 {#block_free_region_v2}
 
@@ -1031,7 +1030,7 @@ The block free region version 2 (xfs_dir2_data_free_t) is 4 bytes of size and co
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 2 | | Free region offset, which is relative to the start of the directory block |
-| 2 | 2 | | Size |
+| 2 | 2 | | Free region size |
 
 #### Block directory entries
 
@@ -1062,7 +1061,7 @@ and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 2 | 0xffff | Signature (free tag) |
-| 2 | 4 | | Entry size, which contains the size of the unused block including the size of the signature and entry size |
+| 2 | 2 | | Entry size, which contains the size of the unused entry including the size of the signature and entry size |
 | 4 | 2 | | Unknown (padding) |
 | ... | 2 | | Unknown (offset, tag) |
 
@@ -1084,23 +1083,23 @@ The block directory footer version 2 (xfs_dir2_block_tail_t) is 8 bytes of size 
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 4 | | Number of directory entries |
+| 0 | 4 | | Number of used entries |
 | 4 | 4 | | Number of unused entries |
 
-### Directory B+ tree {#directory_btree}
+### Directory or attributes B+ tree {#directory_btree}
 
 The first block in the extents is the B+ tree root block.
 
-### Directory B+ tree branch node block
+#### Directory or attributes B+ tree branch node block {#directory_btree_branch_node_block}
 
-An attributes B+ tree branch node block consist of:
+A directory or attributes B+ tree branch node block consist of:
 
-* [a directory branch node block header](#directory_branch_node_block_header)
-* array of directory branch node entry
+* [a directory or attributes branch node block header](#directory_branch_node_block_header)
+* array of directory or attributes branch node entries
 
-#### Directory branch node block header {#directory_branch_node_block_header}
+##### Directory or attributes branch node block header {#directory_branch_node_block_header}
 
-A directory branch node block header is 16 bytes of size and consist of:
+A directory or attributes branch node block header is 16 bytes of size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1108,9 +1107,9 @@ A directory branch node block header is 16 bytes of size and consist of:
 | 12 | 2 | | Number of entries |
 | 14 | 2 | | Node level |
 
-#### Directory B+ tree branch node block entry
+##### Directory or attributes B+ tree branch node block entry
 
-A directory B+ tree branch node block entry is 8 bytes of size and consists of:
+A directory or attributes B+ tree branch node block entry is 8 bytes of size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1196,7 +1195,7 @@ system block header version 3 (xfs_da3_blkinfo_t) is 56 bytes of size and consis
 | 0xd2f1 | XFS_DIR2_LEAF1_MAGIC | |
 | 0xd2ff | XFS_DIR2_LEAFN_MAGIC | |
 | 0xfbee | XFS_ATTR_LEAF_MAGIC | Attributes B+ tree leaf block |
-| 0xfebe | XFS_DA_NODE_MAGIC | Directory or attributes B+ tree branch block |
+| 0xfebe | XFS_DA_NODE_MAGIC | Directory or attributes [B+ tree branch block](#directory_btree_branch_node_block) |
 | 0xfeeb | XFS_DIR_LEAF_MAGIC | Directory B+ tree leaf block |
 
 ## Extended attributes

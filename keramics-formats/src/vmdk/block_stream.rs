@@ -45,6 +45,7 @@ mod tests {
             start_sector: 0,
             number_of_sectors: 8192,
             file_name: Some(ByteString::from("ext2.vmdk")),
+            alternate_file_name: None,
             extent_type: VmdkDescriptorExtentType::Sparse,
             access_mode: VmdkDescriptorExtentAccessMode::ReadWrite,
         }];

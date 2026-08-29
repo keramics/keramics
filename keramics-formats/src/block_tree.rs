@@ -61,7 +61,7 @@ impl<T> BlockTree<T> {
         }
         let elements_per_node: u64 = self.data_size.div_ceil(element_size);
 
-        let node_type: BlockTreeNodeType = if element_size <= size {
+        let node_type: BlockTreeNodeType = if element_size <= self.leaf_value_size {
             BlockTreeNodeType::Leaf
         } else {
             BlockTreeNodeType::Branch

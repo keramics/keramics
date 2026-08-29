@@ -113,7 +113,7 @@ impl<T> BlockTreeNode<T> {
                 while self.element_size / sub_node_element_size > elements_per_node {
                     sub_node_element_size *= elements_per_node;
                 }
-                let sub_node_type: BlockTreeNodeType = if sub_node_element_size <= size {
+                let sub_node_type: BlockTreeNodeType = if sub_node_element_size <= leaf_value_size {
                     BlockTreeNodeType::Leaf
                 } else {
                     BlockTreeNodeType::Branch
@@ -149,11 +149,12 @@ impl<T> BlockTreeNode<T> {
                         value.clone(),
                     ) {
                         Ok(_) => {}
-                        Err(error) => {
-                            return Err(keramics_core::error_trace_new_with_error!(
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
                                 format!("Unable to insert value into sub node: {}", sub_node_index),
-                                error
-                            ));
+                            );
+                            return Err(error);
                         }
                     }
                     sub_node_offset += self.element_size;

@@ -73,34 +73,40 @@ impl Ext2Inode {
 
         if inode.flags & EXT_INODE_FLAG_IS_EXTENDED_ATTRIBUTE_INODE == 0 {
             inode.access_timestamp = bytes_to_i32_le!(data, 8);
-            if inode.access_timestamp == 0 {
-                inode.access_time = Some(DateTime::NotSet);
+
+            inode.access_time = if inode.access_timestamp == 0 {
+                Some(DateTime::NotSet)
             } else {
-                inode.access_time = Some(DateTime::PosixTime32(PosixTime32::new(
+                Some(DateTime::PosixTime32(PosixTime32::new(
                     inode.access_timestamp,
-                )));
-            }
+                )))
+            };
             inode.change_timestamp = bytes_to_i32_le!(data, 12);
-            if inode.change_timestamp == 0 {
-                inode.change_time = Some(DateTime::NotSet);
+
+            inode.change_time = if inode.change_timestamp == 0 {
+                Some(DateTime::NotSet)
             } else {
-                inode.change_time = Some(DateTime::PosixTime32(PosixTime32::new(
+                Some(DateTime::PosixTime32(PosixTime32::new(
                     inode.change_timestamp,
-                )));
-            }
+                )))
+            };
             inode.modification_timestamp = bytes_to_i32_le!(data, 16);
-            if inode.modification_timestamp == 0 {
-                inode.modification_time = Some(DateTime::NotSet);
+
+            inode.modification_time = if inode.modification_timestamp == 0 {
+                Some(DateTime::NotSet)
             } else {
-                inode.modification_time = Some(DateTime::PosixTime32(PosixTime32::new(
+                Some(DateTime::PosixTime32(PosixTime32::new(
                     inode.modification_timestamp,
-                )));
-            }
+                )))
+            };
         }
         let timestamp: i32 = bytes_to_i32_le!(data, 20);
-        if timestamp > 0 {
-            inode.deletion_time = DateTime::PosixTime32(PosixTime32::new(timestamp));
-        }
+
+        inode.deletion_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::PosixTime32(PosixTime32::new(timestamp))
+        };
         inode.number_of_links = bytes_to_u16_le!(data, 26);
         inode.number_of_blocks = bytes_to_u32_le!(data, 28) as u64;
 

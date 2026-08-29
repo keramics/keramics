@@ -44,7 +44,7 @@ impl HfsStandardCatalogFolderRecord {
         folder_record: &mut HfsCatalogFolderRecord,
         data: &[u8],
     ) -> Result<(), ErrorTrace> {
-        if data.len() < 10 {
+        if data.len() < 70 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         folder_record.record_type = bytes_to_u16_be!(data, 0);
@@ -129,7 +129,7 @@ mod tests {
         let mut test_struct = HfsCatalogFolderRecord::new();
 
         let test_data: Vec<u8> = get_test_data();
-        let result = HfsStandardCatalogFolderRecord::read_data(&mut test_struct, &test_data[0..9]);
+        let result = HfsStandardCatalogFolderRecord::read_data(&mut test_struct, &test_data[0..69]);
         assert!(result.is_err());
     }
 

@@ -64,7 +64,7 @@ impl Fat32BootRecord {
         if data.len() < 512 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        if data[510..512] != FAT_BOOT_SIGNATURE {
+        if &data[510..512] != FAT_BOOT_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         boot_record.bytes_per_sector = bytes_to_u16_le!(data, 11);

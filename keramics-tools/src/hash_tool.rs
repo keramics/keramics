@@ -51,7 +51,8 @@ struct CommandLineArguments {
     digest_hash_type: DigestHashType,
 
     #[arg(long, default_value_t = 0)]
-    /// Layer within the storage media image, where 1 represents the first layer
+    /// Layer within the storage media image, where 1 represents the first layer. The default is
+    /// all layers.
     image_layer: usize,
 
     /// Comma seperated list of partitions to include
@@ -315,16 +316,17 @@ impl HashTool {
                 return Ok(());
             }
             let vfs_resolver: VfsResolverReference = VfsResolver::current();
+            let scan_node_location: &VfsLocation = vfs_scan_node.get_location();
 
             let file_system: VfsFileSystemReference =
-                match vfs_resolver.open_file_system(&vfs_scan_node.location) {
+                match vfs_resolver.open_file_system(scan_node_location) {
                     Ok(file_system) => file_system,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                         return Err(error);
                     }
                 };
-            let display_path: String = match vfs_scan_node.location.get_parent() {
+            let display_path: String = match scan_node_location.get_parent() {
                 Some(parent_path) => match self.display_path.get_path(parent_path) {
                     Ok(path) => path,
                     Err(mut error) => {
@@ -398,8 +400,10 @@ impl HashTool {
         path: &Path,
         name: Option<&PathComponent>,
     ) -> Result<(), ErrorTrace> {
+        let scan_node_location: &VfsLocation = vfs_scan_node.get_location();
+
         if vfs_scan_node.is_empty() {
-            let file_system_display_path: String = match vfs_scan_node.location.get_parent() {
+            let file_system_display_path: String = match scan_node_location.get_parent() {
                 Some(parent_path) => match self.display_path.get_path(parent_path) {
                     Ok(path) => path,
                     Err(mut error) => {
@@ -413,7 +417,7 @@ impl HashTool {
                 None => String::new(),
             };
             let vfs_resolver: VfsResolverReference = VfsResolver::current();
-            let vfs_location: VfsLocation = vfs_scan_node.location.new_with_parent(path.clone());
+            let vfs_location: VfsLocation = scan_node_location.new_with_parent(path.clone());
 
             match vfs_resolver.get_data_stream_by_location_and_name(&vfs_location, name) {
                 Ok(Some(data_stream)) => {

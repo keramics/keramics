@@ -18,10 +18,13 @@ use crate::location::VfsLocation;
 #[derive(Debug)]
 pub struct VfsScanNode {
     /// Location.
-    pub location: VfsLocation,
+    pub(super) location: VfsLocation,
 
     /// Sub nodes.
     pub sub_nodes: Vec<VfsScanNode>,
+
+    /// Value to indicate the scan node is locked.
+    pub(super) is_locked: bool,
 }
 
 impl VfsScanNode {
@@ -30,7 +33,13 @@ impl VfsScanNode {
         Self {
             location,
             sub_nodes: Vec::new(),
+            is_locked: false,
         }
+    }
+
+    /// Retrieves the location.
+    pub fn get_location(&self) -> &VfsLocation {
+        &self.location
     }
 
     /// Retrieves the type.
@@ -72,5 +81,10 @@ impl VfsScanNode {
             | VfsType::Vhdx
             | VfsType::Vmdk => false,
         }
+    }
+
+    /// Determines if the scan node is locked.
+    pub fn is_locked(&self) -> bool {
+        self.is_locked
     }
 }

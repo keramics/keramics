@@ -344,6 +344,7 @@ impl NtfsDirectoryIndex {
             index_value_offset += value_data_size;
 
             let alignment_padding: usize = calculate_alignment_padding(index_value_offset, 8);
+
             if alignment_padding > 0 {
                 // TODO: debug print 8-byte alignment padding.
 
@@ -588,6 +589,7 @@ impl NtfsDirectoryIndex {
             index_value_offset += value_data_size;
 
             let alignment_padding: usize = calculate_alignment_padding(index_value_offset, 8);
+
             if alignment_padding > 0 {
                 // TODO: debug print 8-byte alignment padding.
 

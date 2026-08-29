@@ -95,6 +95,7 @@ impl StructureLayoutBitFieldsGroup {
             DataType::BitField16 => 16,
             DataType::BitField32 => 32,
             DataType::BitField64 => 64,
+            DataType::BitField128 => 128,
             _ => 0,
         };
         Self {
@@ -135,6 +136,7 @@ impl StructureLayoutBitFieldsGroup {
             DataType::BitField16 => Some(2),
             DataType::BitField32 => Some(4),
             DataType::BitField64 => Some(8),
+            DataType::BitField128 => Some(16),
             _ => None,
         }
     }
@@ -149,28 +151,37 @@ impl StructureLayoutBitFieldsGroup {
             DataType::BitField8 => quote!(data[#data_offset]),
             DataType::BitField16 => match *byte_order {
                 ByteOrder::BigEndian => {
-                    quote!(keramics_types::bytes_to_u16_be!(data, #data_offset))
+                    quote!(u16::from_be_bytes(*data[#data_offset..].first_chunk::<2>().unwrap()))
                 }
                 ByteOrder::LittleEndian => {
-                    quote!(keramics_types::bytes_to_u16_le!(data, #data_offset))
+                    quote!(u16::from_le_bytes(*data[#data_offset..].first_chunk::<2>().unwrap()))
                 }
                 _ => panic!("Unsupported byte order"),
             },
             DataType::BitField32 => match *byte_order {
                 ByteOrder::BigEndian => {
-                    quote!(keramics_types::bytes_to_u32_be!(data, #data_offset))
+                    quote!(u32::from_be_bytes(*data[#data_offset..].first_chunk::<4>().unwrap()))
                 }
                 ByteOrder::LittleEndian => {
-                    quote!(keramics_types::bytes_to_u32_le!(data, #data_offset))
+                    quote!(u32::from_le_bytes(*data[#data_offset..].first_chunk::<4>().unwrap()))
                 }
                 _ => panic!("Unsupported byte order"),
             },
             DataType::BitField64 => match *byte_order {
                 ByteOrder::BigEndian => {
-                    quote!(keramics_types::bytes_to_u64_be!(data, #data_offset))
+                    quote!(u64::from_be_bytes(*data[#data_offset..].first_chunk::<8>().unwrap()))
                 }
                 ByteOrder::LittleEndian => {
-                    quote!(keramics_types::bytes_to_u64_le!(data, #data_offset))
+                    quote!(u64::from_le_bytes(*data[#data_offset..].first_chunk::<8>().unwrap()))
+                }
+                _ => panic!("Unsupported byte order"),
+            },
+            DataType::BitField128 => match *byte_order {
+                ByteOrder::BigEndian => {
+                    quote!(u128::from_be_bytes(*data[#data_offset..].first_chunk::<16>().unwrap()))
+                }
+                ByteOrder::LittleEndian => {
+                    quote!(u128::from_le_bytes(*data[#data_offset..].first_chunk::<16>().unwrap()))
                 }
                 _ => panic!("Unsupported byte order"),
             },
@@ -185,6 +196,7 @@ impl StructureLayoutBitFieldsGroup {
             DataType::BitField16 => quote!(u16),
             DataType::BitField32 => quote!(u32),
             DataType::BitField64 => quote!(u64),
+            DataType::BitField128 => quote!(u128),
             _ => panic!("Unsupported data type"),
         }
     }
@@ -468,55 +480,55 @@ impl StructureLayoutField {
             }
             DataType::SignedInteger16Bit => match *byte_order {
                 ByteOrder::BigEndian => {
-                    quote!(keramics_types::bytes_to_i16_be!(data, #data_offset))
+                    quote!(i16::from_be_bytes(*data[#data_offset..].first_chunk::<2>().unwrap()))
                 }
                 ByteOrder::LittleEndian => {
-                    quote!(keramics_types::bytes_to_i16_le!(data, #data_offset))
+                    quote!(i16::from_le_bytes(*data[#data_offset..].first_chunk::<2>().unwrap()))
                 }
                 _ => panic!("Unsupported byte order"),
             },
             DataType::SignedInteger32Bit => match *byte_order {
                 ByteOrder::BigEndian => {
-                    quote!(keramics_types::bytes_to_i32_be!(data, #data_offset))
+                    quote!(i32::from_be_bytes(*data[#data_offset..].first_chunk::<4>().unwrap()))
                 }
                 ByteOrder::LittleEndian => {
-                    quote!(keramics_types::bytes_to_i32_le!(data, #data_offset))
+                    quote!(i32::from_le_bytes(*data[#data_offset..].first_chunk::<4>().unwrap()))
                 }
                 _ => panic!("Unsupported byte order"),
             },
             DataType::SignedInteger64Bit => match *byte_order {
                 ByteOrder::BigEndian => {
-                    quote!(keramics_types::bytes_to_i64_be!(data, #data_offset))
+                    quote!(i64::from_be_bytes(*data[#data_offset..].first_chunk::<8>().unwrap()))
                 }
                 ByteOrder::LittleEndian => {
-                    quote!(keramics_types::bytes_to_i64_le!(data, #data_offset))
+                    quote!(i64::from_le_bytes(*data[#data_offset..].first_chunk::<8>().unwrap()))
                 }
                 _ => panic!("Unsupported byte order"),
             },
             DataType::UnsignedInteger16Bit => match *byte_order {
                 ByteOrder::BigEndian => {
-                    quote!(keramics_types::bytes_to_u16_be!(data, #data_offset))
+                    quote!(u16::from_be_bytes(*data[#data_offset..].first_chunk::<2>().unwrap()))
                 }
                 ByteOrder::LittleEndian => {
-                    quote!(keramics_types::bytes_to_u16_le!(data, #data_offset))
+                    quote!(u16::from_le_bytes(*data[#data_offset..].first_chunk::<2>().unwrap()))
                 }
                 _ => panic!("Unsupported byte order"),
             },
             DataType::UnsignedInteger32Bit => match *byte_order {
                 ByteOrder::BigEndian => {
-                    quote!(keramics_types::bytes_to_u32_be!(data, #data_offset))
+                    quote!(u32::from_be_bytes(*data[#data_offset..].first_chunk::<4>().unwrap()))
                 }
                 ByteOrder::LittleEndian => {
-                    quote!(keramics_types::bytes_to_u32_le!(data, #data_offset))
+                    quote!(u32::from_le_bytes(*data[#data_offset..].first_chunk::<4>().unwrap()))
                 }
                 _ => panic!("Unsupported byte order"),
             },
             DataType::UnsignedInteger64Bit => match *byte_order {
                 ByteOrder::BigEndian => {
-                    quote!(keramics_types::bytes_to_u64_be!(data, #data_offset))
+                    quote!(u64::from_be_bytes(*data[#data_offset..].first_chunk::<8>().unwrap()))
                 }
                 ByteOrder::LittleEndian => {
-                    quote!(keramics_types::bytes_to_u64_le!(data, #data_offset))
+                    quote!(u64::from_le_bytes(*data[#data_offset..].first_chunk::<8>().unwrap()))
                 }
                 _ => panic!("Unsupported byte order"),
             },
@@ -977,7 +989,7 @@ mod tests {
                 let field1: u8 = data[0];
                 string_parts.push(format!("    field1: {},\n", field1));
 
-                let field2: u16 = keramics_types::bytes_to_u16_le!(data, 1) - 7;
+                let field2: u16 = u16::from_le_bytes(*data[1..].first_chunk::<2>().unwrap()) - 7;
                 string_parts.push(format!("    field2: {},\n", field2));
 
                 string_parts.push(format!("}}\n\n"));
@@ -1026,7 +1038,7 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let field1: u64 = keramics_types::bytes_to_u64_be!(data, 0);
+                let field1: u64 = u64::from_be_bytes(*data[0..].first_chunk::<8>().unwrap());
                 string_parts.push(format!("    field1: {},\n", field1));
 
                 let mut array_parts: Vec<String> = Vec::new();
@@ -1082,7 +1094,7 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let field1: u64 = keramics_types::bytes_to_u64_be!(data, 0);
+                let field1: u64 = u64::from_be_bytes(*data[0..].first_chunk::<8>().unwrap());
                 string_parts.push(format!("    field1: {},\n", field1));
 
                 let field2: keramics_types::ByteString = keramics_types::ByteString::from(&data[8..40]);
@@ -1126,7 +1138,7 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let value_32bit: u32 = keramics_types::bytes_to_u32_le!(data, 0);
+                let value_32bit: u32 = u32::from_le_bytes(*data[0..].first_chunk::<4>().unwrap());
 
                 let field1: u32 = value_32bit & 0x1ff;
                 string_parts.push(format!("    field1: {},\n", field1));
@@ -1173,7 +1185,7 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let value_64bit: u64 = keramics_types::bytes_to_u64_le!(data, 0);
+                let value_64bit: u64 = u64::from_le_bytes(*data[0..].first_chunk::<8>().unwrap());
 
                 let field1: u64 = value_64bit & 0xfffffffffffffff;
                 string_parts.push(format!("    field1: {},\n", field1));
@@ -1238,11 +1250,11 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let field1: u64 = keramics_types::bytes_to_u64_be!(data, 0);
+                let field1: u64 = u64::from_be_bytes(*data[0..].first_chunk::<8>().unwrap());
                 string_parts.push(format!("    field1: {},\n", field1));
 
                 if data.len() > 8 {
-                    let field2: u32 = keramics_types::bytes_to_u32_be!(data, 8);
+                    let field2: u32 = u32::from_be_bytes(*data[8..].first_chunk::<4>().unwrap());
                     string_parts.push(format!("    field2: {},\n", field2));
                 }
                 string_parts.push(format!("}}\n\n"));
@@ -1293,7 +1305,7 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let field1: u32 = keramics_types::bytes_to_u32_le!(data, 0);
+                let field1: u32 = u32::from_le_bytes(*data[0..].first_chunk::<4>().unwrap());
                 string_parts.push(format!("    field1: {},\n", field1));
 
                 string_parts.push(format!("    field2: "));
@@ -1353,7 +1365,7 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let field1: i32 = keramics_types::bytes_to_i32_le!(data, 0);
+                let field1: i32 = i32::from_le_bytes(*data[0..].first_chunk::<4>().unwrap());
                 string_parts.push(format!("    field1: {},\n", field1));
 
                 string_parts.push(format!("    field2: [\n"));

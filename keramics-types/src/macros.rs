@@ -15,7 +15,7 @@
 #[macro_export]
 macro_rules! bytes_to_i16_be {
     ( $array:expr, $element:expr $(,)? ) => {
-        i16::from_be_bytes(<[u8; 2]>::try_from(&$array[$element..$element + 2]).unwrap())
+        i16::from_be_bytes(*$array[$element..].first_chunk::<2>().unwrap())
     };
 }
 
@@ -23,7 +23,7 @@ macro_rules! bytes_to_i16_be {
 #[macro_export]
 macro_rules! bytes_to_i16_le {
     ( $array:expr, $element:expr $(,)? ) => {
-        i16::from_le_bytes(<[u8; 2]>::try_from(&$array[$element..$element + 2]).unwrap())
+        i16::from_le_bytes(*$array[$element..].first_chunk::<2>().unwrap())
     };
 }
 
@@ -31,7 +31,7 @@ macro_rules! bytes_to_i16_le {
 #[macro_export]
 macro_rules! bytes_to_i32_be {
     ( $array:expr, $element:expr $(,)? ) => {
-        i32::from_be_bytes(<[u8; 4]>::try_from(&$array[$element..$element + 4]).unwrap())
+        i32::from_be_bytes(*$array[$element..].first_chunk::<4>().unwrap())
     };
 }
 
@@ -39,7 +39,7 @@ macro_rules! bytes_to_i32_be {
 #[macro_export]
 macro_rules! bytes_to_i32_le {
     ( $array:expr, $element:expr $(,)? ) => {
-        i32::from_le_bytes(<[u8; 4]>::try_from(&$array[$element..$element + 4]).unwrap())
+        i32::from_le_bytes(*$array[$element..].first_chunk::<4>().unwrap())
     };
 }
 
@@ -47,7 +47,7 @@ macro_rules! bytes_to_i32_le {
 #[macro_export]
 macro_rules! bytes_to_i64_be {
     ( $array:expr, $element:expr $(,)? ) => {
-        i64::from_be_bytes(<[u8; 8]>::try_from(&$array[$element..$element + 8]).unwrap())
+        i64::from_be_bytes(*$array[$element..].first_chunk::<8>().unwrap())
     };
 }
 
@@ -55,7 +55,7 @@ macro_rules! bytes_to_i64_be {
 #[macro_export]
 macro_rules! bytes_to_i64_le {
     ( $array:expr, $element:expr $(,)? ) => {
-        i64::from_le_bytes(<[u8; 8]>::try_from(&$array[$element..$element + 8]).unwrap())
+        i64::from_le_bytes(*$array[$element..].first_chunk::<8>().unwrap())
     };
 }
 
@@ -63,7 +63,7 @@ macro_rules! bytes_to_i64_le {
 #[macro_export]
 macro_rules! bytes_to_u16_be {
     ( $array:expr, $element:expr $(,)? ) => {
-        u16::from_be_bytes(<[u8; 2]>::try_from(&$array[$element..$element + 2]).unwrap())
+        u16::from_be_bytes(*$array[$element..].first_chunk::<2>().unwrap())
     };
 }
 
@@ -71,7 +71,7 @@ macro_rules! bytes_to_u16_be {
 #[macro_export]
 macro_rules! bytes_to_u16_le {
     ( $array:expr, $element:expr $(,)? ) => {
-        u16::from_le_bytes(<[u8; 2]>::try_from(&$array[$element..$element + 2]).unwrap())
+        u16::from_le_bytes(*$array[$element..].first_chunk::<2>().unwrap())
     };
 }
 
@@ -79,7 +79,7 @@ macro_rules! bytes_to_u16_le {
 #[macro_export]
 macro_rules! bytes_to_u32_be {
     ( $array:expr, $element:expr $(,)? ) => {
-        u32::from_be_bytes(<[u8; 4]>::try_from(&$array[$element..$element + 4]).unwrap())
+        u32::from_be_bytes(*$array[$element..].first_chunk::<4>().unwrap())
     };
 }
 
@@ -87,7 +87,7 @@ macro_rules! bytes_to_u32_be {
 #[macro_export]
 macro_rules! bytes_to_u32_le {
     ( $array:expr, $element:expr $(,)? ) => {
-        u32::from_le_bytes(<[u8; 4]>::try_from(&$array[$element..$element + 4]).unwrap())
+        u32::from_le_bytes(*$array[$element..].first_chunk::<4>().unwrap())
     };
 }
 
@@ -95,7 +95,7 @@ macro_rules! bytes_to_u32_le {
 #[macro_export]
 macro_rules! bytes_to_u64_be {
     ( $array:expr, $element:expr $(,)? ) => {
-        u64::from_be_bytes(<[u8; 8]>::try_from(&$array[$element..$element + 8]).unwrap())
+        u64::from_be_bytes(*$array[$element..].first_chunk::<8>().unwrap())
     };
 }
 
@@ -103,7 +103,7 @@ macro_rules! bytes_to_u64_be {
 #[macro_export]
 macro_rules! bytes_to_u64_le {
     ( $array:expr, $element:expr $(,)? ) => {
-        u64::from_le_bytes(<[u8; 8]>::try_from(&$array[$element..$element + 8]).unwrap())
+        u64::from_le_bytes(*$array[$element..].first_chunk::<8>().unwrap())
     };
 }
 
