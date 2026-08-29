@@ -236,7 +236,6 @@ impl Lznt1Context {
                         "uncompressed_data_offset",
                         safe_uncompressed_data_offset,
                     );
-
                     if distance as usize > safe_uncompressed_data_offset {
                         return Err(keramics_core::error_trace_new!(
                             "Invalid distance value exceeds uncompressed data offset"
@@ -909,6 +908,32 @@ mod tests {
     }
 
     #[test]
+    fn test_block_header_read_data() -> Result<(), ErrorTrace> {
+        let mut header: Lznt1BlockHeader = Lznt1BlockHeader::new();
+
+        header.read_data(&[0x05, 0x80])?;
+        assert_eq!(header.block_size, 6);
+        assert_eq!(header.is_compressed, true);
+
+        header.read_data(&[0x07, 0x00])?;
+        assert_eq!(header.block_size, 8);
+        assert_eq!(header.is_compressed, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_block_header_read_data_with_unsupported_data_size() {
+        let mut header: Lznt1BlockHeader = Lznt1BlockHeader::new();
+
+        let result: Result<(), ErrorTrace> = header.read_data(&[0x01]);
+        assert!(result.is_err());
+
+        let result: Result<(), ErrorTrace> = header.read_data(&[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_decompress() -> Result<(), ErrorTrace> {
         let mut test_context: Lznt1Context = Lznt1Context::new();
 
@@ -929,5 +954,142 @@ mod tests {
         assert_eq!(&uncompressed_data[0..11358], &expected_data);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_decompress_without_compressed_data() -> Result<(), ErrorTrace> {
+        let mut context: Lznt1Context = Lznt1Context::new();
+
+        let test_data: [u8; 0] = [];
+        let mut uncompressed: Vec<u8> = vec![0; 1024];
+        context.decompress(&test_data, &mut uncompressed)?;
+        assert_eq!(context.uncompressed_data_size, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_end_of_input_marker() -> Result<(), ErrorTrace> {
+        let mut context: Lznt1Context = Lznt1Context::new();
+
+        let test_data: [u8; 2] = [0x00, 0x00];
+        let mut uncompressed: Vec<u8> = vec![0; 1024];
+        context.decompress(&test_data, &mut uncompressed)?;
+        assert_eq!(context.uncompressed_data_size, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_uncompressed_block() -> Result<(), ErrorTrace> {
+        let mut context: Lznt1Context = Lznt1Context::new();
+
+        let test_data: Vec<u8> = vec![0x01, 0x00, b'a', b'b'];
+        let mut uncompressed: Vec<u8> = vec![0; 1024];
+        context.decompress(&test_data, &mut uncompressed)?;
+        assert_eq!(context.uncompressed_data_size, 2);
+        assert_eq!(&uncompressed[0..2], b"ab");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_compressed_block() -> Result<(), ErrorTrace> {
+        let mut context: Lznt1Context = Lznt1Context::new();
+
+        let test_data: Vec<u8> = vec![0x02, 0x00, b'a', b'b', b'c', 0x02, 0x80, 0x01, 0x00, 0x20];
+        let mut uncompressed: Vec<u8> = vec![0; 16];
+        context.decompress(&test_data, &mut uncompressed)?;
+        assert_eq!(context.uncompressed_data_size, 6);
+        assert_eq!(&uncompressed[0..6], b"abcabc");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_missing_compressed_data() {
+        let mut context: Lznt1Context = Lznt1Context::new();
+
+        let test_data: [u8; 1] = [0x01];
+        let mut uncompressed: Vec<u8> = vec![0; 1024];
+        let result: Result<(), ErrorTrace> = context.decompress(&test_data, &mut uncompressed);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_uncompressed_block_and_missing_compressed_data() {
+        let mut context: Lznt1Context = Lznt1Context::new();
+
+        let test_data: Vec<u8> = vec![0x07, 0x00, b'H', b'e', b'l', b'l', b'o'];
+
+        let mut uncompressed: Vec<u8> = vec![0; 1024];
+        let result: Result<(), ErrorTrace> = context.decompress(&test_data, &mut uncompressed);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_uncompressed_block_and_missing_uncompressed_data() {
+        let mut context: Lznt1Context = Lznt1Context::new();
+
+        let test_data: Vec<u8> = vec![0x07, 0x00, b'H', b'e', b'l', b'l', b'o', b'w', b'!'];
+
+        let mut uncompressed: Vec<u8> = vec![0; 3];
+        let result: Result<(), ErrorTrace> = context.decompress(&test_data, &mut uncompressed);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_compressed_block_and_invalid_distance() {
+        let mut context: Lznt1Context = Lznt1Context::new();
+
+        let test_data: Vec<u8> = vec![0x02, 0x80, 0x01, 0x00, 0x00];
+
+        let mut uncompressed: Vec<u8> = vec![0; 1024];
+        let result: Result<(), ErrorTrace> = context.decompress(&test_data, &mut uncompressed);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_compressed_block_and_invalid_match() {
+        let mut context: Lznt1Context = Lznt1Context::new();
+
+        let test_data: Vec<u8> = vec![0x01, 0x00, b'a', b'b', 0x02, 0x80, 0x01, 0x00, 0x00];
+
+        let mut uncompressed: Vec<u8> = vec![0; 4];
+        let result: Result<(), ErrorTrace> = context.decompress(&test_data, &mut uncompressed);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_compressed_block_and_missing_tuple_data() {
+        let mut context: Lznt1Context = Lznt1Context::new();
+
+        let test_data: Vec<u8> = vec![0x00, 0x80, 0x01];
+
+        let mut uncompressed: Vec<u8> = vec![0; 1024];
+        let result: Result<(), ErrorTrace> = context.decompress(&test_data, &mut uncompressed);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_compressed_block_and_missing_compressed_data() {
+        let mut context: Lznt1Context = Lznt1Context::new();
+
+        let test_data: Vec<u8> = vec![0x00, 0x80, 0x00];
+
+        let mut uncompressed: Vec<u8> = vec![0; 1024];
+        let result: Result<(), ErrorTrace> = context.decompress(&test_data, &mut uncompressed);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_compressed_block_and_missing_uncompressed_data() {
+        let mut context: Lznt1Context = Lznt1Context::new();
+
+        let test_data: Vec<u8> = vec![0x02, 0x80, 0x03, b'a', b'b'];
+
+        let mut uncompressed: Vec<u8> = vec![0; 1];
+        let result: Result<(), ErrorTrace> = context.decompress(&test_data, &mut uncompressed);
+        assert!(result.is_err());
     }
 }

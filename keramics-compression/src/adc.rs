@@ -50,11 +50,6 @@ impl AdcContext {
             if uncompressed_data_offset >= uncompressed_data_size {
                 break;
             }
-            if compressed_data_offset >= compressed_data_size {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid compressed data value too small"
-                ));
-            }
             let oppcode: u8 = compressed_data[compressed_data_offset];
             compressed_data_offset += 1;
 

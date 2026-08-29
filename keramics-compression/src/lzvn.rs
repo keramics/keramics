@@ -522,4 +522,263 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_decompress_with_empty_compressed_data() -> Result<(), ErrorTrace> {
+        let test_data: [u8; 0] = [];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 4] = [0; 4];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 0);
+        assert_eq!(uncompressed_data, [0; 4]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_empty_uncompressed_data() -> Result<(), ErrorTrace> {
+        let test_data: [u8; 2] = [0xe1, 0x61];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 0] = [];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_literal_small_and_end_of_stream() -> Result<(), ErrorTrace> {
+        let test_data: [u8; 3] = [0xe1, 0x61, 0x06];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 2] = [0; 2];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 1);
+        assert_eq!(uncompressed_data, [0x61, 0]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_distance_small() -> Result<(), ErrorTrace> {
+        let test_data: [u8; 5] = [0xc0, 0x01, 0x61, 0x62, 0x63];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 6] = [0; 6];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 6);
+        assert_eq!(uncompressed_data, [0x61, 0x62, 0x63, 0x63, 0x63, 0x63]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_distance_previous() -> Result<(), ErrorTrace> {
+        let test_data: [u8; 7] = [0xc0, 0x01, 0x61, 0x62, 0x63, 0x46, 0x78];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 10] = [0; 10];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 10);
+        assert_eq!(
+            uncompressed_data,
+            [0x61, 0x62, 0x63, 0x63, 0x63, 0x63, 0x78, 0x78, 0x78, 0x78]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_distance_large() -> Result<(), ErrorTrace> {
+        let test_data: [u8; 6] = [0xc7, 0x01, 0x00, 0x61, 0x62, 0x63];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 6] = [0; 6];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 6);
+        assert_eq!(uncompressed_data, [0x61, 0x62, 0x63, 0x63, 0x63, 0x63]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_distance_medium() -> Result<(), ErrorTrace> {
+        let test_data: [u8; 5] = [0xb1, 0x04, 0x00, 0x61, 0x62];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 9] = [0; 9];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 9);
+        assert_eq!(
+            uncompressed_data,
+            [0x61, 0x62, 0x62, 0x62, 0x62, 0x62, 0x62, 0x62, 0x62]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_match_small() -> Result<(), ErrorTrace> {
+        let test_data: [u8; 6] = [0xc0, 0x01, 0x61, 0x62, 0x63, 0xf2];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 8] = [0; 8];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 8);
+        assert_eq!(
+            uncompressed_data,
+            [0x61, 0x62, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_match_large() -> Result<(), ErrorTrace> {
+        let test_data: [u8; 7] = [0xc0, 0x01, 0x61, 0x62, 0x63, 0xf0, 0x08];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 30] = [0; 30];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 30);
+        assert_eq!(uncompressed_data[0], 0x61);
+        assert_eq!(uncompressed_data[1], 0x62);
+        assert!(uncompressed_data[2..].iter().all(|&value| value == 0x63));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_literal_large() -> Result<(), ErrorTrace> {
+        let mut test_data: Vec<u8> = vec![0xe0, 0x02];
+        test_data.extend([0x61; 18]);
+
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 20] = [0; 20];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 18);
+        assert_eq!(&uncompressed_data[..18], &[0x61; 18]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_invalid_oppcode() {
+        let test_data: [u8; 1] = [0x70];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 1] = [0];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_literal_size_exceeds_compressed_data_size() {
+        let test_data: [u8; 1] = [0xe1];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 1] = [0];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_literal_size_exceeds_uncompressed_data_size() {
+        let test_data: [u8; 3] = [0xe2, 0x61, 0x62];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 1] = [0];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_insufficient_data_for_large_literal() {
+        let test_data: [u8; 1] = [0xe0];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 8] = [0; 8];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_insufficient_data_for_distance_small() {
+        let test_data: [u8; 1] = [0x00];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 1] = [0];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_insufficient_data_for_distance_large() {
+        let test_data: [u8; 1] = [0x07];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 1] = [0];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_insufficient_data_for_distance_medium() {
+        let test_data: [u8; 1] = [0xa0];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 1] = [0];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_insufficient_data_for_large_match() {
+        let test_data: [u8; 1] = [0xf0];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 4] = [0; 4];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_distance_exceeds_uncompressed_data_offset() {
+        let test_data: [u8; 5] = [0xc0, 0x05, 0x61, 0x62, 0x63];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 8] = [0; 8];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_match_size_exceeds_uncompressed_data_size() {
+        let test_data: [u8; 7] = [0xc0, 0x01, 0x61, 0x62, 0x63, 0xf0, 0x08];
+        let mut test_context: LzvnContext = LzvnContext::new();
+
+        let mut uncompressed_data: [u8; 10] = [0; 10];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+
+        assert!(result.is_err());
+    }
 }
