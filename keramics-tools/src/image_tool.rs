@@ -93,7 +93,8 @@ struct BodyfileCommandArguments {
     calculate_md5: bool,
 
     #[arg(long, default_value_t = 0)]
-    /// Layer within the storage media image, where 1 represents the first layer
+    /// Layer within the storage media image, where 1 represents the first layer. The default is
+    /// all layers.
     image_layer: usize,
 
     /// Comma seperated list of partitions to include
@@ -114,7 +115,8 @@ struct BodyfileCommandArguments {
 #[derive(Args, Debug)]
 struct HashCommandArguments {
     #[arg(long, default_value_t = 0)]
-    /// Layer within the storage media image, where 1 represents the first layer
+    /// Layer within the storage media image, where 1 represents the first layer. The default is
+    /// all layers.
     image_layer: usize,
 }
 
@@ -733,15 +735,17 @@ impl ImageTool {
             if !vfs_scan_node.is_file_system() {
                 return Ok(());
             }
+            let scan_node_location: &VfsLocation = vfs_scan_node.get_location();
+
             let file_system: VfsFileSystemReference =
-                match self.vfs_resolver.open_file_system(&vfs_scan_node.location) {
+                match self.vfs_resolver.open_file_system(scan_node_location) {
                     Ok(file_system) => file_system,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                         return Err(error);
                     }
                 };
-            let display_path: String = match vfs_scan_node.location.get_parent() {
+            let display_path: String = match scan_node_location.get_parent() {
                 Some(parent_path) => match self.display_path.get_path(parent_path) {
                     Ok(path) => path,
                     Err(mut error) => {
@@ -838,9 +842,11 @@ impl ImageTool {
         vfs_scan_node: &VfsScanNode,
         levels: &mut Vec<bool>,
     ) -> Result<(), ErrorTrace> {
+        let scan_node_location: &VfsLocation = vfs_scan_node.get_location();
+
         let result: Option<VfsFileEntry> = match self
             .vfs_resolver
-            .get_file_entry_by_location(&vfs_scan_node.location)
+            .get_file_entry_by_location(scan_node_location)
         {
             Ok(file_entry) => file_entry,
             Err(mut error) => {
@@ -849,7 +855,7 @@ impl ImageTool {
             }
         };
         let prefix: String = self.get_hierarchy_prefix(levels);
-        let path: &Path = vfs_scan_node.location.get_path();
+        let path: &Path = scan_node_location.get_path();
         let vfs_type: &VfsType = vfs_scan_node.get_type();
 
         let path_string: String = match result.as_ref() {
@@ -946,18 +952,23 @@ impl ImageTool {
             },
             None => path.to_string(),
         };
-        println!("{}{}: path: {}", prefix, vfs_type, path_string);
+        let is_locked: bool = vfs_scan_node.is_locked();
 
-        let number_of_sub_nodes: usize = vfs_scan_node.sub_nodes.len();
+        let suffix: &str = if is_locked { " [LOCKED]" } else { "" };
+        println!("{}{}: path: {}{}", prefix, vfs_type, path_string, suffix);
 
-        for (node_index, sub_scan_node) in vfs_scan_node.sub_nodes.iter().enumerate() {
-            let is_last: bool = node_index + 1 == number_of_sub_nodes;
+        if !is_locked {
+            let number_of_sub_nodes: usize = vfs_scan_node.sub_nodes.len();
 
-            levels.push(is_last);
+            for (node_index, sub_scan_node) in vfs_scan_node.sub_nodes.iter().enumerate() {
+                let is_last: bool = node_index + 1 == number_of_sub_nodes;
 
-            self.print_scan_node_as_hierarchy(sub_scan_node, levels)?;
+                levels.push(is_last);
 
-            levels.pop();
+                self.print_scan_node_as_hierarchy(sub_scan_node, levels)?;
+
+                levels.pop();
+            }
         }
         Ok(())
     }

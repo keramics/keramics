@@ -20,6 +20,7 @@ mod filetime;
 mod hfs;
 mod posix;
 mod util;
+mod xfs;
 
 pub use apfs::ApfsTime;
 pub use enums::DateTime;
@@ -27,3 +28,4 @@ pub use fat::{FatDate, FatTimeDate, FatTimeDate10Ms};
 pub use filetime::Filetime;
 pub use hfs::HfsTime;
 pub use posix::{PosixTime32, PosixTime64Ns};
+pub use xfs::XfsBigtime;

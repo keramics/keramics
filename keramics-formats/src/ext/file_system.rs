@@ -27,7 +27,6 @@ use super::features::ExtFeatures;
 use super::file_entry::ExtFileEntry;
 use super::group_descriptor::ExtGroupDescriptor;
 use super::group_descriptor_table::ExtGroupDescriptorTable;
-use super::inode::ExtInode;
 use super::inode_table::ExtInodeTable;
 use super::superblock::ExtSuperblock;
 
@@ -94,14 +93,14 @@ impl ExtFileSystem {
         self.block_size
     }
 
-    /// Retrieves the format version.
-    pub fn get_format_version(&self) -> u8 {
-        self.features.get_format_version()
-    }
-
     /// Retrieves the compatible feature flags.
     pub fn get_compatible_feature_flags(&self) -> u32 {
         self.features.compatible_feature_flags
+    }
+
+    /// Retrieves the format version.
+    pub fn get_format_version(&self) -> u8 {
+        self.features.get_format_version()
     }
 
     /// Retrieves the incompatible feature flags.
@@ -164,24 +163,26 @@ impl ExtFileSystem {
                 "Unsupported file systems features"
             ));
         }
-        let inode: ExtInode = match self.inode_table.get_inode(data_stream, inode_number) {
-            Ok(inode) => inode,
+        match self
+            .inode_table
+            .get_inode_by_identifier(data_stream, inode_number)
+        {
+            Ok(inode) => Ok(ExtFileEntry::new(
+                data_stream,
+                &self.inode_table,
+                &self.character_encoding,
+                inode_number,
+                inode,
+                None,
+            )),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
                     format!("Unable to retrieve inode: {}", inode_number)
                 );
-                return Err(error);
+                Err(error)
             }
-        };
-        Ok(ExtFileEntry::new(
-            data_stream,
-            &self.inode_table,
-            inode_number,
-            inode,
-            None,
-            &self.character_encoding,
-        ))
+        }
     }
 
     /// Retrieves the file entry for a specific path.
@@ -573,21 +574,21 @@ mod tests {
     }
 
     #[test]
-    fn test_get_format_version() -> Result<(), ErrorTrace> {
-        let file_system: ExtFileSystem = get_file_system()?;
-
-        let format_version: u8 = file_system.get_format_version();
-        assert_eq!(format_version, 2);
-
-        Ok(())
-    }
-
-    #[test]
     fn test_get_compatible_feature_flags() -> Result<(), ErrorTrace> {
         let file_system: ExtFileSystem = get_file_system()?;
 
         let feature_flags: u32 = file_system.get_compatible_feature_flags();
         assert_eq!(feature_flags, 0x00000038);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_format_version() -> Result<(), ErrorTrace> {
+        let file_system: ExtFileSystem = get_file_system()?;
+
+        let format_version: u8 = file_system.get_format_version();
+        assert_eq!(format_version, 2);
 
         Ok(())
     }

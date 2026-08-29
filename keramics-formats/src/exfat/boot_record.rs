@@ -97,7 +97,7 @@ impl ExFatBootRecord {
         if data.len() < 512 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        if data[510..512] != EXFAT_BOOT_SIGNATURE {
+        if &data[510..512] != EXFAT_BOOT_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         let bytes_per_sector: u8 = data[108];

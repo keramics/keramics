@@ -15,7 +15,7 @@ use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
-use keramics_formats::apfs::ApfsContainer;
+use keramics_formats::apfs::{ApfsContainer, ApfsVolume};
 use keramics_formats::apm::ApmVolumeSystem;
 use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
 use keramics_formats::ewf::EwfImage;
@@ -205,6 +205,33 @@ impl VfsScanner {
         Ok(())
     }
 
+    /// Retrieves a VFS type for a format identifier.
+    fn get_vfs_type(format_identifier: &FormatIdentifier) -> Option<VfsType> {
+        match format_identifier {
+            FormatIdentifier::Apfs => Some(VfsType::ApfsContainer),
+            FormatIdentifier::Apm => Some(VfsType::Apm),
+            FormatIdentifier::Ewf => Some(VfsType::Ewf),
+            FormatIdentifier::ExFat => Some(VfsType::ExFat),
+            FormatIdentifier::Ext => Some(VfsType::Ext),
+            FormatIdentifier::Fat => Some(VfsType::Fat),
+            FormatIdentifier::Gpt => Some(VfsType::Gpt),
+            FormatIdentifier::Hfs => Some(VfsType::Hfs),
+            FormatIdentifier::LinuxLvm => Some(VfsType::LinuxLvm),
+            FormatIdentifier::Mbr => Some(VfsType::Mbr),
+            FormatIdentifier::Ntfs => Some(VfsType::Ntfs),
+            FormatIdentifier::Pdi => Some(VfsType::Pdi),
+            FormatIdentifier::Qcow => Some(VfsType::Qcow),
+            FormatIdentifier::SparseBundle => Some(VfsType::SparseBundle),
+            FormatIdentifier::SparseImage => Some(VfsType::SparseImage),
+            FormatIdentifier::SplitRaw => Some(VfsType::SplitRaw),
+            FormatIdentifier::Udif => Some(VfsType::Udif),
+            FormatIdentifier::Vhd => Some(VfsType::Vhd),
+            FormatIdentifier::Vhdx => Some(VfsType::Vhdx),
+            FormatIdentifier::Vmdk => Some(VfsType::Vmdk),
+            _ => None,
+        }
+    }
+
     /// Scans a storage media image file for supported formats.
     pub fn scan<'a>(
         &self,
@@ -327,7 +354,7 @@ impl VfsScanner {
         &self,
         file_system: &VfsFileSystemReference,
         vfs_location: &VfsLocation,
-    ) -> Result<Option<VfsType>, ErrorTrace> {
+    ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
         let data_stream: DataStreamReference = match self
             .resolver
             .get_data_stream_by_location_and_name(vfs_location, None)
@@ -356,8 +383,8 @@ impl VfsScanner {
                 "Unsupported VFS location type"
             )),
             VfsType::Apm | VfsType::Gpt | VfsType::LinuxLvm | VfsType::Mbr => {
-                let mut result: Option<VfsType> = match self
-                    .scan_for_sub_volume_system_format_vfs(&data_stream)
+                let mut result: Option<FormatIdentifier> = match self
+                    .scan_for_sub_volume_system_format(&data_stream)
                 {
                     Ok(scan_results) => scan_results,
                     Err(mut error) => {
@@ -369,7 +396,7 @@ impl VfsScanner {
                     }
                 };
                 if result.is_none() {
-                    result = match self.scan_for_file_system_format_vfs(&data_stream) {
+                    result = match self.scan_for_file_system_format(&data_stream) {
                         Ok(scan_results) => scan_results,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -392,8 +419,8 @@ impl VfsScanner {
             | VfsType::Vhd
             | VfsType::Vhdx
             | VfsType::Vmdk => {
-                let mut result: Option<VfsType> =
-                    match self.scan_for_volume_system_format_vfs(&data_stream) {
+                let mut result: Option<FormatIdentifier> =
+                    match self.scan_for_volume_system_format(&data_stream) {
                         Ok(scan_results) => scan_results,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -404,7 +431,7 @@ impl VfsScanner {
                         }
                     };
                 if result.is_none() {
-                    result = match self.scan_for_file_system_format_vfs(&data_stream) {
+                    result = match self.scan_for_file_system_format(&data_stream) {
                         Ok(scan_results) => scan_results,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -418,9 +445,9 @@ impl VfsScanner {
                 Ok(result)
             }
             VfsType::Os => {
-                let mut result: Option<VfsType> =
-                    match self.scan_for_storage_media_image_format_vfs(&data_stream) {
-                        Ok(scan_results) => scan_results,
+                let mut result: Option<FormatIdentifier> =
+                    match self.scan_for_storage_media_image_format(&data_stream) {
+                        Ok(result) => result,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
@@ -441,7 +468,7 @@ impl VfsScanner {
                     ) {
                         Ok(_) => {
                             if splitraw_image.get_number_of_segments() > 1 {
-                                Some(VfsType::SplitRaw)
+                                Some(FormatIdentifier::SplitRaw)
                             } else {
                                 None
                             }
@@ -450,7 +477,7 @@ impl VfsScanner {
                     };
                 }
                 if result.is_none() {
-                    result = match self.scan_for_volume_system_format_vfs(&data_stream) {
+                    result = match self.scan_for_volume_system_format(&data_stream) {
                         Ok(scan_results) => scan_results,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -462,7 +489,7 @@ impl VfsScanner {
                     };
                 }
                 if result.is_none() {
-                    result = match self.scan_for_file_system_format_vfs(&data_stream) {
+                    result = match self.scan_for_file_system_format(&data_stream) {
                         Ok(scan_results) => scan_results,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -498,32 +525,6 @@ impl VfsScanner {
                     "Unable to scan data stream for file system format signatures"
                 );
                 Err(error)
-            }
-        }
-    }
-
-    /// Scans a data stream for a supported file system format and maps it to a VFS type.
-    fn scan_for_file_system_format_vfs(
-        &self,
-        data_stream: &DataStreamReference,
-    ) -> Result<Option<VfsType>, ErrorTrace> {
-        match self.scan_for_file_system_format(&data_stream) {
-            Ok(Some(FormatIdentifier::ExFat)) => Ok(Some(VfsType::ExFat)),
-            Ok(Some(FormatIdentifier::Ext)) => Ok(Some(VfsType::Ext)),
-            Ok(Some(FormatIdentifier::Fat)) => Ok(Some(VfsType::Fat)),
-            Ok(Some(FormatIdentifier::Hfs)) => Ok(Some(VfsType::Hfs)),
-            Ok(Some(FormatIdentifier::Ntfs)) => Ok(Some(VfsType::Ntfs)),
-            Ok(Some(format_identifier)) => Err(keramics_core::error_trace_new!(format!(
-                "Found unsupported file system format signature: {}",
-                format_identifier
-            ))),
-            Ok(None) => Ok(None),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to scan data stream for volume system formats"
-                );
-                return Err(error);
             }
         }
     }
@@ -624,36 +625,6 @@ impl VfsScanner {
         Ok(Some(format_identifier))
     }
 
-    /// Scans a data stream for a supported storage media image format and maps it to a VFS type.
-    pub fn scan_for_storage_media_image_format_vfs(
-        &self,
-        data_stream: &DataStreamReference,
-    ) -> Result<Option<VfsType>, ErrorTrace> {
-        match self.scan_for_storage_media_image_format(&data_stream) {
-            Ok(Some(FormatIdentifier::Ewf)) => Ok(Some(VfsType::Ewf)),
-            Ok(Some(FormatIdentifier::Pdi)) => Ok(Some(VfsType::Pdi)),
-            Ok(Some(FormatIdentifier::Qcow)) => Ok(Some(VfsType::Qcow)),
-            Ok(Some(FormatIdentifier::SparseBundle)) => Ok(Some(VfsType::SparseBundle)),
-            Ok(Some(FormatIdentifier::SparseImage)) => Ok(Some(VfsType::SparseImage)),
-            Ok(Some(FormatIdentifier::Udif)) => Ok(Some(VfsType::Udif)),
-            Ok(Some(FormatIdentifier::Vhd)) => Ok(Some(VfsType::Vhd)),
-            Ok(Some(FormatIdentifier::Vhdx)) => Ok(Some(VfsType::Vhdx)),
-            Ok(Some(FormatIdentifier::Vmdk)) => Ok(Some(VfsType::Vmdk)),
-            Ok(Some(format_identifier)) => Err(keramics_core::error_trace_new!(format!(
-                "Found unsupported storage media image signature: {}",
-                format_identifier
-            ))),
-            Ok(None) => Ok(None),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to scan data stream for storage media image formats"
-                );
-                Err(error)
-            }
-        }
-    }
-
     /// Scans for storage media image sub nodes.
     fn scan_for_storage_media_image_sub_nodes(
         &self,
@@ -695,7 +666,16 @@ impl VfsScanner {
             let mut layer_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location);
 
             match self.scan_for_format(&node_file_system, &layer_scan_node.location)? {
-                Some(sub_node_vfs_type) => {
+                Some(format_identifier) => {
+                    let sub_node_vfs_type: VfsType = match Self::get_vfs_type(&format_identifier) {
+                        Some(vfs_type) => vfs_type,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Found unsupported format signature: {}",
+                                format_identifier
+                            )));
+                        }
+                    };
                     let sub_node_path: Path = Path::from("/");
                     let sub_node_vfs_location: VfsLocation = layer_scan_node
                         .location
@@ -764,7 +744,17 @@ impl VfsScanner {
                 let number_of_volumes: usize = apfs_container.get_number_of_volumes();
 
                 // TODO: invoke mediator to ask which volumes to include.
-                for volume_index in 0..number_of_volumes {
+                for (volume_index, result) in apfs_container.volumes().enumerate() {
+                    let apfs_volume: ApfsVolume = match result {
+                        Ok(volume) => volume,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to open APFS volume: {}", volume_index),
+                            );
+                            return Err(error);
+                        }
+                    };
                     if scan_options.volumes != VfsScanOptionGroup::NotSet
                         && !scan_options.volumes.contains_index(volume_index + 1)
                     {
@@ -786,6 +776,7 @@ impl VfsScanner {
                         VfsScanNode::new(file_system_vfs_location);
 
                     let mut volume_scan_node: VfsScanNode = VfsScanNode::new(volume_vfs_location);
+                    volume_scan_node.is_locked = apfs_volume.is_locked();
                     volume_scan_node.sub_nodes.push(file_system_scan_node);
 
                     scan_node.sub_nodes.push(volume_scan_node);
@@ -955,7 +946,27 @@ impl VfsScanner {
                 }
             }
             VfsType::Os => match self.scan_for_format(&file_system, vfs_location)? {
-                Some(sub_node_vfs_type) => {
+                Some(FormatIdentifier::CdsaEncr) => {
+                    // TODO: Set VfsType::SparseImage based on extension?
+                    let sub_node_vfs_type: VfsType = VfsType::Udif;
+                    let sub_node_path: Path = Path::from("/");
+                    let sub_node_vfs_location: VfsLocation =
+                        vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_path);
+                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
+                    sub_scan_node.is_locked = true;
+
+                    scan_node.sub_nodes.push(sub_scan_node);
+                }
+                Some(format_identifier) => {
+                    let sub_node_vfs_type: VfsType = match Self::get_vfs_type(&format_identifier) {
+                        Some(vfs_type) => vfs_type,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Found unsupported format signature: {}",
+                                format_identifier
+                            )));
+                        }
+                    };
                     let sub_node_path: Path = Path::from("/");
                     let sub_node_vfs_location: VfsLocation =
                         vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_path);
@@ -1248,29 +1259,6 @@ impl VfsScanner {
         }
     }
 
-    /// Scans a data stream for a supported volume-system-in-volume-system format and maps it to a VFS type.
-    fn scan_for_sub_volume_system_format_vfs(
-        &self,
-        data_stream: &DataStreamReference,
-    ) -> Result<Option<VfsType>, ErrorTrace> {
-        match self.scan_for_sub_volume_system_format(&data_stream) {
-            Ok(Some(FormatIdentifier::Apfs)) => Ok(Some(VfsType::ApfsContainer)),
-            Ok(Some(FormatIdentifier::LinuxLvm)) => Ok(Some(VfsType::LinuxLvm)),
-            Ok(Some(format_identifier)) => Err(keramics_core::error_trace_new!(format!(
-                "Found unsupported volume-system-in-volume-system format signature: {}",
-                format_identifier
-            ))),
-            Ok(None) => Ok(None),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to scan data stream for volume-system-in-volume-system system formats"
-                );
-                Err(error)
-            }
-        }
-    }
-
     /// Scans a data stream for a supported volume system format.
     pub fn scan_for_volume_system_format(
         &self,
@@ -1381,33 +1369,6 @@ impl VfsScanner {
         }
     }
 
-    /// Scans a data stream for a supported volume system format and maps it to a VFS type.
-    fn scan_for_volume_system_format_vfs(
-        &self,
-        data_stream: &DataStreamReference,
-    ) -> Result<Option<VfsType>, ErrorTrace> {
-        match self.scan_for_volume_system_format(&data_stream) {
-            Ok(Some(FormatIdentifier::Apfs)) => Ok(Some(VfsType::ApfsContainer)),
-            Ok(Some(FormatIdentifier::Apm)) => Ok(Some(VfsType::Apm)),
-            Ok(Some(FormatIdentifier::Fat)) => Ok(Some(VfsType::Fat)),
-            Ok(Some(FormatIdentifier::Gpt)) => Ok(Some(VfsType::Gpt)),
-            Ok(Some(FormatIdentifier::LinuxLvm)) => Ok(Some(VfsType::LinuxLvm)),
-            Ok(Some(FormatIdentifier::Mbr)) => Ok(Some(VfsType::Mbr)),
-            Ok(Some(format_identifier)) => Err(keramics_core::error_trace_new!(format!(
-                "Found unsupported volume system format signature: {}",
-                format_identifier
-            ))),
-            Ok(None) => Ok(None),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to scan data stream for volume system formats"
-                );
-                Err(error)
-            }
-        }
-    }
-
     /// Scans for volume system sub nodes.
     fn scan_for_volume_system_sub_nodes(
         &self,
@@ -1471,7 +1432,16 @@ impl VfsScanner {
             let mut volume_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location);
 
             match self.scan_for_format(&node_file_system, &volume_scan_node.location)? {
-                Some(sub_node_vfs_type) => {
+                Some(format_identifier) => {
+                    let sub_node_vfs_type: VfsType = match Self::get_vfs_type(&format_identifier) {
+                        Some(vfs_type) => vfs_type,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Found unsupported format signature: {}",
+                                format_identifier
+                            )));
+                        }
+                    };
                     let sub_node_path: Path = Path::from("/");
                     let sub_node_vfs_location: VfsLocation = volume_scan_node
                         .location
@@ -1685,11 +1655,11 @@ mod tests {
 
         let path_string: String = get_test_data_path("pdi/hfsplus.hdd/DiskDescriptor.xml");
         let vfs_location: VfsLocation = VfsLocation::from(&path_string);
-        let vfs_type: VfsType = format_scanner
+        let format_identifier: FormatIdentifier = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Pdi);
+        assert_eq!(format_identifier, FormatIdentifier::Pdi);
 
         Ok(())
     }
@@ -1701,11 +1671,11 @@ mod tests {
 
         let path_string: String = get_test_data_path("qcow/ext2.qcow2");
         let vfs_location: VfsLocation = VfsLocation::from(&path_string);
-        let vfs_type: VfsType = format_scanner
+        let format_identifier: FormatIdentifier = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Qcow);
+        assert_eq!(format_identifier, FormatIdentifier::Qcow);
 
         Ok(())
     }
@@ -1717,11 +1687,11 @@ mod tests {
 
         let path_string: String = get_test_data_path("splitraw/ext2.raw.000");
         let vfs_location: VfsLocation = VfsLocation::from(&path_string);
-        let vfs_type: VfsType = format_scanner
+        let format_identifier: FormatIdentifier = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::SplitRaw);
+        assert_eq!(format_identifier, FormatIdentifier::SplitRaw);
 
         Ok(())
     }
@@ -1741,11 +1711,11 @@ mod tests {
 
         let path: Path = Path::from("/qcow1");
         let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, path);
-        let vfs_type: VfsType = format_scanner
+        let format_identifier: FormatIdentifier = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Ext);
+        assert_eq!(format_identifier, FormatIdentifier::Ext);
 
         Ok(())
     }
@@ -1764,11 +1734,11 @@ mod tests {
 
         let path: Path = Path::from("/gpt1");
         let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
-        let vfs_type: VfsType = format_scanner
+        let format_identifier: FormatIdentifier = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Ext);
+        assert_eq!(format_identifier, FormatIdentifier::Ext);
 
         Ok(())
     }
@@ -1776,196 +1746,196 @@ mod tests {
     // TODO: add test for scan_for_format with unsupported path type
 
     #[test]
-    fn test_scan_for_file_system_format_vfs_with_exfat() -> Result<(), ErrorTrace> {
+    fn test_scan_for_file_system_format_with_exfat() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("exfat/exfat.raw");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_file_system_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_file_system_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::ExFat);
+        assert_eq!(format_identifier, FormatIdentifier::ExFat);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_file_system_format_vfs_with_ext() -> Result<(), ErrorTrace> {
+    fn test_scan_for_file_system_format_with_ext() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("ext/ext2.raw");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_file_system_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_file_system_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Ext);
+        assert_eq!(format_identifier, FormatIdentifier::Ext);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_file_system_format_vfs_with_fat() -> Result<(), ErrorTrace> {
+    fn test_scan_for_file_system_format_with_fat() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("fat/fat12.raw");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_file_system_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_file_system_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Fat);
+        assert_eq!(format_identifier, FormatIdentifier::Fat);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_file_system_format_vfs_with_hfs() -> Result<(), ErrorTrace> {
+    fn test_scan_for_file_system_format_with_hfs() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("hfs/hfs.raw");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_file_system_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_file_system_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Hfs);
+        assert_eq!(format_identifier, FormatIdentifier::Hfs);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_file_system_format_vfs_with_hfsplus() -> Result<(), ErrorTrace> {
+    fn test_scan_for_file_system_format_with_hfsplus() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("hfs/hfsplus.raw");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_file_system_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_file_system_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Hfs);
+        assert_eq!(format_identifier, FormatIdentifier::Hfs);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_file_system_format_vfs_with_ntfs() -> Result<(), ErrorTrace> {
+    fn test_scan_for_file_system_format_with_ntfs() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("ntfs/ntfs.raw");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_file_system_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_file_system_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Ntfs);
+        assert_eq!(format_identifier, FormatIdentifier::Ntfs);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_storage_media_image_format_vfs_with_ewf() -> Result<(), ErrorTrace> {
+    fn test_scan_for_storage_media_image_format_with_ewf() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("ewf/ext2.E01");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_storage_media_image_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Ewf);
+        assert_eq!(format_identifier, FormatIdentifier::Ewf);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_storage_media_image_format_vfs_with_qcow() -> Result<(), ErrorTrace> {
+    fn test_scan_for_storage_media_image_format_with_qcow() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("qcow/ext2.qcow2");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_storage_media_image_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Qcow);
+        assert_eq!(format_identifier, FormatIdentifier::Qcow);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_storage_media_image_format_vfs_with_sparseimage() -> Result<(), ErrorTrace> {
+    fn test_scan_for_storage_media_image_format_with_sparseimage() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("sparseimage/hfsplus.sparseimage");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_storage_media_image_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::SparseImage);
+        assert_eq!(format_identifier, FormatIdentifier::SparseImage);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_storage_media_image_format_vfs_with_udif() -> Result<(), ErrorTrace> {
+    fn test_scan_for_storage_media_image_format_with_udif() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("udif/hfsplus_zlib.dmg");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_storage_media_image_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Udif);
+        assert_eq!(format_identifier, FormatIdentifier::Udif);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_storage_media_image_format_vfs_with_vhd() -> Result<(), ErrorTrace> {
+    fn test_scan_for_storage_media_image_format_with_vhd() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("vhd/ntfs-differential.vhd");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_storage_media_image_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Vhd);
+        assert_eq!(format_identifier, FormatIdentifier::Vhd);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_storage_media_image_format_vfs_with_vhdx() -> Result<(), ErrorTrace> {
+    fn test_scan_for_storage_media_image_format_with_vhdx() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("vhdx/ntfs-differential.vhdx");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_storage_media_image_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Vhdx);
+        assert_eq!(format_identifier, FormatIdentifier::Vhdx);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_storage_media_image_format_vfs_with_vmdk() -> Result<(), ErrorTrace> {
+    fn test_scan_for_storage_media_image_format_with_vmdk() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("vmdk/ext2.vmdk");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_storage_media_image_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Vmdk);
+        assert_eq!(format_identifier, FormatIdentifier::Vmdk);
 
         Ok(())
     }
@@ -1974,76 +1944,76 @@ mod tests {
     // TODO: add tests for scan_for_sub_nodes
 
     #[test]
-    fn test_scan_for_volume_system_format_vfs_with_apfs() -> Result<(), ErrorTrace> {
+    fn test_scan_for_volume_system_format_with_apfs() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("apfs/apfs.raw");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_volume_system_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_volume_system_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::ApfsContainer);
+        assert_eq!(format_identifier, FormatIdentifier::Apfs);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_volume_system_format_vfs_with_apm() -> Result<(), ErrorTrace> {
+    fn test_scan_for_volume_system_format_with_apm() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("apm/apm.dmg");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_volume_system_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_volume_system_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Apm);
+        assert_eq!(format_identifier, FormatIdentifier::Apm);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_volume_system_format_vfs_with_gpt() -> Result<(), ErrorTrace> {
+    fn test_scan_for_volume_system_format_with_gpt() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("gpt/gpt.raw");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_volume_system_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_volume_system_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Gpt);
+        assert_eq!(format_identifier, FormatIdentifier::Gpt);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_volume_system_format_vfs_with_linuxlvm() -> Result<(), ErrorTrace> {
+    fn test_scan_for_volume_system_format_with_linuxlvm() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("linuxlvm/lvm2.raw");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_volume_system_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_volume_system_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::LinuxLvm);
+        assert_eq!(format_identifier, FormatIdentifier::LinuxLvm);
 
         Ok(())
     }
 
     #[test]
-    fn test_scan_for_volume_system_format_vfs_with_mbr() -> Result<(), ErrorTrace> {
+    fn test_scan_for_volume_system_format_with_mbr() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
         let path_string: String = get_test_data_path("mbr/mbr.raw");
         let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
-        let vfs_type: VfsType = format_scanner
-            .scan_for_volume_system_format_vfs(&data_stream)?
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_volume_system_format(&data_stream)?
             .unwrap();
 
-        assert_eq!(vfs_type, VfsType::Mbr);
+        assert_eq!(format_identifier, FormatIdentifier::Mbr);
 
         Ok(())
     }

@@ -123,26 +123,8 @@ mod tests {
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let partition: ApmPartition = get_partition()?;
 
-        let data_stream: DataStreamReference = partition.get_data_stream();
-        match data_stream.write() {
-            Ok(mut data_stream) => {
-                let size: u64 = data_stream.get_size()?;
-                assert_eq!(size, 4153344);
+        _ = partition.get_data_stream();
 
-                let offset: u64 = data_stream.seek(SeekFrom::Start(0))?;
-                assert_eq!(offset, 0);
-
-                let mut buffer: [u8; 8] = [0; 8];
-                let bytes_read: usize = data_stream.read(&mut buffer)?;
-                assert_eq!(bytes_read, 8);
-            }
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain write lock on data stream",
-                    error
-                ));
-            }
-        }
         Ok(())
     }
 

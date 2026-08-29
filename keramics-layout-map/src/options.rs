@@ -102,6 +102,7 @@ impl Parse for FieldDataTypeOption {
             "BitField16" => DataType::BitField16,
             "BitField32" => DataType::BitField32,
             "BitField64" => DataType::BitField64,
+            "BitField128" => DataType::BitField128,
             "ByteString" => DataType::ByteString,
             "FatDate" => DataType::FatDate,
             "FatTimeDate" => DataType::FatTimeDate,

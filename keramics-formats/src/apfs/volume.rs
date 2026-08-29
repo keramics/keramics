@@ -188,6 +188,11 @@ impl ApfsVolume {
         }
     }
 
+    /// Determines if the volume is locked.
+    pub fn is_locked(&self) -> bool {
+        self.is_locked
+    }
+
     /// Opens a volume.
     pub(super) fn open(&mut self, superblock_block_number: u64) -> Result<(), ErrorTrace> {
         let superblock_offset: u64 = superblock_block_number * (self.block_size as u64);

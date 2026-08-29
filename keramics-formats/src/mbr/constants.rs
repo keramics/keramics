@@ -11,5 +11,5 @@
  * under the License.
  */
 
-/// MBR boot signature: "\x55\xaa".
-pub(crate) const MBR_BOOT_SIGNATURE: &[u8] = &[0x55, 0xaa];
+/// MBR boot signature.
+pub(crate) const MBR_BOOT_SIGNATURE: &[u8] = b"\x55\xaa";

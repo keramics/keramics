@@ -84,21 +84,19 @@ impl ApmVolumeSystem {
         let mut number_of_entries: u32 = 0;
         let mut partition_map_entry_index: u32 = 0;
 
-        if self.bytes_per_sector == 0 {
-            for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter() {
-                let offset: u64 = *bytes_per_sector as u64;
+        for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter() {
+            let offset: u64 = *bytes_per_sector as u64;
 
-                keramics_core::data_stream_read_at_position!(
-                    data_stream,
-                    &mut partition_map_signature,
-                    SeekFrom::Start(offset)
-                );
-                if &partition_map_signature[0..2] == APM_PARTITION_MAP_SIGNATURE
-                    && &partition_map_signature[48..67] == APM_PARTITION_MAP_TYPE
-                {
-                    self.bytes_per_sector = *bytes_per_sector;
-                    break;
-                }
+            keramics_core::data_stream_read_at_position!(
+                data_stream,
+                &mut partition_map_signature,
+                SeekFrom::Start(offset)
+            );
+            if &partition_map_signature[0..2] == APM_PARTITION_MAP_SIGNATURE
+                && &partition_map_signature[48..67] == APM_PARTITION_MAP_TYPE
+            {
+                self.bytes_per_sector = *bytes_per_sector;
+                break;
             }
         }
         if self.bytes_per_sector == 0 {

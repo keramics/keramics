@@ -62,7 +62,8 @@ struct CommandLineArguments {
     format: Option<FormatType>,
 
     #[arg(long, default_value_t = 0, requires = "contents")]
-    /// Layer within the storage media image, where 1 represents the first layer
+    /// Layer within the storage media image, where 1 represents the first layer. The default is
+    /// the last layer.
     image_layer: usize,
 
     #[arg(short, long, default_value_t = 0, value_parser=maybe_hex::<u64>)]

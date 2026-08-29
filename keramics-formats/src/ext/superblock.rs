@@ -61,7 +61,7 @@ use super::constants::*;
         ),
         field(
             name = "file_system_identifier",
-            data_type = "uuid",
+            data_type = "Uuid",
             byte_order = "big"
         ),
         field(name = "volume_label", data_type = "ByteString<16>"),
@@ -359,6 +359,10 @@ impl ExtSuperblock {
 mod tests {
     use super::*;
 
+    use std::io::SeekFrom;
+
+    use keramics_core::{DataStreamReference, open_fake_data_stream};
+
     fn get_test_data() -> Vec<u8> {
         vec![
             0x00, 0x04, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0xcc, 0x00, 0x00, 0x00, 0x58, 0x0f,
@@ -559,4 +563,46 @@ mod tests {
     }
 
     // TODO: add test_read_data_with_unsupported_checksum_type
+
+    #[test]
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut test_struct = ExtSuperblock::new(&CharacterEncoding::Utf8);
+        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
+
+        assert_eq!(test_struct.number_of_inodes, 1024);
+        assert_eq!(test_struct.number_of_blocks, 4096);
+        assert_eq!(test_struct.block_size, 1024);
+        assert_eq!(test_struct.number_of_blocks_per_block_group, 8192);
+        assert_eq!(test_struct.number_of_inodes_per_block_group, 1024);
+        assert_eq!(test_struct.last_mount_time, PosixTime32::new(1626962851));
+        assert_eq!(test_struct.last_written_time, PosixTime32::new(1626962852));
+        assert_eq!(test_struct.format_revision, 1);
+        assert_eq!(test_struct.inode_size, 128);
+        assert_eq!(test_struct.compatible_feature_flags, 0x00000038);
+        assert_eq!(test_struct.incompatible_feature_flags, 0x00000002);
+        assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000003);
+
+        let expected_file_system_identifier: [u8; 16] = [
+            0xf0, 0x00, 0x50, 0xbb, 0x07, 0xee, 0x46, 0xa3, 0x83, 0xa6, 0xa4, 0x05, 0xee, 0x0d,
+            0xb5, 0x1f,
+        ];
+        assert_eq!(
+            test_struct.file_system_identifier,
+            expected_file_system_identifier
+        );
+        assert_eq!(test_struct.volume_label, ByteString::from("ext2_test"));
+        assert_eq!(
+            test_struct.last_mount_path,
+            ByteString::from("/mnt/keramics")
+        );
+        assert_eq!(test_struct.group_descriptor_size, 0);
+        assert_eq!(test_struct.number_of_block_groups_per_flex_group, 1);
+        assert_eq!(test_struct.first_meta_block_group, 0);
+        assert_eq!(test_struct.metadata_checksum_seed, None);
+
+        Ok(())
+    }
 }

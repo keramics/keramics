@@ -41,7 +41,8 @@ struct CommandLineArguments {
     debug: bool,
 
     #[arg(long, default_value_t = 0)]
-    /// Layer within the storage media image, where 1 represents the first layer
+    /// Layer within the storage media image, where 1 represents the first layer. The default is
+    /// all layers.
     image_layer: usize,
 
     #[arg(short, long, default_value_t = 0, value_parser=maybe_hex::<u64>)]
@@ -114,7 +115,8 @@ impl ExportTool {
         name: Option<&PathComponent>,
     ) -> Result<(), ErrorTrace> {
         if vfs_scan_node.is_empty() {
-            let vfs_location: VfsLocation = vfs_scan_node.location.new_with_parent(path.clone());
+            let scan_node_location: &VfsLocation = vfs_scan_node.get_location();
+            let vfs_location: VfsLocation = scan_node_location.new_with_parent(path.clone());
 
             match self
                 .vfs_resolver

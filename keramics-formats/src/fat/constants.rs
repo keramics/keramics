@@ -11,8 +11,8 @@
  * under the License.
  */
 
-/// FAT boot signature: "\x55\xaa".
-pub(super) const FAT_BOOT_SIGNATURE: [u8; 2] = [0x55, 0xaa];
+/// FAT boot signature.
+pub(super) const FAT_BOOT_SIGNATURE: &[u8] = b"\x55\xaa";
 
 /// Support bytes per sector values.
 pub(super) const FAT_SUPPORTED_BYTES_PER_SECTOR: [u16; 7] =

@@ -11,8 +11,8 @@
  * under the License.
  */
 
-/// ExFAT boot signature: "\x55\xaa".
-pub(super) const EXFAT_BOOT_SIGNATURE: [u8; 2] = [0x55, 0xaa];
+/// ExFAT boot signature.
+pub(super) const EXFAT_BOOT_SIGNATURE: &[u8] = b"\x55\xaa";
 
 /// Largest cluster block number.
 pub(super) const EXFAT_LARGEST_CLUSTER_BLOCK_NUMBER: u32 = 0xfffffff0;

@@ -31,6 +31,7 @@ pub enum DataType {
     BitField16,
     BitField32,
     BitField64,
+    BitField128,
     ByteString,
     FatDate,
     FatTimeDate,

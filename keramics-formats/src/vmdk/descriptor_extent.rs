@@ -13,6 +13,8 @@
 
 use keramics_types::ByteString;
 
+use crate::path_component::PathComponent;
+
 use super::enums::{VmdkDescriptorExtentAccessMode, VmdkDescriptorExtentType};
 
 /// VMware Virtual Disk (VMDK) descriptor extent.
@@ -32,6 +34,9 @@ pub struct VmdkDescriptorExtent {
 
     /// File name.
     pub file_name: Option<ByteString>,
+
+    /// Alternate file name.
+    pub alternate_file_name: Option<PathComponent>,
 
     /// Extent type.
     pub extent_type: VmdkDescriptorExtentType,
@@ -55,6 +60,7 @@ impl VmdkDescriptorExtent {
             start_sector,
             number_of_sectors,
             file_name,
+            alternate_file_name: None,
             extent_type,
             access_mode,
         }

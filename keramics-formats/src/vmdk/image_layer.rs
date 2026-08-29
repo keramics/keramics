@@ -514,7 +514,7 @@ impl VmdkImageLayer {
 
         let number_of_extents: usize = self.extents.len();
 
-        for (extent_index, extent) in self.extents.iter().enumerate() {
+        for (extent_index, extent) in self.extents.iter_mut().enumerate() {
             if extent.extent_type == VmdkDescriptorExtentType::Zero {
                 continue;
             }
@@ -543,7 +543,11 @@ impl VmdkImageLayer {
                             let path_components: [PathComponent; 1] = [file_name.clone()];
 
                             match file_resolver.get_data_stream(&path_components) {
-                                Ok(result) => result,
+                                Ok(result) => {
+                                    extent.alternate_file_name = Some(file_name.clone());
+
+                                    result
+                                }
                                 Err(mut error) => {
                                     keramics_core::error_trace_add_frame!(
                                         error,

@@ -15,7 +15,6 @@ use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_types::ByteString;
 
 use crate::file_resolver::FileResolverReference;
 use crate::lru_cache::LruCache;
@@ -131,17 +130,20 @@ impl BlockReader for VmdkBlockReader {
                     let lookup_extent_index: u64 = extent_index as u64;
 
                     if !self.extent_file_cache.contains(&lookup_extent_index) {
-                        let extent_file_name: &ByteString = match extent.file_name.as_ref() {
-                            Some(file_name) => file_name,
-                            None => {
-                                return Err(keramics_core::error_trace_new!(format!(
-                                    "Missing extent file: {} name",
-                                    extent_index
-                                )));
-                            }
-                        };
-                        let path_components: [PathComponent; 1] =
-                            [PathComponent::from(extent_file_name)];
+                        let extent_file_name: PathComponent =
+                            match extent.alternate_file_name.as_ref() {
+                                Some(file_name) => file_name.clone(),
+                                None => match extent.file_name.as_ref() {
+                                    Some(file_name) => PathComponent::from(file_name),
+                                    None => {
+                                        return Err(keramics_core::error_trace_new!(format!(
+                                            "Missing extent file: {} name",
+                                            extent_index
+                                        )));
+                                    }
+                                },
+                            };
+                        let path_components: [PathComponent; 1] = [extent_file_name.clone()];
                         let data_stream: DataStreamReference =
                             match self.file_resolver.get_data_stream(&path_components) {
                                 Ok(Some(data_stream)) => data_stream,
