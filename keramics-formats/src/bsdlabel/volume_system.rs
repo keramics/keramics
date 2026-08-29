@@ -257,12 +257,10 @@ mod tests {
 
     #[test]
     fn test_read_data_stream_with_unsupported_signature() {
-        let test_data: Vec<u8> = TEST_DISKLABEL.to_vec();
-
         let mut volume_system: BsdDiskLabelVolumeSystem = BsdDiskLabelVolumeSystem::new();
 
         let data_stream: DataStreamReference =
-            open_fake_data_stream_with_offset(&test_data[0..147], 512);
+            open_fake_data_stream_with_offset(&TEST_DISKLABEL[0..147], 512);
 
         let result: Result<(), ErrorTrace> = volume_system.read_data_stream(&data_stream);
         assert!(result.is_err());
