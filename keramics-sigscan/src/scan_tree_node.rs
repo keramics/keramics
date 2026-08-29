@@ -264,6 +264,7 @@ mod tests {
             "conectix".as_bytes(),
         )));
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
         let offsets_to_ignore: Vec<usize> = Vec::new();
         signature_table.fill(&signatures, &offsets_to_ignore, 8);
         signature_table.calculate_weights();
@@ -280,6 +281,7 @@ mod tests {
         let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
 
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
         let signatures: Vec<Arc<Signature>> = Vec::new();
         let offsets_to_ignore: Vec<usize> = Vec::new();
         signature_table.fill(&signatures, &offsets_to_ignore, 8);
@@ -287,7 +289,6 @@ mod tests {
 
         let result: Result<(), ErrorTrace> =
             scan_tree_node.build(&signature_table, &offsets_to_ignore, 8);
-
         assert!(result.is_err());
     }
 
@@ -309,33 +310,37 @@ mod tests {
             "connectx".as_bytes(),
         )));
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
         let offsets_to_ignore: Vec<usize> = Vec::new();
         signature_table.fill(&signatures, &offsets_to_ignore, 8);
         signature_table.calculate_weights();
 
         scan_tree_node.build(&signature_table, &offsets_to_ignore, 8)?;
 
-        // The two signatures share the first 3 bytes, therefore the root node branches on the 4th
+        // The signatures share the first 3 bytes, therefore the root node branches on the 4th
         // byte value and both branches resolve to a single signature.
         assert_eq!(scan_tree_node.pattern_offset, 3);
         assert_eq!(scan_tree_node.scan_objects.len(), 2);
-        assert!(scan_tree_node.scan_objects.contains_key(&0x65_i16));
-        assert!(scan_tree_node.scan_objects.contains_key(&0x6e_i16));
+        assert!(scan_tree_node.scan_objects.contains_key(&0x65));
+        assert!(scan_tree_node.scan_objects.contains_key(&0x6e));
 
         for object in scan_tree_node.scan_objects.values() {
             match object {
                 ScanObject::Signature(signature) => {
                     assert_eq!(signature.pattern_size, 8)
                 }
-                _ => panic!("Incorrect scan object type"),
+                _ => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported scan object type"
+                    ));
+                }
             }
         }
-
         Ok(())
     }
 
     #[test]
-    fn test_scan_buffer() {
+    fn test_scan_buffer() -> Result<(), ErrorTrace> {
         let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
 
         let mut signatures: Vec<Arc<Signature>> = Vec::new();
@@ -346,6 +351,7 @@ mod tests {
             "conectix".as_bytes(),
         )));
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+
         let offsets_to_ignore: Vec<usize> = Vec::new();
         signature_table.fill(&signatures, &offsets_to_ignore, 8);
         signature_table.calculate_weights();
@@ -360,7 +366,11 @@ mod tests {
             ScanResult::Signature(signature) => {
                 assert_eq!(signature.identifier.as_str(), "vdh")
             }
-            _ => panic!("Incorrect scan result type"),
+            _ => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported scan result type"
+                ));
+            }
         };
 
         // Test no match.
@@ -371,5 +381,7 @@ mod tests {
         // Test data offset beyond data size.
         let scan_result: ScanResult = scan_tree_node.scan_buffer(64, 64, &data, 0, 8);
         assert!(matches!(scan_result, ScanResult::None));
+
+        Ok(())
     }
 }
