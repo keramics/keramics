@@ -842,6 +842,22 @@ mod tests {
         test_bitstream.skip_bits(4);
         let test_value: u32 = test_bitstream.get_value(12);
         assert_eq!(test_value, 0x00000141);
+
+        let mut test_bitstream: Bzip2Bitstream = Bzip2Bitstream::new(&test_data, 4);
+
+        // Test reading more than 24 bits.
+        test_bitstream.skip_bits(40);
+
+        let test_value: u32 = test_bitstream.get_value(24);
+        assert_eq!(test_value, 0x595a55);
+
+        // Test resetting the bits buffer.
+        let mut test_bitstream: Bzip2Bitstream = Bzip2Bitstream::new(&test_data, 4);
+
+        test_bitstream.skip_bits(48);
+
+        let test_value: u32 = test_bitstream.get_value(16);
+        assert_eq!(test_value, 0x5a55);
     }
 
     #[test]
@@ -905,6 +921,41 @@ mod tests {
         let mut bitstream: Bzip2Bitstream = Bzip2Bitstream::new(&test_data, 0);
         let result: Result<(), ErrorTrace> = block_header.read_from_bitstream(&mut bitstream);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_block_header_formatter() {
+        let mut block_header: Bzip2BlockHeader = Bzip2BlockHeader::new();
+        block_header.signature = 0x177245385090;
+        block_header.checksum = 0x00000000;
+
+        let display_value: String = format!("{block_header}");
+        let expected_display_value: &str = concat!(
+            "Bzip2BlockHeader {\n",
+            "    signature: 0x177245385090,\n",
+            "    checksum: 0x00000000,\n",
+            "}\n",
+            "\n"
+        );
+        assert_eq!(display_value.as_str(), expected_display_value);
+
+        let mut block_header: Bzip2BlockHeader = Bzip2BlockHeader::new();
+        block_header.signature = 0x314159265359;
+        block_header.checksum = 0x5a55c41e;
+        block_header.randomized_flag = 1;
+        block_header.origin_pointer = 0x000018;
+
+        let display_value: String = format!("{block_header}");
+        let expected_display_value: &str = concat!(
+            "Bzip2BlockHeader {\n",
+            "    signature: 0x314159265359,\n",
+            "    checksum: 0x5a55c41e,\n",
+            "    randomized_flag: 1,\n",
+            "    origin_pointer: 0x000018,\n",
+            "}\n",
+            "\n"
+        );
+        assert_eq!(display_value.as_str(), expected_display_value);
     }
 
     #[test]
@@ -1247,6 +1298,105 @@ mod tests {
 
         let result: Result<(), ErrorTrace> =
             test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_invalid_block_header() {
+        let test_data: [u8; 14] = [
+            0x42, 0x5a, 0x68, 0x31, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let mut test_context: Bzip2Context = Bzip2Context::new();
+
+        let mut uncompressed_data: Vec<u8> = vec![0; 16];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_invalid_origin_pointer() {
+        let test_data: [u8; 14] = [
+            0x42, 0x5a, 0x68, 0x31, 0x31, 0x41, 0x59, 0x26, 0x53, 0x59, 0x12, 0x34, 0x56, 0x78,
+        ];
+        let mut test_context: Bzip2Context = Bzip2Context::new();
+
+        let mut uncompressed_data: Vec<u8> = vec![0; 16];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_invalid_selectors() {
+        let test_data: [u8; 20] = [
+            0x42, 0x5a, 0x68, 0x31, 0x31, 0x41, 0x59, 0x26, 0x53, 0x59, 0x12, 0x34, 0x56, 0x78,
+            0x10, 0x10, 0x30, 0x00, 0x00, 0x00,
+        ];
+        let mut test_context: Bzip2Context = Bzip2Context::new();
+
+        let mut uncompressed_data: Vec<u8> = vec![0; 16];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_invalid_huffman_tree() {
+        let test_data: [u8; 24] = [
+            0x42, 0x5a, 0x68, 0x31, 0x31, 0x41, 0x59, 0x26, 0x53, 0x59, 0x12, 0x34, 0x56, 0x78,
+            0x00, 0x00, 0x40, 0x00, 0x40, 0x00, 0x10, 0x00, 0x29, 0xc0,
+        ];
+        let mut test_context: Bzip2Context = Bzip2Context::new();
+
+        let mut uncompressed_data: Vec<u8> = vec![0; 16];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_checksum_mismatch() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[116] ^= 0x01;
+
+        let mut test_context: Bzip2Context = Bzip2Context::new();
+
+        let mut uncompressed_data: Vec<u8> = vec![0; 512];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_bitstream_with_insufficient_buffer() {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_context: Bzip2Context = Bzip2Context::new();
+
+        let mut bitstream: Bzip2Bitstream = Bzip2Bitstream::new(&test_data, 4);
+        let mut uncompressed_data: Vec<u8> = vec![0; 1];
+
+        let result: Result<(), ErrorTrace> = DebugTrace::scope(|debug_trace| {
+            test_context.decompress_bitstream(debug_trace, &mut bitstream, &mut uncompressed_data)
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_bitstream_with_invalid_block_data() {
+        let test_data: [u8; 16] = [
+            0x42, 0x5a, 0x68, 0x31, 0x31, 0x41, 0x59, 0x26, 0x53, 0x59, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00,
+        ];
+        let mut test_context: Bzip2Context = Bzip2Context::new();
+
+        let mut bitstream: Bzip2Bitstream = Bzip2Bitstream::new(&test_data, 4);
+        let mut uncompressed_data: Vec<u8> = vec![0; 16];
+
+        let result: Result<(), ErrorTrace> = DebugTrace::scope(|debug_trace| {
+            test_context.decompress_bitstream(debug_trace, &mut bitstream, &mut uncompressed_data)
+        });
         assert!(result.is_err());
     }
 }
