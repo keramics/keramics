@@ -81,7 +81,7 @@ impl Scanner {
 mod tests {
     use super::*;
 
-    use super::super::scan_context::ScanContext;
+    use crate::scan_context::ScanContext;
 
     #[test]
     fn test_add_signature() {
