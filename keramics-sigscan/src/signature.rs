@@ -114,6 +114,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_new() {
+        let signature: Signature =
+            Signature::new("vdh", PatternType::BoundToStart, 56, "conectix".as_bytes());
+
+        assert_eq!(signature.identifier.as_str(), "vdh");
+        assert_eq!(signature.pattern_type, PatternType::BoundToStart);
+        assert_eq!(signature.pattern_offset, 56);
+        assert_eq!(
+            signature.pattern,
+            vec![0x63, 0x6f, 0x6e, 0x65, 0x63, 0x74, 0x69, 0x78]
+        );
+        assert_eq!(signature.pattern_size, 8);
+    }
+
+    #[test]
+    fn test_eq() {
+        let signature1: Signature =
+            Signature::new("vdh1", PatternType::BoundToStart, 0, "conectix".as_bytes());
+        let signature2: Signature =
+            Signature::new("vdh2", PatternType::BoundToStart, 0, "conectix".as_bytes());
+        let signature3: Signature =
+            Signature::new("vdh3", PatternType::BoundToStart, 56, "conectix".as_bytes());
+        let signature4: Signature =
+            Signature::new("vdh4", PatternType::Unbound, 0, "conectix".as_bytes());
+        let signature5: Signature =
+            Signature::new("vdh5", PatternType::BoundToStart, 0, "connectx".as_bytes());
+
+        assert_eq!(signature1, signature2);
+        assert_ne!(signature1, signature3);
+        assert_ne!(signature1, signature4);
+        assert_ne!(signature1, signature5);
+    }
+
+    #[test]
     fn test_scan_buffer() {
         let signature: Signature = Signature::new(
             "qcow3",

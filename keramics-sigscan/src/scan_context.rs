@@ -336,4 +336,44 @@ mod tests {
 
         assert_eq!(scan_context.results.len(), 1);
     }
+
+    #[test]
+    fn test_scan_buffer_in_chunks() {
+        let mut scanner: Scanner = Scanner::new();
+        scanner.add_signature(Signature::new(
+            "msiecf1",
+            PatternType::BoundToStart,
+            0,
+            "Client UrlCache MMF Ver ".as_bytes(),
+        ));
+        scanner.build().unwrap();
+
+        let mut data: Vec<u8> = "Client UrlCache MMF Ver ".as_bytes().to_vec();
+        for _ in 24..128 {
+            data.push(0x00);
+        }
+        assert_eq!(data.len(), 128);
+
+        // Test with an empty buffer.
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
+        scan_context.scan_buffer(&[]);
+        assert_eq!(scan_context.data_offset, 0);
+        assert_eq!(scan_context.results.len(), 0);
+
+        // A bound to start signature can only match in the first scanned buffer.
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
+        scan_context.scan_buffer(&data[0..32]);
+        assert_eq!(scan_context.data_offset, 32);
+        assert_eq!(scan_context.results.len(), 1);
+        assert_eq!(
+            scan_context.results.get(&0).unwrap().identifier.as_str(),
+            "msiecf1"
+        );
+
+        // Scanning a following buffer advances the data offset and does not add a duplicate
+        // result.
+        scan_context.scan_buffer(&data[32..64]);
+        assert_eq!(scan_context.data_offset, 64);
+        assert_eq!(scan_context.results.len(), 1);
+    }
 }

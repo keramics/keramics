@@ -81,6 +81,8 @@ impl Scanner {
 mod tests {
     use super::*;
 
+    use super::super::scan_context::ScanContext;
+
     #[test]
     fn test_add_signature() {
         let mut scanner: Scanner = Scanner::new();
@@ -106,6 +108,134 @@ mod tests {
             0,
             "conectix".as_bytes(),
         ));
-        scanner.build()
+        scanner.build()?;
+
+        assert_eq!(scanner.signatures.len(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_with_all_pattern_types() -> Result<(), ErrorTrace> {
+        let mut scanner: Scanner = Scanner::new();
+
+        scanner.add_signature(Signature::new(
+            "vhd_header",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        ));
+        scanner.add_signature(Signature::new(
+            "vhd_footer",
+            PatternType::BoundToEnd,
+            72,
+            "conectix".as_bytes(),
+        ));
+        scanner.add_signature(Signature::new(
+            "vhd_unbound",
+            PatternType::Unbound,
+            0,
+            "conectix".as_bytes(),
+        ));
+
+        scanner.build()?;
+
+        assert_eq!(scanner.signatures.len(), 3);
+        assert!(
+            scanner
+                .header_scan_tree
+                .root_node
+                .scan_objects
+                .contains_key(&0x63_i16)
+        );
+        assert!(
+            scanner
+                .footer_scan_tree
+                .root_node
+                .scan_objects
+                .contains_key(&0x63_i16)
+        );
+        assert!(
+            scanner
+                .unbound_scan_tree
+                .root_node
+                .scan_objects
+                .contains_key(&0x63_i16)
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_with_no_signatures() -> Result<(), ErrorTrace> {
+        let mut scanner: Scanner = Scanner::new();
+
+        scanner.build()?;
+
+        assert_eq!(scanner.signatures.len(), 0);
+        assert!(scanner.header_scan_tree.root_node.scan_objects.is_empty());
+        assert!(scanner.footer_scan_tree.root_node.scan_objects.is_empty());
+        assert!(scanner.unbound_scan_tree.root_node.scan_objects.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_buffer_with_all_pattern_types() {
+        let mut scanner: Scanner = Scanner::new();
+
+        scanner.add_signature(Signature::new(
+            "msiecf1",
+            PatternType::BoundToStart,
+            0,
+            "Client UrlCache MMF Ver ".as_bytes(),
+        ));
+        scanner.add_signature(Signature::new(
+            "vhd1",
+            PatternType::BoundToEnd,
+            72,
+            "conectix".as_bytes(),
+        ));
+        scanner.add_signature(Signature::new(
+            "test1",
+            PatternType::Unbound,
+            0,
+            "example of unbounded pattern".as_bytes(),
+        ));
+        scanner.build().unwrap();
+
+        let mut data: Vec<u8> = "Client UrlCache MMF Ver ".as_bytes().to_vec();
+        for _ in 24..80 {
+            data.push(0x20);
+        }
+        data.extend_from_slice(b"example of unbounded pattern");
+        for _ in 0..72 {
+            data.push(0x20);
+        }
+        data.extend_from_slice(b"conectix");
+        for _ in 0..64 {
+            data.push(0x00);
+        }
+
+        let data_size: u64 = data.len() as u64;
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, data_size);
+        scan_context.scan_buffer(&data);
+
+        assert_eq!(scan_context.results.len(), 2);
+        assert_eq!(
+            scan_context
+                .results
+                .get(&(data_size - 72))
+                .unwrap()
+                .identifier
+                .as_str(),
+            "vhd1"
+        );
+        assert!(
+            scan_context
+                .results
+                .values()
+                .any(|signature| signature.identifier.as_str() == "test1")
+        );
     }
 }
