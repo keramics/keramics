@@ -400,9 +400,37 @@ mod tests {
     use super::*;
 
     use keramics_formats::Path;
-    use keramics_types::Ucs2String;
+    use keramics_types::{ByteString, Ucs2String};
 
-    // TODO: add tests for escape_path
+    #[test]
+    fn test_escape_path() {
+        let display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Index);
+
+        let path: Path = Path::from("/");
+        assert!(path.is_root());
+        let escaped_path: String = display_path.escape_path(&path);
+        assert_eq!(escaped_path, "/");
+
+        let path: Path = Path::from("/foo/bar");
+        let escaped_path: String = display_path.escape_path(&path);
+        assert_eq!(escaped_path, "/foo/bar");
+
+        let path: Path = Path::from("foo/bar");
+        let escaped_path: String = display_path.escape_path(&path);
+        assert_eq!(escaped_path, "foo/bar");
+
+        let escaped_path: Path = Path {
+            components: vec![
+                PathComponent::Root,
+                PathComponent::String(String::from("foo/bar")),
+                PathComponent::Parent,
+                PathComponent::Current,
+                PathComponent::ByteString(ByteString::from("byte:string")),
+            ],
+        };
+        let escaped_path: String = display_path.escape_path(&escaped_path);
+        assert_eq!(escaped_path, "/foo\\/bar/.././byte\\:string");
+    }
 
     #[test]
     fn test_escape_path_component() {

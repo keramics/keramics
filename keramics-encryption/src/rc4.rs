@@ -126,4 +126,40 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_crypt_without_key() {
+        let mut rc4_context: Rc4Context = Rc4Context::new();
+
+        let mut data: Vec<u8> = vec![0; 59];
+        let result: Result<(), ErrorTrace> = rc4_context.crypt(
+            b"012345678ABCDEFGHIJKLMNOPQRSTUVWXYabcdefghijklmnopqrstuvwxy",
+            &mut data,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_crypt_with_unsupported_data() -> Result<(), ErrorTrace> {
+        let mut rc4_context: Rc4Context = Rc4Context::new();
+
+        rc4_context.set_key(b"test1")?;
+
+        let mut data: Vec<u8> = vec![0; 4];
+        let result: Result<(), ErrorTrace> = rc4_context.crypt(
+            b"012345678ABCDEFGHIJKLMNOPQRSTUVWXYabcdefghijklmnopqrstuvwxy",
+            &mut data,
+        );
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_key_with_unsupported_key() {
+        let mut rc4_context: Rc4Context = Rc4Context::new();
+
+        let result: Result<(), ErrorTrace> = rc4_context.set_key(b"");
+        assert!(result.is_err());
+    }
 }

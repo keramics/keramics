@@ -366,6 +366,57 @@ mod tests {
     }
 
     #[test]
+    fn test_decrypt_xts_with_unsupported_tweak_value_size() -> Result<(), ErrorTrace> {
+        let tweak_value: [u8; 15] = [0; 15];
+        let mut xts_context: AesXtsContext = AesXtsContext::new();
+
+        let key: [u8; 16] = [0; 16];
+        let tweak_key: [u8; 16] = [0; 16];
+        xts_context.set_keys(&key, &tweak_key)?;
+
+        let encrypted_data: [u8; 16] = [0; 16];
+        let mut data: Vec<u8> = vec![0; 16];
+        let result = xts_context.decrypt_xts(&tweak_value, &encrypted_data, &mut data);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decrypt_xts_with_unsupported_encrypted_data_size() -> Result<(), ErrorTrace> {
+        let tweak_value: [u8; 16] = [0; 16];
+        let mut xts_context: AesXtsContext = AesXtsContext::new();
+
+        let key: [u8; 16] = [0; 16];
+        let tweak_key: [u8; 16] = [0; 16];
+        xts_context.set_keys(&key, &tweak_key)?;
+
+        let encrypted_data: [u8; 15] = [0; 15];
+        let mut data: Vec<u8> = vec![0; 16];
+        let result = xts_context.decrypt_xts(&tweak_value, &encrypted_data, &mut data);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decrypt_xts_with_unsupported_data_size() -> Result<(), ErrorTrace> {
+        let tweak_value: [u8; 16] = [0; 16];
+        let mut xts_context: AesXtsContext = AesXtsContext::new();
+
+        let key: [u8; 16] = [0; 16];
+        let tweak_key: [u8; 16] = [0; 16];
+        xts_context.set_keys(&key, &tweak_key)?;
+
+        let encrypted_data: [u8; 16] = [0; 16];
+        let mut data: Vec<u8> = vec![0; 15];
+        let result = xts_context.decrypt_xts(&tweak_value, &encrypted_data, &mut data);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_encrypt_xts() -> Result<(), ErrorTrace> {
         let tweak_value: [u8; 16] = [
             0xb2, 0xf8, 0xc6, 0x37, 0x4e, 0xb2, 0x75, 0xc1, 0x74, 0x4e, 0x85, 0xaa, 0x21, 0xf8,
@@ -395,6 +446,93 @@ mod tests {
             0xb3, 0x87, 0xc0, 0x22, 0x82, 0x67, 0x8c, 0x60, 0x00, 0x22, 0x7b,
         ];
         assert_eq!(&encrypted_data, &expected_encrypted_data);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_encrypt_xts_with_unsupported_tweak_value_size() -> Result<(), ErrorTrace> {
+        let tweak_value: [u8; 15] = [0; 15];
+        let mut xts_context: AesXtsContext = AesXtsContext::new();
+
+        let key: [u8; 16] = [0; 16];
+        let tweak_key: [u8; 16] = [0; 16];
+        xts_context.set_keys(&key, &tweak_key)?;
+
+        let data: [u8; 16] = [0; 16];
+        let mut encrypted_data: Vec<u8> = vec![0; 16];
+        let result = xts_context.encrypt_xts(&tweak_value, &data, &mut encrypted_data);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_encrypt_xts_with_unsupported_encrypted_data_size() -> Result<(), ErrorTrace> {
+        let tweak_value: [u8; 16] = [0; 16];
+        let mut xts_context: AesXtsContext = AesXtsContext::new();
+
+        let key: [u8; 16] = [0; 16];
+        let tweak_key: [u8; 16] = [0; 16];
+        xts_context.set_keys(&key, &tweak_key)?;
+
+        let data: [u8; 16] = [0; 16];
+        let mut encrypted_data: Vec<u8> = vec![0; 15];
+        let result = xts_context.encrypt_xts(&tweak_value, &data, &mut encrypted_data);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_encrypt_xts_with_unsupported_data_size() -> Result<(), ErrorTrace> {
+        let tweak_value: [u8; 16] = [0; 16];
+        let mut xts_context: AesXtsContext = AesXtsContext::new();
+
+        let key: [u8; 16] = [0; 16];
+        let tweak_key: [u8; 16] = [0; 16];
+        xts_context.set_keys(&key, &tweak_key)?;
+
+        let data: [u8; 15] = [0; 15];
+        let mut encrypted_data: Vec<u8> = vec![0; 16];
+        let result = xts_context.encrypt_xts(&tweak_value, &data, &mut encrypted_data);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_keys_with_unsupported_key_size() -> Result<(), ErrorTrace> {
+        let mut xts_context: AesXtsContext = AesXtsContext::new();
+
+        let key: [u8; 15] = [0; 15];
+        let tweak_key: [u8; 16] = [0; 16];
+        let result = xts_context.set_keys(&key, &tweak_key);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_keys_with_unsupported_tweak_key_size() -> Result<(), ErrorTrace> {
+        let mut xts_context: AesXtsContext = AesXtsContext::new();
+
+        let key: [u8; 16] = [0; 16];
+        let tweak_key: [u8; 15] = [0; 15];
+        let result = xts_context.set_keys(&key, &tweak_key);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_keys_with_different_key_sizes() -> Result<(), ErrorTrace> {
+        let mut xts_context: AesXtsContext = AesXtsContext::new();
+
+        let key: [u8; 16] = [0; 16];
+        let tweak_key: [u8; 32] = [0; 32];
+        let result = xts_context.set_keys(&key, &tweak_key);
+        assert!(result.is_err());
 
         Ok(())
     }

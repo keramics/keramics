@@ -126,8 +126,13 @@ impl Bodyfile {
 mod tests {
     use super::*;
 
+    use std::time::SystemTime;
+
     use keramics_core::{DataStreamReference, open_fake_data_stream};
-    use keramics_datetime::{Filetime, PosixTime32, PosixTime64Ns};
+    use keramics_datetime::{
+        ApfsTime, FatDate, FatTimeDate, FatTimeDate10Ms, Filetime, HfsTime, PosixTime32,
+        PosixTime64Ns, XfsBigtime,
+    };
 
     #[test]
     fn test_calculate_md5() -> Result<(), ErrorTrace> {
@@ -171,6 +176,27 @@ mod tests {
         let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;
         assert_eq!(timestamp, "1281643591.987654321");
 
+        let date_time: DateTime = DateTime::ApfsTime(ApfsTime::new(1281643591987654321));
+        let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;
+        assert_eq!(timestamp, "1281643591.987654321");
+
+        let date_time: DateTime = DateTime::FatDate(FatDate::new(0x3d0c));
+        let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;
+        assert_eq!(timestamp, "1284249600");
+
+        let date_time: DateTime = DateTime::FatTimeDate(FatTimeDate::new(0x3d0c, 0xa8d0));
+        let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;
+        assert_eq!(timestamp, "1284325592");
+
+        let date_time: DateTime =
+            DateTime::FatTimeDate10Ms(FatTimeDate10Ms::new(0x3d0c, 0xa8d0, 0x7d));
+        let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;
+        assert_eq!(timestamp, "1284325593.25");
+
+        let date_time: DateTime = DateTime::HfsTime(HfsTime::new(3458215528));
+        let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;
+        assert_eq!(timestamp, "1375370728");
+
         let date_time: DateTime = DateTime::NotSet;
         let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;
         assert_eq!(timestamp, "");
@@ -179,5 +205,15 @@ mod tests {
         assert_eq!(timestamp, "");
 
         Ok(())
+    }
+
+    #[test]
+    fn test_format_as_timestamp_unsupported() {
+        let date_time: DateTime = DateTime::XfsBigtime(XfsBigtime::new(1281643591000000000));
+        assert!(Bodyfile::format_as_timestamp(Some(&date_time)).is_err());
+
+        let fake_time: SystemTime = SystemTime::now();
+        let date_time: DateTime = DateTime::FakeTime(fake_time);
+        assert!(Bodyfile::format_as_timestamp(Some(&date_time)).is_err());
     }
 }
