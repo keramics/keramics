@@ -20,6 +20,7 @@ use syn::LitInt;
 use crate::enums::{ByteOrder, DataType, Format};
 
 /// Structure layout bitfield.
+#[derive(Debug)]
 pub(crate) struct StructureLayoutBitField {
     /// Name.
     pub name: String,
@@ -70,6 +71,7 @@ impl StructureLayoutBitField {
 }
 
 /// Structure layout bitfields group.
+#[derive(Debug)]
 pub(crate) struct StructureLayoutBitFieldsGroup {
     /// Data type.
     pub data_type: DataType,
@@ -208,6 +210,7 @@ impl StructureLayoutBitFieldsGroup {
 }
 
 /// Structure layout field.
+#[derive(Debug)]
 pub(crate) struct StructureLayoutField {
     /// Name.
     pub name: String,
@@ -596,6 +599,7 @@ impl StructureLayoutField {
 }
 
 /// Structure layout group.
+#[derive(Debug)]
 pub(crate) struct StructureLayoutGroup {
     /// Condition.
     pub condition: String,
@@ -640,6 +644,7 @@ impl StructureLayoutGroup {
 }
 
 /// Structure layout sequence.
+#[derive(Debug)]
 pub(crate) struct StructureLayoutSequence {
     /// Element.
     pub element: StructureLayoutField,
@@ -671,6 +676,7 @@ impl StructureLayoutSequence {
 }
 
 /// Structure layout member.
+#[derive(Debug)]
 pub enum StructureLayoutMember {
     /// Bitfields group.
     BitFields(StructureLayoutBitFieldsGroup),
@@ -954,6 +960,223 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_bitfield_format_string() {
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field1", 12, "", &Format::Hexadecimal);
+        assert_eq!(bitfield.get_format_string(), String::from("0x{:03x}"));
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field1", 13, "", &Format::Hexadecimal);
+        assert_eq!(bitfield.get_format_string(), String::from("0x{:04x}"));
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field1", 4, "", &Format::NotSet);
+        assert_eq!(bitfield.get_format_string(), String::from("{}"));
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field1", 4, "+ 1", &Format::NotSet);
+        assert_eq!(
+            bitfield.get_modifier_token_stream().to_string(),
+            String::from("+ 1")
+        );
+    }
+
+    #[test]
+    fn test_bitfields_group_get_available_size() {
+        let group: StructureLayoutBitFieldsGroup =
+            StructureLayoutBitFieldsGroup::new(&DataType::BitField64, &ByteOrder::LittleEndian);
+
+        assert_eq!(group.get_available_size(), 64);
+    }
+
+    #[test]
+    fn test_bitfields_group_get_byte_order() {
+        let group: StructureLayoutBitFieldsGroup =
+            StructureLayoutBitFieldsGroup::new(&DataType::BitField64, &ByteOrder::LittleEndian);
+
+        assert_eq!(
+            group.get_byte_order(&ByteOrder::BigEndian),
+            ByteOrder::LittleEndian
+        );
+    }
+
+    #[test]
+    fn test_bitfields_group_get_byte_size() {
+        let group: StructureLayoutBitFieldsGroup =
+            StructureLayoutBitFieldsGroup::new(&DataType::BitField64, &ByteOrder::LittleEndian);
+
+        assert_eq!(group.get_byte_size(), Some(8));
+    }
+
+    #[test]
+    fn test_bitfields_group_get_type_token_stream() {
+        let group: StructureLayoutBitFieldsGroup =
+            StructureLayoutBitFieldsGroup::new(&DataType::BitField64, &ByteOrder::LittleEndian);
+
+        let token_stream: TokenStream = group.get_type_token_stream();
+        assert_eq!(token_stream.to_string(), String::from("u64"));
+    }
+
+    #[test]
+    fn test_bitfields_group_is_full() {
+        let group: StructureLayoutBitFieldsGroup =
+            StructureLayoutBitFieldsGroup::new(&DataType::BitField64, &ByteOrder::LittleEndian);
+
+        assert!(!group.is_full());
+    }
+
+    #[test]
+    fn test_bitfields_group_add_bitfield() {
+        let mut group: StructureLayoutBitFieldsGroup =
+            StructureLayoutBitFieldsGroup::new(&DataType::BitField8, &ByteOrder::NotSet);
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field1", 4, "", &Format::NotSet);
+        group.add_bitfield(bitfield);
+
+        assert_eq!(group.number_of_bits, 4);
+        assert_eq!(group.get_available_size(), 4);
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field2", 4, "", &Format::NotSet);
+        group.add_bitfield(bitfield);
+
+        assert!(group.is_full());
+        assert_eq!(group.get_available_size(), 0);
+    }
+
+    #[test]
+    fn test_field_get_byte_order() {
+        let field: StructureLayoutField = StructureLayoutField::new(
+            "field1",
+            &DataType::PosixTime32,
+            &ByteOrder::LittleEndian,
+            "",
+            &Format::NotSet,
+        );
+        assert_eq!(
+            field.get_byte_order(&ByteOrder::LittleEndian),
+            ByteOrder::LittleEndian
+        );
+    }
+
+    #[test]
+    fn test_field_get_byte_size() {
+        let field: StructureLayoutField = StructureLayoutField::new(
+            "field1",
+            &DataType::PosixTime32,
+            &ByteOrder::NotSet,
+            "",
+            &Format::NotSet,
+        );
+        assert_eq!(field.get_byte_size(), Some(4));
+    }
+
+    #[test]
+    fn test_field_get_type_token_stream() {
+        let field: StructureLayoutField = StructureLayoutField::new(
+            "field1",
+            &DataType::PosixTime32,
+            &ByteOrder::NotSet,
+            "",
+            &Format::NotSet,
+        );
+        let token_stream: TokenStream = field.get_type_token_stream();
+        assert_eq!(
+            token_stream.to_string(),
+            String::from("keramics_datetime :: PosixTime32")
+        );
+    }
+
+    #[test]
+    fn test_field_get_from_bytes_token_stream() {
+        let field: StructureLayoutField = StructureLayoutField::new(
+            "field1",
+            &DataType::Filetime,
+            &ByteOrder::NotSet,
+            "",
+            &Format::NotSet,
+        );
+        let token_stream: TokenStream =
+            field.get_from_bytes_token_stream(&ByteOrder::NotSet, quote!(8));
+        assert_eq!(
+            token_stream.to_string(),
+            quote! { keramics_datetime::Filetime::from_bytes(&data[8..8 + 8]) }.to_string()
+        );
+    }
+
+    #[test]
+    fn test_field_get_modifier_token_stream() {
+        let field: StructureLayoutField = StructureLayoutField::new(
+            "field1",
+            &DataType::UnsignedInteger8Bit,
+            &ByteOrder::NotSet,
+            "+ 1",
+            &Format::NotSet,
+        );
+
+        let modifier_token_stream: TokenStream = field.get_modifier_token_stream();
+        assert_eq!(modifier_token_stream.to_string(), String::from("+ 1"));
+
+        let field: StructureLayoutField = StructureLayoutField::new(
+            "field1",
+            &DataType::UnsignedInteger8Bit,
+            &ByteOrder::NotSet,
+            "",
+            &Format::NotSet,
+        );
+        let modifier_token_stream: TokenStream = field.get_modifier_token_stream();
+        assert_eq!(modifier_token_stream.to_string(), String::new());
+    }
+
+    #[test]
+    fn test_group_get_condition_token_stream() {
+        let mut group: StructureLayoutGroup = StructureLayoutGroup::new("data.len() > 8");
+
+        let field: StructureLayoutField = StructureLayoutField::new(
+            "field1",
+            &DataType::UnsignedInteger32Bit,
+            &ByteOrder::NotSet,
+            "",
+            &Format::NotSet,
+        );
+        group.fields.push(field);
+
+        let field: StructureLayoutField = StructureLayoutField::new(
+            "field2",
+            &DataType::UnsignedInteger8Bit,
+            &ByteOrder::NotSet,
+            "",
+            &Format::NotSet,
+        );
+        group.fields.push(field);
+
+        let data_size: usize = group.get_data_size();
+        assert_eq!(data_size, 5);
+
+        let condition_token_stream: TokenStream = group.get_condition_token_stream();
+        assert_eq!(
+            condition_token_stream.to_string(),
+            quote! { data.len() > 8 }.to_string()
+        );
+    }
+
+    #[test]
+    fn test_sequence_get_data_size() {
+        let field: StructureLayoutField = StructureLayoutField::new(
+            "field1",
+            &DataType::UnsignedInteger16Bit,
+            &ByteOrder::NotSet,
+            "",
+            &Format::NotSet,
+        );
+        let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 16);
+
+        let data_size: usize = sequence.get_data_size();
+        assert_eq!(data_size, 32);
+    }
+
+    #[test]
     fn test_generate_debug_read_data() {
         let mut structure_layout: StructureLayout =
             StructureLayout::new("TestStruct", &ByteOrder::BigEndian);
@@ -997,7 +1220,281 @@ mod tests {
                 string_parts.join("")
             }
         };
-        let test_token_stream = structure_layout.generate_debug_read_data();
+        let test_token_stream: TokenStream = structure_layout.generate_debug_read_data();
+        assert_eq!(
+            test_token_stream.to_string(),
+            expected_token_stream.to_string()
+        );
+    }
+
+    #[test]
+    fn test_generate_debug_read_data_with_bitfield8() {
+        let mut structure_layout: StructureLayout =
+            StructureLayout::new("TestStruct", &ByteOrder::LittleEndian);
+
+        let mut group: StructureLayoutBitFieldsGroup =
+            StructureLayoutBitFieldsGroup::new(&DataType::BitField8, &ByteOrder::NotSet);
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field1", 5, "", &Format::NotSet);
+        group.bitfields.push(bitfield);
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field2", 3, "", &Format::NotSet);
+        group.bitfields.push(bitfield);
+
+        structure_layout
+            .members
+            .push(StructureLayoutMember::BitFields(group));
+
+        let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
+            pub fn debug_read_data(data: &[u8]) -> String {
+                let mut string_parts: Vec<String> = Vec::new();
+                string_parts.push(format!("TestStruct {{\n"));
+
+                let value_8bit: u8 = data[0];
+
+                let field1: u8 = value_8bit & 0x1f;
+                string_parts.push(format!("    field1: {},\n", field1));
+
+                let field2: u8 = (value_8bit >> 5) & 0x7;
+                string_parts.push(format!("    field2: {},\n", field2));
+
+                string_parts.push(format!("}}\n\n"));
+
+                string_parts.join("")
+            }
+        };
+        let test_token_stream: TokenStream = structure_layout.generate_debug_read_data();
+        assert_eq!(
+            test_token_stream.to_string(),
+            expected_token_stream.to_string()
+        );
+    }
+
+    #[test]
+    fn test_generate_debug_read_data_with_bitfield32() {
+        let mut structure_layout: StructureLayout =
+            StructureLayout::new("TestStruct", &ByteOrder::LittleEndian);
+
+        let mut group: StructureLayoutBitFieldsGroup =
+            StructureLayoutBitFieldsGroup::new(&DataType::BitField32, &ByteOrder::NotSet);
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field1", 9, "", &Format::NotSet);
+        group.bitfields.push(bitfield);
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field2", 23, "", &Format::NotSet);
+        group.bitfields.push(bitfield);
+
+        structure_layout
+            .members
+            .push(StructureLayoutMember::BitFields(group));
+
+        let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
+            pub fn debug_read_data(data: &[u8]) -> String {
+                let mut string_parts: Vec<String> = Vec::new();
+                string_parts.push(format!("TestStruct {{\n"));
+
+                let value_32bit: u32 = u32::from_le_bytes(*data[0..].first_chunk::<4>().unwrap());
+
+                let field1: u32 = value_32bit & 0x1ff;
+                string_parts.push(format!("    field1: {},\n", field1));
+
+                let field2: u32 = (value_32bit >> 9) & 0x7fffff;
+                string_parts.push(format!("    field2: {},\n", field2));
+
+                string_parts.push(format!("}}\n\n"));
+
+                string_parts.join("")
+            }
+        };
+        let test_token_stream: TokenStream = structure_layout.generate_debug_read_data();
+
+        assert_eq!(
+            test_token_stream.to_string(),
+            expected_token_stream.to_string()
+        );
+    }
+
+    #[test]
+    fn test_generate_debug_read_data_with_bitfield64() {
+        let mut structure_layout: StructureLayout =
+            StructureLayout::new("TestStruct", &ByteOrder::LittleEndian);
+
+        let mut group: StructureLayoutBitFieldsGroup =
+            StructureLayoutBitFieldsGroup::new(&DataType::BitField64, &ByteOrder::NotSet);
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field1", 60, "", &Format::NotSet);
+        group.bitfields.push(bitfield);
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field2", 4, "", &Format::NotSet);
+        group.bitfields.push(bitfield);
+
+        structure_layout
+            .members
+            .push(StructureLayoutMember::BitFields(group));
+
+        let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
+            pub fn debug_read_data(data: &[u8]) -> String {
+                let mut string_parts: Vec<String> = Vec::new();
+                string_parts.push(format!("TestStruct {{\n"));
+
+                let value_64bit: u64 = u64::from_le_bytes(*data[0..].first_chunk::<8>().unwrap());
+
+                let field1: u64 = value_64bit & 0xfffffffffffffff;
+                string_parts.push(format!("    field1: {},\n", field1));
+
+                let field2: u64 = (value_64bit >> 60) & 0xf;
+                string_parts.push(format!("    field2: {},\n", field2));
+
+                string_parts.push(format!("}}\n\n"));
+
+                string_parts.join("")
+            }
+        };
+        let test_token_stream: TokenStream = structure_layout.generate_debug_read_data();
+
+        // let test_file = syn::parse_file(&test_token_stream.to_string()).unwrap();
+        // let expected_file = syn::parse_file(&expected_token_stream.to_string()).unwrap();
+
+        // assert_eq!(
+        //     prettyplease::unparse(&test_file),
+        //     prettyplease::unparse(&expected_file),
+        // );
+        assert_eq!(
+            test_token_stream.to_string(),
+            expected_token_stream.to_string()
+        );
+    }
+
+    #[test]
+    fn test_generate_debug_read_data_with_bitfield128() {
+        let mut structure_layout: StructureLayout =
+            StructureLayout::new("TestStruct", &ByteOrder::BigEndian);
+
+        let mut group: StructureLayoutBitFieldsGroup =
+            StructureLayoutBitFieldsGroup::new(&DataType::BitField128, &ByteOrder::NotSet);
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field1", 40, "", &Format::NotSet);
+        group.bitfields.push(bitfield);
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field2", 40, "", &Format::NotSet);
+        group.bitfields.push(bitfield);
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field3", 48, "", &Format::NotSet);
+        group.bitfields.push(bitfield);
+
+        structure_layout
+            .members
+            .push(StructureLayoutMember::BitFields(group));
+
+        let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
+            pub fn debug_read_data(data: &[u8]) -> String {
+                let mut string_parts: Vec<String> = Vec::new();
+                string_parts.push(format!("TestStruct {{\n"));
+
+                let value_128bit: u128 = u128::from_be_bytes(*data[0..].first_chunk::<16>().unwrap());
+
+                let field1: u128 = value_128bit & 0xffffffffff;
+                string_parts.push(format!("    field1: {},\n", field1));
+
+                let field2: u128 = (value_128bit >> 40) & 0xffffffffff;
+                string_parts.push(format!("    field2: {},\n", field2));
+
+                let field3: u128 = (value_128bit >> 80) & 0xffffffffffff;
+                string_parts.push(format!("    field3: {},\n", field3));
+
+                string_parts.push(format!("}}\n\n"));
+
+                string_parts.join("")
+            }
+        };
+        let test_token_stream: TokenStream = structure_layout.generate_debug_read_data();
+        assert_eq!(
+            test_token_stream.to_string(),
+            expected_token_stream.to_string()
+        );
+    }
+
+    #[test]
+    fn test_generate_debug_read_data_with_format_character() {
+        let mut structure_layout: StructureLayout =
+            StructureLayout::new("TestStruct", &ByteOrder::BigEndian);
+
+        let field: StructureLayoutField = StructureLayoutField::new(
+            "field1",
+            &DataType::UnsignedInteger8Bit,
+            &ByteOrder::NotSet,
+            "",
+            &Format::Character,
+        );
+        structure_layout
+            .members
+            .push(StructureLayoutMember::Field(field));
+
+        let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
+            pub fn debug_read_data(data: &[u8]) -> String {
+                let mut string_parts: Vec<String> = Vec::new();
+                string_parts.push(format!("TestStruct {{\n"));
+
+                let field1: u8 = data[0];
+                string_parts.push(format!("    field1: {},\n", field1 as char));
+
+                string_parts.push(format!("}}\n\n"));
+
+                string_parts.join("")
+            }
+        };
+        let test_token_stream: TokenStream = structure_layout.generate_debug_read_data();
+        assert_eq!(
+            test_token_stream.to_string(),
+            expected_token_stream.to_string()
+        );
+    }
+
+    #[test]
+    fn test_generate_debug_read_data_with_format_hexadecimal() {
+        let mut structure_layout: StructureLayout =
+            StructureLayout::new("TestStruct", &ByteOrder::BigEndian);
+
+        let field: StructureLayoutField = StructureLayoutField::new(
+            "field1",
+            &DataType::UnsignedInteger16Bit,
+            &ByteOrder::NotSet,
+            "",
+            &Format::Hexadecimal,
+        );
+        structure_layout
+            .members
+            .push(StructureLayoutMember::Field(field));
+
+        let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
+            pub fn debug_read_data(data: &[u8]) -> String {
+                let mut string_parts: Vec<String> = Vec::new();
+                string_parts.push(format!("TestStruct {{\n"));
+
+                let field1: u16 = u16::from_be_bytes(*data[0..].first_chunk::<2>().unwrap());
+                string_parts.push(format!("    field1: 0x{:04x},\n", field1));
+
+                string_parts.push(format!("}}\n\n"));
+
+                string_parts.join("")
+            }
+        };
+        let test_token_stream: TokenStream = structure_layout.generate_debug_read_data();
         assert_eq!(
             test_token_stream.to_string(),
             expected_token_stream.to_string()
@@ -1053,7 +1550,7 @@ mod tests {
                 string_parts.join("")
             }
         };
-        let test_token_stream = structure_layout.generate_debug_read_data();
+        let test_token_stream: TokenStream = structure_layout.generate_debug_read_data();
         assert_eq!(
             test_token_stream.to_string(),
             expected_token_stream.to_string()
@@ -1105,7 +1602,7 @@ mod tests {
                 string_parts.join("")
             }
         };
-        let test_token_stream = structure_layout.generate_debug_read_data();
+        let test_token_stream: TokenStream = structure_layout.generate_debug_read_data();
         assert_eq!(
             test_token_stream.to_string(),
             expected_token_stream.to_string()
@@ -1113,71 +1610,21 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_debug_read_data_with_bitfield32() {
+    fn test_generate_debug_read_data_with_utf16_string() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new("TestStruct", &ByteOrder::LittleEndian);
+            StructureLayout::new("TestStruct", &ByteOrder::BigEndian);
 
-        let mut group: StructureLayoutBitFieldsGroup =
-            StructureLayoutBitFieldsGroup::new(&DataType::BitField32, &ByteOrder::NotSet);
-
-        let bitfield: StructureLayoutBitField =
-            StructureLayoutBitField::new("field1", 9, "", &Format::NotSet);
-        group.bitfields.push(bitfield);
-
-        let bitfield: StructureLayoutBitField =
-            StructureLayoutBitField::new("field2", 23, "", &Format::NotSet);
-        group.bitfields.push(bitfield);
-
-        structure_layout
-            .members
-            .push(StructureLayoutMember::BitFields(group));
-
-        let expected_token_stream = quote! {
-            #[cfg(feature = "debug-trace")]
-            pub fn debug_read_data(data: &[u8]) -> String {
-                let mut string_parts: Vec<String> = Vec::new();
-                string_parts.push(format!("TestStruct {{\n"));
-
-                let value_32bit: u32 = u32::from_le_bytes(*data[0..].first_chunk::<4>().unwrap());
-
-                let field1: u32 = value_32bit & 0x1ff;
-                string_parts.push(format!("    field1: {},\n", field1));
-
-                let field2: u32 = (value_32bit >> 9) & 0x7fffff;
-                string_parts.push(format!("    field2: {},\n", field2));
-
-                string_parts.push(format!("}}\n\n"));
-
-                string_parts.join("")
-            }
-        };
-        let test_token_stream = structure_layout.generate_debug_read_data();
-
-        assert_eq!(
-            test_token_stream.to_string(),
-            expected_token_stream.to_string()
+        let field: StructureLayoutField = StructureLayoutField::new(
+            "field1",
+            &DataType::Utf16String,
+            &ByteOrder::NotSet,
+            "",
+            &Format::NotSet,
         );
-    }
-
-    #[test]
-    fn test_generate_debug_read_data_with_bitfield64() {
-        let mut structure_layout: StructureLayout =
-            StructureLayout::new("TestStruct", &ByteOrder::LittleEndian);
-
-        let mut group: StructureLayoutBitFieldsGroup =
-            StructureLayoutBitFieldsGroup::new(&DataType::BitField64, &ByteOrder::NotSet);
-
-        let bitfield: StructureLayoutBitField =
-            StructureLayoutBitField::new("field1", 60, "", &Format::NotSet);
-        group.bitfields.push(bitfield);
-
-        let bitfield: StructureLayoutBitField =
-            StructureLayoutBitField::new("field2", 4, "", &Format::NotSet);
-        group.bitfields.push(bitfield);
-
+        let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 16);
         structure_layout
             .members
-            .push(StructureLayoutMember::BitFields(group));
+            .push(StructureLayoutMember::Sequence(sequence));
 
         let expected_token_stream = quote! {
             #[cfg(feature = "debug-trace")]
@@ -1185,28 +1632,15 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let value_64bit: u64 = u64::from_le_bytes(*data[0..].first_chunk::<8>().unwrap());
-
-                let field1: u64 = value_64bit & 0xfffffffffffffff;
-                string_parts.push(format!("    field1: {},\n", field1));
-
-                let field2: u64 = (value_64bit >> 60) & 0xf;
-                string_parts.push(format!("    field2: {},\n", field2));
+                let field1: keramics_types::Utf16String = keramics_types::Utf16String::from_be_bytes(&data[0..32]);
+                string_parts.push(format!("    field1: \"{}\",\n", field1.to_string()));
 
                 string_parts.push(format!("}}\n\n"));
 
                 string_parts.join("")
             }
         };
-        let test_token_stream = structure_layout.generate_debug_read_data();
-
-        // let test_file = syn::parse_file(&test_token_stream.to_string()).unwrap();
-        // let expected_file = syn::parse_file(&expected_token_stream.to_string()).unwrap();
-
-        // assert_eq!(
-        //     prettyplease::unparse(&test_file),
-        //     prettyplease::unparse(&expected_file),
-        // );
+        let test_token_stream: TokenStream = structure_layout.generate_debug_read_data();
         assert_eq!(
             test_token_stream.to_string(),
             expected_token_stream.to_string()
@@ -1262,7 +1696,7 @@ mod tests {
                 string_parts.join("")
             }
         };
-        let test_token_stream = structure_layout.generate_debug_read_data();
+        let test_token_stream: TokenStream = structure_layout.generate_debug_read_data();
         assert_eq!(
             test_token_stream.to_string(),
             expected_token_stream.to_string()
@@ -1321,7 +1755,7 @@ mod tests {
                 string_parts.join("")
             }
         };
-        let test_token_stream = structure_layout.generate_debug_read_data();
+        let test_token_stream: TokenStream = structure_layout.generate_debug_read_data();
         assert_eq!(
             test_token_stream.to_string(),
             expected_token_stream.to_string()
@@ -1385,7 +1819,7 @@ mod tests {
                 string_parts.join("")
             }
         };
-        let test_token_stream = structure_layout.generate_debug_read_data();
+        let test_token_stream: TokenStream = structure_layout.generate_debug_read_data();
 
         assert_eq!(
             test_token_stream.to_string(),
@@ -1433,7 +1867,7 @@ mod tests {
                 self.read_data(&data)
             }
         };
-        let test_token_stream = structure_layout.generate_read_at_position();
+        let test_token_stream: TokenStream = structure_layout.generate_read_at_position();
         assert_eq!(
             test_token_stream.to_string(),
             expected_token_stream.to_string()

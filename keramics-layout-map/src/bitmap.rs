@@ -26,3 +26,19 @@ impl BitmapLayout {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bitmap_layout() {
+        let bitmap_layout: BitmapLayout = BitmapLayout::new(
+            DataType::UnsignedInteger32Bit,
+            BitOrder::LeastSignificantBit,
+        );
+
+        assert_eq!(bitmap_layout.data_type, DataType::UnsignedInteger32Bit);
+        assert_eq!(bitmap_layout.bit_order, BitOrder::LeastSignificantBit);
+    }
+}
