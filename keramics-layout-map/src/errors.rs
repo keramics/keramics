@@ -37,3 +37,16 @@ impl fmt::Display for ParseError {
         write!(formatter, "{}", self.message)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_error() {
+        let message_string: String = String::from("Test error");
+
+        let parse_error: ParseError = ParseError::new(message_string.clone());
+        assert_eq!(parse_error.to_string(), message_string);
+    }
+}

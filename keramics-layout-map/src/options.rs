@@ -374,88 +374,128 @@ mod tests {
 
     #[test]
     fn test_parse_byte_order_option() -> syn::Result<()> {
-        let test_struct: ByteOrderOption = syn::parse2(parse_quote! {
-            ""
-        })?;
-        assert_eq!(
-            test_struct,
-            ByteOrderOption {
-                value: ByteOrder::NotSet
-            }
-        );
-
-        let test_struct: ByteOrderOption = syn::parse2(parse_quote! {
-            "big"
-        })?;
-        assert_eq!(
-            test_struct,
-            ByteOrderOption {
-                value: ByteOrder::BigEndian
-            }
-        );
-
-        let test_struct: ByteOrderOption = syn::parse2(parse_quote! {
-            "little"
-        })?;
-        assert_eq!(
-            test_struct,
-            ByteOrderOption {
-                value: ByteOrder::LittleEndian
-            }
-        );
-
+        let test_cases: &[(&str, ByteOrder)] = &[
+            ("", ByteOrder::NotSet),
+            ("BigEndian", ByteOrder::BigEndian),
+            ("be", ByteOrder::BigEndian),
+            ("big", ByteOrder::BigEndian),
+            ("LittleEndian", ByteOrder::LittleEndian),
+            ("le", ByteOrder::LittleEndian),
+            ("little", ByteOrder::LittleEndian),
+        ];
+        for (option_string, expected_byte_order) in test_cases {
+            let byte_order_option: ByteOrderOption = syn::parse2(parse_quote! {
+                #option_string
+            })?;
+            assert_eq!(byte_order_option.value, *expected_byte_order);
+        }
         Ok(())
+    }
+
+    #[test]
+    fn test_parse_byte_order_option_with_unsupported_byte_order() {
+        let result: syn::Result<ByteOrderOption> = syn::parse2(parse_quote! { "unsupported" });
+        assert!(result.is_err());
+
+        let error: syn::Error = result.unwrap_err();
+        assert_eq!(
+            error.to_string().as_str(),
+            "Unsupported byte order: unsupported"
+        );
     }
 
     #[test]
     fn test_parse_field_data_type_option() -> syn::Result<()> {
-        let test_struct: FieldDataTypeOption = syn::parse2(parse_quote! {
-            "u8"
-        })?;
-        assert_eq!(
-            test_struct,
-            FieldDataTypeOption {
-                value: DataType::UnsignedInteger8Bit,
-                number_of_elements: 1
-            }
-        );
-
+        let test_cases: &[(&str, DataType, usize)] = &[
+            ("u8", DataType::UnsignedInteger8Bit, 1),
+            ("uint16", DataType::UnsignedInteger16Bit, 1),
+            ("SignedInteger32Bit", DataType::SignedInteger32Bit, 1),
+            ("Filetime", DataType::Filetime, 1),
+            ("Uuid", DataType::Uuid, 1),
+            ("BitField16<12>", DataType::BitField16, 12),
+            ("[u64; 4]", DataType::UnsignedInteger64Bit, 4),
+            (
+                "Struct<MyStruct; 32>",
+                DataType::Struct {
+                    name: String::from("MyStruct"),
+                    size: 32,
+                },
+                1,
+            ),
+        ];
+        for (option_string, expected_data_type, expected_number_of_elements) in test_cases {
+            let field_data_type_option: FieldDataTypeOption = syn::parse2(parse_quote! {
+                #option_string
+            })?;
+            assert_eq!(field_data_type_option.value, *expected_data_type);
+            assert_eq!(
+                field_data_type_option.number_of_elements,
+                *expected_number_of_elements
+            );
+        }
         Ok(())
     }
 
     #[test]
+    fn test_parse_field_data_type_option_with_unsupported_data_type() {
+        let result: syn::Result<FieldDataTypeOption> = syn::parse2(parse_quote! { "unsupported" });
+        assert!(result.is_err());
+
+        let error: syn::Error = result.unwrap_err();
+        assert_eq!(
+            error.to_string().as_str(),
+            "Unsupported data type: unsupported"
+        );
+    }
+
+    #[test]
+    fn test_parse_field_data_type_option_with_invalid_struct_definition() {
+        let result: syn::Result<FieldDataTypeOption> =
+            syn::parse2(parse_quote! { "Struct<MyStruct" });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_field_data_type_option_with_unsupported_number_of_elements() {
+        let result: syn::Result<FieldDataTypeOption> =
+            syn::parse2(parse_quote! { "BitField16<string>" });
+        assert!(result.is_err());
+
+        let error: syn::Error = result.unwrap_err();
+        assert_eq!(
+            error.to_string().as_str(),
+            "Unsupported number of elements: string in data type: BitField16"
+        );
+    }
+
+    #[test]
     fn test_parse_field_format_option() -> syn::Result<()> {
-        let test_struct: FieldFormatOption = syn::parse2(parse_quote! {
-            ""
-        })?;
-        assert_eq!(
-            test_struct,
-            FieldFormatOption {
-                value: Format::NotSet
-            }
-        );
-
-        let test_struct: FieldFormatOption = syn::parse2(parse_quote! {
-            "char"
-        })?;
-        assert_eq!(
-            test_struct,
-            FieldFormatOption {
-                value: Format::Character
-            }
-        );
-
-        let test_struct: FieldFormatOption = syn::parse2(parse_quote! {
-            "hex"
-        })?;
-        assert_eq!(
-            test_struct,
-            FieldFormatOption {
-                value: Format::Hexadecimal
-            }
-        );
-
+        let test_cases: &[(&str, Format)] = &[
+            ("", Format::NotSet),
+            ("Character", Format::Character),
+            ("char", Format::Character),
+            ("Hexadecimal", Format::Hexadecimal),
+            ("hex", Format::Hexadecimal),
+        ];
+        for (option_string, expected_format) in test_cases {
+            let field_format_option: FieldFormatOption = syn::parse2(parse_quote! {
+                #option_string
+            })?;
+            assert_eq!(field_format_option.value, *expected_format);
+        }
         Ok(())
+    }
+
+    #[test]
+    fn test_parse_field_format_option_with_unsupported_format() {
+        let result: syn::Result<FieldFormatOption> = syn::parse2(parse_quote! { "unsupported" });
+        assert!(result.is_err());
+
+        let error: syn::Error = result.unwrap_err();
+        assert_eq!(
+            error.to_string().as_str(),
+            "Unsupported format: unsupported"
+        );
     }
 
     #[test]
@@ -474,7 +514,40 @@ mod tests {
                 number_of_elements: 1,
             }
         );
+
+        let test_struct: FieldOptions = syn::parse2(parse_quote! {
+            name = "block_size",
+            byte_order = "little",
+            data_type = "BitField16<12>",
+            modifier = "+ 1",
+            format = "hex"
+        })?;
+        assert_eq!(
+            test_struct,
+            FieldOptions {
+                byte_order: ByteOrder::LittleEndian,
+                data_type: DataType::BitField16,
+                format: Format::Hexadecimal,
+                modifier: String::from("+ 1"),
+                name: String::from("block_size"),
+                number_of_elements: 12,
+            }
+        );
         Ok(())
+    }
+
+    #[test]
+    fn test_parse_field_options_with_unsupported_attribute() {
+        let result: syn::Result<FieldOptions> = syn::parse2(parse_quote! {
+            unsupported = "value"
+        });
+        assert!(result.is_err());
+
+        let error: syn::Error = result.unwrap_err();
+        assert_eq!(
+            error.to_string().as_str(),
+            "Unsupported field attribute: unsupported"
+        );
     }
 
     #[test]
@@ -497,6 +570,69 @@ mod tests {
                 }],
             }
         );
+
+        let test_struct: GroupOptions = syn::parse2(parse_quote! {
+            size_condition = "",
+            field(name = "format_version", data_type = "u16")
+        })?;
+        assert_eq!(
+            test_struct,
+            GroupOptions {
+                size_condition: Some(String::new()),
+                fields: vec![FieldOptions {
+                    byte_order: ByteOrder::NotSet,
+                    data_type: DataType::UnsignedInteger16Bit,
+                    format: Format::NotSet,
+                    modifier: String::new(),
+                    name: String::from("format_version"),
+                    number_of_elements: 1,
+                }],
+            }
+        );
+
+        let test_struct: GroupOptions = syn::parse2(parse_quote! {
+            size_condition = ">= 8",
+            field(name = "extra_size", data_type = "u16"),
+            field(name = "extra_data", data_type = "u8")
+        })?;
+        assert_eq!(
+            test_struct,
+            GroupOptions {
+                size_condition: Some(String::from("data.len() >= 8")),
+                fields: vec![
+                    FieldOptions {
+                        byte_order: ByteOrder::NotSet,
+                        data_type: DataType::UnsignedInteger16Bit,
+                        format: Format::NotSet,
+                        modifier: String::new(),
+                        name: String::from("extra_size"),
+                        number_of_elements: 1,
+                    },
+                    FieldOptions {
+                        byte_order: ByteOrder::NotSet,
+                        data_type: DataType::UnsignedInteger8Bit,
+                        format: Format::NotSet,
+                        modifier: String::new(),
+                        name: String::from("extra_data"),
+                        number_of_elements: 1,
+                    },
+                ],
+            }
+        );
         Ok(())
+    }
+
+    #[test]
+    fn test_parse_group_options_with_unsupported_attribute() {
+        let result: syn::Result<GroupOptions> = syn::parse2(parse_quote! {
+            unsupported = "value"
+        });
+        assert!(result.is_err());
+
+        let error: syn::Error = result.unwrap_err();
+        assert_eq!(
+            error.to_string().as_str(),
+            "Unsupported group attribute: unsupported"
+        );
     }
 }

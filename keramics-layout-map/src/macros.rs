@@ -127,6 +127,7 @@ impl FromMeta for MethodsOptions {
     }
 }
 
+#[derive(Debug)]
 enum StructureMember {
     BitField(FieldOptions),
     Field(FieldOptions),
@@ -188,6 +189,7 @@ impl Parse for StructureMember {
     }
 }
 
+#[derive(Debug)]
 struct StructureOptions {
     /// Byte order.
     byte_order: ByteOrder,
@@ -692,8 +694,336 @@ pub fn process_input(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enums::Format;
 
     use syn::parse_quote;
+
+    #[test]
+    fn test_bitmap_options_is_empty() {
+        let bitmap_options: BitmapOptions = BitmapOptions {
+            bit_order: String::new(),
+            data_type: String::new(),
+        };
+        assert!(bitmap_options.is_empty());
+
+        let bitmap_options: BitmapOptions = BitmapOptions {
+            bit_order: String::from("msb"),
+            data_type: String::new(),
+        };
+        assert!(!bitmap_options.is_empty());
+    }
+
+    #[test]
+    fn test_bitmap_options_parse_bit_order() -> Result<(), ParseError> {
+        let test_cases: &[(&str, BitOrder)] = &[
+            ("msb", BitOrder::MostSignificantBit),
+            ("most", BitOrder::MostSignificantBit),
+            ("MostSignificantBit", BitOrder::MostSignificantBit),
+            ("lsb", BitOrder::LeastSignificantBit),
+            ("least", BitOrder::LeastSignificantBit),
+            ("LeastSignificantBit", BitOrder::LeastSignificantBit),
+        ];
+        for (bit_order_string, expected_bit_order) in test_cases {
+            let bitmap_options: BitmapOptions = BitmapOptions {
+                bit_order: bit_order_string.to_string(),
+                data_type: String::new(),
+            };
+            let bit_order: BitOrder = bitmap_options.parse_bit_order()?;
+            assert_eq!(bit_order, *expected_bit_order);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_bitmap_options_parse_bit_order_with_missing_bit_order() {
+        let bitmap_options: BitmapOptions = BitmapOptions {
+            bit_order: String::new(),
+            data_type: String::new(),
+        };
+        let result: Result<BitOrder, ParseError> = bitmap_options.parse_bit_order();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bitmap_options_parse_bit_order_with_unsupported_bit_order() {
+        let bitmap_options: BitmapOptions = BitmapOptions {
+            bit_order: String::from("unsupported"),
+            data_type: String::new(),
+        };
+        let result: Result<BitOrder, ParseError> = bitmap_options.parse_bit_order();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bitmap_options_parse_data_type() -> Result<(), ParseError> {
+        let test_cases: &[(&str, DataType)] = &[
+            ("u8", DataType::UnsignedInteger8Bit),
+            ("uint8", DataType::UnsignedInteger8Bit),
+            ("UnsignedInteger8Bit", DataType::UnsignedInteger8Bit),
+            ("u16", DataType::UnsignedInteger16Bit),
+            ("uint16", DataType::UnsignedInteger16Bit),
+            ("UnsignedInteger16Bit", DataType::UnsignedInteger16Bit),
+            ("u32", DataType::UnsignedInteger32Bit),
+            ("uint32", DataType::UnsignedInteger32Bit),
+            ("UnsignedInteger32Bit", DataType::UnsignedInteger32Bit),
+            ("u64", DataType::UnsignedInteger64Bit),
+            ("uint64", DataType::UnsignedInteger64Bit),
+            ("UnsignedInteger64Bit", DataType::UnsignedInteger64Bit),
+        ];
+        for (data_type_string, expected_data_type) in test_cases {
+            let bitmap_options: BitmapOptions = BitmapOptions {
+                bit_order: String::new(),
+                data_type: data_type_string.to_string(),
+            };
+            let data_type: DataType = bitmap_options.parse_data_type()?;
+            assert_eq!(data_type, *expected_data_type);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_bitmap_options_parse_data_type_with_missing_data_type() {
+        let bitmap_options: BitmapOptions = BitmapOptions {
+            bit_order: String::new(),
+            data_type: String::new(),
+        };
+        let result: Result<DataType, ParseError> = bitmap_options.parse_data_type();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bitmap_options_parse_data_type_with_unsupported_data_type() {
+        let bitmap_options: BitmapOptions = BitmapOptions {
+            bit_order: String::new(),
+            data_type: String::from("unsupported"),
+        };
+        let result: Result<DataType, ParseError> = bitmap_options.parse_data_type();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_methods_options_is_empty() {
+        let methods_options: MethodsOptions = MethodsOptions { names: Vec::new() };
+        assert!(methods_options.is_empty());
+
+        let methods_options: MethodsOptions = MethodsOptions {
+            names: vec![String::from("debug_read_data")],
+        };
+        assert!(!methods_options.is_empty());
+        assert_eq!(methods_options.names, vec![String::from("debug_read_data")]);
+    }
+
+    #[test]
+    fn test_parse_methods_options() -> syn::Result<()> {
+        let methods_options: MethodsOptions = syn::parse2(parse_quote! {
+            "debug_read_data", "read_at_position"
+        })?;
+        assert_eq!(
+            methods_options.names,
+            vec![
+                String::from("debug_read_data"),
+                String::from("read_at_position")
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_structure_options_is_empty() {
+        let structure_options: StructureOptions = StructureOptions::new();
+
+        assert!(structure_options.is_empty());
+        assert_eq!(structure_options.byte_order, ByteOrder::NotSet);
+    }
+
+    #[test]
+    fn test_parse_structure_member_with_field() -> syn::Result<()> {
+        let structure_member: StructureMember = syn::parse2(parse_quote! {
+            field(name = "format_version", data_type = "u16")
+        })?;
+        assert!(matches!(structure_member, StructureMember::Field(_)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_structure_member_with_bitfield() -> syn::Result<()> {
+        let structure_member: StructureMember = syn::parse2(parse_quote! {
+            field(name = "block_size", data_type = "BitField16<12>")
+        })?;
+        assert!(matches!(structure_member, StructureMember::BitField(_)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_structure_member_with_group() -> syn::Result<()> {
+        let structure_member: StructureMember = syn::parse2(parse_quote! {
+            group(
+                size_condition = ">= 8",
+                field(name = "extra_size", data_type = "u16")
+            )
+        })?;
+        assert!(matches!(structure_member, StructureMember::Group(_)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_structure_member_with_unsupported_member() {
+        let result: syn::Result<StructureMember> =
+            syn::parse2(parse_quote! { unsupported(name = "value") });
+
+        assert!(result.is_err());
+
+        let error: syn::Error = result.unwrap_err();
+        assert_eq!(
+            error.to_string().as_str(),
+            "Unsupported member attribute: unsupported"
+        );
+    }
+
+    #[test]
+    fn test_parse_structure_options() -> syn::Result<()> {
+        let structure_options: StructureOptions = syn::parse2(parse_quote! {
+            byte_order = "little",
+            field(name = "format_version", data_type = "u16"),
+            group(
+                size_condition = ">= 8",
+                field(name = "extra_size", data_type = "u16")
+            )
+        })?;
+        assert_eq!(structure_options.byte_order, ByteOrder::LittleEndian);
+        assert_eq!(structure_options.members.len(), 2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_structure_options_with_unsupported_attribute() {
+        let result: syn::Result<StructureOptions> = syn::parse2(parse_quote! {
+            unsupported = "value"
+        });
+        assert!(result.is_err());
+
+        let error: syn::Error = result.unwrap_err();
+        assert_eq!(
+            error.to_string().as_str(),
+            "Unsupported structure attribute: unsupported"
+        );
+    }
+
+    #[test]
+    fn test_parse_structure_layout_member_with_bitfield() {
+        let name: String = String::from("TestStruct");
+        let field_options: FieldOptions = FieldOptions {
+            byte_order: ByteOrder::NotSet,
+            data_type: DataType::BitField16,
+            format: Format::NotSet,
+            modifier: String::new(),
+            name: String::from("field1"),
+            number_of_elements: 4,
+        };
+        let result: Result<StructureLayoutMember, ParseError> =
+            parse_structure_layout_member(&name, &field_options);
+        assert!(result.is_err());
+
+        let error: ParseError = result.unwrap_err();
+        assert_eq!(
+            error.to_string().as_str(),
+            "Unsupported data type of field: field1"
+        );
+    }
+
+    #[test]
+    fn test_parse_structure_layout_member_with_missing_name() {
+        let name: String = String::from("TestStruct");
+        let field_options: FieldOptions = FieldOptions {
+            byte_order: ByteOrder::NotSet,
+            data_type: DataType::UnsignedInteger16Bit,
+            format: Format::NotSet,
+            modifier: String::new(),
+            name: String::new(),
+            number_of_elements: 1,
+        };
+        let result: Result<StructureLayoutMember, ParseError> =
+            parse_structure_layout_member(&name, &field_options);
+        assert!(result.is_err());
+
+        let error: ParseError = result.unwrap_err();
+        assert_eq!(
+            error.to_string().as_str(),
+            "Name missing in field in layout map of TestStruct"
+        );
+    }
+
+    #[test]
+    fn test_parse_structure_layout_sequence_with_modifier() -> syn::Result<()> {
+        let name: String = String::from("TestStruct");
+        let field_options: FieldOptions = FieldOptions {
+            byte_order: ByteOrder::NotSet,
+            data_type: DataType::UnsignedInteger8Bit,
+            format: Format::NotSet,
+            modifier: String::from("+ 1"),
+            name: String::from("field1"),
+            number_of_elements: 4,
+        };
+        let result: Result<StructureLayoutSequence, ParseError> =
+            parse_structure_layout_sequence(&name, &field_options);
+        assert!(result.is_err());
+
+        let error: ParseError = result.unwrap_err();
+        assert_eq!(
+            error.to_string().as_str(),
+            "Modifier not supported for sequence field: field1 in layout map of TestStruct"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_structure_layout_group_with_missing_fields() -> syn::Result<()> {
+        let name: String = String::from("TestStruct");
+        let group_options: GroupOptions = GroupOptions {
+            size_condition: Some(String::from("data.len() > 8")),
+            fields: Vec::new(),
+        };
+        let result: Result<StructureLayoutGroup, ParseError> =
+            parse_structure_layout_group(&name, &group_options);
+        assert!(result.is_err());
+
+        let error: ParseError = result.unwrap_err();
+        assert_eq!(
+            error.to_string().as_str(),
+            "Missing fields in group in layout map of TestStruct"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_structure_layout_group_with_missing_condition() -> syn::Result<()> {
+        let name: String = String::from("TestStruct");
+        let group_options: GroupOptions = GroupOptions {
+            size_condition: None,
+            fields: vec![FieldOptions {
+                byte_order: ByteOrder::NotSet,
+                data_type: DataType::UnsignedInteger16Bit,
+                format: Format::NotSet,
+                modifier: String::new(),
+                name: String::from("field1"),
+                number_of_elements: 1,
+            }],
+        };
+        let result: Result<StructureLayoutGroup, ParseError> =
+            parse_structure_layout_group(&name, &group_options);
+        assert!(result.is_err());
+
+        let error: ParseError = result.unwrap_err();
+        assert_eq!(
+            error.to_string().as_str(),
+            "Missing condition in group in layout map of TestStruct"
+        );
+        Ok(())
+    }
 
     #[test]
     fn test_derive() {
