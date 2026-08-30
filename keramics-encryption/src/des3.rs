@@ -500,11 +500,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_encrypt_block() -> Result<(), ErrorTrace> {
+    fn test_decrypt_block() -> Result<(), ErrorTrace> {
         let des3_context: Des3Context = Des3Context::new();
 
-        let output_value: u64 = des3_context.encrypt_block(0x9837239487, 0x2983123819080ac1);
-        assert_eq!(output_value, 0xa9494d9bbdc2873f);
+        let output_value: u64 = des3_context.decrypt_block(0x3719827398, 0x344720e90cdc908f);
+        assert_eq!(output_value, 0x6d0ee7e5792e2a93);
 
         Ok(())
     }
@@ -529,6 +529,68 @@ mod tests {
     }
 
     #[test]
+    fn test_decrypt_cbc_without_key() {
+        let des3_context: Des3Context = Des3Context::new();
+
+        let initialization_vector: [u8; 8] = [0; 8];
+        let encrypted_data: [u8; 8] = [0; 8];
+        let mut data: Vec<u8> = vec![0; 8];
+
+        let result = des3_context.decrypt_cbc(&initialization_vector, &encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_cbc_with_unsupported_initialization_vector() {
+        let mut des3_context: Des3Context = Des3Context::new();
+
+        let result = des3_context.set_key(b"test1234");
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 7] = [0; 7];
+        let encrypted_data: [u8; 8] = [0; 8];
+        let mut data: Vec<u8> = vec![0; 8];
+
+        let result = des3_context.decrypt_cbc(&initialization_vector, &encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_cbc_with_unsupported_encrypted_data_size() {
+        let mut des3_context: Des3Context = Des3Context::new();
+
+        let result = des3_context.set_key(b"test1234");
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 8] = [0; 8];
+        let encrypted_data: [u8; 7] = [0; 7];
+        let mut data: Vec<u8> = vec![0; 8];
+
+        let result = des3_context.decrypt_cbc(&initialization_vector, &encrypted_data, &mut data);
+        assert!(result.is_err());
+
+        let encrypted_data: [u8; 17] = [0; 17];
+        let result =
+            des3_context.decrypt_cbc(&initialization_vector, &encrypted_data[0..9], &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_cbc_with_unsupported_data_size() {
+        let mut des3_context: Des3Context = Des3Context::new();
+
+        let result = des3_context.set_key(b"test1234");
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 8] = [0; 8];
+        let encrypted_data: [u8; 8] = [0; 8];
+        let mut data: Vec<u8> = vec![0; 4];
+
+        let result = des3_context.decrypt_cbc(&initialization_vector, &encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_decrypt_ecb() -> Result<(), ErrorTrace> {
         let mut des3_context: Des3Context = Des3Context::new();
 
@@ -546,11 +608,54 @@ mod tests {
     }
 
     #[test]
-    fn test_decrypt_block() -> Result<(), ErrorTrace> {
+    fn test_decrypt_ecb_without_key() {
         let des3_context: Des3Context = Des3Context::new();
 
-        let output_value: u64 = des3_context.decrypt_block(0x3719827398, 0x344720e90cdc908f);
-        assert_eq!(output_value, 0x6d0ee7e5792e2a93);
+        let encrypted_data: [u8; 8] = [0; 8];
+        let mut data: Vec<u8> = vec![0; 8];
+
+        let result = des3_context.decrypt_ecb(&encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_ecb_with_unsupported_encrypted_data_size() {
+        let mut des3_context: Des3Context = Des3Context::new();
+
+        let result = des3_context.set_key(b"test1234");
+        assert!(result.is_ok());
+
+        let encrypted_data: [u8; 7] = [0; 7];
+        let mut data: Vec<u8> = vec![0; 8];
+
+        let result = des3_context.decrypt_ecb(&encrypted_data, &mut data);
+        assert!(result.is_err());
+
+        let encrypted_data: [u8; 17] = [0; 17];
+        let result = des3_context.decrypt_ecb(&encrypted_data[0..9], &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_ecb_with_unsupported_data_size() {
+        let mut des3_context: Des3Context = Des3Context::new();
+
+        let result = des3_context.set_key(b"test1234");
+        assert!(result.is_ok());
+
+        let encrypted_data: [u8; 8] = [0; 8];
+        let mut data: Vec<u8> = vec![0; 4];
+
+        let result = des3_context.decrypt_ecb(&encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_block() -> Result<(), ErrorTrace> {
+        let des3_context: Des3Context = Des3Context::new();
+
+        let output_value: u64 = des3_context.encrypt_block(0x9837239487, 0x2983123819080ac1);
+        assert_eq!(output_value, 0xa9494d9bbdc2873f);
 
         Ok(())
     }
@@ -579,6 +684,53 @@ mod tests {
     }
 
     #[test]
+    fn test_encrypt_cbc_without_key() {
+        let des3_context: Des3Context = Des3Context::new();
+
+        let initialization_vector: [u8; 8] = [0; 8];
+        let data: [u8; 8] = [0; 8];
+        let mut encrypted_data: Vec<u8> = vec![0; 8];
+
+        let result = des3_context.encrypt_cbc(&initialization_vector, &data, &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_cbc_with_unsupported_data_size() {
+        let mut des3_context: Des3Context = Des3Context::new();
+
+        let result = des3_context.set_key(b"test1234");
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 8] = [0; 8];
+        let data: [u8; 7] = [0; 7];
+        let mut encrypted_data: Vec<u8> = vec![0; 8];
+
+        let result = des3_context.encrypt_cbc(&initialization_vector, &data, &mut encrypted_data);
+        assert!(result.is_err());
+
+        let data: [u8; 17] = [0; 17];
+        let result =
+            des3_context.encrypt_cbc(&initialization_vector, &data[0..9], &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_cbc_with_unsupported_encrypted_data_size() {
+        let mut des3_context: Des3Context = Des3Context::new();
+
+        let result = des3_context.set_key(b"test1234");
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 8] = [0; 8];
+        let data: [u8; 8] = [0; 8];
+        let mut encrypted_data: Vec<u8> = vec![0; 4];
+
+        let result = des3_context.encrypt_cbc(&initialization_vector, &data, &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_encrypt_ecb() -> Result<(), ErrorTrace> {
         let mut des3_context: Des3Context = Des3Context::new();
 
@@ -593,5 +745,77 @@ mod tests {
         assert_eq!(&encrypted_data, &expected_encrypted_data);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_encrypt_ecb_without_key() {
+        let des3_context: Des3Context = Des3Context::new();
+
+        let data: [u8; 8] = [0; 8];
+        let mut encrypted_data: Vec<u8> = vec![0; 8];
+
+        let result = des3_context.encrypt_ecb(&data, &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_ecb_with_unsupported_data_size() {
+        let mut des3_context: Des3Context = Des3Context::new();
+
+        let result = des3_context.set_key(b"test1234");
+        assert!(result.is_ok());
+
+        let data: [u8; 7] = [0; 7];
+        let mut encrypted_data: Vec<u8> = vec![0; 8];
+
+        let result = des3_context.encrypt_ecb(&data, &mut encrypted_data);
+        assert!(result.is_err());
+
+        let data: [u8; 17] = [0; 17];
+        let result = des3_context.encrypt_ecb(&data[0..9], &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_ecb_with_unsupported_encrypted_data_size() {
+        let mut des3_context: Des3Context = Des3Context::new();
+
+        let result = des3_context.set_key(b"test1234");
+        assert!(result.is_ok());
+
+        let data: [u8; 8] = [0; 8];
+        let mut encrypted_data: Vec<u8> = vec![0; 4];
+
+        let result = des3_context.encrypt_ecb(&data, &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_set_key_with_unsupported_key_size() {
+        let mut des3_context: Des3Context = Des3Context::new();
+
+        let key: &[u8] = &[];
+        let result = des3_context.set_key(key);
+        assert!(result.is_err());
+
+        let key: [u8; 5] = [0; 5];
+        let result = des3_context.set_key(&key);
+        assert!(result.is_err());
+
+        let key: [u8; 9] = [0; 9];
+        let result = des3_context.set_key(&key);
+        assert!(result.is_err());
+
+        let key: [u8; 15] = [0; 15];
+        let result = des3_context.set_key(&key);
+        assert!(result.is_err());
+
+        let key: [u8; 20] = [0; 20];
+        let result = des3_context.set_key(&key);
+        assert!(result.is_err());
+
+        let key: [u8; 22] = [0; 22];
+        let result = des3_context.set_key(&key);
+        assert!(result.is_err());
     }
 }

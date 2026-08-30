@@ -586,6 +586,72 @@ mod tests {
     }
 
     #[test]
+    fn test_decrypt_cbc_without_key() {
+        let blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let initialization_vector: [u8; 8] = [0; 8];
+        let encrypted_data: [u8; 8] = [0; 8];
+        let mut data: Vec<u8> = vec![0; 8];
+
+        let result =
+            blowfish_context.decrypt_cbc(&initialization_vector, &encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_cbc_with_unsupported_initialization_vector() {
+        let mut blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let result = blowfish_context.set_key(b"test1");
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 7] = [0; 7];
+        let encrypted_data: [u8; 8] = [0; 8];
+        let mut data: Vec<u8> = vec![0; 8];
+
+        let result =
+            blowfish_context.decrypt_cbc(&initialization_vector, &encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_cbc_with_unsupported_encrypted_data_size() {
+        let mut blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let result = blowfish_context.set_key(b"test1");
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 8] = [0; 8];
+        let encrypted_data: [u8; 7] = [0; 7];
+        let mut data: Vec<u8> = vec![0; 8];
+
+        let result =
+            blowfish_context.decrypt_cbc(&initialization_vector, &encrypted_data, &mut data);
+        assert!(result.is_err());
+
+        let encrypted_data: [u8; 16] = [0; 16];
+        let result =
+            blowfish_context.decrypt_cbc(&initialization_vector, &encrypted_data[0..9], &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_cbc_with_unsupported_data_size() {
+        let mut blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let result = blowfish_context.set_key(b"test1");
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 8] = [0; 8];
+        let encrypted_data: [u8; 8] = [0; 8];
+        let mut data: Vec<u8> = vec![0; 4];
+
+        let result =
+            blowfish_context.decrypt_cbc(&initialization_vector, &encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_decrypt_ecb() -> Result<(), ErrorTrace> {
         let mut blowfish_context: BlowfishContext = BlowfishContext::new();
 
@@ -598,6 +664,49 @@ mod tests {
         assert_eq!(&data, b"12345678");
 
         Ok(())
+    }
+
+    #[test]
+    fn test_decrypt_ecb_without_key() {
+        let blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let encrypted_data: [u8; 8] = [0; 8];
+        let mut data: Vec<u8> = vec![0; 8];
+
+        let result = blowfish_context.decrypt_ecb(&encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_ecb_with_unsupported_encrypted_data_size() {
+        let mut blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let result = blowfish_context.set_key(b"test1");
+        assert!(result.is_ok());
+
+        let encrypted_data: [u8; 7] = [0; 7];
+        let mut data: Vec<u8> = vec![0; 8];
+
+        let result = blowfish_context.decrypt_ecb(&encrypted_data, &mut data);
+        assert!(result.is_err());
+
+        let encrypted_data: [u8; 16] = [0; 16];
+        let result = blowfish_context.decrypt_ecb(&encrypted_data[0..9], &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_ecb_with_unsupported_data_size() {
+        let mut blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let result = blowfish_context.set_key(b"test1");
+        assert!(result.is_ok());
+
+        let encrypted_data: [u8; 8] = [0; 8];
+        let mut data: Vec<u8> = vec![0; 4];
+
+        let result = blowfish_context.decrypt_ecb(&encrypted_data, &mut data);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -641,6 +750,56 @@ mod tests {
     }
 
     #[test]
+    fn test_encrypt_cbc_without_key() {
+        let blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let initialization_vector: [u8; 8] = [0; 8];
+        let data: [u8; 8] = [0; 8];
+        let mut encrypted_data: Vec<u8> = vec![0; 8];
+
+        let result =
+            blowfish_context.encrypt_cbc(&initialization_vector, &data, &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_cbc_with_unsupported_data_size() {
+        let mut blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let result = blowfish_context.set_key(b"test1");
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 8] = [0; 8];
+        let data: [u8; 7] = [0; 7];
+        let mut encrypted_data: Vec<u8> = vec![0; 8];
+
+        let result =
+            blowfish_context.encrypt_cbc(&initialization_vector, &data, &mut encrypted_data);
+        assert!(result.is_err());
+
+        let data: [u8; 16] = [0; 16];
+        let result =
+            blowfish_context.encrypt_cbc(&initialization_vector, &data[0..9], &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_cbc_with_unsupported_encrypted_data_size() {
+        let mut blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let result = blowfish_context.set_key(b"test1");
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 8] = [0; 8];
+        let data: [u8; 8] = [0; 8];
+        let mut encrypted_data: Vec<u8> = vec![0; 4];
+
+        let result =
+            blowfish_context.encrypt_cbc(&initialization_vector, &data, &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_encrypt_ecb() -> Result<(), ErrorTrace> {
         let mut blowfish_context: BlowfishContext = BlowfishContext::new();
 
@@ -652,6 +811,49 @@ mod tests {
         assert_eq!(&encrypted_data, b"\x11qMc\xe0m\xd7\x9e");
 
         Ok(())
+    }
+
+    #[test]
+    fn test_encrypt_ecb_without_key() {
+        let blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let data: [u8; 8] = [0; 8];
+        let mut encrypted_data: Vec<u8> = vec![0; 8];
+
+        let result = blowfish_context.encrypt_ecb(&data, &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_ecb_with_unsupported_data_size() {
+        let mut blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let result = blowfish_context.set_key(b"test1");
+        assert!(result.is_ok());
+
+        let data: [u8; 7] = [0; 7];
+        let mut encrypted_data: Vec<u8> = vec![0; 8];
+
+        let result = blowfish_context.encrypt_ecb(&data, &mut encrypted_data);
+        assert!(result.is_err());
+
+        let data: [u8; 16] = [0; 16];
+        let result = blowfish_context.encrypt_ecb(&data[0..9], &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_ecb_with_unsupported_encrypted_data_size() {
+        let mut blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let result = blowfish_context.set_key(b"test1");
+        assert!(result.is_ok());
+
+        let data: [u8; 8] = [0; 8];
+        let mut encrypted_data: Vec<u8> = vec![0; 4];
+
+        let result = blowfish_context.encrypt_ecb(&data, &mut encrypted_data);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -668,5 +870,18 @@ mod tests {
         assert_eq!(right_value, 0x30a71bb4);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_set_key_with_unsupported_key_size() {
+        let mut blowfish_context: BlowfishContext = BlowfishContext::new();
+
+        let key: &[u8] = &[];
+        let result = blowfish_context.set_key(key);
+        assert!(result.is_err());
+
+        let key: [u8; 57] = [0; 57];
+        let result = blowfish_context.set_key(&key);
+        assert!(result.is_err());
     }
 }
