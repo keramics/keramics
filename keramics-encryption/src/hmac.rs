@@ -17,8 +17,12 @@
 
 use keramics_core::ErrorTrace;
 use keramics_hashes::{
-    DigestHashContext, Sha1Context, Sha224Context, Sha256Context, Sha384Context, Sha512Context,
+    DigestHashContext, Md5Context, Sha1Context, Sha224Context, Sha256Context, Sha384Context,
+    Sha512Context,
 };
+
+/// Context for HMAC-MD5.
+pub type HmacMd5Context = HmacContext<Md5Context, 64, 16>;
 
 /// Context for HMAC-SHA-1.
 pub type HmacSha1Context = HmacContext<Sha1Context, 64, 20>;
@@ -109,7 +113,10 @@ mod tests {
         /// Data.
         data: &'static [u8],
 
-        /// HMAC-SHA1.
+        /// HMAC-MD5.
+        hmac_md5: &'static [u8],
+
+        /// HMAC-SHA-1.
         hmac_sha1: &'static [u8],
 
         /// HMAC-SHA-224.
@@ -125,11 +132,110 @@ mod tests {
         hmac_sha512: &'static [u8],
     }
 
-    const TEST_VECTORS: &'static [TestVector] = &[
+    const RCF2202_TEST_VECTORS: &'static [TestVector] = &[
+        // RFC 2202 test vectors.
+        TestVector {
+            key: &[0x0b; 16],
+            data: b"Hi There",
+            hmac_md5: &[
+                0x92, 0x94, 0x72, 0x7a, 0x36, 0x38, 0xbb, 0x1c, 0x13, 0xf4, 0x8e, 0xf8, 0x15, 0x8b,
+                0xfc, 0x9d,
+            ],
+            hmac_sha1: &[],
+            hmac_sha224: &[],
+            hmac_sha256: &[],
+            hmac_sha384: &[],
+            hmac_sha512: &[],
+        },
+        TestVector {
+            key: b"Jefe",
+            data: b"what do ya want for nothing?",
+            hmac_md5: &[
+                0x75, 0x0c, 0x78, 0x3e, 0x6a, 0xb0, 0xb5, 0x03, 0xea, 0xa8, 0x6e, 0x31, 0x0a, 0x5d,
+                0xb7, 0x38,
+            ],
+            hmac_sha1: &[],
+            hmac_sha224: &[],
+            hmac_sha256: &[],
+            hmac_sha384: &[],
+            hmac_sha512: &[],
+        },
+        TestVector {
+            key: &[0xaa; 16],
+            data: &[0xdd; 50],
+            hmac_md5: &[
+                0x56, 0xbe, 0x34, 0x52, 0x1d, 0x14, 0x4c, 0x88, 0xdb, 0xb8, 0xc7, 0x33, 0xf0, 0xe8,
+                0xb3, 0xf6,
+            ],
+            hmac_sha1: &[],
+            hmac_sha224: &[],
+            hmac_sha256: &[],
+            hmac_sha384: &[],
+            hmac_sha512: &[],
+        },
+        TestVector {
+            key: &[
+                0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
+                0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+            ],
+            data: &[0xcd; 50],
+            hmac_md5: &[
+                0x69, 0x7e, 0xaf, 0x0a, 0xca, 0x3a, 0x3a, 0xea, 0x3a, 0x75, 0x16, 0x47, 0x46, 0xff,
+                0xaa, 0x79,
+            ],
+            hmac_sha1: &[],
+            hmac_sha224: &[],
+            hmac_sha256: &[],
+            hmac_sha384: &[],
+            hmac_sha512: &[],
+        },
+        TestVector {
+            key: &[0x0c; 16],
+            data: b"Test With Truncation",
+            hmac_md5: &[
+                0x56, 0x46, 0x1e, 0xf2, 0x34, 0x2e, 0xdc, 0x00, 0xf9, 0xba, 0xb9, 0x95, 0x69, 0x0e,
+                0xfd, 0x4c,
+            ],
+            hmac_sha1: &[],
+            hmac_sha224: &[],
+            hmac_sha256: &[],
+            hmac_sha384: &[],
+            hmac_sha512: &[],
+        },
+        TestVector {
+            key: &[0xaa; 80],
+            data: b"Test Using Larger Than Block-Size Key - Hash Key First",
+            hmac_md5: &[
+                0x6b, 0x1a, 0xb7, 0xfe, 0x4b, 0xd7, 0xbf, 0x8f, 0x0b, 0x62, 0xe6, 0xce, 0x61, 0xb9,
+                0xd0, 0xcd,
+            ],
+            hmac_sha1: &[],
+            hmac_sha224: &[],
+            hmac_sha256: &[],
+            hmac_sha384: &[],
+            hmac_sha512: &[],
+        },
+        TestVector {
+            key: &[0xaa; 80],
+            data: b"Test Using Larger Than Block-Size Key and Larger Than One Block-Size Data",
+            hmac_md5: &[
+                0x6f, 0x63, 0x0f, 0xad, 0x67, 0xcd, 0xa0, 0xee, 0x1f, 0xb1, 0xf5, 0x62, 0xdb, 0x3a,
+                0xa5, 0x3e,
+            ],
+            hmac_sha1: &[],
+            hmac_sha224: &[],
+            hmac_sha256: &[],
+            hmac_sha384: &[],
+            hmac_sha512: &[],
+        },
+    ];
+
+    const RFC4231_TEST_VECTORS: &'static [TestVector] = &[
         // RFC 4231 test vectors.
         TestVector {
             key: &[0x0b; 20],
             data: b"Hi There",
+            hmac_md5: &[],
             hmac_sha1: &[
                 0xb6, 0x17, 0x31, 0x86, 0x55, 0x05, 0x72, 0x64, 0xe2, 0x8b, 0xc0, 0xb6, 0xfb, 0x37,
                 0x8c, 0x8e, 0xf1, 0x46, 0xbe, 0x00,
@@ -160,6 +266,7 @@ mod tests {
         TestVector {
             key: b"Jefe",
             data: b"what do ya want for nothing?",
+            hmac_md5: &[],
             hmac_sha1: &[
                 0xef, 0xfc, 0xdf, 0x6a, 0xe5, 0xeb, 0x2f, 0xa2, 0xd2, 0x74, 0x16, 0xd5, 0xf1, 0x84,
                 0xdf, 0x9c, 0x25, 0x9a, 0x7c, 0x79,
@@ -190,6 +297,7 @@ mod tests {
         TestVector {
             key: &[0xaa; 20],
             data: &[0xdd; 50],
+            hmac_md5: &[],
             hmac_sha1: &[
                 0x12, 0x5d, 0x73, 0x42, 0xb9, 0xac, 0x11, 0xcd, 0x91, 0xa3, 0x9a, 0xf4, 0x8a, 0xa1,
                 0x7b, 0x4f, 0x63, 0xf1, 0x75, 0xd3,
@@ -223,6 +331,7 @@ mod tests {
                 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
             ],
             data: &[0xcd; 50],
+            hmac_md5: &[],
             hmac_sha1: &[
                 0x4c, 0x90, 0x07, 0xf4, 0x02, 0x62, 0x50, 0xc6, 0xbc, 0x84, 0x14, 0xf9, 0xbf, 0x50,
                 0xc8, 0x6c, 0x2d, 0x72, 0x35, 0xda,
@@ -253,6 +362,7 @@ mod tests {
         TestVector {
             key: &[0x0c; 20],
             data: b"Test With Truncation",
+            hmac_md5: &[],
             hmac_sha1: &[
                 0x4c, 0x1a, 0x03, 0x42, 0x4b, 0x55, 0xe0, 0x7f, 0xe7, 0xf2, 0x7b, 0xe1,
             ],
@@ -281,6 +391,7 @@ mod tests {
                 0x2d, 0x53, 0x69, 0x7a, 0x65, 0x20, 0x4b, 0x65, 0x79, 0x20, 0x2d, 0x20, 0x48, 0x61,
                 0x73, 0x68, 0x20, 0x4b, 0x65, 0x79, 0x20, 0x46, 0x69, 0x72, 0x73, 0x74,
             ],
+            hmac_md5: &[],
             hmac_sha1: &[
                 0x90, 0xd0, 0xda, 0xce, 0x1c, 0x1b, 0xdc, 0x95, 0x73, 0x39, 0x30, 0x78, 0x03, 0x16,
                 0x03, 0x35, 0xbd, 0xe6, 0xdf, 0x2b,
@@ -323,6 +434,7 @@ mod tests {
                 0x73, 0x65, 0x64, 0x20, 0x62, 0x79, 0x20, 0x74, 0x68, 0x65, 0x20, 0x48, 0x4d, 0x41,
                 0x43, 0x20, 0x61, 0x6c, 0x67, 0x6f, 0x72, 0x69, 0x74, 0x68, 0x6d, 0x2e,
             ],
+            hmac_md5: &[],
             hmac_sha1: &[
                 0x21, 0x7e, 0x44, 0xbb, 0x08, 0xb6, 0xe0, 0x6a, 0x2d, 0x6c, 0x30, 0xf3, 0xcb, 0x9f,
                 0x53, 0x7f, 0x97, 0xc6, 0x33, 0x56,
@@ -353,8 +465,27 @@ mod tests {
     ];
 
     #[test]
+    fn test_calculate_hmac_md5() -> Result<(), ErrorTrace> {
+        for (test_number, test_vector) in RCF2202_TEST_VECTORS.iter().enumerate() {
+            let mut hmac_context: HmacMd5Context = HmacMd5Context::new();
+
+            let mut hmac: [u8; 16] = [0; 16];
+            hmac_context.calculate_hmac(test_vector.key, test_vector.data, &mut hmac)?;
+
+            let expected_hmac_size: usize = test_vector.hmac_md5.len();
+            assert_eq!(
+                &hmac[0..expected_hmac_size],
+                test_vector.hmac_md5,
+                "HMAC-MD5 mismatch for test vector: {}",
+                test_number + 1
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn test_calculate_hmac_sha1() -> Result<(), ErrorTrace> {
-        for (test_number, test_vector) in TEST_VECTORS.iter().enumerate() {
+        for (test_number, test_vector) in RFC4231_TEST_VECTORS.iter().enumerate() {
             let mut hmac_context: HmacSha1Context = HmacSha1Context::new();
 
             let mut hmac: [u8; 20] = [0; 20];
@@ -364,7 +495,7 @@ mod tests {
             assert_eq!(
                 &hmac[0..expected_hmac_size],
                 test_vector.hmac_sha1,
-                "HMAC-SHA1 mismatch for test vector: {}",
+                "HMAC-SHA-1 mismatch for test vector: {}",
                 test_number + 1
             );
         }
@@ -373,7 +504,7 @@ mod tests {
 
     #[test]
     fn test_calculate_hmac_sha224() -> Result<(), ErrorTrace> {
-        for (test_number, test_vector) in TEST_VECTORS.iter().enumerate() {
+        for (test_number, test_vector) in RFC4231_TEST_VECTORS.iter().enumerate() {
             let mut hmac_context: HmacSha224Context = HmacSha224Context::new();
 
             let mut hmac: [u8; 28] = [0; 28];
@@ -392,7 +523,7 @@ mod tests {
 
     #[test]
     fn test_calculate_hmac_sha256() -> Result<(), ErrorTrace> {
-        for (test_number, test_vector) in TEST_VECTORS.iter().enumerate() {
+        for (test_number, test_vector) in RFC4231_TEST_VECTORS.iter().enumerate() {
             let mut hmac_context: HmacSha256Context = HmacSha256Context::new();
 
             let mut hmac: [u8; 32] = [0; 32];
@@ -411,7 +542,7 @@ mod tests {
 
     #[test]
     fn test_calculate_hmac_sha384() -> Result<(), ErrorTrace> {
-        for (test_number, test_vector) in TEST_VECTORS.iter().enumerate() {
+        for (test_number, test_vector) in RFC4231_TEST_VECTORS.iter().enumerate() {
             let mut hmac_context: HmacSha384Context = HmacSha384Context::new();
 
             let mut hmac: [u8; 48] = [0; 48];
@@ -430,7 +561,7 @@ mod tests {
 
     #[test]
     fn test_calculate_hmac_sha512() -> Result<(), ErrorTrace> {
-        for (test_number, test_vector) in TEST_VECTORS.iter().enumerate() {
+        for (test_number, test_vector) in RFC4231_TEST_VECTORS.iter().enumerate() {
             let mut hmac_context: HmacSha512Context = HmacSha512Context::new();
 
             let mut hmac: [u8; 64] = [0; 64];
