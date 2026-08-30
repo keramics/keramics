@@ -110,7 +110,7 @@ The XFS superblock (xfs_sb_t) is (at least) 512 bytes of size and consists of:
 | <td colspan="4">*Common*</td> |
 | 184 | 4 | | Stripe (or RAID) unit size, in number of blocks |
 | 188 | 4 | | Stripe (or RAID) width, in number of blocks |
-| 192 | 1 | | Directory block size in log2, in number of block |
+| 192 | 1 | | Directory block size in log2, in number of blocks |
 | 193 | 1 | | Journal device sector size in log2 |
 | 194 | 2 | | Journal device sector size (in bytes) |
 | <td colspan="4">*Only used if the XFS_SB_VERSION_LOGV2BIT feature flag is set*</td> |
