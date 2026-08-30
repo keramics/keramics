@@ -1125,6 +1125,83 @@ mod tests {
     }
 
     #[test]
+    fn test_decrypt_cbc_without_key() {
+        let aes_context: AesContext = AesContext::new();
+
+        let initialization_vector: [u8; 16] = [0; 16];
+        let encrypted_data: [u8; 16] = [0; 16];
+        let mut data: Vec<u8> = vec![0; 16];
+
+        let result = aes_context.decrypt_cbc(&initialization_vector, &encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_cbc_with_unsupported_initialization_vector() {
+        let mut aes_context: AesContext = AesContext::new();
+
+        let key: [u8; 16] = [
+            0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf,
+            0x4f, 0x3c,
+        ];
+
+        let result = aes_context.set_key(&key);
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 15] = [0; 15];
+        let encrypted_data: [u8; 16] = [0; 16];
+        let mut data: Vec<u8> = vec![0; 16];
+
+        let result = aes_context.decrypt_cbc(&initialization_vector, &encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_cbc_with_unsupported_encrypted_data_size() {
+        let mut aes_context: AesContext = AesContext::new();
+
+        let key: [u8; 16] = [
+            0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf,
+            0x4f, 0x3c,
+        ];
+
+        let result = aes_context.set_key(&key);
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 16] = [0; 16];
+        let encrypted_data: [u8; 15] = [0; 15];
+        let mut data: Vec<u8> = vec![0; 16];
+
+        let result = aes_context.decrypt_cbc(&initialization_vector, &encrypted_data, &mut data);
+        assert!(result.is_err());
+
+        let encrypted_data: [u8; 32] = [0; 32];
+        let result =
+            aes_context.decrypt_cbc(&initialization_vector, &encrypted_data[0..17], &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_cbc_with_unsupported_data_size() {
+        let mut aes_context: AesContext = AesContext::new();
+
+        let key: [u8; 16] = [
+            0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf,
+            0x4f, 0x3c,
+        ];
+
+        let result = aes_context.set_key(&key);
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 16] = [0; 16];
+        let encrypted_data: [u8; 16] = [0; 16];
+        let mut data: Vec<u8> = vec![0; 8];
+
+        let result = aes_context.decrypt_cbc(&initialization_vector, &encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_encrypt_cbc() -> Result<(), ErrorTrace> {
         let mut aes_context: AesContext = AesContext::new();
 
@@ -1152,6 +1229,63 @@ mod tests {
         assert_eq!(&encrypted_data, &expected_encrypted_data);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_encrypt_cbc_without_key() {
+        let aes_context: AesContext = AesContext::new();
+
+        let initialization_vector: [u8; 16] = [0; 16];
+        let data: [u8; 16] = [0; 16];
+        let mut encrypted_data: Vec<u8> = vec![0; 16];
+
+        let result = aes_context.encrypt_cbc(&initialization_vector, &data, &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_cbc_with_unsupported_data_size() {
+        let mut aes_context: AesContext = AesContext::new();
+
+        let key: [u8; 16] = [
+            0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf,
+            0x4f, 0x3c,
+        ];
+
+        let result = aes_context.set_key(&key);
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 16] = [0; 16];
+        let data: [u8; 15] = [0; 15];
+        let mut encrypted_data: Vec<u8> = vec![0; 16];
+
+        let result = aes_context.encrypt_cbc(&initialization_vector, &data, &mut encrypted_data);
+        assert!(result.is_err());
+
+        let data: [u8; 32] = [0; 32];
+        let result =
+            aes_context.encrypt_cbc(&initialization_vector, &data[0..17], &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_cbc_with_unsupported_encrypted_data_size() {
+        let mut aes_context: AesContext = AesContext::new();
+
+        let key: [u8; 16] = [
+            0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf,
+            0x4f, 0x3c,
+        ];
+
+        let result = aes_context.set_key(&key);
+        assert!(result.is_ok());
+
+        let initialization_vector: [u8; 16] = [0; 16];
+        let data: [u8; 16] = [0; 16];
+        let mut encrypted_data: Vec<u8> = vec![0; 8];
+
+        let result = aes_context.encrypt_cbc(&initialization_vector, &data, &mut encrypted_data);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1237,6 +1371,53 @@ mod tests {
     }
 
     #[test]
+    fn test_decrypt_ecb_without_key() {
+        let aes_context: AesContext = AesContext::new();
+
+        let encrypted_data: [u8; 16] = [0; 16];
+        let mut data: Vec<u8> = vec![0; 16];
+
+        let result = aes_context.decrypt_ecb(&encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_ecb_with_unsupported_encrypted_data_size() {
+        let mut aes_context: AesContext = AesContext::new();
+
+        let key: [u8; 16] = [0; 16];
+
+        let result = aes_context.set_key(&key);
+        assert!(result.is_ok());
+
+        let encrypted_data: [u8; 15] = [0; 15];
+        let mut data: Vec<u8> = vec![0; 16];
+
+        let result = aes_context.decrypt_ecb(&encrypted_data, &mut data);
+        assert!(result.is_err());
+
+        let encrypted_data: [u8; 32] = [0; 32];
+        let result = aes_context.decrypt_ecb(&encrypted_data[0..17], &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decrypt_ecb_with_unsupported_data_size() {
+        let mut aes_context: AesContext = AesContext::new();
+
+        let key: [u8; 16] = [0; 16];
+
+        let result = aes_context.set_key(&key);
+        assert!(result.is_ok());
+
+        let encrypted_data: [u8; 16] = [0; 16];
+        let mut data: Vec<u8> = vec![0; 8];
+
+        let result = aes_context.decrypt_ecb(&encrypted_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_encrypt_ecb_with_128bits_key() -> Result<(), ErrorTrace> {
         let mut aes_context: AesContext = AesContext::new();
 
@@ -1313,5 +1494,65 @@ mod tests {
         assert_eq!(&encrypted_data, &expected_encrypted_data);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_encrypt_ecb_without_key() {
+        let aes_context: AesContext = AesContext::new();
+
+        let data: [u8; 16] = [0; 16];
+        let mut encrypted_data: Vec<u8> = vec![0; 16];
+
+        let result = aes_context.encrypt_ecb(&data, &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_ecb_with_unsupported_data_size() {
+        let mut aes_context: AesContext = AesContext::new();
+
+        let key: [u8; 16] = [0; 16];
+
+        let result = aes_context.set_key(&key);
+        assert!(result.is_ok());
+
+        let data: [u8; 15] = [0; 15];
+        let mut encrypted_data: Vec<u8> = vec![0; 16];
+
+        let result = aes_context.encrypt_ecb(&data, &mut encrypted_data);
+        assert!(result.is_err());
+
+        let data: [u8; 32] = [0; 32];
+        let result = aes_context.encrypt_ecb(&data[0..17], &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_ecb_with_unsupported_encrypted_data_size() {
+        let mut aes_context: AesContext = AesContext::new();
+
+        let key: [u8; 16] = [0; 16];
+
+        let result = aes_context.set_key(&key);
+        assert!(result.is_ok());
+
+        let data: [u8; 16] = [0; 16];
+        let mut encrypted_data: Vec<u8> = vec![0; 8];
+
+        let result = aes_context.encrypt_ecb(&data, &mut encrypted_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_set_key_with_unsupported_key_size() {
+        let mut aes_context: AesContext = AesContext::new();
+
+        let key: [u8; 8] = [0; 8];
+        let result = aes_context.set_key(&key);
+        assert!(result.is_err());
+
+        let key: [u8; 33] = [0; 33];
+        let result = aes_context.set_key(&key);
+        assert!(result.is_err());
     }
 }
