@@ -44,115 +44,131 @@ impl<'a> Iterator for DecoderUtf8<'a> {
         let mut byte_index: usize = self.byte_index;
 
         let byte_value1: u8 = match self.bytes.get(byte_index) {
-            Some(byte_value) => {
+            Some(&byte_value) => {
                 byte_index += 1;
-
-                *byte_value
+                byte_value
             }
             None => return None,
         };
-        if (0x80..0xc0).contains(&byte_value1) || byte_value1 > 0xf4 {
-            return Some(Err(keramics_core::error_trace_new!(format!(
-                "Unable to decode UTF-8: 0x{:02x} as Unicode",
-                byte_value1
-            ))));
-        }
-        let byte_value2: u8 = if byte_value1 >= 0xc0 {
-            let byte_value: u8 = match self.bytes.get(byte_index) {
-                Some(byte_value) => {
-                    byte_index += 1;
+        let code_point: u32 = match byte_value1 {
+            0x00..=0x7f => byte_value1 as u32,
+            0xc2..=0xdf => {
+                let byte_value2 = match self.bytes.get(byte_index) {
+                    Some(&byte_value) if (0x80..=0xbf).contains(&byte_value) => {
+                        byte_index += 1;
+                        byte_value
+                    }
+                    _ => {
+                        return Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to decode UTF-8: 0x{:02x} as Unicode",
+                            byte_value1
+                        ))));
+                    }
+                };
+                (((byte_value1 & 0x1f) as u32) << 6) | ((byte_value2 & 0x3f) as u32)
+            }
+            0xe0..=0xef => {
+                let byte_value2 = match self.bytes.get(byte_index) {
+                    Some(&byte_value) => {
+                        let is_valid = match byte_value1 {
+                            0xe0 => (0xa0..=0xbf).contains(&byte_value),
+                            0xed => (0x80..=0x9f).contains(&byte_value),
+                            _ => (0x80..=0xbf).contains(&byte_value),
+                        };
+                        if is_valid {
+                            byte_index += 1;
+                            byte_value
+                        } else {
+                            return Some(Err(keramics_core::error_trace_new!(format!(
+                                "Unable to decode UTF-8: 0x{:02x}, 0x{:02x} as Unicode",
+                                byte_value1, byte_value,
+                            ))));
+                        }
+                    }
+                    None => {
+                        return Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to decode UTF-8: 0x{:02x} as Unicode",
+                            byte_value1
+                        ))));
+                    }
+                };
 
-                    *byte_value
-                }
-                None => {
-                    return Some(Err(keramics_core::error_trace_new!(format!(
-                        "Unable to decode UTF-8: 0x{:02x} as Unicode",
-                        byte_value1
-                    ))));
-                }
-            };
-            let is_valid: bool = match byte_value1 {
-                0xe0 => (0xa0..=0xbf).contains(&byte_value),
-                0xed => (0x80..=0x9f).contains(&byte_value),
-                0xf0 => (0x90..=0xbf).contains(&byte_value),
-                _ => (0x80..=0xbf).contains(&byte_value),
-            };
-            if !is_valid {
+                let byte_value3 = match self.bytes.get(byte_index) {
+                    Some(&byte_value) if (0x80..=0xbf).contains(&byte_value) => {
+                        byte_index += 1;
+                        byte_value
+                    }
+                    _ => {
+                        return Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to decode UTF-8: 0x{:02x}, 0x{:02x} as Unicode",
+                            byte_value1, byte_value2
+                        ))));
+                    }
+                };
+                (((byte_value1 & 0x0f) as u32) << 12)
+                    | (((byte_value2 & 0x3f) as u32) << 6)
+                    | ((byte_value3 & 0x3f) as u32)
+            }
+            0xf0..=0xf4 => {
+                let byte_value2 = match self.bytes.get(byte_index) {
+                    Some(&byte_value) => {
+                        let is_valid = match byte_value1 {
+                            0xf0 => (0x90..=0xbf).contains(&byte_value),
+                            0xf4 => (0x80..=0x8f).contains(&byte_value),
+                            _ => (0x80..=0xbf).contains(&byte_value),
+                        };
+                        if is_valid {
+                            byte_index += 1;
+                            byte_value
+                        } else {
+                            return Some(Err(keramics_core::error_trace_new!(format!(
+                                "Unable to decode UTF-8: 0x{:02x}, 0x{:02x} as Unicode",
+                                byte_value1, byte_value,
+                            ))));
+                        }
+                    }
+                    None => {
+                        return Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to decode UTF-8: 0x{:02x} as Unicode",
+                            byte_value1
+                        ))));
+                    }
+                };
+                let byte_value3 = match self.bytes.get(byte_index) {
+                    Some(&byte_value) if (0x80..=0xbf).contains(&byte_value) => {
+                        byte_index += 1;
+                        byte_value
+                    }
+                    _ => {
+                        return Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to decode UTF-8: 0x{:02x}, 0x{:02x} as Unicode",
+                            byte_value1, byte_value2,
+                        ))));
+                    }
+                };
+                let byte_value4 = match self.bytes.get(byte_index) {
+                    Some(&byte_value) if (0x80..=0xbf).contains(&byte_value) => {
+                        byte_index += 1;
+                        byte_value
+                    }
+                    _ => {
+                        return Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to decode UTF-8: 0x{:02x}, 0x{:02x}, 0x{:02x} as Unicode",
+                            byte_value1, byte_value2, byte_value3
+                        ))));
+                    }
+                };
+                (((byte_value1 & 0x07) as u32) << 18)
+                    | (((byte_value2 & 0x3f) as u32) << 12)
+                    | (((byte_value3 & 0x3f) as u32) << 6)
+                    | ((byte_value4 & 0x3f) as u32)
+            }
+            _ => {
                 return Some(Err(keramics_core::error_trace_new!(format!(
-                    "Unable to decode UTF-8: 0x{:02x}, 0x{:02x} as Unicode",
-                    byte_value1, byte_value
+                    "Unable to decode UTF-8: 0x{:02x} as Unicode",
+                    byte_value1
                 ))));
             }
-            byte_value
-        } else {
-            0
-        };
-        let byte_value3: u8 = if byte_value1 >= 0xe0 {
-            let byte_value: u8 = match self.bytes.get(byte_index) {
-                Some(byte_value) => {
-                    byte_index += 1;
-
-                    *byte_value
-                }
-                None => {
-                    return Some(Err(keramics_core::error_trace_new!(format!(
-                        "Unable to decode UTF-8: 0x{:02x}, 0x{:02x} as Unicode",
-                        byte_value1, byte_value2
-                    ))));
-                }
-            };
-            let is_valid: bool = match byte_value2 {
-                0xe0 => (0xa0..=0xbf).contains(&byte_value),
-                0xed => (0x80..=0x9f).contains(&byte_value),
-                _ => (0x80..=0xbf).contains(&byte_value),
-            };
-            if !is_valid {
-                return Some(Err(keramics_core::error_trace_new!(format!(
-                    "Unable to decode UTF-8: 0x{:02x}, 0x{:02x}, 0x{:02x} as Unicode",
-                    byte_value1, byte_value2, byte_value
-                ))));
-            }
-            byte_value
-        } else {
-            0
-        };
-        let byte_value4: u8 = if byte_value1 >= 0xf0 {
-            let byte_value: u8 = match self.bytes.get(byte_index) {
-                Some(byte_value) => {
-                    byte_index += 1;
-
-                    *byte_value
-                }
-                None => {
-                    return Some(Err(keramics_core::error_trace_new!(format!(
-                        "Unable to decode UTF-8: 0x{:02x}, 0x{:02x}, 0x{:02x} as Unicode",
-                        byte_value1, byte_value2, byte_value3
-                    ))));
-                }
-            };
-            if !(0x80..=0xbf).contains(&byte_value) {
-                return Some(Err(keramics_core::error_trace_new!(format!(
-                    "Unable to decode UTF-8: 0x{:02x}, 0x{:02x}, 0x{:02x}, 0x{:02x} as Unicode",
-                    byte_value1, byte_value2, byte_value3, byte_value
-                ))));
-            }
-            byte_value
-        } else {
-            0
-        };
-        let code_point: u32 = if byte_value1 < 0x80 {
-            byte_value1 as u32
-        } else if byte_value1 < 0xe0 {
-            (((byte_value1 & 0x1f) as u32) << 6) | ((byte_value2 & 0x3f) as u32)
-        } else if byte_value1 < 0xf0 {
-            (((byte_value1 & 0x0f) as u32) << 12)
-                | (((byte_value2 & 0x3f) as u32) << 6)
-                | ((byte_value3 & 0x3f) as u32)
-        } else {
-            (((byte_value1 & 0x07) as u32) << 18)
-                | (((byte_value2 & 0x3f) as u32) << 12)
-                | (((byte_value3 & 0x3f) as u32) << 6)
-                | ((byte_value4 & 0x3f) as u32)
         };
         self.byte_index = byte_index;
 

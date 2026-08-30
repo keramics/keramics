@@ -52668,6 +52668,27 @@ mod tests {
         assert_eq!(decoder.next(), Some(Ok(vec![0x00000073])));
         assert_eq!(decoder.next(), None);
 
+        let byte_string: [u8; 2] = [0xb0, 0xa1];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000ac00])));
+        assert_eq!(decoder.next(), None);
+
+        let byte_string: [u8; 2] = [0xcc, 0xc8];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00004eac])));
+        assert_eq!(decoder.next(), None);
+
+        let byte_string: [u8; 2] = [0xa3, 0xdc];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000ffe6])));
+        assert_eq!(decoder.next(), None);
+
         Ok(())
     }
 
@@ -52862,6 +52883,34 @@ mod tests {
         let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
+        let byte_string: [u8; 2] = [0xc9, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xc9, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xfe, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xfe, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
         let byte_string: [u8; 1] = [0xff];
 
         let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
@@ -52886,12 +52935,103 @@ mod tests {
         assert_eq!(encoder.next(), Some(Ok(vec![b's'])));
         assert_eq!(encoder.next(), None);
 
+        let code_points: [u32; 1] = [0xac00];
+
+        let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
+
+        assert_eq!(encoder.next(), Some(Ok(vec![0xb0, 0xa1])));
+        assert_eq!(encoder.next(), None);
+
+        let code_points: [u32; 1] = [0x4eac];
+
+        let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
+
+        assert_eq!(encoder.next(), Some(Ok(vec![0xcc, 0xc8])));
+        assert_eq!(encoder.next(), None);
+
+        let code_points: [u32; 1] = [0xffe6];
+
+        let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
+
+        assert_eq!(encoder.next(), Some(Ok(vec![0xa3, 0xdc])));
+        assert_eq!(encoder.next(), None);
+
         Ok(())
     }
 
     #[test]
     fn test_encode_with_unsupported_code_point() {
+        let code_points: [u32; 1] = [0x00a0];
+
+        let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x0390];
+
+        let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x0400];
+
+        let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x2011];
+
+        let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x2504];
+
+        let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x3004];
+
+        let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x3094];
+
+        let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x4e02];
+
+        let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
         let code_points: [u32; 1] = [0xd800];
+
+        let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0xfe32];
+
+        let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0xff00];
 
         let mut encoder: EncoderWindows949 = EncoderWindows949::new(&code_points);
 

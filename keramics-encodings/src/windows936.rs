@@ -46080,6 +46080,13 @@ mod tests {
         assert_eq!(encoder.next(), Some(Ok(vec![b's'])));
         assert_eq!(encoder.next(), None);
 
+        let code_points: [u32; 1] = [0x4e00];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        assert_eq!(encoder.next(), Some(Ok(vec![0xd2, 0xbb])));
+        assert_eq!(encoder.next(), None);
+
         Ok(())
     }
 

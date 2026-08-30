@@ -78,7 +78,6 @@ impl BsdDiskLabelPartition {
 mod tests {
     use super::*;
 
-    use std::io::SeekFrom;
     use std::path::PathBuf;
 
     use keramics_core::{ErrorTrace, open_os_data_stream};
