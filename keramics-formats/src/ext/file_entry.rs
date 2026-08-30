@@ -17,8 +17,9 @@ use std::sync::{Arc, RwLock};
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_datetime::DateTime;
 use keramics_encodings::CharacterEncoding;
-use keramics_types::{ByteString, bytes_to_u16_le};
+use keramics_types::ByteString;
 
+use crate::indexed_hash_map::IndexedHashMap;
 use crate::path_component::PathComponent;
 use crate::traits::FileEntryIterator;
 
@@ -27,7 +28,7 @@ use super::attributes_entry::ExtAttributesEntry;
 use super::block_reader::ExtBlockReader;
 use super::block_stream::ExtBlockStream;
 use super::constants::*;
-use super::directory_entries::ExtDirectoryEntries;
+use super::directory_entry::ExtDirectoryEntry;
 use super::directory_tree::ExtDirectoryTree;
 use super::extended_attribute::ExtExtendedAttribute;
 use super::extended_attributes::ExtExtendedAttributesIterator;
@@ -61,7 +62,7 @@ pub struct ExtFileEntry {
     block_ranges: Vec<ExtBlockRange>,
 
     /// Sub directory entries.
-    sub_directory_entries: ExtDirectoryEntries,
+    sub_directory_entries: IndexedHashMap<ByteString, ExtDirectoryEntry>,
 
     /// Value to indicate the sub directory entries were read.
     sub_directory_entries_read: bool,
@@ -69,8 +70,8 @@ pub struct ExtFileEntry {
     /// Symbolic link target.
     symbolic_link_target: Option<ByteString>,
 
-    /// Value to indicate the attributes block was read.
-    attributes_block_is_read: bool,
+    /// Value to indicate the attributes were read.
+    attributes_read: bool,
 }
 
 impl ExtFileEntry {
@@ -91,10 +92,10 @@ impl ExtFileEntry {
             inode,
             name,
             block_ranges: Vec::new(),
-            sub_directory_entries: ExtDirectoryEntries::new(),
+            sub_directory_entries: IndexedHashMap::new(),
             sub_directory_entries_read: false,
             symbolic_link_target: None,
-            attributes_block_is_read: false,
+            attributes_read: false,
         }
     }
 
@@ -107,14 +108,14 @@ impl ExtFileEntry {
     fn get_block_stream(
         &self,
         block_ranges: &Vec<ExtBlockRange>,
+        data_size: u64,
     ) -> Result<ExtBlockStream, ErrorTrace> {
-        let block_reader: ExtBlockReader = ExtBlockReader::new(
+        Ok(ExtBlockStream::new(ExtBlockReader::new(
             &self.data_stream,
             self.inode_table.block_size,
             block_ranges,
-            self.inode.data_size,
-        );
-        Ok(ExtBlockStream::new(block_reader))
+            data_size,
+        )))
     }
 
     /// Retrieves the change time.
@@ -133,20 +134,8 @@ impl ExtFileEntry {
     }
 
     /// Retrieves the device identifier.
-    pub fn get_device_identifier(&self) -> Result<Option<u16>, ErrorTrace> {
-        if self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_CHARACTER_DEVICE
-            || self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_BLOCK_DEVICE
-        {
-            if self.inode.data_size > 2 {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Invalid device identifier data size: {} value out of bounds",
-                    self.inode.data_size,
-                )));
-            }
-            let device_identifier: u16 = bytes_to_u16_le!(&self.inode.data_reference, 0);
-            return Ok(Some(device_identifier));
-        }
-        Ok(None)
+    pub fn get_device_identifier(&self) -> Option<&u16> {
+        self.inode.device_identifier.as_ref()
     }
 
     /// Retrieves the file mode.
@@ -224,17 +213,12 @@ impl ExtFileEntry {
                         return Err(error);
                     }
                 }
-                let mut block_stream: ExtBlockStream =
-                    match self.get_block_stream(&self.block_ranges) {
-                        Ok(block_stream) => block_stream,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to retrieve block stream"
-                            );
-                            return Err(error);
-                        }
-                    };
+                let mut block_stream: ExtBlockStream = ExtBlockStream::new(ExtBlockReader::new(
+                    &self.data_stream,
+                    self.inode_table.block_size,
+                    &self.block_ranges,
+                    self.inode.data_size,
+                ));
                 let mut data: Vec<u8> = vec![0; self.inode.data_size as usize];
 
                 match block_stream.read_exact(&mut data) {
@@ -248,7 +232,7 @@ impl ExtFileEntry {
                     }
                 }
                 byte_string.read_data(data.as_slice())
-            };
+            }
             self.symbolic_link_target = Some(byte_string);
         }
         Ok(self.symbolic_link_target.as_ref())
@@ -277,28 +261,29 @@ impl ExtFileEntry {
             }
         }
         if self.inode.has_inline_data() {
-            let data_stream: FakeDataStream =
-                FakeDataStream::new(&self.inode.data_reference, self.inode.data_size);
-
-            Ok(Some(Arc::new(RwLock::new(data_stream))))
+            Ok(Some(Arc::new(RwLock::new(FakeDataStream::new(
+                &self.inode.data_reference,
+                self.inode.data_size,
+            )))))
         } else {
-            match self.get_block_stream(&self.block_ranges) {
-                Ok(block_stream) => Ok(Some(Arc::new(RwLock::new(block_stream)))),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve block stream");
-                    Err(error)
-                }
-            }
+            Ok(Some(Arc::new(RwLock::new(ExtBlockStream::new(
+                ExtBlockReader::new(
+                    &self.data_stream,
+                    self.inode_table.block_size,
+                    &self.block_ranges,
+                    self.inode.data_size,
+                ),
+            )))))
         }
     }
 
     /// Retrieves the number of extended attributes.
     pub fn get_number_of_extended_attributes(&mut self) -> Result<usize, ErrorTrace> {
-        if !self.attributes_block_is_read {
-            match self.read_attributes_block() {
+        if !self.attributes_read {
+            match self.read_attributes() {
                 Ok(_) => {}
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes block");
+                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
                     return Err(error);
                 }
             }
@@ -312,11 +297,10 @@ impl ExtFileEntry {
         attributes_entry: &ExtAttributesEntry,
     ) -> Result<DataStreamReference, ErrorTrace> {
         if attributes_entry.value_data_inode_number == 0 {
-            let data_stream: FakeDataStream = FakeDataStream::new(
+            Ok(Arc::new(RwLock::new(FakeDataStream::new(
                 &attributes_entry.value_data,
                 attributes_entry.value_data_size as u64,
-            );
-            Ok(Arc::new(RwLock::new(data_stream)))
+            ))))
         } else {
             let inode: ExtInode = match self.inode_table.get_inode_by_identifier(
                 &self.data_stream,
@@ -335,14 +319,14 @@ impl ExtFileEntry {
                 }
             };
             if inode.has_inline_data() {
-                let data_stream: FakeDataStream =
-                    FakeDataStream::new(&self.inode.data_reference, self.inode.data_size);
-
-                Ok(Arc::new(RwLock::new(data_stream)))
+                Ok(Arc::new(RwLock::new(FakeDataStream::new(
+                    &inode.data_reference,
+                    inode.data_size,
+                ))))
             } else {
                 let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
 
-                match self.inode.read_block_ranges(
+                match inode.read_block_ranges(
                     self.inode_table.format_version,
                     &self.data_stream,
                     self.inode_table.block_size,
@@ -357,16 +341,14 @@ impl ExtFileEntry {
                         return Err(error);
                     }
                 }
-                match self.get_block_stream(&block_ranges) {
-                    Ok(block_stream) => Ok(Arc::new(RwLock::new(block_stream))),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve block stream"
-                        );
-                        Err(error)
-                    }
-                }
+                Ok(Arc::new(RwLock::new(ExtBlockStream::new(
+                    ExtBlockReader::new(
+                        &self.data_stream,
+                        self.inode_table.block_size,
+                        &block_ranges,
+                        inode.data_size,
+                    ),
+                ))))
             }
         }
     }
@@ -376,11 +358,11 @@ impl ExtFileEntry {
         &mut self,
         extended_attribute_index: usize,
     ) -> Result<ExtExtendedAttribute, ErrorTrace> {
-        if !self.attributes_block_is_read {
-            match self.read_attributes_block() {
+        if !self.attributes_read {
+            match self.read_attributes() {
                 Ok(_) => {}
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes block");
+                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
                     return Err(error);
                 }
             }
@@ -416,11 +398,11 @@ impl ExtFileEntry {
         &mut self,
         extended_attribute_name: &PathComponent,
     ) -> Result<Option<ExtExtendedAttribute>, ErrorTrace> {
-        if !self.attributes_block_is_read {
-            match self.read_attributes_block() {
+        if !self.attributes_read {
+            match self.read_attributes() {
                 Ok(_) => {}
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes block");
+                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
                     return Err(error);
                 }
             }
@@ -539,8 +521,8 @@ impl ExtFileEntry {
         self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_SYMBOLIC_LINK
     }
 
-    /// Reads the attributes block.
-    fn read_attributes_block(&mut self) -> Result<(), ErrorTrace> {
+    /// Reads the attributes.
+    fn read_attributes(&mut self) -> Result<(), ErrorTrace> {
         if self.inode.file_acl_block_number != 0 {
             let mut attributes_block: ExtAttributesBlock = ExtAttributesBlock::new(0);
 
@@ -560,7 +542,7 @@ impl ExtFileEntry {
                 }
             }
         }
-        self.attributes_block_is_read = true;
+        self.attributes_read = true;
 
         Ok(())
     }
@@ -734,8 +716,6 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_block_stream
-
     #[test]
     fn test_get_change_time() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
@@ -771,20 +751,20 @@ mod tests {
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let device_identifier: Option<u16> = ext_file_entry.get_device_identifier()?;
+        let device_identifier: Option<&u16> = ext_file_entry.get_device_identifier();
         assert_eq!(device_identifier, None);
 
         let path: Path = Path::from("/testdir1/blockdev1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let device_identifier: Option<u16> = ext_file_entry.get_device_identifier()?;
-        assert_eq!(device_identifier, Some(0x1839));
+        let device_identifier: Option<&u16> = ext_file_entry.get_device_identifier();
+        assert_eq!(device_identifier, Some(0x1839).as_ref());
 
         let path: Path = Path::from("/testdir1/chardev1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let device_identifier: Option<u16> = ext_file_entry.get_device_identifier()?;
-        assert_eq!(device_identifier, Some(0x0d44));
+        let device_identifier: Option<&u16> = ext_file_entry.get_device_identifier();
+        assert_eq!(device_identifier, Some(0x0d44).as_ref());
 
         Ok(())
     }
@@ -974,9 +954,7 @@ mod tests {
             ext_file_entry.get_extended_attribute_by_index(0)?;
         let expected_name: ByteString = ByteString {
             encoding: CharacterEncoding::Ascii,
-            elements: vec![
-                115, 101, 99, 117, 114, 105, 116, 121, 46, 115, 101, 108, 105, 110, 117, 120,
-            ],
+            elements: b"security.selinux".to_vec(),
         };
         assert_eq!(extended_attribute.get_name(), &expected_name);
 
@@ -1001,9 +979,7 @@ mod tests {
             .unwrap();
         let expected_name: ByteString = ByteString {
             encoding: CharacterEncoding::Ascii,
-            elements: vec![
-                115, 101, 99, 117, 114, 105, 116, 121, 46, 115, 101, 108, 105, 110, 117, 120,
-            ],
+            elements: b"security.selinux".to_vec(),
         };
         assert_eq!(extended_attribute.get_name(), &expected_name);
 

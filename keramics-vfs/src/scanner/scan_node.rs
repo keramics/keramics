@@ -62,7 +62,8 @@ impl VfsScanNode {
             | VfsType::Ext
             | VfsType::Fat
             | VfsType::Hfs
-            | VfsType::Ntfs => true,
+            | VfsType::Ntfs
+            | VfsType::Xfs => true,
             VfsType::ApfsContainer
             | VfsType::Apm
             | VfsType::Ewf

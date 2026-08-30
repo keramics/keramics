@@ -916,6 +916,7 @@ impl HfsCatalogFile {
         record_data: &[u8],
     ) -> Result<HfsCatalogThreadRecord, ErrorTrace> {
         let mut data_offset: usize = key.size as usize;
+        let data_size: usize = record_data.len();
 
         if self.btree_file.format == HfsFormat::Hfs {
             let alignment_padding: usize = calculate_alignment_padding(data_offset, 2);
@@ -925,11 +926,16 @@ impl HfsCatalogFile {
                 data_offset += alignment_padding;
             }
         }
+        if data_offset > data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid record offset value out of bounds",
+            ));
+        }
         keramics_core::debug_trace_data_and_structure!(
             "HfsCatalogThreadRecord",
             0,
             &record_data[data_offset..],
-            record_data.len() - data_offset,
+            data_size - data_offset,
             HfsCatalogThreadRecord::debug_read_data(
                 &self.btree_file.format,
                 &record_data[data_offset..]

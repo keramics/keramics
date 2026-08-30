@@ -422,21 +422,25 @@ impl ImageTool {
                     file_reference >> 48,
                 )
             }
+            VfsFileEntry::Xfs(xfs_file_entry) => {
+                format!("{}", xfs_file_entry.get_inode_number())
+            }
             _ => String::new(),
         };
         let file_type: VfsFileType = file_entry.get_file_type();
 
         let file_mode_string: String = match file_entry {
-            VfsFileEntry::Apfs(_) | VfsFileEntry::Ext(_) | VfsFileEntry::Hfs(_) => {
-                match file_entry.get_file_mode() {
-                    Some(file_mode) => {
-                        let file_mode_info: FileModeInfo = FileModeInfo::new(file_mode);
+            VfsFileEntry::Apfs(_)
+            | VfsFileEntry::Ext(_)
+            | VfsFileEntry::Hfs(_)
+            | VfsFileEntry::Xfs(_) => match file_entry.get_file_mode() {
+                Some(file_mode) => {
+                    let file_mode_info: FileModeInfo = FileModeInfo::new(file_mode);
 
-                        file_mode_info.to_string()
-                    }
-                    None => Self::get_file_mode_string_from_file_type(&file_type),
+                    file_mode_info.to_string()
                 }
-            }
+                None => Self::get_file_mode_string_from_file_type(&file_type),
+            },
             VfsFileEntry::Fat(fat_file_entry) => {
                 let file_attribute_flags: u8 = fat_file_entry.get_file_attribute_flags();
 

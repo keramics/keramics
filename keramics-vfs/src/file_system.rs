@@ -18,6 +18,7 @@ use keramics_formats::ext::ExtFileSystem;
 use keramics_formats::fat::FatFileSystem;
 use keramics_formats::hfs::HfsFileSystem;
 use keramics_formats::ntfs::NtfsFileSystem;
+use keramics_formats::xfs::XfsFileSystem;
 use keramics_formats::{Path, PathComponent};
 
 use super::apfs::{ApfsContainerFileEntry, ApfsContainerFileSystem};
@@ -67,6 +68,7 @@ pub enum VfsFileSystem {
     Vhd(VhdFileSystem),
     Vhdx(VhdxFileSystem),
     Vmdk(VmdkFileSystem),
+    Xfs(XfsFileSystem),
 }
 
 impl VfsFileSystem {
@@ -96,6 +98,7 @@ impl VfsFileSystem {
             VfsType::Vhd => VfsFileSystem::Vhd(VhdFileSystem::new()),
             VfsType::Vhdx => VfsFileSystem::Vhdx(VhdxFileSystem::new()),
             VfsType::Vmdk => VfsFileSystem::Vmdk(VmdkFileSystem::new()),
+            VfsType::Xfs => VfsFileSystem::Xfs(XfsFileSystem::new()),
         }
     }
 
@@ -126,6 +129,7 @@ impl VfsFileSystem {
             VfsFileSystem::Vhd(_) => VfsType::Vhd,
             VfsFileSystem::Vhdx(_) => VfsType::Vhdx,
             VfsFileSystem::Vmdk(_) => VfsType::Vmdk,
+            VfsFileSystem::Xfs(_) => VfsType::Xfs,
         }
     }
 
@@ -249,6 +253,19 @@ impl VfsFileSystem {
             VfsFileSystem::Vhd(vhd_file_system) => Ok(vhd_file_system.file_entry_exists(path)),
             VfsFileSystem::Vhdx(vhdx_file_system) => Ok(vhdx_file_system.file_entry_exists(path)),
             VfsFileSystem::Vmdk(vmdk_file_system) => Ok(vmdk_file_system.file_entry_exists(path)),
+            VfsFileSystem::Xfs(xfs_file_system) => {
+                match xfs_file_system.get_file_entry_by_path(path) {
+                    Ok(Some(_)) => Ok(true),
+                    Ok(None) => Ok(false),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve XFS file entry"
+                        );
+                        Err(error)
+                    }
+                }
+            }
         }
     }
 
@@ -456,6 +473,12 @@ impl VfsFileSystem {
                     None => Ok(None),
                 }
             }
+            VfsFileSystem::Xfs(xfs_file_system) => {
+                match xfs_file_system.get_file_entry_by_path(path)? {
+                    Some(file_entry) => Ok(Some(VfsFileEntry::Xfs(file_entry))),
+                    None => Ok(None),
+                }
+            }
         };
         match result {
             Ok(result) => Ok(result),
@@ -636,6 +659,17 @@ impl VfsFileSystem {
 
                 Ok(Some(VfsFileEntry::Vmdk(vmdk_file_entry)))
             }
+            VfsFileSystem::Xfs(xfs_file_system) => match xfs_file_system.get_root_directory() {
+                Ok(Some(xfs_file_entry)) => Ok(Some(VfsFileEntry::Xfs(xfs_file_entry))),
+                Ok(None) => Ok(None),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve XFS root directory"
+                    );
+                    Err(error)
+                }
+            },
         }
     }
 
@@ -723,6 +757,9 @@ impl VfsFileSystem {
             }
             VfsFileSystem::Vmdk(vmdk_file_system) => {
                 vmdk_file_system.open(parent_file_system, vfs_location)
+            }
+            VfsFileSystem::Xfs(xfs_file_system) => {
+                Self::open_xfs_file_system(xfs_file_system, parent_file_system, vfs_location)
             }
         };
         match result {
@@ -987,6 +1024,48 @@ impl VfsFileSystem {
                 keramics_core::error_trace_add_frame!(
                     error,
                     "Unable to read NTFS file system from data stream"
+                );
+                Err(error)
+            }
+        }
+    }
+
+    /// Opens an XFS file system.
+    fn open_xfs_file_system(
+        xfs_file_system: &mut XfsFileSystem,
+        parent_file_system: Option<&VfsFileSystemReference>,
+        vfs_location: &VfsLocation,
+    ) -> Result<(), ErrorTrace> {
+        let file_system: &VfsFileSystemReference = match parent_file_system {
+            Some(file_system) => file_system,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Missing parent file system"
+                ));
+            }
+        };
+        let path: &Path = vfs_location.get_path();
+
+        let data_stream: DataStreamReference =
+            match file_system.get_data_stream_by_path_and_name(path, None) {
+                Ok(Some(data_stream)) => data_stream,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing data stream: {}",
+                        path,
+                    )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                    return Err(error);
+                }
+            };
+        match xfs_file_system.read_data_stream(&data_stream) {
+            Ok(_) => Ok(()),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read XFS file system from data stream"
                 );
                 Err(error)
             }
@@ -2452,6 +2531,71 @@ mod tests {
     #[test]
     fn test_get_file_entry_by_path_with_vmdk_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vmdk_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with XFS.
+
+    fn get_xfs_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Xfs);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("xfs/xfs.raw");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_xfs() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_xfs_file_system()?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
+
+        let path: Path = Path::from("/bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_xfs_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_xfs_file_system()?;
+
+        let path: Path = Path::from("/bogus");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_xfs_file() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_xfs_file_system()?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_xfs_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_xfs_file_system()?;
 
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();

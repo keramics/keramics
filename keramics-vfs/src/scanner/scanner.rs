@@ -194,6 +194,7 @@ impl VfsScanner {
         self.file_system_scanner.add_fat_signatures();
         self.file_system_scanner.add_hfs_signatures();
         self.file_system_scanner.add_ntfs_signatures();
+        self.file_system_scanner.add_xfs_signatures();
 
         match self.file_system_scanner.build() {
             Ok(_) => {}
@@ -228,6 +229,7 @@ impl VfsScanner {
             FormatIdentifier::Vhd => Some(VfsType::Vhd),
             FormatIdentifier::Vhdx => Some(VfsType::Vhdx),
             FormatIdentifier::Vmdk => Some(VfsType::Vmdk),
+            FormatIdentifier::Xfs => Some(VfsType::Xfs),
             _ => None,
         }
     }
@@ -379,7 +381,8 @@ impl VfsScanner {
             | VfsType::Fake
             | VfsType::Fat
             | VfsType::Hfs
-            | VfsType::Ntfs => Err(keramics_core::error_trace_new!(
+            | VfsType::Ntfs
+            | VfsType::Xfs => Err(keramics_core::error_trace_new!(
                 "Unsupported VFS location type"
             )),
             VfsType::Apm | VfsType::Gpt | VfsType::LinuxLvm | VfsType::Mbr => {
@@ -723,7 +726,8 @@ impl VfsScanner {
             | VfsType::Ext
             | VfsType::Fat
             | VfsType::Hfs
-            | VfsType::Ntfs => {}
+            | VfsType::Ntfs
+            | VfsType::Xfs => {}
             VfsType::ApfsContainer => {
                 let mut apfs_container: ApfsContainer = ApfsContainer::new();
 
@@ -1831,6 +1835,21 @@ mod tests {
             .unwrap();
 
         assert_eq!(format_identifier, FormatIdentifier::Ntfs);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_file_system_format_with_xfs() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        let path_string: String = get_test_data_path("xfs/xfs.raw");
+        let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_file_system_format(&data_stream)?
+            .unwrap();
+
+        assert_eq!(format_identifier, FormatIdentifier::Xfs);
 
         Ok(())
     }

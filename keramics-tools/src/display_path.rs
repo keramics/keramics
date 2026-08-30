@@ -325,7 +325,8 @@ impl DisplayPath {
                     | VfsType::Fat
                     | VfsType::Hfs
                     | VfsType::LinuxLvm
-                    | VfsType::Ntfs => match self.get_path(parent) {
+                    | VfsType::Ntfs
+                    | VfsType::Xfs => match self.get_path(parent) {
                         Ok(parent_display_path) => {
                             Some(format!("{}{}", parent_display_path, path_string))
                         }
