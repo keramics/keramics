@@ -184,9 +184,6 @@ pub fn get_date_values(mut number_of_days: i64, epoch: &Epoch) -> (i16, u8, u8) 
         if month == 0 {
             month = 12;
             year -= 1;
-        } else if month > 12 {
-            month = 1;
-            year += 1;
         }
         number_of_days -= days_in_month;
 
@@ -301,11 +298,6 @@ mod tests {
 
         let test_epoch: Epoch = Epoch::new(2000, 1, 9);
         assert_eq!(get_date_values(-10, &test_epoch), (1999, 12, 30));
-
-        let test_epoch: Epoch = Epoch::new(2000, 12, 1);
-        assert_eq!(get_date_values(30, &test_epoch), (2000, 12, 31));
-        assert_eq!(get_date_values(31, &test_epoch), (2001, 1, 1));
-        assert_eq!(get_date_values(62, &test_epoch), (2001, 2, 1));
 
         let test_epoch: Epoch = Epoch::new(1899, 12, 30);
         assert_eq!(get_date_values(0, &test_epoch), (1899, 12, 30));

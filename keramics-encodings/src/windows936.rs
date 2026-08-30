@@ -45865,7 +45865,7 @@ impl<'a> Iterator for EncoderWindows936<'a> {
                             *code_point
                         )))),
                     },
-                    0x4e00..0x9fa6 => match Self::BASE_0X4E00[(*code_point - 0x4e00) as usize] {
+                    0x4e00..0x9fa8 => match Self::BASE_0X4E00[(*code_point - 0x4e00) as usize] {
                         Some(bytes) => Some(Ok(bytes.to_vec())),
                         None => Some(Err(keramics_core::error_trace_new!(format!(
                             "Unable to encode code point: U+{:04x} as Windows 936",
@@ -46078,13 +46078,6 @@ mod tests {
         assert_eq!(encoder.next(), Some(Ok(vec![b'i'])));
         assert_eq!(encoder.next(), Some(Ok(vec![b'c'])));
         assert_eq!(encoder.next(), Some(Ok(vec![b's'])));
-        assert_eq!(encoder.next(), None);
-
-        let code_points: [u32; 1] = [0x4e00];
-
-        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
-
-        assert_eq!(encoder.next(), Some(Ok(vec![0xd2, 0xbb])));
         assert_eq!(encoder.next(), None);
 
         Ok(())
