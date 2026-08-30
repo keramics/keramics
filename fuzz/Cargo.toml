@@ -255,6 +255,13 @@ doc = false
 required-features = ["fuzzing"]
 
 [[bin]]
+name = "xfs"
+path = "fuzz_targets/xfs.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
 name = "zlib"
 path = "fuzz_targets/zlib.rs"
 test = false

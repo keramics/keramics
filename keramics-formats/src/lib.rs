@@ -64,6 +64,7 @@ pub mod ext;
 pub mod fat;
 pub mod hfs;
 pub mod ntfs;
+pub mod xfs;
 
 pub use enums::FormatIdentifier;
 pub use file_resolver::{FileResolver, FileResolverReference};

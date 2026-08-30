@@ -40,6 +40,7 @@ pub enum FormatIdentifier {
     Vhd,
     Vhdx,
     Vmdk,
+    Xfs,
 }
 
 impl FormatIdentifier {
@@ -56,7 +57,8 @@ impl FormatIdentifier {
             | FormatIdentifier::Udif
             | FormatIdentifier::Vhd
             | FormatIdentifier::Vhdx
-            | FormatIdentifier::Vmdk => true,
+            | FormatIdentifier::Vmdk
+            | FormatIdentifier::Xfs => true,
             _ => false,
         }
     }
@@ -90,6 +92,7 @@ impl fmt::Display for FormatIdentifier {
             FormatIdentifier::Vhd => "vhd",
             FormatIdentifier::Vhdx => "vhdx",
             FormatIdentifier::Vmdk => "vmdk",
+            FormatIdentifier::Xfs => "xfs",
         };
         write!(formatter, "{}", string)
     }
@@ -196,5 +199,9 @@ mod tests {
         let format_identifier: FormatIdentifier = FormatIdentifier::Vmdk;
         let string: String = format_identifier.to_string();
         assert_eq!(string, "vmdk");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Xfs;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "xfs");
     }
 }

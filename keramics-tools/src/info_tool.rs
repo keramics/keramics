@@ -37,7 +37,7 @@ use crate::enums::{DisplayPathType, EncodingType, FormatType};
 use crate::info::{
     ApfsInfo, ApmInfo, BsdDiskLabelInfo, CdsaEncrInfo, EwfInfo, ExFatInfo, ExtInfo, FatInfo,
     GptInfo, HfsInfo, LinuxLvmInfo, LuksInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo,
-    SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
+    SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo, XfsInfo,
 };
 use crate::storage_media_image::StorageMediaImage;
 
@@ -318,6 +318,7 @@ impl InfoTool {
         format_scanner.add_linuxlvm_signatures();
         format_scanner.add_luksde_signatures();
         format_scanner.add_ntfs_signatures();
+        format_scanner.add_xfs_signatures();
 
         match format_scanner.build() {
             Ok(_) => {}
@@ -503,6 +504,7 @@ fn main() -> ExitCode {
         Some(FormatType::Vhd) => FormatIdentifier::Vhd,
         Some(FormatType::Vhdx) => FormatIdentifier::Vhdx,
         Some(FormatType::Vmdk) => FormatIdentifier::Vmdk,
+        Some(FormatType::Xfs) => FormatIdentifier::Xfs,
         None => {
             if !arguments.contents
                 && arguments.source.is_dir()
@@ -551,6 +553,11 @@ fn main() -> ExitCode {
             FormatIdentifier::Ntfs => {
                 NtfsInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
             }
+            FormatIdentifier::Xfs => XfsInfo::print_file_entry_by_identifier(
+                &data_stream,
+                command_arguments.entry,
+                info_tool.character_encoding.as_ref(),
+            ),
             _ => Err(keramics_core::error_trace_new!(format!(
                 "Unsupported format: {}",
                 format_identifier
@@ -580,6 +587,11 @@ fn main() -> ExitCode {
             FormatIdentifier::Ntfs => {
                 NtfsInfo::print_hierarchy(&data_stream, command_arguments.path.as_ref())
             }
+            FormatIdentifier::Xfs => XfsInfo::print_hierarchy(
+                &data_stream,
+                info_tool.character_encoding.as_ref(),
+                command_arguments.path.as_ref(),
+            ),
             _ => Err(keramics_core::error_trace_new!(format!(
                 "Unsupported format: {}",
                 format_identifier
@@ -603,6 +615,11 @@ fn main() -> ExitCode {
                 FormatIdentifier::Fat => FatInfo::print_file_entry_by_path(&data_stream, &path),
                 FormatIdentifier::Hfs => HfsInfo::print_file_entry_by_path(&data_stream, &path),
                 FormatIdentifier::Ntfs => NtfsInfo::print_file_entry_by_path(&data_stream, &path),
+                FormatIdentifier::Xfs => XfsInfo::print_file_entry_by_path(
+                    &data_stream,
+                    &path,
+                    info_tool.character_encoding.as_ref(),
+                ),
                 _ => Err(keramics_core::error_trace_new!(format!(
                     "Unsupported format: {}",
                     format_identifier
@@ -641,6 +658,9 @@ fn main() -> ExitCode {
             FormatIdentifier::Vhdx => VhdxInfo::print_file(&data_stream),
             // TODO: add support for individual VMDK file.
             FormatIdentifier::Vmdk => VmdkInfo::print_image(&arguments.source),
+            FormatIdentifier::Xfs => {
+                XfsInfo::print_file_system(&data_stream, info_tool.character_encoding.as_ref())
+            }
             _ => Err(keramics_core::error_trace_new!(format!(
                 "Unsupported format: {}",
                 format_identifier

@@ -277,4 +277,7 @@ pub enum FormatType {
 
     /// VMware Virtual Disk (VMDK)
     Vmdk,
+
+    /// X File System (XFS)
+    Xfs,
 }

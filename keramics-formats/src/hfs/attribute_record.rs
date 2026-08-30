@@ -15,6 +15,7 @@ use super::attribute_extents_record::HfsAttributeExtentsRecord;
 use super::attribute_fork_data_record::HfsAttributeForkDataRecord;
 use super::attribute_inline_data_record::HfsAttributeInlineDataRecord;
 
+/// Hierarchical File System (HFS) attribute record.
 pub enum HfsAttributeRecord {
     Extents(HfsAttributeExtentsRecord),
     ForkData(HfsAttributeForkDataRecord),

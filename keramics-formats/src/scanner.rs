@@ -35,6 +35,7 @@ use super::udif::constants::*;
 use super::vhd::constants::*;
 use super::vhdx::constants::*;
 use super::vmdk::constants::*;
+use super::xfs::constants::*;
 
 /// Format scanner.
 pub struct FormatScanner {
@@ -365,6 +366,16 @@ impl FormatScanner {
         ));
     }
 
+    /// Adds X File System (XFS) signatures.
+    pub fn add_xfs_signatures(&mut self) {
+        self.signature_scanner.add_signature(Signature::new(
+            "xfs1",
+            PatternType::BoundToStart,
+            0,
+            XFS_SUPERBLOCK_SIGNATURE,
+        ));
+    }
+
     /// Builds the format signature scanner.
     pub fn build(&mut self) -> Result<(), ErrorTrace> {
         match self.signature_scanner.build() {
@@ -458,6 +469,7 @@ impl FormatScanner {
                 "vhd1" => FormatIdentifier::Vhd,
                 "vhdx1" => FormatIdentifier::Vhdx,
                 "vmdk1" | "vmdk2" => FormatIdentifier::Vmdk,
+                "xfs1" => FormatIdentifier::Xfs,
                 _ => FormatIdentifier::Unknown,
             };
             scan_results.insert(format_identifier);
@@ -499,6 +511,7 @@ mod tests {
         format_scanner.add_vhd_signatures();
         format_scanner.add_vhdx_signatures();
         format_scanner.add_vmdk_signatures();
+        format_scanner.add_xfs_signatures();
 
         format_scanner.build()
     }
@@ -526,6 +539,7 @@ mod tests {
         format_scanner.add_vhd_signatures();
         format_scanner.add_vhdx_signatures();
         format_scanner.add_vmdk_signatures();
+        format_scanner.add_xfs_signatures();
 
         match format_scanner.build() {
             Ok(_) => {}

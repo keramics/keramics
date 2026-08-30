@@ -226,12 +226,8 @@ impl PyVfsFileEntry {
     #[getter]
     pub fn device_identifier(&self) -> PyResult<Option<u64>> {
         match self.file_entry.get_device_identifier() {
-            Ok(Some(device_identifier)) => Ok(Some(device_identifier)),
-            Ok(None) => Ok(None),
-            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
-                "Unable to retrieve device identifier with error:\n{}",
-                error
-            ))),
+            Some(device_identifier) => Ok(Some(device_identifier)),
+            None => Ok(None),
         }
     }
 

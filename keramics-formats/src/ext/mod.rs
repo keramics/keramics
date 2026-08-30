@@ -19,7 +19,6 @@ mod block_range;
 mod block_reader;
 mod block_stream;
 pub mod constants;
-mod directory_entries;
 mod directory_entry;
 mod directory_tree;
 mod extended_attribute;

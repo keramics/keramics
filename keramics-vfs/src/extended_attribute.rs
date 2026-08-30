@@ -16,12 +16,14 @@ use keramics_formats::PathComponent;
 use keramics_formats::apfs::ApfsExtendedAttribute;
 use keramics_formats::ext::ExtExtendedAttribute;
 use keramics_formats::hfs::{HfsExtendedAttribute, HfsString};
+use keramics_formats::xfs::XfsExtendedAttribute;
 
 /// Virtual File System (VFS) extended attribute.
 pub enum VfsExtendedAttribute {
     Apfs(ApfsExtendedAttribute),
     Ext(ExtExtendedAttribute),
     Hfs(HfsExtendedAttribute),
+    Xfs(XfsExtendedAttribute),
 }
 
 impl VfsExtendedAttribute {
@@ -36,6 +38,9 @@ impl VfsExtendedAttribute {
             }
             VfsExtendedAttribute::Hfs(hfs_extended_attribute) => {
                 hfs_extended_attribute.get_data_stream()
+            }
+            VfsExtendedAttribute::Xfs(xfs_extended_attribute) => {
+                xfs_extended_attribute.get_data_stream()
             }
         }
     }
@@ -55,6 +60,9 @@ impl VfsExtendedAttribute {
                     HfsString::Utf16String(utf16_string) => PathComponent::from(utf16_string),
                 }
             }
+            VfsExtendedAttribute::Xfs(xfs_extended_attribute) => {
+                PathComponent::from(xfs_extended_attribute.get_name())
+            }
         }
     }
 }
@@ -71,6 +79,7 @@ mod tests {
     use keramics_formats::apfs::{ApfsContainer, ApfsFileEntry, ApfsFileSystem, ApfsVolume};
     use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
     use keramics_formats::hfs::{HfsFileEntry, HfsFileSystem};
+    use keramics_formats::xfs::{XfsFileEntry, XfsFileSystem};
     use keramics_types::{ByteString, Utf16String};
 
     use crate::tests::get_test_data_path;
@@ -128,7 +137,7 @@ mod tests {
         let name: PathComponent = vfs_extended_attribute.get_name();
         let expected_name: PathComponent = PathComponent::ByteString(ByteString {
             encoding: CharacterEncoding::Utf8,
-            elements: vec![109, 121, 120, 97, 116, 116, 114, 49],
+            elements: b"myxattr1".to_vec(),
         });
         assert_eq!(name, expected_name);
 
@@ -187,9 +196,7 @@ mod tests {
         let name: PathComponent = vfs_extended_attribute.get_name();
         let expected_name: PathComponent = PathComponent::ByteString(ByteString {
             encoding: CharacterEncoding::Ascii,
-            elements: vec![
-                115, 101, 99, 117, 114, 105, 116, 121, 46, 115, 101, 108, 105, 110, 117, 120,
-            ],
+            elements: b"security.selinux".to_vec(),
         });
         assert_eq!(name, expected_name);
 
@@ -248,6 +255,65 @@ mod tests {
         let name: PathComponent = vfs_extended_attribute.get_name();
         let expected_name: PathComponent = PathComponent::Utf16String(Utf16String {
             elements: vec![109, 121, 120, 97, 116, 116, 114, 49],
+        });
+        assert_eq!(name, expected_name);
+
+        Ok(())
+    }
+
+    // Tests with XFS.
+
+    fn get_xfs_file_system(path_string: &str) -> Result<XfsFileSystem, ErrorTrace> {
+        let mut file_system: XfsFileSystem = XfsFileSystem::new();
+
+        let test_data_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file_system.read_data_stream(&data_stream)?;
+
+        Ok(file_system)
+    }
+
+    fn get_xfs_file_entry(path_string: &str) -> Result<XfsFileEntry, ErrorTrace> {
+        let xfs_file_system: XfsFileSystem = get_xfs_file_system("xfs/xfs.raw")?;
+
+        let path: Path = Path::from(path_string);
+        match xfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path_string
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_data_stream_with_xfs() -> Result<(), ErrorTrace> {
+        let mut xfs_file_entry: XfsFileEntry = get_xfs_file_entry("/testdir1/testfile1")?;
+
+        let xfs_extended_attribute: XfsExtendedAttribute =
+            xfs_file_entry.get_extended_attribute_by_index(0)?;
+        let vfs_extended_attribute: VfsExtendedAttribute =
+            VfsExtendedAttribute::Xfs(xfs_extended_attribute);
+
+        let _ = vfs_extended_attribute.get_data_stream();
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_xfs() -> Result<(), ErrorTrace> {
+        let mut xfs_file_entry: XfsFileEntry = get_xfs_file_entry("/testdir1/testfile1")?;
+
+        let xfs_extended_attribute: XfsExtendedAttribute =
+            xfs_file_entry.get_extended_attribute_by_index(0)?;
+        let vfs_extended_attribute: VfsExtendedAttribute =
+            VfsExtendedAttribute::Xfs(xfs_extended_attribute);
+
+        let name: PathComponent = vfs_extended_attribute.get_name();
+        let expected_name: PathComponent = PathComponent::ByteString(ByteString {
+            encoding: CharacterEncoding::Utf8,
+            elements: b"secure.selinux".to_vec(),
         });
         assert_eq!(name, expected_name);
 

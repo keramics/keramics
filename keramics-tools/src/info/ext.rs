@@ -140,9 +140,6 @@ struct ExtFileEntryInfo<'a> {
     /// File entry.
     file_entry: &'a ExtFileEntry,
 
-    /// Device identifier.
-    pub device_identifier: Option<u16>,
-
     /// Symbolic link target.
     pub symbolic_link_target: Option<ByteString>,
 }
@@ -152,7 +149,6 @@ impl<'a> ExtFileEntryInfo<'a> {
     fn new(file_entry: &'a ExtFileEntry) -> Self {
         Self {
             file_entry,
-            device_identifier: None,
             symbolic_link_target: None,
         }
     }
@@ -226,12 +222,12 @@ impl<'a> fmt::Display for ExtFileEntryInfo<'a> {
 
         writeln!(formatter, "    File mode\t\t\t\t\t: {}", file_mode_info)?;
 
-        if let Some(device_identifier) = &self.device_identifier {
+        if let Some(device_identifier) = self.file_entry.get_device_identifier() {
             writeln!(
                 formatter,
                 "    Device number\t\t\t\t: {},{}",
-                device_identifier >> 8,
-                device_identifier & 0x00ff
+                *device_identifier >> 8,
+                *device_identifier & 0x00ff
             )?;
         }
         if let Some(symbolic_link_target) = &self.symbolic_link_target {
@@ -616,16 +612,6 @@ impl ExtInfo {
 
     /// Prints information about a file entry.
     fn print_file_entry(file_entry: &mut ExtFileEntry) -> Result<(), ErrorTrace> {
-        let device_identifier: Option<u16> = match file_entry.get_device_identifier() {
-            Ok(result) => result,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to retrieve device identifier"
-                );
-                return Err(error);
-            }
-        };
         let symbolic_link_target: Option<ByteString> = match file_entry.get_symbolic_link_target() {
             Ok(link_target) => link_target.cloned(),
             Err(mut error) => {
@@ -637,7 +623,6 @@ impl ExtInfo {
             }
         };
         let mut file_entry_information: ExtFileEntryInfo = ExtFileEntryInfo::new(&file_entry);
-        file_entry_information.device_identifier = device_identifier;
         file_entry_information.symbolic_link_target = symbolic_link_target;
 
         print!("{}", file_entry_information);
@@ -961,11 +946,9 @@ mod tests {
         let mut ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let device_identifier: Option<u16> = ext_file_entry.get_device_identifier()?;
         let symbolic_link_target: Option<ByteString> =
             ext_file_entry.get_symbolic_link_target()?.cloned();
         let mut test_struct: ExtFileEntryInfo = ExtFileEntryInfo::new(&ext_file_entry);
-        test_struct.device_identifier = device_identifier;
         test_struct.symbolic_link_target = symbolic_link_target;
 
         let expected_string: &str = concat!(

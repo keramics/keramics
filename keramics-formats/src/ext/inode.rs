@@ -15,7 +15,7 @@ use std::cmp::max;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
-use keramics_types::ByteString;
+use keramics_types::{ByteString, bytes_to_u16_le};
 
 use crate::indexed_hash_map::IndexedHashMap;
 
@@ -87,6 +87,9 @@ pub struct ExtInode {
 
     /// Attributes.
     pub attributes: IndexedHashMap<ByteString, ExtAttributesEntry>,
+
+    /// Device identifier.
+    pub device_identifier: Option<u16>,
 }
 
 impl ExtInode {
@@ -112,6 +115,7 @@ impl ExtInode {
             checksum: 0,
             creation_time: None,
             attributes: IndexedHashMap::new(),
+            device_identifier: None,
         }
     }
 
@@ -224,6 +228,11 @@ impl ExtInode {
         if data.len() > 128 {
             Ext4InodeExtension::read_data(self, &data[128..])?;
         }
+        if self.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_CHARACTER_DEVICE
+            || self.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_BLOCK_DEVICE
+        {
+            self.device_identifier = Some(bytes_to_u16_le!(&self.data_reference, 0));
+        }
         Ok(())
     }
 }
@@ -329,6 +338,7 @@ mod tests {
         assert_eq!(test_struct.flags, 0);
         assert_eq!(test_struct.data_reference, &test_data[40..100]);
         assert_eq!(test_struct.file_acl_block_number, 162);
+        assert_eq!(test_struct.device_identifier, None);
 
         Ok(())
     }
@@ -371,6 +381,7 @@ mod tests {
         assert_eq!(test_struct.flags, 0);
         assert_eq!(test_struct.data_reference, &test_data[40..100]);
         assert_eq!(test_struct.file_acl_block_number, 162);
+        assert_eq!(test_struct.device_identifier, None);
 
         Ok(())
     }
@@ -425,6 +436,7 @@ mod tests {
         );
         assert_eq!(test_struct.checksum, 0x53d5bd9c);
         assert_eq!(test_struct.attributes.len(), 1);
+        assert_eq!(test_struct.device_identifier, None);
 
         Ok(())
     }

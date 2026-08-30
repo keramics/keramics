@@ -36,6 +36,7 @@ mod vhd;
 mod vhdx;
 mod vmdk;
 mod windows;
+mod xfs;
 
 pub use apfs::ApfsInfo;
 pub use apm::ApmInfo;
@@ -59,6 +60,7 @@ pub use udif::UdifInfo;
 pub use vhd::VhdInfo;
 pub use vhdx::VhdxInfo;
 pub use vmdk::VmdkInfo;
+pub use xfs::XfsInfo;
 
 #[cfg(test)]
 mod tests {

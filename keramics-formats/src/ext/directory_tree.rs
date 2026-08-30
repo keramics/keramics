@@ -22,8 +22,9 @@ use keramics_core::DebugTrace;
 #[cfg(feature = "debug-trace")]
 use keramics_types::bytes_to_u32_le;
 
+use crate::indexed_hash_map::IndexedHashMap;
+
 use super::block_range::{ExtBlockRange, ExtBlockRangeType};
-use super::directory_entries::ExtDirectoryEntries;
 use super::directory_entry::ExtDirectoryEntry;
 
 /// Extended File System directory.
@@ -49,7 +50,7 @@ impl ExtDirectoryTree {
         &mut self,
         data_stream: &DataStreamReference,
         block_ranges: &[ExtBlockRange],
-        entries: &mut ExtDirectoryEntries,
+        entries: &mut IndexedHashMap<ByteString, ExtDirectoryEntry>,
     ) -> Result<(), ErrorTrace> {
         for block_range in block_ranges.iter() {
             if block_range.range_type != ExtBlockRangeType::InFile {
@@ -86,7 +87,7 @@ impl ExtDirectoryTree {
     pub fn read_inline_data(
         &mut self,
         data: &[u8],
-        entries: &mut ExtDirectoryEntries,
+        entries: &mut IndexedHashMap<ByteString, ExtDirectoryEntry>,
     ) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
@@ -122,7 +123,7 @@ impl ExtDirectoryTree {
         data: &[u8],
         mut data_offset: usize,
         data_size: usize,
-        entries: &mut ExtDirectoryEntries,
+        entries: &mut IndexedHashMap<ByteString, ExtDirectoryEntry>,
     ) -> Result<(), ErrorTrace> {
         while data_offset < data_size {
             keramics_core::debug_trace_structure!(ExtDirectoryEntry::debug_read_data(
@@ -180,7 +181,7 @@ impl ExtDirectoryTree {
         &mut self,
         data_stream: &DataStreamReference,
         position: SeekFrom,
-        entries: &mut ExtDirectoryEntries,
+        entries: &mut IndexedHashMap<ByteString, ExtDirectoryEntry>,
     ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; self.block_size as usize];
 
@@ -248,7 +249,7 @@ mod tests {
             number_of_blocks: 1,
             range_type: ExtBlockRangeType::InFile,
         }];
-        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new();
+        let mut entries: IndexedHashMap<ByteString, ExtDirectoryEntry> = IndexedHashMap::new();
         test_struct.read_block_data(&data_stream, &block_ranges, &mut entries)?;
 
         assert_eq!(entries.len(), 10);
@@ -267,7 +268,7 @@ mod tests {
         ];
         let mut test_struct = ExtDirectoryTree::new(&CharacterEncoding::Utf8, 256);
 
-        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new();
+        let mut entries: IndexedHashMap<ByteString, ExtDirectoryEntry> = IndexedHashMap::new();
         test_struct.read_inline_data(&test_data, &mut entries)?;
 
         assert_eq!(entries.len(), 1);
@@ -281,7 +282,7 @@ mod tests {
 
         let mut test_struct = ExtDirectoryTree::new(&CharacterEncoding::Utf8, 256);
 
-        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new();
+        let mut entries: IndexedHashMap<ByteString, ExtDirectoryEntry> = IndexedHashMap::new();
         test_struct.read_node_data(&test_data, 0, 256, &mut entries)?;
 
         assert_eq!(entries.len(), 10);
@@ -296,7 +297,7 @@ mod tests {
 
         let mut test_struct = ExtDirectoryTree::new(&CharacterEncoding::Utf8, 256);
 
-        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new();
+        let mut entries: IndexedHashMap<ByteString, ExtDirectoryEntry> = IndexedHashMap::new();
         test_struct.read_node_at_position(&data_stream, SeekFrom::Start(0), &mut entries)?;
 
         assert_eq!(entries.len(), 10);

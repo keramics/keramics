@@ -110,7 +110,7 @@ The XFS superblock (xfs_sb_t) is (at least) 512 bytes of size and consists of:
 | <td colspan="4">*Common*</td> |
 | 184 | 4 | | Stripe (or RAID) unit size, in number of blocks |
 | 188 | 4 | | Stripe (or RAID) width, in number of blocks |
-| 192 | 1 | | Directory block size in log2 |
+| 192 | 1 | | Directory block size in log2, in number of blocks |
 | 193 | 1 | | Journal device sector size in log2 |
 | 194 | 2 | | Journal device sector size (in bytes) |
 | <td colspan="4">*Only used if the XFS_SB_VERSION_LOGV2BIT feature flag is set*</td> |
@@ -153,7 +153,7 @@ The 4 LSB contain the version the remaining bits are used to store feature flags
 | <td colspan="3">*Second generation*</td> |
 | 4 | XFS_SB_VERSION_4 | Introduced in Irix 6.2, added directory version 2 support |
 | <td colspan="3">*Third generation*</td> |
-| 5 | XFS_SB_VERSION_5 | Intoduced in Linux 3.10 |
+| 5 | XFS_SB_VERSION_5 | Introduced in Linux 3.10 |
 
 | Value | Identifier | Description |
 | --- | --- | --- |
@@ -383,7 +383,7 @@ size and consist of:
 
 #### B+ tree block header 64-bit {#btree_block_header_64bit}
 
-The B+ tree block header 64-bit (xfs_btree_lblock_t) is 24 or 68 bytes of size and consist of:
+The B+ tree block header 64-bit (xfs_btree_lblock_t) is 24 or 72 bytes of size and consist of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -400,7 +400,7 @@ The B+ tree block header 64-bit (xfs_btree_lblock_t) is 24 or 68 bytes of size a
 | 40 | 16 | | Block type identifier, which contains an UUID that should correspond to sb_uuid or sb_meta_uuid |
 | 56 | 8 | | Owner allocation group, which contains the allocation group the block is part of |
 | 64 | 4 | | Checksum |
-| 64 | 4 | 0 | Unknown (padding) |
+| 68 | 4 | 0 | Unknown (padding) |
 
 <!-- rumdl-enable MD033 MD056 -->
 
@@ -481,7 +481,14 @@ The inode B+ tree branch node key is 4 bytes of size and consist of:
 | --- | --- | --- | --- |
 | 0 | 4 | | Block number of the inode B+ tree sub node, which contains a block number relative to the start of the allocation group |
 
-#### Inode B+ tree leaf node record
+#### Inode B+ tree leaf node
+
+The inode B+ tree branch node consists of:
+
+* node header
+* array of inode B+ tree leaf node entry records
+
+##### Inode B+ tree leaf node record
 
 The inode B+ tree leaf node record (xfs_inobt_rec_t) is 16 bytes of size and consist of:
 
@@ -744,6 +751,8 @@ The packed extent (xfs_bmbt_rec_t) is 128 bits of size and consist of:
 | 9.1 | 54 bits | | Logical block number |
 | 15.7 | 1 bit | | Uninitialized (unwritten) extent |
 
+> Note that uninitialized extents are treated as sparse extents when read.
+
 ### Extent B+ tree {#extent_btree}
 
 #### Extent B+ tree root node
@@ -764,7 +773,7 @@ otherwise the remaining inode block size.
 
 An extent B+ tree sub nodes is stored in [a B+ tree block](#btree_block).
 
-The inode B+ tree uses [the B+ tree block header 64-bit](#btree_block_header_64bit).
+The extent B+ tree uses [the B+ tree block header 64-bit](#btree_block_header_64bit).
 
 ##### Extent B+ tree sub node block header
 
@@ -775,7 +784,7 @@ The sub node block header (xfs_bmbt_block_t) is equivalent to
 
 | Signature | Description |
 | --- | --- |
-| "BMA3" | File system version 5 extent B+ tree sub node block |
+| "BMA3" | Extent B+ tree sub node block ((file system version 5) |
 | "BMAP" | Extent B+ tree sub node block |
 
 #### Extent B+ tree branch node {#extent_btree_branch_node}
@@ -1198,6 +1207,10 @@ system block header version 3 (xfs_da3_blkinfo_t) is 56 bytes of size and consis
 | 0xfebe | XFS_DA_NODE_MAGIC | Directory or attributes [B+ tree branch block](#directory_btree_branch_node_block) |
 | 0xfeeb | XFS_DIR_LEAF_MAGIC | Directory B+ tree leaf block |
 
+## Symbolic links
+
+A symbolic link can be maximum 1024 bytes (XFS_SYMLINK_MAXLEN).
+
 ## Extended attributes
 
 Extended attributes are stored in the attributes fork of an inode. The extended attributes can be
@@ -1215,12 +1228,12 @@ If the inode attributes fork type is XFS_DINODE_FMT_LOCAL the extended attribute
 short-form attributes table (xfs_attr_shortform) inline in the attribtes fork. The short-form
 attributes table consist of:
 
-* a short-form attribute table header
-* one or more short-form attribute table entries
+* a short-form attributes table header
+* one or more short-form attributes table entries
 
-#### The short-form attribute table header
+#### The short-form attributes table header
 
-The short-form attribute table header (xfs_attr_sf_hdr) is 4 bytes of size and consists of:
+The short-form attributes table header (xfs_attr_sf_hdr) is 4 bytes of size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1233,7 +1246,7 @@ The short-form attribute table header (xfs_attr_sf_hdr) is 4 bytes of size and c
 
 #### The short-form attribute entry
 
-The short-form attribute table entry (xfs_attr_sf_entry) is variable of size and consists of:
+The short-form attributes table entry (xfs_attr_sf_entry) is variable of size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |

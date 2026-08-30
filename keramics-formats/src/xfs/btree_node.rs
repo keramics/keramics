@@ -1,0 +1,243 @@
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may
+ * obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+
+use std::io::SeekFrom;
+
+use keramics_core::{DataStreamReference, ErrorTrace};
+
+use super::btree_node_header_32bit::XfsBtreeNodeHeader32bit;
+use super::btree_node_header_64bit::XfsBtreeNodeHeader64bit;
+
+/// X File System (XFS) B-Tree node.
+pub struct XfsBtreeNode {
+    /// Signature.
+    pub signature: Vec<u8>,
+
+    /// Level.
+    level: u16,
+
+    /// Number of records.
+    pub number_of_records: u16,
+
+    /// Data.
+    pub data: Vec<u8>,
+
+    /// Records offset.
+    pub records_offset: usize,
+}
+
+impl XfsBtreeNode {
+    /// Creates a new B-tree node.
+    pub fn new() -> Self {
+        Self {
+            signature: Vec::new(),
+            level: 0,
+            number_of_records: 0,
+            data: Vec::new(),
+            records_offset: 0,
+        }
+    }
+
+    /// Determines if the node is a branch node.
+    pub fn is_branch(&self) -> bool {
+        self.level != 0
+    }
+
+    /// Reads the B-tree node from a buffer.
+    fn read_data(
+        &mut self,
+        format_version: u16,
+        block_number_bit_size: u8,
+        data: &[u8],
+    ) -> Result<(), ErrorTrace> {
+        let data_size: usize = data.len();
+
+        if block_number_bit_size == 32 {
+            let data_end_offset: usize = if format_version < 5 { 16 } else { 56 };
+
+            if data_size < data_end_offset {
+                return Err(keramics_core::error_trace_new!("Unsupported data size"));
+            }
+            keramics_core::debug_trace_structure!(XfsBtreeNodeHeader32bit::debug_read_data(
+                &data[0..data_end_offset]
+            ));
+            let mut btree_node_header: XfsBtreeNodeHeader32bit = XfsBtreeNodeHeader32bit::new();
+
+            match btree_node_header.read_data(&data[0..data_end_offset]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read 32-bit B-tree node header"
+                    );
+                    return Err(error);
+                }
+            }
+            self.signature = btree_node_header.signature;
+            self.level = btree_node_header.level;
+            self.number_of_records = btree_node_header.number_of_records;
+            self.records_offset = data_end_offset;
+        } else if block_number_bit_size == 64 {
+            let data_end_offset: usize = if format_version < 5 { 24 } else { 72 };
+
+            if data_size < data_end_offset {
+                return Err(keramics_core::error_trace_new!("Unsupported data size"));
+            }
+            keramics_core::debug_trace_structure!(XfsBtreeNodeHeader64bit::debug_read_data(
+                &data[0..data_end_offset]
+            ));
+            let mut btree_node_header: XfsBtreeNodeHeader64bit = XfsBtreeNodeHeader64bit::new();
+
+            match btree_node_header.read_data(&data[0..data_end_offset]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read 64-bit B-tree node header"
+                    );
+                    return Err(error);
+                }
+            }
+            self.signature = btree_node_header.signature;
+            self.level = btree_node_header.level;
+            self.number_of_records = btree_node_header.number_of_records;
+            self.records_offset = data_end_offset;
+        } else {
+            return Err(keramics_core::error_trace_new!("Unsupported format"));
+        }
+        Ok(())
+    }
+
+    /// Reads the B-tree node from a specific position in a data stream.
+    pub fn read_at_position(
+        &mut self,
+        format_version: u16,
+        block_number_bit_size: u8,
+        data_stream: &DataStreamReference,
+        block_size: u32,
+        position: SeekFrom,
+    ) -> Result<(), ErrorTrace> {
+        let mut data: Vec<u8> = vec![0; block_size as usize];
+
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
+
+        keramics_core::debug_trace_data!("XfsBtreeNode", offset, &data, block_size);
+
+        match self.read_data(format_version, block_number_bit_size, &data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read B-tree node data at offset: {} (0x{:08x})",
+                        offset, offset
+                    )
+                );
+                return Err(error);
+            }
+        }
+        self.data = data;
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::io::SeekFrom;
+
+    use keramics_core::{DataStreamReference, open_fake_data_stream};
+
+    fn get_test_data() -> Vec<u8> {
+        vec![
+            0x46, 0x49, 0x42, 0x33, 0x00, 0x00, 0x00, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x01,
+            0x00, 0x00, 0x00, 0x12, 0x1a, 0x06, 0xf8, 0x61, 0x55, 0x10, 0x42, 0x99, 0x86, 0xaa,
+            0x62, 0x9a, 0x2d, 0x10, 0x94, 0xe4, 0x00, 0x00, 0x00, 0x00, 0x16, 0x13, 0x5a, 0x1a,
+            0x00, 0x00, 0x3f, 0x00, 0x00, 0x00, 0x40, 0x2b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xe0,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]
+    }
+
+    #[test]
+    fn test_read_data() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = XfsBtreeNode::new();
+        test_struct.read_data(5, 32, &test_data)?;
+
+        assert_eq!(test_struct.signature, &test_data[0..4]);
+        assert_eq!(test_struct.level, 0);
+        assert_eq!(test_struct.number_of_records, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_with_unsupported_data_size() {
+        let mut test_struct = XfsBtreeNode::new();
+
+        let test_data: Vec<u8> = get_test_data();
+        let result = test_struct.read_data(4, 32, &test_data[0..15]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut test_struct = XfsBtreeNode::new();
+        test_struct.read_at_position(5, 32, &data_stream, 512, SeekFrom::Start(0))?;
+
+        assert_eq!(test_struct.signature, &test_data[0..4]);
+        assert_eq!(test_struct.level, 0);
+        assert_eq!(test_struct.number_of_records, 1);
+
+        Ok(())
+    }
+}

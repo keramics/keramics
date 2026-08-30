@@ -28,6 +28,7 @@ Supported data formats:
 * [Virtual Hard Disk (VHD) image format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/vhd/README.md)
 * [Virtual Hard Disk version 2 (VHDX) image format](https://github.com/keramics/keramics/tree/main/keramics-formats/src/vhdx/README.md)
 * [VMWare Virtual Disk Format (VMDK)](https://github.com/keramics/keramics/tree/main/keramics-formats/src/vmdk/README.md)
+* [X File System (XFS)](https://github.com/keramics/keramics/tree/main/keramics-formats/src/xfs/README.md)
 
 ## License
 
