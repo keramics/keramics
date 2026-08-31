@@ -68,13 +68,13 @@ pub mod xfs;
 
 pub use enums::FormatIdentifier;
 pub use file_resolver::{FileResolver, FileResolverReference};
-pub use iterators::{FileEntriesIterator, PartitionsIterator};
+pub use iterators::{ExtendedAttributesIterator, FileEntriesIterator, PartitionsIterator};
 pub use os_file_resolver::{OsFileResolver, open_os_file_resolver};
 pub use path::Path;
 pub use path_component::PathComponent;
 pub use range_stream::RangeStream;
 pub use scanner::FormatScanner;
-pub use traits::{FileEntryIterator, PartitionIterator};
+pub use traits::{ExtendedAttributeIterator, FileEntryIterator, PartitionIterator};
 
 #[cfg(test)]
 mod tests {

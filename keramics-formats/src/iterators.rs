@@ -13,7 +13,61 @@
 
 use keramics_core::ErrorTrace;
 
-use super::traits::{FileEntryIterator, PartitionIterator};
+use super::traits::{ExtendedAttributeIterator, FileEntryIterator, PartitionIterator};
+
+/// Generic extended attributes iterator.
+pub struct ExtendedAttributesIterator<'a, T: ExtendedAttributeIterator> {
+    /// File entry.
+    file_entry: &'a mut T,
+
+    /// Number of extended attributes.
+    number_of_extended_attributes: usize,
+
+    /// Extended attribute index.
+    extended_attribute_index: usize,
+
+    /// Value to indicate whether the iterator is initialized.
+    is_initialized: bool,
+}
+
+impl<'a, T: ExtendedAttributeIterator> ExtendedAttributesIterator<'a, T> {
+    /// Creates a new iterator.
+    pub fn new(file_entry: &'a mut T) -> Self {
+        Self {
+            file_entry,
+            number_of_extended_attributes: 0,
+            extended_attribute_index: 0,
+            is_initialized: false,
+        }
+    }
+}
+
+impl<'a, T: ExtendedAttributeIterator> Iterator for ExtendedAttributesIterator<'a, T> {
+    type Item = Result<T::ExtendedAttributeItem, ErrorTrace>;
+
+    /// Retrieves the next file entry.
+    fn next(&mut self) -> Option<Self::Item> {
+        if !self.is_initialized {
+            match self.file_entry.get_number_of_extended_attributes() {
+                Ok(number_of_extended_attributes) => {
+                    self.number_of_extended_attributes = number_of_extended_attributes;
+                }
+                Err(error) => return Some(Err(error)),
+            }
+            self.is_initialized = true;
+        }
+        if self.extended_attribute_index >= self.number_of_extended_attributes {
+            return None;
+        }
+        let item: Self::Item = self
+            .file_entry
+            .get_extended_attribute_by_index(self.extended_attribute_index);
+
+        self.extended_attribute_index += 1;
+
+        Some(item)
+    }
+}
 
 /// Generic file entries iterator.
 pub struct FileEntriesIterator<'a, T: FileEntryIterator> {

@@ -26,7 +26,7 @@ use keramics_formats::hfs::{HfsFileEntry, HfsString};
 use keramics_formats::ntfs::NtfsFileEntry;
 use keramics_formats::xfs::XfsFileEntry;
 use keramics_formats::xfs::constants::*;
-use keramics_formats::{FileEntryIterator, Path, PathComponent};
+use keramics_formats::{ExtendedAttributeIterator, FileEntryIterator, Path, PathComponent};
 use keramics_types::Ucs2String;
 
 use super::apfs::ApfsContainerFileEntry;

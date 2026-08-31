@@ -75,11 +75,11 @@ mod tests {
 
     use keramics_core::{ErrorTrace, open_os_data_stream};
     use keramics_encodings::CharacterEncoding;
-    use keramics_formats::Path;
     use keramics_formats::apfs::{ApfsContainer, ApfsFileEntry, ApfsFileSystem, ApfsVolume};
     use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
     use keramics_formats::hfs::{HfsFileEntry, HfsFileSystem};
     use keramics_formats::xfs::{XfsFileEntry, XfsFileSystem};
+    use keramics_formats::{ExtendedAttributeIterator, Path};
     use keramics_types::{ByteString, Utf16String};
 
     use crate::tests::get_test_data_path;
@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_apfs() -> Result<(), ErrorTrace> {
-        let apfs_file_entry: ApfsFileEntry = get_apfs_file_entry("/testdir1/xattr1")?;
+        let mut apfs_file_entry: ApfsFileEntry = get_apfs_file_entry("/testdir1/xattr1")?;
 
         let apfs_extended_attribute: ApfsExtendedAttribute =
             apfs_file_entry.get_extended_attribute_by_index(0)?;
@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn test_get_name_with_apfs() -> Result<(), ErrorTrace> {
-        let apfs_file_entry: ApfsFileEntry = get_apfs_file_entry("/testdir1/xattr1")?;
+        let mut apfs_file_entry: ApfsFileEntry = get_apfs_file_entry("/testdir1/xattr1")?;
 
         let apfs_extended_attribute: ApfsExtendedAttribute =
             apfs_file_entry.get_extended_attribute_by_index(0)?;
@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_hfs() -> Result<(), ErrorTrace> {
-        let hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
+        let mut hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
 
         let hfs_extended_attribute: HfsExtendedAttribute =
             hfs_file_entry.get_extended_attribute_by_index(0)?;
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_get_name_with_hfs() -> Result<(), ErrorTrace> {
-        let hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
+        let mut hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
 
         let hfs_extended_attribute: HfsExtendedAttribute =
             hfs_file_entry.get_extended_attribute_by_index(0)?;

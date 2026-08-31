@@ -22,7 +22,7 @@ use crate::decmpfs::{
 };
 use crate::indexed_hash_map::IndexedHashMap;
 use crate::path_component::PathComponent;
-use crate::traits::FileEntryIterator;
+use crate::traits::{ExtendedAttributeIterator, FileEntryIterator};
 
 use super::attribute_record::HfsAttributeRecord;
 use super::attributes_file::HfsAttributesFile;
@@ -511,41 +511,6 @@ impl HfsFileEntry {
         }
     }
 
-    /// Retrieves the number of extended attributes.
-    pub fn get_number_of_extended_attributes(&self) -> Result<usize, ErrorTrace> {
-        Ok(self.attributes.len())
-    }
-
-    /// Retrieves a specific extended attribute.
-    pub fn get_extended_attribute_by_index(
-        &self,
-        extended_attribute_index: usize,
-    ) -> Result<HfsExtendedAttribute, ErrorTrace> {
-        match self
-            .attributes
-            .get_key_value_by_index(extended_attribute_index)
-        {
-            Some((name, attribute_record)) => {
-                let data_stream: DataStreamReference =
-                    match self.get_extended_attribute_data_stream(attribute_record) {
-                        Ok(data_stream) => data_stream,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to retrieve data stream"
-                            );
-                            return Err(error);
-                        }
-                    };
-                Ok(HfsExtendedAttribute::new(name, data_stream))
-            }
-            None => Err(keramics_core::error_trace_new!(format!(
-                "Missing extended attribute: {}",
-                extended_attribute_index
-            ))),
-        }
-    }
-
     /// Retrieves a specific extended attribute.
     pub fn get_extended_attribute_by_name(
         &self,
@@ -797,6 +762,45 @@ impl HfsFileEntry {
         self.sub_directory_entries_read = true;
 
         Ok(())
+    }
+}
+
+impl ExtendedAttributeIterator for HfsFileEntry {
+    type ExtendedAttributeItem = HfsExtendedAttribute;
+
+    /// Retrieves the number of extended attributes.
+    fn get_number_of_extended_attributes(&mut self) -> Result<usize, ErrorTrace> {
+        Ok(self.attributes.len())
+    }
+
+    /// Retrieves a specific extended attribute.
+    fn get_extended_attribute_by_index(
+        &mut self,
+        extended_attribute_index: usize,
+    ) -> Result<HfsExtendedAttribute, ErrorTrace> {
+        match self
+            .attributes
+            .get_key_value_by_index(extended_attribute_index)
+        {
+            Some((name, attribute_record)) => {
+                let data_stream: DataStreamReference =
+                    match self.get_extended_attribute_data_stream(attribute_record) {
+                        Ok(data_stream) => data_stream,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve data stream"
+                            );
+                            return Err(error);
+                        }
+                    };
+                Ok(HfsExtendedAttribute::new(name, data_stream))
+            }
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing extended attribute: {}",
+                extended_attribute_index
+            ))),
+        }
     }
 }
 
@@ -1130,7 +1134,8 @@ mod tests {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
-        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+        let mut hfs_file_entry: HfsFileEntry =
+            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_attributes: usize = hfs_file_entry.get_number_of_extended_attributes()?;
         assert_eq!(number_of_attributes, 0);
@@ -1143,7 +1148,8 @@ mod tests {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
-        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+        let mut hfs_file_entry: HfsFileEntry =
+            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let result: Result<HfsExtendedAttribute, ErrorTrace> =
             hfs_file_entry.get_extended_attribute_by_index(0);
@@ -1604,7 +1610,8 @@ mod tests {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/xattr1");
-        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+        let mut hfs_file_entry: HfsFileEntry =
+            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_attributes: usize = hfs_file_entry.get_number_of_extended_attributes()?;
         assert_eq!(number_of_attributes, 1);
@@ -1617,7 +1624,8 @@ mod tests {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/xattr1");
-        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+        let mut hfs_file_entry: HfsFileEntry =
+            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let extended_attribute: HfsExtendedAttribute =
             hfs_file_entry.get_extended_attribute_by_index(0)?;

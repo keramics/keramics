@@ -533,7 +533,7 @@ mod tests {
 
     use keramics_core::open_fake_data_stream;
 
-    fn get_test_data() -> Vec<u8> {
+    fn get_test_data_lzvn() -> Vec<u8> {
         vec![
             0x66, 0x70, 0x6d, 0x63, 0x07, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0xe0, 0x03, 0x4d, 0x79, 0x20, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73,
@@ -542,9 +542,41 @@ mod tests {
         ]
     }
 
+    fn get_test_data_zlib() -> Vec<u8> {
+        vec![
+            0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x44, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x08, 0x00,
+            0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x63, 0x6d, 0x70, 0x66, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]
+    }
+
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {
-        let test_data: Vec<u8> = get_test_data();
+        let test_data: Vec<u8> = get_test_data_lzvn();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let mut block_reader: DecmpfsBlockReader =
@@ -616,7 +648,7 @@ mod tests {
 
         assert_eq!(&data[0..19], b"My compressed file\n");
 
-        let test_data: Vec<u8> = get_test_data();
+        let test_data: Vec<u8> = get_test_data_lzvn();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let mut block_reader: DecmpfsBlockReader =
@@ -715,7 +747,196 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_read_compressed_block_offsets
+    #[test]
+    fn test_read_compressed_block_offsets_with_lzvn() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = vec![
+            0x08, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc2, 0x14, 0x41, 0x44,
+            0x00, 0x0a,
+        ];
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-    // TODO: add tests for read_data_from_blocks
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Lzvn);
+        block_reader.open(19)?;
+        block_reader.read_compressed_block_offsets()?;
+
+        assert_eq!(block_reader.block_offsets, vec![8, 16]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_compressed_block_offsets_with_zlib() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data_zlib();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Zlib);
+        block_reader.open(19)?;
+        block_reader.read_compressed_block_offsets()?;
+
+        assert_eq!(block_reader.block_offsets, vec![268]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_compressed_block_offsets_with_lzvn_and_first_offset_out_of_bounds() {
+        let test_data: Vec<u8> = vec![0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Lzvn);
+        block_reader.open(19).unwrap();
+
+        let result: Result<(), ErrorTrace> = block_reader.read_compressed_block_offsets();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_compressed_block_offsets_with_lzvn_and_successive_block_offset_out_of_bounds() {
+        let test_data: Vec<u8> = vec![
+            0x08, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc2, 0x14, 0x41, 0x44,
+            0x00, 0x0a,
+        ];
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Lzvn);
+        block_reader.open(19).unwrap();
+
+        let result: Result<(), ErrorTrace> = block_reader.read_compressed_block_offsets();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_compressed_block_offsets_with_zlib_and_unsupported_header() {
+        let mut test_data: Vec<u8> = get_test_data_zlib();
+        test_data[0] = 0xff;
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Zlib);
+        block_reader.open(19).unwrap();
+
+        let result: Result<(), ErrorTrace> = block_reader.read_compressed_block_offsets();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_compressed_block_offsets_with_zlib_and_invalid_number_of_block_descriptors() {
+        let mut test_data: Vec<u8> = get_test_data_zlib();
+        test_data[260] = 0xff;
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Zlib);
+        block_reader.open(19).unwrap();
+
+        let result: Result<(), ErrorTrace> = block_reader.read_compressed_block_offsets();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_compressed_block_offsets_with_zlib_and_invalid_descriptor_offset() {
+        let mut test_data: Vec<u8> = get_test_data_zlib();
+        test_data[264] = 0xff;
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Zlib);
+        block_reader.open(19).unwrap();
+
+        let result: Result<(), ErrorTrace> = block_reader.read_compressed_block_offsets();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_compressed_block_offsets_with_zlib_and_invalid_descriptor_size() {
+        let mut test_data: Vec<u8> = get_test_data_zlib();
+        test_data[268] = 0xff;
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Zlib);
+        block_reader.open(19).unwrap();
+
+        let result: Result<(), ErrorTrace> = block_reader.read_compressed_block_offsets();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_compressed_block_offsets_with_zlib_and_invalid_footer_offset() {
+        let mut test_data: Vec<u8> = get_test_data_zlib();
+        test_data[4] = 0xff;
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Zlib);
+        block_reader.open(19).unwrap();
+
+        let result: Result<(), ErrorTrace> = block_reader.read_compressed_block_offsets();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_compressed_block_offsets_with_zlib_and_invalid_footer_size() {
+        let mut test_data: Vec<u8> = get_test_data_zlib();
+        test_data[12] = 0xff;
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Zlib);
+        block_reader.open(19).unwrap();
+
+        let result: Result<(), ErrorTrace> = block_reader.read_compressed_block_offsets();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_from_blocks() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data_lzvn();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Lzvn);
+        block_reader.open(19)?;
+
+        let mut data: Vec<u8> = vec![0; 19];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut data, 0)?;
+
+        assert_eq!(read_count, 19);
+        assert_eq!(&data[0..19], b"My compressed file\n");
+
+        let mut data: Vec<u8> = vec![0; 5];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut data, 14)?;
+
+        assert_eq!(read_count, 5);
+        assert_eq!(&data[0..5], b"file\n");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_from_blocks_beyond_size() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data_lzvn();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Lzvn);
+        block_reader.open(19)?;
+
+        let mut data: Vec<u8> = vec![0; 10];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut data, 19)?;
+
+        assert_eq!(read_count, 0);
+
+        Ok(())
+    }
 }

@@ -15,10 +15,10 @@ use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
-use keramics_formats::Path;
 use keramics_formats::apfs::{
     ApfsContainer, ApfsExtendedAttribute, ApfsFileEntry, ApfsFileSystem, ApfsVolume,
 };
+use keramics_formats::{ExtendedAttributeIterator, Path};
 use keramics_types::ByteString;
 
 use crate::enums::DisplayPathType;
