@@ -42,7 +42,11 @@ impl<'a> fmt::Display for SgiDiskLabelPartitionInfo<'a> {
         // let partition_index: u8 = self.partition.get_partition_index();
         // TODO: print partition index
 
-        writeln!(formatter, "    Type\t\t\t\t\t: {}", self.partition.get_partition_type())?;
+        writeln!(
+            formatter,
+            "    Type\t\t\t\t\t: {}",
+            self.partition.get_partition_type()
+        )?;
 
         let partition_offset: u64 = self.partition.get_partition_offset();
         writeln!(

@@ -67,7 +67,7 @@ The BSD disklabel is of variable size and consists of:
 | 138 | 2 | | Number of partition entries, should not exceed 16 (MAXPARTITIONS) |
 | 140 | 4 | | Boot area size in bytes |
 | 144 | 4 | | Maximum superblock size in bytes |
-| 148 | number of partitions x 16 | | Array of [partition entries](#partition_entries) |
+| 148 | number of partitions x 16 | | Array of [partition entries](#partition_entry) |
 
 > Note that the number of partition entries contains the total number of entries in the array, not
 > the number of partitions in use.
@@ -89,7 +89,7 @@ The checksum is calculated as following:
 | 6 | DTYPE_ST506 | ST506 |
 | 7 | DTYPE_HPIB | CS/80 on HP-IB |
 | 8 | DTYPE_HPFL | HP Fiber-link |
-| | |
+| | | |
 | 10 | DTYPE_FLOPPY | Floppy drive |
 
 ### Flags

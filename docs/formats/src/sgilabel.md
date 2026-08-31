@@ -8,8 +8,8 @@ A SGI disklabel consists of one or more partition entries.
 
 Certain paritions have a predefined meaning, such as:
 
-* 9 is the volume header;
-* 11 is the entire volume.
+* entry 9 the volume header (partition type 0);
+* entry 11 the entire volume (partition type 6).
 
 ### Characteristics
 
@@ -33,9 +33,9 @@ The SGI disklabel is 512 bytes of size and consists of:
 | 4 | 2 | | Root partition number |
 | 6 | 2 | | Swap partition number |
 | 8 | 16 | | ARCS boot file name, with consists of an ASCII string  |
-| 24 | 48 | | Device parameters | 
-| 72 | 15 x 16 = 240 | Array of [volume descriptors](#volume_descriptor) |
-| 312 | 16 x 12 = 192 | | Array of [partition entries](#partition_entries) |
+| 24 | 48 | | Device parameters |
+| 72 | 15 x 16 = 240 | | Array of [volume descriptors](#volume_descriptor) |
+| 312 | 16 x 12 = 192 | | Array of [partition entries](#partition_entry) |
 | 504 | 4 | | Checksum |
 | 508 | 4 | | Unknown (padding) |
 
