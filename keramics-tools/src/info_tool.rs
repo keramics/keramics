@@ -37,7 +37,8 @@ use crate::enums::{DisplayPathType, EncodingType, FormatType};
 use crate::info::{
     ApfsInfo, ApmInfo, BsdDiskLabelInfo, CdsaEncrInfo, EwfInfo, ExFatInfo, ExtInfo, FatInfo,
     GptInfo, HfsInfo, LinuxLvmInfo, LuksInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo,
-    SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo, XfsInfo,
+    SgiDiskLabelInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
+    XfsInfo,
 };
 use crate::storage_media_image::StorageMediaImage;
 
@@ -318,6 +319,7 @@ impl InfoTool {
         format_scanner.add_linuxlvm_signatures();
         format_scanner.add_luksde_signatures();
         format_scanner.add_ntfs_signatures();
+        format_scanner.add_sgilabel_signatures();
         format_scanner.add_xfs_signatures();
 
         match format_scanner.build() {
@@ -498,6 +500,7 @@ fn main() -> ExitCode {
         Some(FormatType::Ntfs) => FormatIdentifier::Ntfs,
         Some(FormatType::Pdi) => FormatIdentifier::Pdi,
         Some(FormatType::Qcow) => FormatIdentifier::Qcow,
+        Some(FormatType::SgiDiskLabel) => FormatIdentifier::SgiDiskLabel,
         Some(FormatType::SparseBundle) => FormatIdentifier::SparseBundle,
         Some(FormatType::SparseImage) => FormatIdentifier::SparseImage,
         Some(FormatType::Udif) => FormatIdentifier::Udif,
@@ -648,6 +651,7 @@ fn main() -> ExitCode {
             FormatIdentifier::Pdi => PdiInfo::print_image(&arguments.source),
             // TODO: add support for QCOW image.
             FormatIdentifier::Qcow => QcowInfo::print_file(&data_stream),
+            FormatIdentifier::SgiDiskLabel => SgiDiskLabelInfo::print_volume_system(&data_stream),
             FormatIdentifier::SparseBundle => SparseBundleInfo::print_image(&arguments.source),
             FormatIdentifier::SparseImage => SparseImageInfo::print_file(&data_stream),
             // TODO: bundle all credentials into 1 credential store argument.

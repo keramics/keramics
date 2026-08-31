@@ -30,6 +30,7 @@ use super::linuxlvm::constants::*;
 use super::luksde::constants::*;
 use super::mbr::constants::*;
 use super::ntfs::constants::*;
+use super::sgilabel::constants::*;
 use super::sparseimage::constants::*;
 use super::udif::constants::*;
 use super::vhd::constants::*;
@@ -308,6 +309,16 @@ impl FormatScanner {
         ));
     }
 
+    /// Adds SGI disklabel (sgilabel) signatures.
+    pub fn add_sgilabel_signatures(&mut self) {
+        self.signature_scanner.add_signature(Signature::new(
+            "sgilabel1",
+            PatternType::BoundToStart,
+            0,
+            SGI_DISKLABEL_SIGNATURE,
+        ));
+    }
+
     /// Adds Mac OS sparse image (.sparseimage) signatures.
     pub fn add_sparseimage_signatures(&mut self) {
         self.signature_scanner.add_signature(Signature::new(
@@ -464,6 +475,7 @@ impl FormatScanner {
                 "ntfs1" => FormatIdentifier::Ntfs,
                 "pdi1" => FormatIdentifier::Pdi,
                 "qcow1" | "qcow2" | "qcow3" => FormatIdentifier::Qcow,
+                "sgilabel1" => FormatIdentifier::SgiDiskLabel,
                 "sparseimage1" => FormatIdentifier::SparseImage,
                 "udif1" => FormatIdentifier::Udif,
                 "vhd1" => FormatIdentifier::Vhd,
