@@ -462,15 +462,36 @@ mod tests {
         assert_eq!(block_range.logical_block_number, 0);
         assert_eq!(block_range.physical_block_number, 1);
         assert_eq!(block_range.number_of_blocks, 1);
-        assert!(block_range.range_type == ExtBlockRangeType::InFile);
+        assert_eq!(block_range.range_type, ExtBlockRangeType::InFile);
 
         let block_range: &ExtBlockRange = &block_ranges[1];
         assert_eq!(block_range.logical_block_number, 1);
         assert_eq!(block_range.physical_block_number, 0);
         assert_eq!(block_range.number_of_blocks, 15);
-        assert!(block_range.range_type == ExtBlockRangeType::Sparse);
+        assert_eq!(block_range.range_type, ExtBlockRangeType::Sparse);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_read_data_reference_with_missing_indirect_block() {
+        let mut test_struct = ExtBlockNumbersTree::new(1024, 16);
+
+        let test_data: Vec<u8> = get_test_data();
+        let test_data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
+
+        let test_data: Vec<u8> = vec![
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ];
+        let result: Result<(), ErrorTrace> =
+            test_struct.read_data_reference(&test_data, &test_data_stream, &mut block_ranges);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -498,7 +519,7 @@ mod tests {
         assert_eq!(block_range.logical_block_number, 0);
         assert_eq!(block_range.physical_block_number, 1);
         assert_eq!(block_range.number_of_blocks, 1);
-        assert!(block_range.range_type == ExtBlockRangeType::InFile);
+        assert_eq!(block_range.range_type, ExtBlockRangeType::InFile);
 
         Ok(())
     }
@@ -528,15 +549,37 @@ mod tests {
         assert_eq!(block_range.logical_block_number, 0);
         assert_eq!(block_range.physical_block_number, 2049);
         assert_eq!(block_range.number_of_blocks, 1);
-        assert!(block_range.range_type == ExtBlockRangeType::InFile);
+        assert_eq!(block_range.range_type, ExtBlockRangeType::InFile);
 
         let block_range: &ExtBlockRange = &block_ranges[1];
         assert_eq!(block_range.logical_block_number, 1);
         assert_eq!(block_range.physical_block_number, 0);
         assert_eq!(block_range.number_of_blocks, 15);
-        assert!(block_range.range_type == ExtBlockRangeType::Sparse);
+        assert_eq!(block_range.range_type, ExtBlockRangeType::Sparse);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_read_node_data_with_missing_indirect_block() {
+        let mut test_struct = ExtBlockNumbersTree::new(1024, 16);
+
+        let test_data: Vec<u8> = get_test_data();
+        let test_data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut logical_block_number: u64 = 0;
+        let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
+
+        let test_data: Vec<u8> = vec![0x05, 0x00, 0x00, 0x00];
+
+        let result: Result<(), ErrorTrace> = test_struct.read_node_data(
+            &test_data,
+            &test_data_stream,
+            &mut logical_block_number,
+            &mut block_ranges,
+            1,
+        );
+        assert!(result.is_err());
     }
 
     #[test]
@@ -562,14 +605,34 @@ mod tests {
         assert_eq!(block_range.logical_block_number, 0);
         assert_eq!(block_range.physical_block_number, 2049);
         assert_eq!(block_range.number_of_blocks, 1);
-        assert!(block_range.range_type == ExtBlockRangeType::InFile);
+        assert_eq!(block_range.range_type, ExtBlockRangeType::InFile);
 
         let block_range: &ExtBlockRange = &block_ranges[1];
         assert_eq!(block_range.logical_block_number, 1);
         assert_eq!(block_range.physical_block_number, 0);
         assert_eq!(block_range.number_of_blocks, 15);
-        assert!(block_range.range_type == ExtBlockRangeType::Sparse);
+        assert_eq!(block_range.range_type, ExtBlockRangeType::Sparse);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_read_node_at_position_beyond_size() {
+        let mut test_struct = ExtBlockNumbersTree::new(1024, 16);
+
+        let test_data: Vec<u8> = get_test_data();
+        let test_data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut logical_block_number: u64 = 0;
+        let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
+
+        let result: Result<(), ErrorTrace> = test_struct.read_node_at_position(
+            &test_data_stream,
+            SeekFrom::Start(1500),
+            &mut logical_block_number,
+            &mut block_ranges,
+            1,
+        );
+        assert!(result.is_err());
     }
 }

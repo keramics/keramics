@@ -162,6 +162,10 @@ impl ExtGroupDescriptorTable {
 mod tests {
     use super::*;
 
+    use std::io::SeekFrom;
+
+    use keramics_core::open_fake_data_stream;
+
     fn get_test_data() -> Vec<u8> {
         vec![
             0x12, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0x58, 0x0f,
@@ -183,5 +187,29 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add test_read_at_position
+    #[test]
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let test_data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut test_struct: ExtGroupDescriptorTable =
+            ExtGroupDescriptorTable::new(2, None, 32, 0, 1);
+        test_struct.read_at_position(&test_data_stream, SeekFrom::Start(0))?;
+
+        assert_eq!(test_struct.entries.len(), 1);
+        assert_eq!(test_struct.entries[0].inode_table_block_number, 20);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_at_position_with_unsupported_data_size() {
+        let test_data: Vec<u8> = get_test_data();
+        let test_data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut test_struct: ExtGroupDescriptorTable =
+            ExtGroupDescriptorTable::new(2, None, 1000000, 0, 1);
+        let result = test_struct.read_at_position(&test_data_stream, SeekFrom::Start(0));
+        assert!(result.is_err());
+    }
 }

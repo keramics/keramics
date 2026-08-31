@@ -562,7 +562,16 @@ mod tests {
         assert!(result.is_err());
     }
 
-    // TODO: add test_read_data_with_unsupported_checksum_type
+    #[test]
+    fn test_read_data_with_unsupported_checksum_type() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[101] = 0x04; // EXT_READ_ONLY_COMPATIBLE_FEATURE_FLAG_METADATA_CHECKSUM
+        test_data[373] = 0xff;
+
+        let mut test_struct = ExtSuperblock::new(&CharacterEncoding::Utf8);
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
 
     #[test]
     fn test_read_at_position() -> Result<(), ErrorTrace> {

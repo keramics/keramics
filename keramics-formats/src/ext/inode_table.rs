@@ -179,5 +179,33 @@ impl ExtInodeTable {
 mod tests {
     use super::*;
 
-    // TODO: add tests for get_inode_by_identifier.
+    use keramics_core::open_fake_data_stream;
+
+    #[test]
+    fn test_get_inode_by_identifier_with_unsupported_inode_number() -> Result<(), ErrorTrace> {
+        let mut test_struct: ExtInodeTable = ExtInodeTable::new();
+        test_struct.initialize(4, None, 1024, 256, 16, Vec::new(), 16)?;
+
+        let test_data: Vec<u8> = Vec::new();
+        let test_data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let result = test_struct.get_inode_by_identifier(&test_data_stream, 17);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_by_identifier_with_missing_group_descriptor() -> Result<(), ErrorTrace> {
+        let mut test_struct: ExtInodeTable = ExtInodeTable::new();
+        test_struct.initialize(4, None, 1024, 256, 16, Vec::new(), 16)?;
+
+        let test_data: Vec<u8> = Vec::new();
+        let test_data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let result = test_struct.get_inode_by_identifier(&test_data_stream, 1);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 }

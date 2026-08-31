@@ -21,7 +21,7 @@ use crate::indexed_hash_map::IndexedHashMap;
 
 use super::attributes_entry::ExtAttributesEntry;
 use super::block_numbers_tree::ExtBlockNumbersTree;
-use super::block_range::ExtBlockRange;
+use super::block_range::{ExtBlockRange, ExtBlockRangeType};
 use super::constants::*;
 use super::extents_tree::ExtExtentsTree;
 use super::inode_ext2::Ext2Inode;
@@ -243,6 +243,8 @@ mod tests {
 
     use keramics_datetime::{PosixTime32, PosixTime64Ns};
 
+    use keramics_core::open_fake_data_stream;
+
     fn get_test_data_ext2() -> Vec<u8> {
         vec![
             0xa4, 0x81, 0xe8, 0x03, 0x5e, 0x2c, 0x00, 0x00, 0x0a, 0xea, 0x78, 0x67, 0x09, 0xea,
@@ -297,8 +299,100 @@ mod tests {
         ]
     }
 
-    // TODO: add tests for has_inline_data
-    // TODO: add tests for read_block_ranges
+    #[test]
+    fn test_has_inline_data() {
+        let mut test_struct = ExtInode::new();
+        test_struct.flags = EXT_INODE_FLAG_INLINE_DATA;
+
+        assert_eq!(test_struct.has_inline_data(), true);
+    }
+
+    #[test]
+    fn test_read_block_ranges_with_inline_data() -> Result<(), ErrorTrace> {
+        let mut test_struct = ExtInode::new();
+        test_struct.file_mode = EXT_FILE_MODE_TYPE_REGULAR_FILE;
+        test_struct.flags = EXT_INODE_FLAG_INLINE_DATA;
+        test_struct.data_size = 60;
+
+        let test_data: Vec<u8> = Vec::new();
+        let test_data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
+        test_struct.read_block_ranges(4, &test_data_stream, 1024, &mut block_ranges)?;
+
+        assert_eq!(block_ranges.len(), 1);
+        assert_eq!(block_ranges[0].logical_block_number, 0);
+        assert_eq!(block_ranges[0].number_of_blocks, 1);
+        assert_eq!(block_ranges[0].range_type, ExtBlockRangeType::Sparse);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_block_ranges_with_ext4_extents() -> Result<(), ErrorTrace> {
+        let mut test_struct = ExtInode::new();
+        test_struct.file_mode = EXT_FILE_MODE_TYPE_REGULAR_FILE;
+        test_struct.flags = EXT_INODE_FLAG_HAS_EXTENTS;
+        test_struct.data_size = 2048;
+
+        test_struct.data_reference[0..24].copy_from_slice(&[
+            0x0a, 0xf3, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00,
+        ]);
+        let test_data: Vec<u8> = Vec::new();
+        let test_data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
+        test_struct.read_block_ranges(4, &test_data_stream, 1024, &mut block_ranges)?;
+
+        assert_eq!(block_ranges.len(), 1);
+        assert_eq!(block_ranges[0].logical_block_number, 0);
+        assert_eq!(block_ranges[0].physical_block_number, 100);
+        assert_eq!(block_ranges[0].number_of_blocks, 2);
+        assert_eq!(block_ranges[0].range_type, ExtBlockRangeType::InFile);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_block_ranges_with_ext4_extents_and_sparse_tail() -> Result<(), ErrorTrace> {
+        let mut test_struct = ExtInode::new();
+        test_struct.file_mode = EXT_FILE_MODE_TYPE_REGULAR_FILE;
+        test_struct.flags = EXT_INODE_FLAG_HAS_EXTENTS;
+        test_struct.data_size = 4096;
+
+        test_struct.data_reference[0..24].copy_from_slice(&[
+            0x0a, 0xf3, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00,
+        ]);
+        let test_data: Vec<u8> = Vec::new();
+        let test_data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
+        test_struct.read_block_ranges(4, &test_data_stream, 1024, &mut block_ranges)?;
+
+        assert_eq!(block_ranges.len(), 2);
+        assert_eq!(block_ranges[1].range_type, ExtBlockRangeType::Sparse);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_block_ranges_with_character_device() -> Result<(), ErrorTrace> {
+        let mut test_struct = ExtInode::new();
+        test_struct.file_mode = EXT_FILE_MODE_TYPE_CHARACTER_DEVICE;
+        test_struct.data_size = 11358;
+
+        let test_data: Vec<u8> = Vec::new();
+        let test_data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
+        test_struct.read_block_ranges(4, &test_data_stream, 1024, &mut block_ranges)?;
+
+        assert_eq!(block_ranges.len(), 0);
+
+        Ok(())
+    }
 
     #[test]
     fn test_read_data_ext2() -> Result<(), ErrorTrace> {

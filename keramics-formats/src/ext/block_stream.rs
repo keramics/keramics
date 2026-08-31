@@ -58,7 +58,20 @@ mod tests {
         )))
     }
 
-    // TODO: add tests for get_offset.
+    #[test]
+    fn test_get_offset() -> Result<(), ErrorTrace> {
+        let mut block_stream: ExtBlockStream = get_block_stream()?;
+
+        let offset: u64 = block_stream.get_offset()?;
+        assert_eq!(offset, 0);
+
+        block_stream.seek(SeekFrom::Start(1024))?;
+
+        let offset: u64 = block_stream.get_offset()?;
+        assert_eq!(offset, 1024);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {

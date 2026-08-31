@@ -290,59 +290,51 @@ mod tests {
 
     #[test]
     fn test_handle_preprocessing() -> Result<(), Error> {
-        let input: &str = r####"
-        [
-          {
-            "root": ".",
-            "config": {},
-            "renderer": "html",
-            "mdbook_version": "0.5.2"
-          },
-          {
-            "items": [
-              {
-                "Chapter": {
-                  "name": "Characteristics",
-                  "content": "### Characteristics\n\n| Characteristics | Description |\n| --- | --- |\n| Byte order | big-endian |\n",
-                  "path": "intro.md",
-                  "sub_items": [],
-                  "parent_names": []
-                }
-              }
-            ]
-          }
-        ]
-        "####;
-
+        let input: &str = concat!(
+            "[\n",
+            "    {\n",
+            "        \"root\": \".\",\n",
+            "        \"config\": {},\n",
+            "        \"renderer\": \"html\",\n",
+            "        \"mdbook_version\": \"0.5.2\"\n",
+            "    },\n",
+            "    {\n",
+            "        \"items\": [\n",
+            "            {\n",
+            "                \"Chapter\": {\n",
+            "                    \"name\": \"Characteristics\",\n",
+            "                    \"content\": \"",
+            "### Characteristics\\n\\n",
+            "| Characteristics | Description |\\n",
+            "| --- | --- |\\n| Byte order | big-endian |\\n",
+            "\",\n",
+            "                    \"path\": \"intro.md\",\n",
+            "                    \"sub_items\": [],\n",
+            "                    \"parent_names\": []\n",
+            "                }\n",
+            "            }\n",
+            "        ]\n",
+            "    }\n",
+            "]\n",
+        );
         let result: String = handle_preprocessing(input.as_bytes())?;
-
         let output: Book = serde_json::from_str(&result)?;
-
         let mut sections = output.items.iter();
 
-        if let Some(BookItem::Chapter(chapter)) = sections.next() {
+        let book_item: &BookItem = sections.next().unwrap();
+        assert!(matches!(book_item, BookItem::Chapter(_)));
+
+        let expected_content: &str = concat!(
+            "### Characteristics  \n",
+            "<div class=\"table-wrapper\">",
+            "<table>",
+            "<thead><th>Characteristics</th><th>Description</th></thead>",
+            "<tr><td>Byte order</td><td>big-endian</td></tr>\n",
+            "</table></div>",
+        );
+        if let BookItem::Chapter(chapter) = book_item {
             assert_eq!(chapter.name, "Characteristics");
-
-            assert!(
-                chapter
-                    .content
-                    .contains("<div class=\"table-wrapper\"><table>")
-            );
-            assert!(
-                chapter
-                    .content
-                    .contains("<thead><th>Characteristics</th><th>Description</th></thead>")
-            );
-            assert!(
-                chapter
-                    .content
-                    .contains("<td>Byte order</td><td>big-endian</td>")
-            );
-            assert!(chapter.content.contains("</table></div>"));
-
-            assert!(!chapter.content.contains("| Byte order | big-endian |"));
-        } else {
-            panic!("No chapter found");
+            assert_eq!(chapter.content, expected_content);
         }
         Ok(())
     }
@@ -377,28 +369,25 @@ mod tests {
         book.push_item(chapter);
 
         let preprocessor: TablesPreprocessor = TablesPreprocessor::new();
-
         let processed_book: Book = preprocessor.run(&context, book)?;
-
         let mut chapters = processed_book.iter();
 
-        if let Some(BookItem::Chapter(ch)) = chapters.next() {
-            assert_eq!(ch.name, "Characteristics");
+        let book_item: &BookItem = chapters.next().unwrap();
+        assert!(matches!(book_item, BookItem::Chapter(_)));
 
-            assert!(ch.content.contains("<div class=\"table-wrapper\"><table>"));
-            assert!(
-                ch.content
-                    .contains("<thead><th>Characteristics</th><th>Description</th></thead>")
-            );
-            assert!(
-                ch.content
-                    .contains("<td>Byte order</td><td>big-endian</td>")
-            );
-            assert!(ch.content.contains("</table></div>"));
-
-            assert!(!ch.content.contains("| Byte order | big-endian |"));
-        } else {
-            panic!("No chapter found");
+        let expected_content: &str = concat!(
+            "### Characteristics  \n",
+            "<div class=\"table-wrapper\">",
+            "<table>",
+            "<thead><th>Characteristics</th><th>Description</th></thead>",
+            "<tr><td>Byte order</td><td>big-endian</td></tr>\n",
+            "<tr><td>Date and time values</td><td>N/A</td></tr>\n",
+            "</table>",
+            "</div>",
+        );
+        if let BookItem::Chapter(chapter) = book_item {
+            assert_eq!(chapter.name, "Characteristics");
+            assert_eq!(chapter.content, expected_content);
         }
         Ok(())
     }
