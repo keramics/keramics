@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use keramics_core::ErrorTrace;
 use keramics_encodings::CharacterEncoding;
 use keramics_types::ByteString;
 

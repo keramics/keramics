@@ -132,6 +132,9 @@ pub struct XfsSuperblock {
     /// Secondary feature flags.
     pub secondary_feature_flags: u32,
 
+    /// Copy of secondary feature flags.
+    pub secondary_feature_flags_copy: u32,
+
     /// Compatible feature flags.
     pub compatible_feature_flags: u32,
 
@@ -173,6 +176,7 @@ impl XfsSuperblock {
             volume_label: ByteString::new_with_encoding(encoding),
             directory_block_size: 0,
             secondary_feature_flags: 0,
+            secondary_feature_flags_copy: 0,
             compatible_feature_flags: 0,
             read_only_compatible_feature_flags: 0,
             incompatible_feature_flags: 0,
@@ -284,17 +288,9 @@ impl XfsSuperblock {
             )));
         }
         self.directory_block_size *= self.block_size;
-
         self.secondary_feature_flags = bytes_to_u32_be!(data, 200);
+        self.secondary_feature_flags_copy = bytes_to_u32_be!(data, 204);
 
-        let value_32bit: u32 = bytes_to_u32_be!(data, 204);
-
-        if self.secondary_feature_flags != value_32bit {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Secondary feature flags: 0x{:08x} does not match copy: 0x{:08x}",
-                self.secondary_feature_flags, value_32bit
-            )));
-        }
         if self.format_version >= 5 {
             self.compatible_feature_flags = bytes_to_u32_be!(data, 208);
             self.read_only_compatible_feature_flags = bytes_to_u32_be!(data, 212);
@@ -374,6 +370,7 @@ mod tests {
         assert_eq!(test_struct.volume_label, ByteString::from("xfs_test"));
         assert_eq!(test_struct.directory_block_size, 4096);
         assert_eq!(test_struct.secondary_feature_flags, 0x0000018a);
+        assert_eq!(test_struct.secondary_feature_flags_copy, 0x0000018a);
         assert_eq!(test_struct.compatible_feature_flags, 0x00000000);
         assert_eq!(test_struct.read_only_compatible_feature_flags, 0x0000000f);
         assert_eq!(test_struct.incompatible_feature_flags, 0x000000e3);
@@ -446,16 +443,6 @@ mod tests {
 
     // TODO: add tests with invalid allocation_group_size_log2
     // TODO: add tests with invalid directory_block_size_log2
-
-    #[test]
-    fn test_read_data_with_invalid_secondary_feature_flags_copy() {
-        let mut test_data: Vec<u8> = get_test_data();
-        test_data[204] = 0xff;
-
-        let mut test_struct = XfsSuperblock::new(&CharacterEncoding::Utf8);
-        let result = test_struct.read_data(&test_data);
-        assert!(result.is_err());
-    }
 
     #[test]
     fn test_read_at_position() -> Result<(), ErrorTrace> {

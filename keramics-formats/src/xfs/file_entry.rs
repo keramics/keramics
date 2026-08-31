@@ -31,6 +31,7 @@ use super::constants::*;
 use super::directory_entry::XfsDirectoryEntry;
 use super::directory_list::XfsDirectoryList;
 use super::directory_table::XfsDirectoryTable;
+use super::directory_tree::XfsDirectoryTree;
 use super::extended_attribute::XfsExtendedAttribute;
 use super::extended_attributes::XfsExtendedAttributesIterator;
 use super::extent_list::XfsExtentList;
@@ -532,8 +533,26 @@ impl XfsFileEntry {
                         }
                     }
                 } else {
-                    // TODO: if not LIBFSXFS_FEATURE_FLAG_DIRECTORY_V2 read directory block
-                    todo!();
+                    let directory_tree: XfsDirectoryTree = XfsDirectoryTree::new(
+                        &self.character_encoding,
+                        self.inode_tree.allocation_group_size,
+                        self.inode_tree.number_of_relative_block_number_bits,
+                        self.inode_tree.block_size,
+                    );
+                    match directory_tree.read_entries(
+                        &self.data_stream,
+                        &self.inode.extents,
+                        &mut self.sub_directory_entries,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read directory tree"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
             }
             _ => {

@@ -242,6 +242,13 @@ impl XfsFileSystem {
                 }
             }
             if allocation_group_index == 0 {
+                // Note that the flag values of successive superblocks can contain random data.
+                if superblock.secondary_feature_flags != superblock.secondary_feature_flags_copy {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Secondary feature flags: 0x{:08x} does not match copy: 0x{:08x}",
+                        superblock.secondary_feature_flags, superblock.secondary_feature_flags_copy
+                    )));
+                }
                 self.block_size = superblock.block_size;
                 self.bytes_per_sector = superblock.bytes_per_sector;
                 self.inode_size = superblock.inode_size;
