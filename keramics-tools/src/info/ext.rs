@@ -16,8 +16,8 @@ use std::fmt;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_encodings::CharacterEncoding;
-use keramics_formats::Path;
 use keramics_formats::ext::{ExtExtendedAttribute, ExtFileEntry, ExtFileSystem};
+use keramics_formats::{ExtendedAttributeIterator, Path};
 use keramics_types::ByteString;
 
 use crate::formatters::ByteSize;

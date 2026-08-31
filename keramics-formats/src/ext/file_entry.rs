@@ -21,7 +21,7 @@ use keramics_types::ByteString;
 
 use crate::indexed_hash_map::IndexedHashMap;
 use crate::path_component::PathComponent;
-use crate::traits::FileEntryIterator;
+use crate::traits::{ExtendedAttributeIterator, FileEntryIterator};
 
 use super::attributes_block::ExtAttributesBlock;
 use super::attributes_entry::ExtAttributesEntry;
@@ -277,20 +277,6 @@ impl ExtFileEntry {
         }
     }
 
-    /// Retrieves the number of extended attributes.
-    pub fn get_number_of_extended_attributes(&mut self) -> Result<usize, ErrorTrace> {
-        if !self.attributes_read {
-            match self.read_attributes() {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
-                    return Err(error);
-                }
-            }
-        }
-        Ok(self.inode.attributes.len())
-    }
-
     /// Retrieves the data stream of an extended attribute.
     fn get_extended_attribute_data_stream(
         &self,
@@ -350,46 +336,6 @@ impl ExtFileEntry {
                     ),
                 ))))
             }
-        }
-    }
-
-    /// Retrieves a specific extended attribute.
-    pub fn get_extended_attribute_by_index(
-        &mut self,
-        extended_attribute_index: usize,
-    ) -> Result<ExtExtendedAttribute, ErrorTrace> {
-        if !self.attributes_read {
-            match self.read_attributes() {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
-                    return Err(error);
-                }
-            }
-        }
-        match self
-            .inode
-            .attributes
-            .get_key_value_by_index(extended_attribute_index)
-        {
-            Some((name, attributes_entry)) => {
-                let data_stream: DataStreamReference =
-                    match self.get_extended_attribute_data_stream(attributes_entry) {
-                        Ok(data_stream) => data_stream,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to retrieve data stream"
-                            );
-                            return Err(error);
-                        }
-                    };
-                Ok(ExtExtendedAttribute::new(name, data_stream))
-            }
-            None => Err(keramics_core::error_trace_new!(format!(
-                "Missing extended attribute: {}",
-                extended_attribute_index
-            ))),
         }
     }
 
@@ -603,6 +549,64 @@ impl ExtFileEntry {
         self.sub_directory_entries_read = true;
 
         Ok(())
+    }
+}
+
+impl ExtendedAttributeIterator for ExtFileEntry {
+    type ExtendedAttributeItem = ExtExtendedAttribute;
+
+    /// Retrieves the number of extended attributes.
+    fn get_number_of_extended_attributes(&mut self) -> Result<usize, ErrorTrace> {
+        if !self.attributes_read {
+            match self.read_attributes() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                    return Err(error);
+                }
+            }
+        }
+        Ok(self.inode.attributes.len())
+    }
+
+    /// Retrieves a specific extended attribute.
+    fn get_extended_attribute_by_index(
+        &mut self,
+        extended_attribute_index: usize,
+    ) -> Result<Self::ExtendedAttributeItem, ErrorTrace> {
+        if !self.attributes_read {
+            match self.read_attributes() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                    return Err(error);
+                }
+            }
+        }
+        match self
+            .inode
+            .attributes
+            .get_key_value_by_index(extended_attribute_index)
+        {
+            Some((name, attributes_entry)) => {
+                let data_stream: DataStreamReference =
+                    match self.get_extended_attribute_data_stream(attributes_entry) {
+                        Ok(data_stream) => data_stream,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve data stream"
+                            );
+                            return Err(error);
+                        }
+                    };
+                Ok(ExtExtendedAttribute::new(name, data_stream))
+            }
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing extended attribute: {}",
+                extended_attribute_index
+            ))),
+        }
     }
 }
 

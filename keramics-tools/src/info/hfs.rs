@@ -15,10 +15,10 @@ use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
-use keramics_formats::Path;
 use keramics_formats::hfs::{
     HfsExtendedAttribute, HfsFileEntry, HfsFileSystem, HfsFormat, HfsString,
 };
+use keramics_formats::{ExtendedAttributeIterator, Path};
 
 use crate::formatters::ByteSize;
 

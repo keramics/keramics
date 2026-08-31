@@ -22,6 +22,21 @@ pub trait BlockReader {
     fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace>;
 }
 
+/// Extended attribute iterator trait.
+pub trait ExtendedAttributeIterator {
+    /// Extended attribute item.
+    type ExtendedAttributeItem;
+
+    /// Retrieves the number of extended attributes.
+    fn get_number_of_extended_attributes(&mut self) -> Result<usize, ErrorTrace>;
+
+    /// Retrieves a specific extended attribute.
+    fn get_extended_attribute_by_index(
+        &mut self,
+        extended_attribute_index: usize,
+    ) -> Result<Self::ExtendedAttributeItem, ErrorTrace>;
+}
+
 /// File entry iterator trait.
 pub trait FileEntryIterator {
     /// Retrieves the number of sub file entries.

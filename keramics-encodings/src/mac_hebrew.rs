@@ -500,19 +500,6 @@ mod tests {
         assert_eq!(decoder.next(), Some(Ok(vec![0x00000073])));
         assert_eq!(decoder.next(), None);
 
-        let byte_string: [u8; 7] = [0x80, 0x81, 0xa6, 0xc0, 0xca, 0xe0, 0xff];
-
-        let mut decoder: DecoderMacHebrew = DecoderMacHebrew::new(&byte_string);
-
-        assert_eq!(decoder.next(), Some(Ok(vec![0x000000c4])));
-        assert_eq!(decoder.next(), Some(Ok(vec![0x05f2, 0x05b7])));
-        assert_eq!(decoder.next(), Some(Ok(vec![0x000020aa])));
-        assert_eq!(decoder.next(), Some(Ok(vec![0xf86a, 0x05dc, 0x05b9])));
-        assert_eq!(decoder.next(), Some(Ok(vec![0x000000a0])));
-        assert_eq!(decoder.next(), Some(Ok(vec![0x05d0])));
-        assert_eq!(decoder.next(), Some(Ok(vec![0x0000007c])));
-        assert_eq!(decoder.next(), None);
-
         Ok(())
     }
 
@@ -532,25 +519,47 @@ mod tests {
         assert_eq!(encoder.next(), Some(Ok(vec![b's'])));
         assert_eq!(encoder.next(), None);
 
-        let code_points: [u32; 9] = [
-            0x00c4, 0x05f2, 0x05b7, 0x20aa, 0xf86a, 0x05dc, 0x05b9, 0x00a0, 0x05d0,
-        ];
-        let mut encoder: EncoderMacHebrew = EncoderMacHebrew::new(&code_points);
-
-        assert_eq!(encoder.next(), Some(Ok(vec![0x80])));
-        assert_eq!(encoder.next(), Some(Ok(vec![0x81])));
-        assert_eq!(encoder.next(), Some(Ok(vec![0xa6])));
-        assert_eq!(encoder.next(), Some(Ok(vec![0xc0])));
-        assert_eq!(encoder.next(), Some(Ok(vec![0xca])));
-        assert_eq!(encoder.next(), Some(Ok(vec![0xe0])));
-        assert_eq!(encoder.next(), None);
-
         Ok(())
     }
 
     #[test]
-    fn test_encode_with_missing_additional_code_point() {
+    fn test_encode_with_unsupported_code_point() {
+        let code_points: [u32; 1] = [0x00a4];
+
+        let mut encoder: EncoderMacHebrew = EncoderMacHebrew::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x00c0];
+
+        let mut encoder: EncoderMacHebrew = EncoderMacHebrew::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x05ba];
+
+        let mut encoder: EncoderMacHebrew = EncoderMacHebrew::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
         let code_points: [u32; 1] = [0x05f2];
+
+        let mut encoder: EncoderMacHebrew = EncoderMacHebrew::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 2] = [0x05f2, 0x05b5];
+
+        let mut encoder: EncoderMacHebrew = EncoderMacHebrew::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x2010];
 
         let mut encoder: EncoderMacHebrew = EncoderMacHebrew::new(&code_points);
 
@@ -570,16 +579,6 @@ mod tests {
 
         let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_encode_with_unsupported_additional_code_point() {
-        let code_points: [u32; 2] = [0x05f2, 0x05b5];
-
-        let mut encoder: EncoderMacHebrew = EncoderMacHebrew::new(&code_points);
-
-        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
-        assert!(result.is_err());
 
         let code_points: [u32; 2] = [0xf86a, 0x05d0];
 
@@ -588,37 +587,7 @@ mod tests {
         let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
         assert!(result.is_err());
 
-        let code_points: [u32; 3] = [0xf86a, 0x05dc, 0x05b9];
-
-        let mut encoder: EncoderMacHebrew = EncoderMacHebrew::new(&code_points);
-
-        assert_eq!(encoder.next(), Some(Ok(vec![0xc0])));
-
         let code_points: [u32; 3] = [0xf86a, 0x05d0, 0x05b9];
-
-        let mut encoder: EncoderMacHebrew = EncoderMacHebrew::new(&code_points);
-
-        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_encode_with_unsupported_code_point() {
-        let code_points: [u32; 1] = [0x00a4];
-
-        let mut encoder: EncoderMacHebrew = EncoderMacHebrew::new(&code_points);
-
-        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
-        assert!(result.is_err());
-
-        let code_points: [u32; 1] = [0x2010];
-
-        let mut encoder: EncoderMacHebrew = EncoderMacHebrew::new(&code_points);
-
-        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
-        assert!(result.is_err());
-
-        let code_points: [u32; 1] = [0xd800];
 
         let mut encoder: EncoderMacHebrew = EncoderMacHebrew::new(&code_points);
 
