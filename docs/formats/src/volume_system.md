@@ -21,5 +21,6 @@ This documentation uses the term volume systems in a broad sense to describe:
 * [Linux Logical Volume Manager (LVM)](linuxlvm.md)
 * [Linux Unified Key Setup (LUKS) Disk Encryption](luksde.md)
 * [Master Boot Record (MBR)](mbr.md)
+* [SGI disklabel (sgilabel)](sgilabel.md)
 
 Also see: [hybrid volume and file system formats](hybrid.md)

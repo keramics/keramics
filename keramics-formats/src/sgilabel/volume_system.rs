@@ -17,13 +17,13 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 
 use crate::traits::PartitionIterator;
 
-use super::disklabel::BsdDiskLabel;
-use super::partition::BsdDiskLabelPartition;
-use super::partition_entry::BsdDiskLabelPartitionEntry;
-use super::partitions::BsdDiskLabelPartitionsIterator;
+use super::disklabel::SgiDiskLabel;
+use super::partition::SgiDiskLabelPartition;
+use super::partition_entry::SgiDiskLabelPartitionEntry;
+use super::partitions::SgiDiskLabelPartitionsIterator;
 
-/// BSD disklabel (bsdlabel) volume system.
-pub struct BsdDiskLabelVolumeSystem {
+/// SGI disklabel (sgilabel) volume system.
+pub struct SgiDiskLabelVolumeSystem {
     /// Data stream.
     data_stream: Option<DataStreamReference>,
 
@@ -31,10 +31,10 @@ pub struct BsdDiskLabelVolumeSystem {
     bytes_per_sector: u32,
 
     /// Disklabel entries.
-    disklabel_entries: Vec<BsdDiskLabelPartitionEntry>,
+    disklabel_entries: Vec<SgiDiskLabelPartitionEntry>,
 }
 
-impl BsdDiskLabelVolumeSystem {
+impl SgiDiskLabelVolumeSystem {
     /// Creates a volume system.
     pub fn new() -> Self {
         Self {
@@ -55,8 +55,8 @@ impl BsdDiskLabelVolumeSystem {
     }
 
     /// Retrieves a partitions iterator.
-    pub fn partitions(&self) -> BsdDiskLabelPartitionsIterator<'_> {
-        BsdDiskLabelPartitionsIterator::new(self, self.disklabel_entries.len())
+    pub fn partitions(&self) -> SgiDiskLabelPartitionsIterator<'_> {
+        SgiDiskLabelPartitionsIterator::new(self, self.disklabel_entries.len())
     }
 
     /// Reads the volume system from a data stream.
@@ -64,19 +64,19 @@ impl BsdDiskLabelVolumeSystem {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        let mut disklabel: BsdDiskLabel = BsdDiskLabel::new();
+        let mut disklabel: SgiDiskLabel = SgiDiskLabel::new();
 
-        match disklabel.read_at_position(data_stream, SeekFrom::Start(512)) {
+        match disklabel.read_at_position(data_stream, SeekFrom::Start(0)) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    "Unable to read disklabel at offset: 512 (0x00000200)",
+                    "Unable to read disklabel at offset: 0 (0x00000000)",
                 );
                 return Err(error);
             }
         }
-        self.bytes_per_sector = disklabel.bytes_per_sector;
+        self.bytes_per_sector = 512;
         self.disklabel_entries = disklabel.entries;
 
         self.data_stream = Some(data_stream.clone());
@@ -85,8 +85,8 @@ impl BsdDiskLabelVolumeSystem {
     }
 }
 
-impl PartitionIterator for BsdDiskLabelVolumeSystem {
-    type PartitionItem = BsdDiskLabelPartition;
+impl PartitionIterator for SgiDiskLabelVolumeSystem {
+    type PartitionItem = SgiDiskLabelPartition;
 
     /// Retrieves a partition by index.
     fn get_partition_by_index(
@@ -95,7 +95,7 @@ impl PartitionIterator for BsdDiskLabelVolumeSystem {
     ) -> Result<Self::PartitionItem, ErrorTrace> {
         match self.disklabel_entries.get(partition_index) {
             Some(partition_entry) => match self.data_stream.as_ref() {
-                Some(data_stream) => Ok(BsdDiskLabelPartition::new(
+                Some(data_stream) => Ok(SgiDiskLabelPartition::new(
                     &data_stream,
                     self.bytes_per_sector,
                     partition_entry,
@@ -158,10 +158,10 @@ mod tests {
         0x00, 0x00,
     ];
 
-    fn get_volume_system() -> Result<BsdDiskLabelVolumeSystem, ErrorTrace> {
-        let mut volume_system: BsdDiskLabelVolumeSystem = BsdDiskLabelVolumeSystem::new();
+    fn get_volume_system() -> Result<SgiDiskLabelVolumeSystem, ErrorTrace> {
+        let mut volume_system: SgiDiskLabelVolumeSystem = SgiDiskLabelVolumeSystem::new();
 
-        let path_string: String = get_test_data_path("bsdlabel/bsdlabel.raw");
+        let path_string: String = get_test_data_path("sgilabel/sgilabel.raw");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         volume_system.read_data_stream(&data_stream)?;
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
-        let volume_system: BsdDiskLabelVolumeSystem = get_volume_system()?;
+        let volume_system: SgiDiskLabelVolumeSystem = get_volume_system()?;
 
         let bytes_per_sector: u32 = volume_system.get_bytes_per_sector();
         assert_eq!(bytes_per_sector, 512);
@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_get_number_of_partitions() -> Result<(), ErrorTrace> {
-        let volume_system: BsdDiskLabelVolumeSystem = get_volume_system()?;
+        let volume_system: SgiDiskLabelVolumeSystem = get_volume_system()?;
 
         let number_of_partitions: usize = volume_system.get_number_of_partitions();
         assert_eq!(number_of_partitions, 1);
@@ -191,21 +191,21 @@ mod tests {
 
     #[test]
     fn test_get_partition_by_index() -> Result<(), ErrorTrace> {
-        let volume_system: BsdDiskLabelVolumeSystem = get_volume_system()?;
+        let volume_system: SgiDiskLabelVolumeSystem = get_volume_system()?;
 
-        let partition: BsdDiskLabelPartition = volume_system.get_partition_by_index(0)?;
+        let partition: SgiDiskLabelPartition = volume_system.get_partition_by_index(0)?;
 
-        assert_eq!(partition.offset, 8192);
-        assert_eq!(partition.size, 4186112);
+        assert_eq!(partition.offset, 2580480);
+        assert_eq!(partition.size, 1049088);
 
         Ok(())
     }
 
     #[test]
     fn test_get_partition_by_index_with_unsupported_partition_index() -> Result<(), ErrorTrace> {
-        let volume_system: BsdDiskLabelVolumeSystem = get_volume_system()?;
+        let volume_system: SgiDiskLabelVolumeSystem = get_volume_system()?;
 
-        let result: Result<BsdDiskLabelPartition, ErrorTrace> =
+        let result: Result<SgiDiskLabelPartition, ErrorTrace> =
             volume_system.get_partition_by_index(1);
         assert!(result.is_err());
 
@@ -214,10 +214,10 @@ mod tests {
 
     #[test]
     fn test_get_partition_by_index_without_data_stream() {
-        let mut volume_system: BsdDiskLabelVolumeSystem = BsdDiskLabelVolumeSystem::new();
+        let mut volume_system: SgiDiskLabelVolumeSystem = SgiDiskLabelVolumeSystem::new();
         volume_system
             .disklabel_entries
-            .push(BsdDiskLabelPartitionEntry::new());
+            .push(SgiDiskLabelPartitionEntry::new());
 
         let result = volume_system.get_partition_by_index(0);
         assert!(result.is_err());
@@ -225,15 +225,15 @@ mod tests {
 
     #[test]
     fn test_partitions() -> Result<(), ErrorTrace> {
-        let volume_system: BsdDiskLabelVolumeSystem = get_volume_system()?;
+        let volume_system: SgiDiskLabelVolumeSystem = get_volume_system()?;
 
-        let mut partitions_iterator: BsdDiskLabelPartitionsIterator = volume_system.partitions();
+        let mut partitions_iterator: SgiDiskLabelPartitionsIterator = volume_system.partitions();
 
-        let result: Option<Result<BsdDiskLabelPartition, ErrorTrace>> = partitions_iterator.next();
+        let result: Option<Result<SgiDiskLabelPartition, ErrorTrace>> = partitions_iterator.next();
         assert!(result.is_some());
         assert!(result.unwrap().is_ok());
 
-        let result: Option<Result<BsdDiskLabelPartition, ErrorTrace>> =
+        let result: Option<Result<SgiDiskLabelPartition, ErrorTrace>> =
             partitions_iterator.skip(1).next();
         assert!(result.is_none());
 
@@ -242,9 +242,9 @@ mod tests {
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
-        let mut volume_system: BsdDiskLabelVolumeSystem = BsdDiskLabelVolumeSystem::new();
+        let mut volume_system: SgiDiskLabelVolumeSystem = SgiDiskLabelVolumeSystem::new();
 
-        let path_string: String = get_test_data_path("bsdlabel/bsdlabel.raw");
+        let path_string: String = get_test_data_path("sgilabel/sgilabel.raw");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         volume_system.read_data_stream(&data_stream)?;
@@ -257,10 +257,10 @@ mod tests {
 
     #[test]
     fn test_read_data_stream_with_unsupported_size() {
-        let mut volume_system: BsdDiskLabelVolumeSystem = BsdDiskLabelVolumeSystem::new();
+        let mut volume_system: SgiDiskLabelVolumeSystem = SgiDiskLabelVolumeSystem::new();
 
         let data_stream: DataStreamReference =
-            open_fake_data_stream_with_offset(&TEST_DISKLABEL[0..147], 512);
+            open_fake_data_stream_with_offset(&TEST_DISKLABEL[0..511], 512);
 
         let result: Result<(), ErrorTrace> = volume_system.read_data_stream(&data_stream);
         assert!(result.is_err());

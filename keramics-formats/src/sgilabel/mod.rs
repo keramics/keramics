@@ -12,12 +12,13 @@
  */
 
 pub mod constants;
+mod device_parameters;
 mod disklabel;
-mod header;
 mod partition;
 mod partition_entry;
 mod partitions;
+mod volume_descriptor;
 mod volume_system;
 
-pub use partition::BsdDiskLabelPartition;
-pub use volume_system::BsdDiskLabelVolumeSystem;
+pub use partition::SgiDiskLabelPartition;
+pub use volume_system::SgiDiskLabelVolumeSystem;

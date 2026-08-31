@@ -22,6 +22,7 @@
   * [Linux Logical Volume Manager (LVM)](linuxlvm.md)
   * [Linux Unified Key Setup (LUKS) Disk Encryption](luksde.md)
   * [Master Boot Record (MBR)](mbr.md)
+  * [SGI disklabel (sgilabel)](sgilabel.md)
 * [File system formats](file_system.md)
   * [Apple File System Compression (decmpfs)](decmpfs.md)
   * [Extended File System (ext)](ext.md)

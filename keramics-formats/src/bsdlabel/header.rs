@@ -65,7 +65,7 @@ pub struct BsdDiskLabelHeader {
 }
 
 impl BsdDiskLabelHeader {
-    /// Creates a new disklabel header.
+    /// Creates a new header.
     pub fn new() -> Self {
         Self {
             bytes_per_sector: 0,
@@ -74,7 +74,7 @@ impl BsdDiskLabelHeader {
         }
     }
 
-    /// Reads the disklabel header from a buffer.
+    /// Reads the header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 148 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));

@@ -258,6 +258,10 @@ pub enum FormatType {
     /// QEMU Copy-On-Write (QCOW)
     Qcow,
 
+    /// SGI disklabel (sgilabel)
+    #[value(name = "sgilabel")]
+    SgiDiskLabel,
+
     /// Mac OS sparse bundle (.sparsebundle)
     #[value(name = "sparsebundle")]
     SparseBundle,

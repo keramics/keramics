@@ -10,7 +10,7 @@ A BSD disklabel consists of one or more partition entries, labeled alphabeticall
 > Note that BSD disklabel originally contained 8 entries for describing partitions and some BSD
 > variants have since increased this to 16 partitions.
 
-Labels "a", "b", "c" and "d" have a predefined meaning:
+Certain labels have a predefined meaning, such as:
 
 * "a" is the "root" partition
 * "b" is the "swap" partition
@@ -67,7 +67,7 @@ The BSD disklabel is of variable size and consists of:
 | 138 | 2 | | Number of partition entries, should not exceed 16 (MAXPARTITIONS) |
 | 140 | 4 | | Boot area size in bytes |
 | 144 | 4 | | Maximum superblock size in bytes |
-| 148 | number of partitions x 16 | | Array of partition entries |
+| 148 | number of partitions x 16 | | Array of [partition entries](#partition_entries) |
 
 > Note that the number of partition entries contains the total number of entries in the array, not
 > the number of partitions in use.
@@ -79,8 +79,6 @@ The checksum is calculated as following:
 
 ### Drive types {#drive_types}
 
-<!-- rumdl-disable MD033 MD056 -->
-
 | Value | Identifier | Description |
 | --- | --- | --- |
 | 1 | DTYPE_SMD | SMD, XSMD |
@@ -91,10 +89,8 @@ The checksum is calculated as following:
 | 6 | DTYPE_ST506 | ST506 |
 | 7 | DTYPE_HPIB | CS/80 on HP-IB |
 | 8 | DTYPE_HPFL | HP Fiber-link |
-| <td colspan="3">&nbsp;</td> |
+| | |
 | 10 | DTYPE_FLOPPY | Floppy drive |
-
-<!-- rumdl-enable MD033 MD056 -->
 
 ### Flags
 
@@ -106,7 +102,7 @@ The checksum is calculated as following:
 | 0x00000008 | D_RAMDISK | Emulated media using RAM |
 | 0x00000010 | D_CHAIN | Media can do back-to-back transfers |
 
-### Partition entry
+### Partition entry {#partition_entry}
 
 The partition entry is 16 bytes of size and consists of:
 

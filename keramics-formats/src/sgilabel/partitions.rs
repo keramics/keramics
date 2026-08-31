@@ -11,13 +11,9 @@
  * under the License.
  */
 
-pub mod constants;
-mod disklabel;
-mod header;
-mod partition;
-mod partition_entry;
-mod partitions;
-mod volume_system;
+use crate::iterators::PartitionsIterator;
 
-pub use partition::BsdDiskLabelPartition;
-pub use volume_system::BsdDiskLabelVolumeSystem;
+use super::volume_system::SgiDiskLabelVolumeSystem;
+
+/// SGI disklabel (sgilabel) partitions iterator.
+pub type SgiDiskLabelPartitionsIterator<'a> = PartitionsIterator<'a, SgiDiskLabelVolumeSystem>;

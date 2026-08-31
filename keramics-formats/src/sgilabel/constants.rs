@@ -11,13 +11,5 @@
  * under the License.
  */
 
-pub mod constants;
-mod disklabel;
-mod header;
-mod partition;
-mod partition_entry;
-mod partitions;
-mod volume_system;
-
-pub use partition::BsdDiskLabelPartition;
-pub use volume_system::BsdDiskLabelVolumeSystem;
+/// SGI disklabel signature.
+pub(crate) const SGI_DISKLABEL_SIGNATURE: &[u8] = b"\x0b\xe5\xa9\x41";

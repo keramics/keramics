@@ -17,35 +17,39 @@ use keramics_core::DataStreamReference;
 
 use crate::range_stream::RangeStream;
 
-use super::partition_entry::BsdDiskLabelPartitionEntry;
+use super::partition_entry::SgiDiskLabelPartitionEntry;
 
-/// BSD disklabel (bsdlabel) partition.
-pub struct BsdDiskLabelPartition {
+/// SGI disklabel (bsdlabel) partition.
+pub struct SgiDiskLabelPartition {
     /// The data stream.
     data_stream: DataStreamReference,
 
     /// The index of the corresponding partition entry.
-    entry_index: u16,
+    entry_index: u8,
 
     /// The offset of the partition relative to start of the volume system.
     pub(super) offset: u64,
 
     /// The size.
     pub(super) size: u64,
+
+    /// The partition type.
+    partition_type: u32,
 }
 
-impl BsdDiskLabelPartition {
+impl SgiDiskLabelPartition {
     /// Creates a new partition.
     pub(super) fn new(
         data_stream: &DataStreamReference,
         bytes_per_sector: u32,
-        partition_entry: &BsdDiskLabelPartitionEntry,
+        partition_entry: &SgiDiskLabelPartitionEntry,
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
             entry_index: partition_entry.entry_index,
-            offset: (partition_entry.start_sector as u64) * (bytes_per_sector as u64),
-            size: (partition_entry.number_of_sectors as u64) * (bytes_per_sector as u64),
+            offset: (partition_entry.start_block_number as u64) * (bytes_per_sector as u64),
+            size: (partition_entry.number_of_blocks as u64) * (bytes_per_sector as u64),
+            partition_type: partition_entry.partition_type,
         }
     }
 
@@ -59,7 +63,7 @@ impl BsdDiskLabelPartition {
     }
 
     /// Retrieves the partition (entry) index.
-    pub fn get_partition_index(&self) -> u16 {
+    pub fn get_partition_index(&self) -> u8 {
         self.entry_index
     }
 
@@ -71,6 +75,11 @@ impl BsdDiskLabelPartition {
     /// Retrieves the partition size.
     pub fn get_partition_size(&self) -> u64 {
         self.size
+    }
+
+    /// Retrieves the partition type.
+    pub fn get_partition_type(&self) -> u32 {
+        self.partition_type
     }
 }
 
@@ -84,17 +93,18 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_partition() -> Result<BsdDiskLabelPartition, ErrorTrace> {
+    fn get_partition() -> Result<SgiDiskLabelPartition, ErrorTrace> {
         let path_string: String = get_test_data_path("bsdlabel/bsdlabel.raw");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
-        let mut partition_entry: BsdDiskLabelPartitionEntry = BsdDiskLabelPartitionEntry::new();
+        let mut partition_entry: SgiDiskLabelPartitionEntry = SgiDiskLabelPartitionEntry::new();
         partition_entry.entry_index = 0;
-        partition_entry.number_of_sectors = 8176;
-        partition_entry.start_sector = 16;
+        partition_entry.number_of_blocks = 2049;
+        partition_entry.start_block_number = 5040;
+        partition_entry.partition_type = 10;
 
-        Ok(BsdDiskLabelPartition::new(
+        Ok(SgiDiskLabelPartition::new(
             &data_stream,
             512,
             &partition_entry,
@@ -103,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
-        let partition: BsdDiskLabelPartition = get_partition()?;
+        let partition: SgiDiskLabelPartition = get_partition()?;
 
         _ = partition.get_data_stream();
 
@@ -112,9 +122,9 @@ mod tests {
 
     #[test]
     fn test_get_partition_index() -> Result<(), ErrorTrace> {
-        let partition: BsdDiskLabelPartition = get_partition()?;
+        let partition: SgiDiskLabelPartition = get_partition()?;
 
-        let partition_index: u16 = partition.get_partition_index();
+        let partition_index: u8 = partition.get_partition_index();
         assert_eq!(partition_index, 0);
 
         Ok(())
@@ -122,20 +132,30 @@ mod tests {
 
     #[test]
     fn test_get_partition_offset() -> Result<(), ErrorTrace> {
-        let partition: BsdDiskLabelPartition = get_partition()?;
+        let partition: SgiDiskLabelPartition = get_partition()?;
 
         let partition_offset: u64 = partition.get_partition_offset();
-        assert_eq!(partition_offset, 8192);
+        assert_eq!(partition_offset, 2580480);
 
         Ok(())
     }
 
     #[test]
     fn test_get_partition_size() -> Result<(), ErrorTrace> {
-        let partition: BsdDiskLabelPartition = get_partition()?;
+        let partition: SgiDiskLabelPartition = get_partition()?;
 
         let partition_size: u64 = partition.get_partition_size();
-        assert_eq!(partition_size, 4186112);
+        assert_eq!(partition_size, 1049088);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_partition_type() -> Result<(), ErrorTrace> {
+        let partition: SgiDiskLabelPartition = get_partition()?;
+
+        let partition_type: u32 = partition.get_partition_type();
+        assert_eq!(partition_type, 10);
 
         Ok(())
     }

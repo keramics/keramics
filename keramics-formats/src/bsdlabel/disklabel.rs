@@ -15,8 +15,8 @@ use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
-use super::disklabel_entry::BsdDiskLabelEntry;
-use super::disklabel_header::BsdDiskLabelHeader;
+use super::header::BsdDiskLabelHeader;
+use super::partition_entry::BsdDiskLabelPartitionEntry;
 
 /// BSD disklabel (bsdlabel).
 pub struct BsdDiskLabel {
@@ -24,7 +24,7 @@ pub struct BsdDiskLabel {
     pub bytes_per_sector: u32,
 
     /// Entries.
-    pub entries: Vec<BsdDiskLabelEntry>,
+    pub entries: Vec<BsdDiskLabelPartitionEntry>,
 }
 
 impl BsdDiskLabel {
@@ -40,9 +40,9 @@ impl BsdDiskLabel {
     fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         keramics_core::debug_trace_structure!(BsdDiskLabelHeader::debug_read_data(data));
 
-        let mut disklabel_header: BsdDiskLabelHeader = BsdDiskLabelHeader::new();
+        let mut header: BsdDiskLabelHeader = BsdDiskLabelHeader::new();
 
-        match disklabel_header.read_data(data) {
+        match header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read disklabel header");
@@ -52,20 +52,19 @@ impl BsdDiskLabel {
         let mut data_offset: usize = 148;
         let data_size: usize = data.len();
 
-        if disklabel_header.number_of_entries > 16 {
+        if header.number_of_entries > 16 {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported disklabel - number of entries value out of bounds"
             ));
         }
-        let entries_end_offset: usize =
-            data_offset + ((disklabel_header.number_of_entries as usize) * 16);
+        let entries_end_offset: usize = data_offset + ((header.number_of_entries as usize) * 16);
 
         if entries_end_offset >= data_size {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported disklabel - number of entries value out of bounds"
             ));
         }
-        if disklabel_header.checksum != 0 {
+        if header.checksum != 0 {
             let mut calculated_checksum: u16 = 0;
 
             for (chunk_index, chunk) in data[0..entries_end_offset].chunks_exact(2).enumerate() {
@@ -76,27 +75,27 @@ impl BsdDiskLabel {
                 };
                 calculated_checksum ^= value_16bit;
             }
-            if disklabel_header.checksum != calculated_checksum {
+            if header.checksum != calculated_checksum {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Mismatch between stored: 0x{:04x} and calculated: 0x{:04x} checksums",
-                    disklabel_header.checksum, calculated_checksum
+                    header.checksum, calculated_checksum
                 )));
             }
         }
-        self.bytes_per_sector = disklabel_header.bytes_per_sector;
+        self.bytes_per_sector = header.bytes_per_sector;
 
-        for entry_index in 0..disklabel_header.number_of_entries {
-            keramics_core::debug_trace_structure!(BsdDiskLabelEntry::debug_read_data(
+        for entry_index in 0..header.number_of_entries {
+            keramics_core::debug_trace_structure!(BsdDiskLabelPartitionEntry::debug_read_data(
                 &data[data_offset..]
             ));
-            let mut disklabel_entry: BsdDiskLabelEntry = BsdDiskLabelEntry::new();
+            let mut partition_entry: BsdDiskLabelPartitionEntry = BsdDiskLabelPartitionEntry::new();
 
-            match disklabel_entry.read_data(&data[data_offset..]) {
+            match partition_entry.read_data(&data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        format!("Unable to read disklabel entry: {}", entry_index)
+                        format!("Unable to read partition entry: {}", entry_index)
                     );
                     return Err(error);
                 }
@@ -104,10 +103,10 @@ impl BsdDiskLabel {
             data_offset += 16;
 
             // Ignore the full volume and empty entries.
-            if entry_index != 2 && disklabel_entry.number_of_sectors > 0 {
-                disklabel_entry.entry_index = entry_index;
+            if entry_index != 2 && partition_entry.number_of_sectors > 0 {
+                partition_entry.entry_index = entry_index;
 
-                self.entries.push(disklabel_entry);
+                self.entries.push(partition_entry);
             }
         }
         Ok(())
