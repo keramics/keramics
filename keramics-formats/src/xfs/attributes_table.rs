@@ -78,39 +78,32 @@ impl XfsAttributesTable {
 
             let name_end_offset: usize = data_offset + (entry.name_size as usize);
 
-            if name_end_offset > data_size {
+            if entry.name_size == 0 || name_end_offset > data_size {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Invalid entry: {} - name size value out of bounds",
                     entry_index
                 )));
             }
-            let value_end_offset: usize = name_end_offset + (entry.value_size as usize);
+            let value_data_end_offset: usize = name_end_offset + (entry.value_data_size as usize);
 
-            if value_end_offset > data_size {
+            if value_data_end_offset > data_size {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Invalid entry: {} - value size value out of bounds",
+                    "Invalid entry: {} - value data size value out of bounds",
                     entry_index
                 )));
             }
             // Ignore the parent attribute (XFS_ATTR_PARENT).
-            if entry.flags & 0x08 == 0 {
-                // TODO: refactor into XfsAttribute
-                let mut name: ByteString = ByteString::new_with_encoding(&self.character_encoding);
-
-                let name_prefix: &str = match entry.flags & 0x7e {
-                    0x00 => "user.",
-                    0x02 => "trusted.",
-                    0x04 => "secure.",
-                    _ => "",
-                };
-                name.read_data(name_prefix.as_bytes());
-                name.read_data(&data[data_offset..name_end_offset]);
-
-                let value_data: Vec<u8> = data[name_end_offset..value_end_offset].to_vec();
+            if entry.attribute_flags & 0x08 == 0 {
+                let mut name: ByteString = XfsAttribute::read_name(
+                    &self.character_encoding,
+                    entry.attribute_flags,
+                    &data[data_offset..name_end_offset],
+                );
+                let value_data: Vec<u8> = data[name_end_offset..value_data_end_offset].to_vec();
 
                 attributes.insert(name, XfsAttribute::InlineData(value_data));
             }
-            data_offset = value_end_offset;
+            data_offset = value_data_end_offset;
         }
         Ok(())
     }

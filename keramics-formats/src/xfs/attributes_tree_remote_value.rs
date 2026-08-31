@@ -19,31 +19,42 @@ use keramics_types::bytes_to_u32_be;
 #[layout_map(
     structure(
         byte_order = "big",
-        field(name = "number_of_used_entries", data_type = "u32"),
-        field(name = "number_of_unused_entries", data_type = "u32"),
+        field(name = "value_block_number", data_type = "u32"),
+        field(name = "value_data_size", data_type = "u32"),
+        field(name = "name_size", data_type = "u8"),
     ),
     methods("debug_read_data")
 )]
-/// X File System (XFS) block directory footer version 2.
-pub struct XfsBlockDirectoryFooterV2 {
-    /// Number of entries.
-    pub number_of_entries: u32,
+/// X File System (XFS) attributes tree local value.
+pub struct XfsAttributesTreeRemoteValue {
+    /// Value block number.
+    pub value_block_number: u32,
+
+    /// Value data size.
+    pub value_data_size: u32,
+
+    /// name size.
+    pub name_size: u8,
 }
 
-impl XfsBlockDirectoryFooterV2 {
-    /// Creates a new footer.
+impl XfsAttributesTreeRemoteValue {
+    /// Creates a new entry.
     pub fn new() -> Self {
         Self {
-            number_of_entries: 0,
+            value_block_number: 0,
+            value_data_size: 0,
+            name_size: 0,
         }
     }
 
-    /// Reads the footer from a buffer.
+    /// Reads the entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 8 {
+        if data.len() < 9 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        self.number_of_entries = bytes_to_u32_be!(data, 0);
+        self.value_block_number = bytes_to_u32_be!(data, 0);
+        self.value_data_size = bytes_to_u32_be!(data, 4);
+        self.name_size = data[8];
 
         Ok(())
     }
@@ -54,17 +65,19 @@ mod tests {
     use super::*;
 
     fn get_test_data() -> Vec<u8> {
-        vec![0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x00]
+        vec![0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x10, 0x06, 0x00]
     }
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsBlockDirectoryFooterV2::new();
+        let mut test_struct = XfsAttributesTreeRemoteValue::new();
         test_struct.read_data(&test_data)?;
 
-        assert_eq!(test_struct.number_of_entries, 11);
+        assert_eq!(test_struct.value_block_number, 32);
+        assert_eq!(test_struct.value_data_size, 16);
+        assert_eq!(test_struct.name_size, 6);
 
         Ok(())
     }
@@ -73,8 +86,8 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsBlockDirectoryFooterV2::new();
-        let result = test_struct.read_data(&test_data[0..7]);
+        let mut test_struct = XfsAttributesTreeRemoteValue::new();
+        let result = test_struct.read_data(&test_data[0..3]);
         assert!(result.is_err());
     }
 }

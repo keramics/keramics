@@ -58,7 +58,7 @@ impl BlockReader for XfsBlockReader {
         self.size
     }
 
-    /// Reads media data based on the block ranges.
+    /// Reads media data based on the extents.
     fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
@@ -66,11 +66,11 @@ impl BlockReader for XfsBlockReader {
 
         let block_number: u64 = current_offset / (self.block_size as u64);
 
-        let mut range_index: usize = match self.extents.binary_search_by(|extent| {
-            let range_end_block_number: u64 =
+        let mut extent_index: usize = match self.extents.binary_search_by(|extent| {
+            let extent_end_block_number: u64 =
                 extent.logical_block_number + (extent.number_of_blocks as u64);
 
-            if block_number >= range_end_block_number {
+            if block_number >= extent_end_block_number {
                 Ordering::Less
             } else if block_number < extent.logical_block_number {
                 Ordering::Greater
@@ -78,10 +78,10 @@ impl BlockReader for XfsBlockReader {
                 Ordering::Equal
             }
         }) {
-            Ok(range_index) => range_index,
+            Ok(extent_index) => extent_index,
             Err(_) => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Missing block range for offset: {} (0x{:08x})",
+                    "Missing extent for offset: {} (0x{:08x})",
                     current_offset, current_offset
                 )));
             }
@@ -90,12 +90,12 @@ impl BlockReader for XfsBlockReader {
             if current_offset >= self.size {
                 break;
             }
-            let extent: &XfsPackedExtent = match self.extents.get(range_index) {
+            let extent: &XfsPackedExtent = match self.extents.get(extent_index) {
                 Some(extent) => extent,
                 None => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unable to retrieve block range: {} for offset: {} (0x{:08x})",
-                        range_index, current_offset, current_offset,
+                        "Unable to retrieve extent: {} for offset: {} (0x{:08x})",
+                        extent_index, current_offset, current_offset,
                     )));
                 }
             };
@@ -121,7 +121,7 @@ impl BlockReader for XfsBlockReader {
             );
             data_offset = data_end_offset;
             current_offset += range_read_size as u64;
-            range_index += 1;
+            extent_index += 1;
         }
         Ok(data_offset)
     }

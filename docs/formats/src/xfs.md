@@ -49,10 +49,10 @@ An allocation group consists of:
 
 * a sector containing a superblock
 * a sector containing free block information
-* a sector containing inode B+ tree information
+* a sector containing inode tree information
 * a sector containing internal free list
 * blocks containing
-  * root of the inode B+ tree
+  * root of the inode tree
   * root of the free space B+ tree
   * free list
   * inodes table
@@ -321,8 +321,8 @@ The inode information (xfs_agi_t) is (at least) 512 bytes of size and consists o
 | 8 | 4 | | Sequence number, which contains the allocation group number of the corresponding sector |
 | 12 | 4 | | Unknown (Allocation group size), in number of blocks |
 | 16 | 4 | | Number of inodes in the allocation group |
-| 20 | 4 | | Inode B+ tree root block number, which contains a block number relative to the start of the allocation group |
-| 24 | 4 | | Inode B+ tree height/depth |
+| 20 | 4 | | Inode tree root block number, which contains a block number relative to the start of the allocation group |
+| 24 | 4 | | Inode tree height/depth |
 | 28 | 4 | | Number of unused (free) inodes in the allocation group |
 | 32 | 4 | | First inode number of the last allocated inode chunk, which contains an inode number relative to the allocation group |
 | 36 | 4 | -1 (0xffffffff) | Unknown |
@@ -332,8 +332,8 @@ The inode information (xfs_agi_t) is (at least) 512 bytes of size and consists o
 | 312 | 4 | | Checksum |
 | 316 | 4 | | Unknown (padding) |
 | 320 | 8 | | Log sequence number |
-| 328 | 4 | | Free inode B+ tree root block number, which contains a block number relative to the start of the allocation group |
-| 332 | 4 | | Free inode B+ tree height/depth |
+| 328 | 4 | | Free inode tree root block number, which contains a block number relative to the start of the allocation group |
+| 332 | 4 | | Free inode tree height/depth |
 | 336 | 4 | | Unknown |
 | 340 | 4 | | Unknown |
 | 344 | 168 | | Unknown (empty values) |
@@ -346,7 +346,7 @@ XFS uses B+ trees to store various types of information. There are 2 different t
 namely:
 
 * Free space block B+ tree
-* Inode B+ tree
+* Inode tree
 * Reference count B+ tree
 
 ### B+ tree block {#btree_block}
@@ -445,17 +445,17 @@ The free space B+ tree leaf node record (xfs_alloc_key_t) is 8 bytes of size and
 | 0 | 4 | | Unknown (ar_startblock) |
 | 4 | 4 | | Unknown (ar_blockcount) |
 
-### Inode B+ tree
+### Inode tree
 
-The inode B+ tree uses [the B+ tree block header 32-bit](#btree_block_header_32bit).
+The inode tree uses [the B+ tree block header 32-bit](#btree_block_header_32bit).
 
-#### Inode B+ tree branch node
+#### Inode tree branch node
 
-The inode B+ tree branch node consists of:
+The inode tree branch node consists of:
 
 * node header
-* array of inode B+ tree branch node entry keys
-* array of inode B+ tree branch node entry values
+* array of inode tree branch node entry keys
+* array of inode tree branch node entry values
 
 The number of key-value pairs is calculated as following:
 
@@ -463,9 +463,9 @@ The number of key-value pairs is calculated as following:
 number_of_key_value_pairs = node_records_data_size / 8
 ```
 
-##### Inode B+ tree branch node key
+##### Inode tree branch node key
 
-The inode B+ tree branch node key (xfs_inobt_key_t) is 4 bytes of size and consist of:
+The inode tree branch node key (xfs_inobt_key_t) is 4 bytes of size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -473,24 +473,24 @@ The inode B+ tree branch node key (xfs_inobt_key_t) is 4 bytes of size and consi
 
 > Note that the inode number of the last key can be 0.
 
-##### Inode B+ tree branch node value
+##### Inode tree branch node value
 
-The inode B+ tree branch node key is 4 bytes of size and consist of:
+The inode tree branch node key is 4 bytes of size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 4 | | Block number of the inode B+ tree sub node, which contains a block number relative to the start of the allocation group |
+| 0 | 4 | | Block number of the inode tree sub node, which contains a block number relative to the start of the allocation group |
 
-#### Inode B+ tree leaf node
+#### Inode tree leaf node
 
-The inode B+ tree branch node consists of:
+The inode tree branch node consists of:
 
 * node header
-* array of inode B+ tree leaf node entry records
+* array of inode tree leaf node entry records
 
-##### Inode B+ tree leaf node record
+##### Inode tree leaf node record
 
-The inode B+ tree leaf node record (xfs_inobt_rec_t) is 16 bytes of size and consist of:
+The inode tree leaf node record (xfs_inobt_rec_t) is 16 bytes of size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -513,11 +513,11 @@ The inode can be followed by:
   * device identifier (fork type is XFS_DINODE_FMT_DEV)
   * inline data fork (fork type is XFS_DINODE_FMT_LOCAL)
   * extent list data fork (fork type is XFS_DINODE_FMT_EXTENTS)
-  * extent B+ tree data fork (fork type is XFS_DINODE_FMT_BTREE)
+  * extent tree data fork (fork type is XFS_DINODE_FMT_BTREE)
 * optional (extended) attributes data fork (descriptor)
   * inline attributes fork (fork type is XFS_DINODE_FMT_LOCAL)
   * extent list attributes fork (fork type is XFS_DINODE_FMT_EXTENTS)
-  * extent B+ tree attributes fork (fork type is XFS_DINODE_FMT_BTREE)
+  * extent tree attributes fork (fork type is XFS_DINODE_FMT_BTREE)
 
 ### Inode version 1
 
@@ -710,7 +710,7 @@ The inode version 3 (xfs_dinode_core_t) is 176 bytes of size and consist of:
 | 0 | XFS_DINODE_FMT_DEV | Device identifier is stored inline (in the inode) |
 | 1 | XFS_DINODE_FMT_LOCAL | Data is stored inline (in the inode) |
 | 2 | XFS_DINODE_FMT_EXTENTS | Data is referrenced by extents stored in [an extent list](#extent_list) |
-| 3 | XFS_DINODE_FMT_BTREE | Data is referrence by extents stored in [an extent B+ tree](#extent_btree) |
+| 3 | XFS_DINODE_FMT_BTREE | Data is referrence by extents stored in [an extent tree](#extent_tree) |
 | 4 | XFS_DINODE_FMT_UUID | Unknown (currently not used) |
 | 5 | XFS_DINODE_FMT_RMAP | Data is referrence by a reverse mapping |
 
@@ -753,12 +753,12 @@ The packed extent (xfs_bmbt_rec_t) is 128 bits of size and consist of:
 
 > Note that uninitialized extents are treated as sparse extents when read.
 
-### Extent B+ tree {#extent_btree}
+### Extent tree {#extent_tree}
 
-#### Extent B+ tree root node
+#### Extent tree root node
 
-The root node of the extent B+ tree is stored in the inode and equivalent to
-[an extent B+ tree branch node](#extent_btree_branch_node).
+The root node of the extent tree is stored in the inode and equivalent to
+[an extent tree branch node](#extent_tree_branch_node).
 
 The number of key-value pairs is calculated as following:
 
@@ -769,31 +769,31 @@ number_of_key_value_pairs = (node_data_size - 4) / 16
 Where "node data size" is `(attributes_fork_descriptor_offset * 8)` if the value is not 0, or
 otherwise the remaining inode block size.
 
-#### Extent B+ tree sub node block
+#### Extent tree sub node block
 
-An extent B+ tree sub nodes is stored in [a B+ tree block](#btree_block).
+An extent tree sub nodes is stored in [a B+ tree block](#btree_block).
 
-The extent B+ tree uses [the B+ tree block header 64-bit](#btree_block_header_64bit).
+The extent tree uses [the B+ tree block header 64-bit](#btree_block_header_64bit).
 
-##### Extent B+ tree sub node block header
+##### Extent tree sub node block header
 
 The sub node block header (xfs_bmbt_block_t) is equivalent to
 [B+ tree block header](#btree_block_header).
 
-##### Extent B+ tree sub node block header signatures
+##### Extent tree sub node block header signatures
 
 | Signature | Description |
 | --- | --- |
-| "BMA3" | Extent B+ tree sub node block ((file system version 5) |
-| "BMAP" | Extent B+ tree sub node block |
+| "BMA3" | Extent tree sub node block ((file system version 5) |
+| "BMAP" | Extent tree sub node block |
 
-#### Extent B+ tree branch node {#extent_btree_branch_node}
+#### Extent tree branch node {#extent_tree_branch_node}
 
-The extent B+ tree branch node record consists of:
+The extent tree branch node record consists of:
 
 * node header
-* array of extent B+ tree branch node entry keys
-* array of extent B+ tree branch node entry values
+* array of extent tree branch node entry keys
+* array of extent tree branch node entry values
 
 TODO: number of key-value pairs
 
@@ -803,7 +803,7 @@ The number of key-value pairs is calculated as following:
 number_of_key_value_pairs = node_records_data_size / 16
 ```
 
-##### Extent B+ tree branch node header
+##### Extent tree branch node header
 
 The branch node header (xfs_bmdr_block_t) is 4 byte of size and consist of:
 
@@ -812,7 +812,7 @@ The branch node header (xfs_bmdr_block_t) is 4 byte of size and consist of:
 | 0 | 2 | | Node level |
 | 2 | 2 | | Number of used key-value pairs in the node |
 
-##### Extent B+ tree branch node entry key
+##### Extent tree branch node entry key
 
 The branch node entry key (xfs_bmbt_key_t) is 8 byte of size and consist of:
 
@@ -820,17 +820,17 @@ The branch node entry key (xfs_bmbt_key_t) is 8 byte of size and consist of:
 | --- | --- | --- | --- |
 | 0 | 8 | | Data offset |
 
-##### Extent B+ tree branch node entry value
+##### Extent tree branch node entry value
 
 The branch node entry value (xfs_bmbt_ptr_t or xfs_bmdr_ptr_t) is 8 byte of size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 8 | | Block number of the extent B+ tree sub node, which contains a [file system block number](#file_system_block_number) |
+| 0 | 8 | | Block number of the extent tree sub node, which contains a [file system block number](#file_system_block_number) |
 
-#### Extent B+ tree leaf block node
+#### Extent tree leaf block node
 
-The extent B+ tree leaf block node consists of:
+The extent tree leaf block node consists of:
 
 * one or more [packed extents](#packed_extent)
 
@@ -840,7 +840,7 @@ Directories entries are stored in the data fork of a directory inode. The direct
 stored in multiple ways:
 
 * as a short-form directory table
-* as an extent-based block directory (or leaf directory)
+* as an extent-based directory list (or leaf directory)
 * as an extent-based directory B+ tree (or node directory)
 
 ### Short-form directory table
@@ -920,25 +920,30 @@ A directory (leaf) block (xfs_dir_leafblock_t) consist of:
 * array of block values
 * a block footer
 
-If more than one block is needed to store the directory entries
-[a directory B+ tree](#directory_btree) is used.
+If more than one block is needed to store the directory entries [a directory tree](#directory_tree)
+is used.
 
 > Note that if the XFS_SB_VERSION_DIRV2BIT flag in the superblock is set the directory is stored
-> using [a block directory](#block_directory) instead.
+> using [a directory list](#directory_list) instead.
 
 #### Directory (leaf) block header version 1
 
 A directory (leaf) block header version 1 (xfs_dir_leaf_hdr_t) is 16 bytes of size and consists of:
 
+<!-- rumdl-disable MD033 MD056 -->
+
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 12 | | [File system block header version 1](#file_system_block_header_version_1) |
+| <td colspan="4">*Block tree leaf header version 1*</td> |
 | 12 | 2 | | Number of entries |
 | 14 | 2 | | Used (block) data size, in number of bytes |
 | 16 | 2 | | Used data offset |
 | 18 | 1 | | Flag to indicate block compaction is needed |
 | 19 | 1 | | Unknown (padding) |
 | 20 | 4 x 3 | | Array of [free regions](#block_free_region_v2) in the block |
+
+<!-- rumdl-enable MD033 MD056 -->
 
 > Note that a directory (leaf) block header version 2 (xfs_dir2_leaf_hdr_t) is equivalent to
 > version 1.
@@ -950,7 +955,7 @@ The directory (leaf) block entry (xfs_dir_leaf_entry_t) is 8 bytes of size and c
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | | Name hash |
-| 4 | 2 | | Values offset, which contains an offset relative to the start of the directory block |
+| 4 | 2 | | Value offset, which contains an offset relative to the start of the directory block |
 | 6 | 1 | | Name size, which does not include the end-of-string character |
 | 7 | 1 | | Unknown (padding) |
 
@@ -977,32 +982,34 @@ A directory (leaf) block footer version 1 (xfs_dir_leaf_tail_t) is 4 bytes of si
 > Note that a directory (leaf) block footer version 2 (xfs_dir2_leaf_tail_t) is equivalent to
 > version 1.
 
-### Block directory {#block_directory}
+### Directory list {#directory_list}
 
-A block directory (xfs_dir2_block_t) consist of one or more blocks that consist of:
+A directory list (xfs_dir2_block_t) consist of one or more elements (block) that consist of:
 
-* a block directory header
+* a directory list element header
 * array of used and unused directory entries
 * hash values of the entries
-* a block directory footer
+* a directory list element footer
 
 > Note that if the XFS_SB_VERSION_DIRV2BIT flag in the superblock is not set the directory is
 > stored using [a directory (leaf) block](#directory_leaf_block) instead.
 
-#### Block directory header
+#### Directory list element header
 
-##### Block directory header version 2
+##### Directory list element header version 2
 
-The block directory header version 2 (xfs_dir2_data_hdr_t) is 16 bytes of size and consist of:
+The directory list element header version 2 (xfs_dir2_data_hdr_t) is 16 bytes of size and consist
+of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | "XD2B" or "XD2D" | Signature |
 | 4 | 4 x 3 | | Array of [free regions](#block_free_region_v2) in the block |
 
-##### Block directory header version 3
+##### Directory list element header version 3
 
-The block directory header version 3 (xfs_dir3_data_hdr_t) is 64 bytes of size and consist of:
+The directory list element header version 3 (xfs_dir3_data_hdr_t) is 64 bytes of size and consist
+of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -1021,7 +1028,7 @@ The block directory header version 3 (xfs_dir3_data_hdr_t) is 64 bytes of size a
 
 <!-- rumdl-enable MD033 MD056 -->
 
-##### Block directory header version signatures
+##### Directory list element header version signatures
 
 | Signature | Description |
 | --- | --- |
@@ -1041,11 +1048,12 @@ The block free region version 2 (xfs_dir2_data_free_t) is 4 bytes of size and co
 | 0 | 2 | | Free region offset, which is relative to the start of the directory block |
 | 2 | 2 | | Free region size |
 
-#### Block directory entries
+#### Directory list element entries
 
-##### Block directory entry version 2
+##### Directory list element entry version 2
 
-The block directory entry version 2 (xfs_dir2_data_entry_t) is variable of size and consists of:
+The directory list element entry version 2 (xfs_dir2_data_entry_t) is variable of size and consists
+of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -1062,9 +1070,9 @@ The block directory entry version 2 (xfs_dir2_data_entry_t) is variable of size 
 
 <!-- rumdl-enable MD033 MD056 -->
 
-##### Unused block directory entry version 2
+##### Unused directory list element entry version 2
 
-The unused block directory entry version 2 (xfs_dir2_data_unused_t) is variable of size
+The unused directory list element entry version 2 (xfs_dir2_data_unused_t) is variable of size
 and consists of:
 
 | Offset | Size | Value | Description |
@@ -1074,51 +1082,57 @@ and consists of:
 | 4 | 2 | | Unknown (padding) |
 | ... | 2 | | Unknown (offset, tag) |
 
-#### Block directory hash value
+#### Directory list element hash value
 
-The block directory hash value (xfs_dir_leaf_entry_t or xfs_dir2_leaf_entry_t) is 8 bytes of size
-and consists of:
+The directory list element hash value (xfs_dir_leaf_entry_t or xfs_dir2_leaf_entry_t) is 8 bytes of
+size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | | Hash value of the name of the directory entry |
 | 4 | 4 | | Entry offset, which is relative to the start of the block |
 
-#### Block directory footer
+#### Directory list element footer
 
-##### Block directory footer version 2
+##### Directory list element footer version 2
 
-The block directory footer version 2 (xfs_dir2_block_tail_t) is 8 bytes of size and consists of:
+The directory list element footer version 2 (xfs_dir2_block_tail_t) is 8 bytes of size and consists
+of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | | Number of used entries |
 | 4 | 4 | | Number of unused entries |
 
-### Directory or attributes B+ tree {#directory_btree}
+### Directory or attributes tree {#directory_tree}
 
-The first block in the extents is the B+ tree root block.
+The first block in the extents is the root block.
 
-#### Directory or attributes B+ tree branch node block {#directory_btree_branch_node_block}
+#### Directory or attributes tree branch node {#block_tree_branch_node}
 
-A directory or attributes B+ tree branch node block consist of:
+A directory or attributes tree branch node consist of:
 
-* [a directory or attributes branch node block header](#directory_branch_node_block_header)
-* array of directory or attributes branch node entries
+* [a directory or attributes tree branch node header](#directory_tree_branch_node_header)
+* array of directory or attributes tree branch node entries
 
-##### Directory or attributes branch node block header {#directory_branch_node_block_header}
+##### Block directory or attributes tree branch node header {#directory_tree_branch_node_header}
 
-A directory or attributes branch node block header is 16 bytes of size and consist of:
+A directory or attributes tree branch node header is 16 bytes of size and consist of:
+
+<!-- rumdl-disable MD033 MD056 -->
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 12 | | [File system block header version 1](#file_system_block_header_version_1) |
+| <td colspan="4">*Block tree branch header version 1*</td> |
 | 12 | 2 | | Number of entries |
 | 14 | 2 | | Node level |
 
-##### Directory or attributes B+ tree branch node block entry
+<!-- rumdl-enable MD033 MD056 -->
 
-A directory or attributes B+ tree branch node block entry is 8 bytes of size and consists of:
+##### Directory or attributes tree branch node entry
+
+A directory or attributes tree branch node entry is 8 bytes of size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1160,7 +1174,7 @@ TODO: determine if the hole can be at the start or end of the file content data.
 
 ## File system block B+ tree
 
-The file system block B+ tree is a structure used to store the directory and attributes B+ trees
+The file system block B+ tree is a structure used to store the directory and attributes trees.
 
 ### File system block header {#file_system_block_header}
 
@@ -1173,7 +1187,7 @@ system block header version 1 (xfs_da_blkinfo_t) is 12 bytes of size and consist
 | --- | --- | --- | --- |
 | 0 | 4 | | (Logical) block number of the next B+ tree block at the same level |
 | 4 | 4 | | (Logical) block number of the previous B+ tree block at the same level |
-| 8 | 2 | 0xfbee | Signature (XFS_ATTR_LEAF_MAGIC) |
+| 8 | 2 | | [Signature](#file_system_block_signatures) |
 | 10 | 2 | | Unknown (padding) |
 
 > Note that a file system block header version 2 is equivalent to version 1.
@@ -1187,7 +1201,7 @@ system block header version 3 (xfs_da3_blkinfo_t) is 56 bytes of size and consis
 | --- | --- | --- | --- |
 | 0 | 4 | | (Logical) block number of the next B+ tree block at the same level |
 | 4 | 4 | | (Logical) block number of the previous B+ tree block at the same level |
-| 8 | 2 | 0x3bee | Signature (XFS_ATTR3_LEAF_MAGIC) |
+| 8 | 2 | | [Signature](#file_system_block_signatures) |
 | 10 | 2 | | Unknown (padding) |
 | 12 | 4 | | Checksum |
 | 16 | 8 | | Block number |
@@ -1195,17 +1209,17 @@ system block header version 3 (xfs_da3_blkinfo_t) is 56 bytes of size and consis
 | 32 | 16 | | Block type identifier, which contains an UUID that should correspond to sb_uuid or sb_meta_uuid |
 | 48 | 8 | | Owner inode number, which contains the absolute inode number the block is part of |
 
-#### File system block header signatures
+#### File system block header signatures {#file_system_block_signatures}
 
 | Signature | Identifier | Description |
 | --- | --- | --- |
-| 0x3bee | XFS_ATTR_LEAF_MAGIC | File system version 5 attributes B+ tree leaf block |
-| 0x3ebe | XFS_DA3_NODE_MAGIC | File system version 5 directory or attributes B+ tree branch block |
+| 0x3bee | XFS_ATTR_LEAF_MAGIC | Attributes tree leaf node (file system version 5) |
+| 0x3ebe | XFS_DA3_NODE_MAGIC | Directory or attributes [tree branch node](#block_tree_branch_node) (file system version 5) |
 | 0xd2f1 | XFS_DIR2_LEAF1_MAGIC | |
 | 0xd2ff | XFS_DIR2_LEAFN_MAGIC | |
-| 0xfbee | XFS_ATTR_LEAF_MAGIC | Attributes B+ tree leaf block |
-| 0xfebe | XFS_DA_NODE_MAGIC | Directory or attributes [B+ tree branch block](#directory_btree_branch_node_block) |
-| 0xfeeb | XFS_DIR_LEAF_MAGIC | Directory B+ tree leaf block |
+| 0xfbee | XFS_ATTR_LEAF_MAGIC | Attributes tree leaf node |
+| 0xfebe | XFS_DA_NODE_MAGIC | Directory or attributes [tree branch node](#block_tree_branch_node) |
+| 0xfeeb | XFS_DIR_LEAF_MAGIC | Directory tree leaf node |
 
 ## Symbolic links
 
@@ -1217,8 +1231,7 @@ Extended attributes are stored in the attributes fork of an inode. The extended 
 stored in multiple ways:
 
 * as a short-form attributes table
-* as an extent-based [attributes block](#attributes_block) (or leaf attributes)
-* as an extent-based [attributes B+ tree](#attributes_btree) (or node attributes)
+* as an extent-based [attributes tree](#attributes_tree)
 
 The start of the attributes fork can be determined using the attributes fork descriptor offset.
 
@@ -1256,33 +1269,94 @@ The short-form attributes table entry (xfs_attr_sf_entry) is variable of size an
 | 3 | ... | | Name string, which contains an ASCII string without end-of-string character |
 | ... | ... | | Value data |
 
-### Attributes (leaf) block {#attributes_block}
+### Attributes tree {#attributes_tree}
 
-If the inode attributes fork type is XFS_DINODE_FMT_EXTENTS the extended attributes are stored in
-an attributes (leaf) block. The attributes fork contains [an extent list](#extent_list).
+If the inode attributes fork type is XFS_DINODE_FMT_BTREE the extended attributes are stored in an
+attributes tree. The attributes fork contains [an extent tree](#extent_tree).
 
-An attributes (leaf) block (xfs_attr_leafblock_t or xfs_attr3_leafblock_t) consist of:
+The first block in the extents is the B+ tree root block.
 
-* [an attributes (leaf) block header](#attributes_leaf_block_header)
-* array of block entries
-* array of local or remote attribute block values
+### Attributes tree branch node
 
-If more than one block is needed to store the extended attributes
-[an attributes B+ tree](#attributes_btree) is used.
+An attributes tree branch node consist of:
 
-> Note that since extended attributes were introduced in superblock format version 2 there are no
-> version 1 structures.
+* [a attributes tree branch node header](#attributes_branch_node_block_header)
+* array of attribute branch node entry
 
-#### Attributes (leaf) block header {#attributes_leaf_block_header}
+#### Attributes tree branch node header {#attributes_branch_node_block_header}
 
-##### Attributes (leaf) block header version 2
+##### Attributes tree branch node header version 2
 
-If the superblock format version <= 4 the attributes (leaf) block header version 2 is used. The
-attributes (leaf) block header version 2 (xfs_attr_leaf_hdr_t) is 32 bytes of size and consist of:
+If the superblock format version <= 4 the attributes tree branch node header version 2 is used.
+The attributes tree branch node header version 2 (xfs_da_blkinfo_t) is 16 bytes of size and
+consist of:
+
+<!-- rumdl-disable MD033 MD056 -->
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 12 | | [File system block header version 1](#file_system_block_header_version_1) |
+| <td colspan="4">*Block tree branch header version 1*</td> |
+| 12 | 2 | | Number of entries |
+| 14 | 2 | | Node level |
+
+<!-- rumdl-enable MD033 MD056 -->
+
+##### Attributes tree branch node header version 3
+
+If the superblock format version >= 5 the attributes tree branch node header version 3 is used.
+The attributes tree branch node header version 3 (xfs_da3_blkinfo_t) is 64 bytes of size and
+consist of:
+
+<!-- rumdl-disable MD033 MD056 -->
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 56 | | [File system block header version 3](#file_system_block_header_version_3) |
+| <td colspan="4">*Block tree branch header version 3*</td> |
+| 56 | 2 | | Number of entries |
+| 58 | 2 | | Node level |
+| 60 | 4 | | Unknown (padding) |
+
+<!-- rumdl-enable MD033 MD056 -->
+
+##### Attributes tree branch node block entry
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Name hash |
+| 4 | 4 | | Sub block number, which is relative to the start of the attributes extents |
+
+### Attributes tree leaf node
+
+If the inode attributes fork type is XFS_DINODE_FMT_EXTENTS the extended attributes are stored as
+attributes tree. The attributes fork contains [an extent list](#extent_list).
+
+Attributes tree (xfs_attr_leafblock_t or xfs_attr3_leafblock_t) consist of:
+
+* [attributes tree leaf node header](#attributes_tree_leaf_node_header)
+* array of block entries
+* array of local or remote attribute block values
+
+If more than one block is needed to store the extended attributes
+[an attributes tree](#attributes_tree) is used.
+
+> Note that since extended attributes were introduced in superblock format version 2 there are no
+> version 1 structures.
+
+#### Attributes tree leaf node header {#attributes_tree_leaf_node_header}
+
+##### Attributes tree leaf node header version 2
+
+If the superblock format version <= 4 the attributes tree leaf node header version 2 is used. The
+attributes tree leaf node header version 2 (xfs_attr_leaf_hdr_t) is 32 bytes of size and consist of:
+
+<!-- rumdl-disable MD033 MD056 -->
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 12 | | [File system block header version 1](#file_system_block_header_version_1) |
+| <td colspan="4">*Block tree leaf header version 1*</td> |
 | 12 | 2 | | Number of entries |
 | 14 | 2 | | Used (block) data size, in number of bytes |
 | 16 | 2 | | Used data offset |
@@ -1290,14 +1364,20 @@ attributes (leaf) block header version 2 (xfs_attr_leaf_hdr_t) is 32 bytes of si
 | 19 | 1 | | Unknown (padding) |
 | 20 | 4 x 3 | | Array of [free regions](#block_free_region_v2) in the block |
 
-##### Attributes (leaf) block header version 3
+<!-- rumdl-enable MD033 MD056 -->
 
-If the superblock format version >= 5 the attributes (leaf) block header version 3 is used. The
-attributes (leaf) block header version 3 (xfs_attr3_leaf_hdr_t) is 80 bytes of size and consist of:
+##### Attributes tree leaf node header version 3
+
+If the superblock format version >= 5 the attributes tree leaf node header version 3 is used. The
+attributes tree leaf node header version 3 (xfs_attr3_leaf_hdr_t) is 80 bytes of size and consist
+of:
+
+<!-- rumdl-disable MD033 MD056 -->
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 56 | | [File system block header version 3](#file_system_block_header_version_3) |
+| <td colspan="4">*Block tree leaf header version 3*</td> |
 | 56 | 2 | | Number of entries |
 | 58 | 2 | | Used (block) data size, in number of bytes |
 | 60 | 2 | | Used data offset |
@@ -1306,27 +1386,28 @@ attributes (leaf) block header version 3 (xfs_attr3_leaf_hdr_t) is 80 bytes of s
 | 64 | 4 x 3 | | Array of [free regions](#block_free_region_v2) in the block |
 | 76 | 4 | | Unknown (padding) |
 
-#### Attributes (leaf) block entry
+<!-- rumdl-enable MD033 MD056 -->
 
-The attributes (leaf) block entry (xfs_attr_leaf_entry_t) is 8 bytes of size and consist of:
+#### Attributes tree leaf node entry
+
+The attributes tree leaf node entry (xfs_attr_leaf_entry_t) is 8 bytes of size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | | Name hash |
-| 4 | 2 | | Values offset, which is relative to the start of the attributes block |
+| 4 | 2 | | Value offset, which is relative to the start of the attributes tree |
 | 6 | 1 | | [Attribute flags](#attribute_flags) |
 | 7 | 1 | | Unknown (padding) |
 
-#### Attribute (leaf) block values
+#### Attributes tree leaf node value
 
-If the attributes (leaf) block entry flag XFS_ATTR_LOCAL is set the attribute values are stored as
-local attribute block values otherwise as remote attribute block values. The value data of remote
-attribute values are stored in
-[a remote attribute value data block](#remote_attribute_value_data_block).
+If the attributes tree leaf node entry flag XFS_ATTR_LOCAL is set the attribute value is stored
+as local attribute value otherwise as remote attribute value. The value data of remote attribute
+value are stored in [a remote attribute value data block](#remote_attribute_value_data_block).
 
-##### Local attribute block values
+##### Local attribute value
 
-The local attributes values (xfs_attr_leaf_name_local_t) is variable of size and consist of:
+The local attributes value (xfs_attr_leaf_name_local_t) is variable of size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1334,9 +1415,9 @@ The local attributes values (xfs_attr_leaf_name_local_t) is variable of size and
 | 2 | 1 | | Name size |
 | 3 | ... | | Name string, which contains an ASCII string without end-of-string character |
 
-##### Remote attribute block values
+##### Remote attribute value
 
-The remote attributes values (xfs_attr_leaf_name_remote_t) is variable of size and consist of:
+The remote attributes value (xfs_attr_leaf_name_remote_t) is variable of size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1345,58 +1426,6 @@ The remote attributes values (xfs_attr_leaf_name_remote_t) is variable of size a
 | 8 | 1 | | Name size |
 | 9 | ... | | Name string, which contains an ASCII string without end-of-string character |
 
-### Attributes B+ tree {#attributes_btree}
-
-If the inode attributes fork type is XFS_DINODE_FMT_BTREE the extended attributes are stored in an
-attributes B+ tree. The attributes fork contains [an extent B+ tree](#extent_btree).
-
-The first block in the extents is the B+ tree root block.
-
-### Attributes B+ tree branch node block
-
-An attributes B+ tree branch node block consist of:
-
-* [an attributes branch node block header](#attributes_branch_node_block_header)
-* array of attribute branch node entry
-
-#### Attributes branch node block header {#attributes_branch_node_block_header}
-
-##### Attributes branch node block header version 2
-
-If the superblock format version <= 4 the attributes branch node block header version 2 is used.
-The attributes branch node block header version 2 (xfs_da_blkinfo_t) is 16 bytes of size and
-consist of:
-
-| Offset | Size | Value | Description |
-| --- | --- | --- | --- |
-| 0 | 12 | | [File system block header version 1](#file_system_block_header_version_1) |
-| 12 | 2 | | Number of entries |
-| 14 | 2 | | Node level |
-
-##### Attributes branch node block header version 3
-
-If the superblock format version >= 5 the attributes branch node block header version 3 is used.
-The attributes branch node block header version 3 (xfs_da3_blkinfo_t) is 64 bytes of size and
-consist of:
-
-| Offset | Size | Value | Description |
-| --- | --- | --- | --- |
-| 0 | 56 | | [File system block header version 3](#file_system_block_header_version_3) |
-| 56 | 2 | | Number of entries |
-| 58 | 2 | | Node level |
-| 60 | 4 | | Unknown (padding) |
-
-##### Attributes branch node block entry
-
-| Offset | Size | Value | Description |
-| --- | --- | --- | --- |
-| 0 | 4 | | Name hash |
-| 4 | 4 | | Sub block number, which is relative to the start of the attributes extents |
-
-### Attributes B+ tree leaf node
-
-The extended attributes B+ tree leaf node is equivalent to an [attributes block](#attributes_block).
-
 ### The attribute flags {#attribute_flags}
 
 The attribute flags indicate the prefix (or namespace) of the attribute name.
@@ -1404,7 +1433,7 @@ The attribute flags indicate the prefix (or namespace) of the attribute name.
 | Value | Identifier | Name prefix | Description |
 | --- | --- | --- | --- |
 | 0x00 | | "user." | The attribute is part of the user namespace |
-| 0x01 | XFS_ATTR_LOCAL | | The attribute value is contained within the current block |
+| 0x01 | XFS_ATTR_LOCAL | | The attribute value is contained within the current block, which should be ignored in an attributes table |
 | 0x02 | XFS_ATTR_ROOT | "trusted." | The attribute is part of the trusted namespace |
 | 0x04 | XFS_ATTR_SECURE | "secure." | The attribute is part of the secure namespace |
 | 0x08 | XFS_ATTR_PARENT | | The attribute contains a parent directory reference, where the attribute name contains the file tentry name and the attribute value data [a reference to the parent directory](#parent_directory_attribute_value_data) |

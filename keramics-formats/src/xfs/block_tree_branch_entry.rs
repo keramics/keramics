@@ -24,13 +24,13 @@ use keramics_types::bytes_to_u32_be;
     ),
     methods("debug_read_data")
 )]
-/// X File System (XFS) directory tree branch entry.
-pub struct XfsDirectoryTreeBranchEntry {
+/// X File System (XFS) block tree branch entry.
+pub struct XfsBlockTreeBranchEntry {
     /// Block number.
     pub block_number: u32,
 }
 
-impl XfsDirectoryTreeBranchEntry {
+impl XfsBlockTreeBranchEntry {
     /// Creates a new entry.
     pub fn new() -> Self {
         Self { block_number: 0 }
@@ -59,7 +59,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsDirectoryTreeBranchEntry::new();
+        let mut test_struct = XfsBlockTreeBranchEntry::new();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.block_number, 32);
@@ -71,7 +71,7 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsDirectoryTreeBranchEntry::new();
+        let mut test_struct = XfsBlockTreeBranchEntry::new();
         let result = test_struct.read_data(&test_data[0..7]);
         assert!(result.is_err());
     }

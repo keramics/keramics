@@ -11,7 +11,33 @@
  * under the License.
  */
 
+use keramics_core::ErrorTrace;
+use keramics_encodings::CharacterEncoding;
+use keramics_types::ByteString;
+
 /// X File System (XFS) attribute.
 pub enum XfsAttribute {
     InlineData(Vec<u8>),
+}
+
+impl XfsAttribute {
+    /// Reads the attributes entry name from a buffer.
+    pub fn read_name(
+        character_encoding: &CharacterEncoding,
+        attribute_flags: u8,
+        data: &[u8],
+    ) -> ByteString {
+        let mut name: ByteString = ByteString::new_with_encoding(character_encoding);
+
+        let name_prefix: &str = match attribute_flags & 0x7e {
+            0x00 => "user.",
+            0x02 => "trusted.",
+            0x04 => "secure.",
+            _ => "",
+        };
+        name.read_data(name_prefix.as_bytes());
+        name.read_data(data);
+
+        name
+    }
 }

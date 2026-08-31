@@ -28,11 +28,11 @@ use super::btree_entry::ApfsBtreeEntry;
     ),
     methods("debug_read_data")
 )]
-/// Apple File System (APFS) B-Tree variable size entry.
+/// Apple File System (APFS) B-tree variable size entry.
 pub struct ApfsBtreeEntryVariableSize {}
 
 impl ApfsBtreeEntryVariableSize {
-    /// Reads the B-Tree variable size entry from a buffer.
+    /// Reads the B-tree variable size entry from a buffer.
     pub fn read_data(entry: &mut ApfsBtreeEntry, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 8 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));

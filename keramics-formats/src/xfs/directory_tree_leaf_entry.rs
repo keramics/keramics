@@ -20,16 +20,16 @@ use keramics_types::bytes_to_u16_be;
     structure(
         byte_order = "big",
         field(name = "name_hash", data_type = "u32", format = "hex"),
-        field(name = "values_offset", data_type = "u16"),
+        field(name = "value_offset", data_type = "u16"),
         field(name = "name_size", data_type = "u8"),
-        field(name = "unknonw1", data_type = "u8"),
+        field(name = "unknown1", data_type = "u8"),
     ),
     methods("debug_read_data")
 )]
 /// X File System (XFS) directory tree leaf entry.
 pub struct XfsDirectoryTreeLeafEntry {
-    /// Values offset.
-    pub values_offset: u16,
+    /// Value offset.
+    pub value_offset: u16,
 
     /// Name size.
     pub name_size: u8,
@@ -39,7 +39,7 @@ impl XfsDirectoryTreeLeafEntry {
     /// Creates a new entry.
     pub fn new() -> Self {
         Self {
-            values_offset: 0,
+            value_offset: 0,
             name_size: 0,
         }
     }
@@ -49,7 +49,7 @@ impl XfsDirectoryTreeLeafEntry {
         if data.len() < 8 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        self.values_offset = bytes_to_u16_be!(data, 4);
+        self.value_offset = bytes_to_u16_be!(data, 4);
         self.name_size = data[6];
 
         Ok(())
@@ -71,7 +71,7 @@ mod tests {
         let mut test_struct = XfsDirectoryTreeLeafEntry::new();
         test_struct.read_data(&test_data)?;
 
-        assert_eq!(test_struct.values_offset, 16);
+        assert_eq!(test_struct.value_offset, 16);
         assert_eq!(test_struct.name_size, 6);
 
         Ok(())

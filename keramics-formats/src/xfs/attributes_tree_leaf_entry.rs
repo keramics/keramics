@@ -13,37 +13,45 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
+use keramics_types::bytes_to_u16_be;
 
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "big",
-        field(name = "next_block_number", data_type = "u32"),
-        field(name = "previous_block_number", data_type = "u32"),
-        field(name = "signature", data_type = "[u8; 2]", format = "hex"),
-        field(name = "unknown1", data_type = "[u8; 2]"),
-        field(name = "checksum", data_type = "u32", format = "hex"),
-        field(name = "block_number", data_type = "u64"),
-        field(name = "log_sequence_number", data_type = "u64"),
-        field(name = "block_type_identifier", data_type = "Uuid"),
-        field(name = "owner_inode_number", data_type = "u64"),
+        field(name = "name_hash", data_type = "u32", format = "hex"),
+        field(name = "value_offset", data_type = "u16"),
+        field(name = "attribute_flags", data_type = "u8"),
+        field(name = "unknown1", data_type = "u8"),
     ),
     methods("debug_read_data")
 )]
-/// X File System (XFS) file system block header version 1.
-pub struct XfsFileSystemBlockHeaderV3 {}
+/// X File System (XFS) attributes tree leaf entry.
+pub struct XfsAttributesTreeLeafEntry {
+    /// Value offset.
+    pub value_offset: u16,
 
-impl XfsFileSystemBlockHeaderV3 {
-    /// Creates a new header.
+    /// Attribute flags.
+    pub attribute_flags: u8,
+}
+
+impl XfsAttributesTreeLeafEntry {
+    /// Creates a new entry.
     pub fn new() -> Self {
-        Self {}
+        Self {
+            value_offset: 0,
+            attribute_flags: 0,
+        }
     }
 
-    /// Reads the header from a buffer.
+    /// Reads the entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 56 {
+        if data.len() < 8 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
+        self.value_offset = bytes_to_u16_be!(data, 4);
+        self.attribute_flags = data[6];
+
         Ok(())
     }
 }
@@ -53,20 +61,18 @@ mod tests {
     use super::*;
 
     fn get_test_data() -> Vec<u8> {
-        vec![
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3b, 0xee, 0x00, 0x00, 0x83, 0x64,
-            0x08, 0x8a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2b, 0x38, 0x00, 0x00, 0x00, 0x01,
-            0x00, 0x00, 0x00, 0x02, 0xeb, 0xd6, 0x54, 0x96, 0xec, 0xd8, 0x49, 0x90, 0x95, 0x48,
-            0x47, 0x85, 0x39, 0x5a, 0x1b, 0x6c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2b, 0x4f,
-        ]
+        vec![0x12, 0x34, 0x56, 0x78, 0x00, 0x10, 0x06, 0x00]
     }
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsFileSystemBlockHeaderV3::new();
+        let mut test_struct = XfsAttributesTreeLeafEntry::new();
         test_struct.read_data(&test_data)?;
+
+        assert_eq!(test_struct.value_offset, 16);
+        assert_eq!(test_struct.attribute_flags, 6);
 
         Ok(())
     }
@@ -75,8 +81,8 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsFileSystemBlockHeaderV3::new();
-        let result = test_struct.read_data(&test_data[0..55]);
+        let mut test_struct = XfsAttributesTreeLeafEntry::new();
+        let result = test_struct.read_data(&test_data[0..7]);
         assert!(result.is_err());
     }
 }

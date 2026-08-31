@@ -30,7 +30,7 @@ use keramics_types::bytes_to_u32_le;
     ),
     methods("debug_read_data")
 )]
-/// Apple File System (APFS) B-Tree footer.
+/// Apple File System (APFS) B-tree footer.
 pub struct ApfsBtreeFooter {
     /// Flags.
     pub flags: u32,
@@ -40,7 +40,7 @@ pub struct ApfsBtreeFooter {
 }
 
 impl ApfsBtreeFooter {
-    /// Creates a new B-Tree footer.
+    /// Creates a new B-tree footer.
     pub fn new() -> Self {
         Self {
             flags: 0,
@@ -48,7 +48,7 @@ impl ApfsBtreeFooter {
         }
     }
 
-    /// Reads the B-Tree footer from a buffer.
+    /// Reads the B-tree footer from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 40 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));

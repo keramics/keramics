@@ -133,8 +133,8 @@ The object type (o_type) value consists of a type and flags.
 | --- | --- | --- |
 | 0x00000000 | OBJECT_TYPE_INVALID | Invalid. For a subtype this value represents not set or not specified |
 | 0x00000001 | OBJECT_TYPE_NX_SUPERBLOCK | [Container superblock](#container_superblock) |
-| 0x00000002 | OBJECT_TYPE_BTREE | B-Tree (root) |
-| 0x00000003 | OBJECT_TYPE_BTREE_NODE | B-Tree node |
+| 0x00000002 | OBJECT_TYPE_BTREE | B-tree (root) |
+| 0x00000003 | OBJECT_TYPE_BTREE_NODE | B-tree node |
 | 0x00000004 | | Unknown (MTree?) |
 | 0x00000005 | OBJECT_TYPE_SPACEMAN | Space manager header |
 | 0x00000006 | OBJECT_TYPE_SPACEMAN_CAB | Space manager [chunk information address block](#chunk_information_address_block) |
@@ -187,8 +187,8 @@ The object type (o_type) value consists of a type and flags.
 
 The object subtype is used by specific object types such as:
 
-* B-Tree root
-* B-Tree node
+* B-tree root
+* B-tree node
 
 The object subtypes are the same as the [Object types](#object_types).
 
@@ -213,7 +213,7 @@ A B-tree root or node (or object) consists of:
 * values data, where the first value is stored before the footer in descending order
 * Optional B-tree footer, which is only stored in the root node
 
-> Note that the Apple File System Reference documentation combines the B-Tree object and B-tree
+> Note that the Apple File System Reference documentation combines the B-tree object and B-tree
 > node header into a single structure referred to as btree_node_phys_t.
 
 #### B-tree root object header
@@ -299,7 +299,7 @@ The fixed-size B-tree entry is 4 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 2 | | Key data offset (key_offs), which contains an offset relative to the end of the entries data |
-| 2 | 2 | | Value data offset (value_offs), which contains a reversed offset relative to the start of the B-Tree footer |
+| 2 | 2 | | Value data offset (value_offs), which contains a reversed offset relative to the start of the B-tree footer |
 
 #### Variable-size B-tree entry
 
@@ -309,7 +309,7 @@ The variable-size B-tree entry is 8 bytes in size and consists of:
 | --- | --- | --- | --- |
 | 0 | 2 | | Key data offset (key_offs), which contains an offset relative to the end of the entries data |
 | 2 | 2 | | Key data size (key_len), in number of bytes |
-| 4 | 2 | | Value data offset (value_offs), which contains a reversed offset relative to the start of the B-Tree footer |
+| 4 | 2 | | Value data offset (value_offs), which contains a reversed offset relative to the start of the B-tree footer |
 | 6 | 2 | | Value data size (value_len), in number of bytes |
 
 ### B-tree footer
@@ -1617,7 +1617,7 @@ The directory record can have 2 different types of keys:
 > Reference documentation does not indicate how to distinguish between the two, but one method is
 > to compare calculated and stored size of the key data.
 
-> Note that B-Tree branch nodes are sorted using the case-sensitive name, even when the file system
+> Note that B-tree branch nodes are sorted using the case-sensitive name, even when the file system
 > is case-insensitive.
 
 <!-- rumdl-enable MD028 -->

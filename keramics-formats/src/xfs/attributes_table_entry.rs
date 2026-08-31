@@ -19,8 +19,8 @@ use keramics_layout_map::LayoutMap;
     structure(
         byte_order = "big",
         field(name = "name_size", data_type = "u8"),
-        field(name = "value_size", data_type = "u8"),
-        field(name = "flags", data_type = "u8"),
+        field(name = "value_data_size", data_type = "u8"),
+        field(name = "attribute_flags", data_type = "u8"),
     ),
     methods("debug_read_data")
 )]
@@ -29,11 +29,11 @@ pub struct XfsAttributesTableEntry {
     /// Name size.
     pub name_size: u8,
 
-    /// Value size.
-    pub value_size: u8,
+    /// Value data size.
+    pub value_data_size: u8,
 
-    /// Flags.
-    pub flags: u8,
+    /// Attribute flags.
+    pub attribute_flags: u8,
 }
 
 impl XfsAttributesTableEntry {
@@ -41,8 +41,8 @@ impl XfsAttributesTableEntry {
     pub fn new() -> Self {
         Self {
             name_size: 0,
-            value_size: 0,
-            flags: 0,
+            value_data_size: 0,
+            attribute_flags: 0,
         }
     }
 
@@ -52,8 +52,8 @@ impl XfsAttributesTableEntry {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.name_size = data[0];
-        self.value_size = data[1];
-        self.flags = data[2];
+        self.value_data_size = data[1];
+        self.attribute_flags = data[2];
 
         Ok(())
     }
@@ -75,8 +75,8 @@ mod tests {
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.name_size, 6);
-        assert_eq!(test_struct.value_size, 12);
-        assert_eq!(test_struct.flags, 0x08);
+        assert_eq!(test_struct.value_data_size, 12);
+        assert_eq!(test_struct.attribute_flags, 0x08);
 
         Ok(())
     }

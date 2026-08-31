@@ -13,38 +13,36 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::bytes_to_u16_be;
+
+#[cfg(feature = "debug-trace")]
+use super::block_free_region::XfsBlockFreeRegion;
 
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "big",
-        field(name = "number_of_entries", data_type = "u16"),
-        field(name = "level", data_type = "u16"),
+        field(name = "signature", data_type = "ByteString<4>"),
+        field(
+            name = "free_regions",
+            data_type = "[Struct<XfsBlockFreeRegion; 4>; 3]"
+        ),
     ),
     methods("debug_read_data")
 )]
-/// X File System (XFS) directory tree branch header.
-pub struct XfsDirectoryTreeBranchHeader {
-    /// Number of entries.
-    pub number_of_entries: u16,
-}
+/// X File System (XFS) directory list element header version 2.
+pub struct XfsDirectoryListElementHeaderV2 {}
 
-impl XfsDirectoryTreeBranchHeader {
+impl XfsDirectoryListElementHeaderV2 {
     /// Creates a new header.
     pub fn new() -> Self {
-        Self {
-            number_of_entries: 0,
-        }
+        Self {}
     }
 
     /// Reads the header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 4 {
+        if data.len() < 16 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        self.number_of_entries = bytes_to_u16_be!(data, 0);
-
         Ok(())
     }
 }
@@ -54,17 +52,18 @@ mod tests {
     use super::*;
 
     fn get_test_data() -> Vec<u8> {
-        vec![0x00, 0x10, 0x00, 0x01]
+        vec![
+            0x58, 0x44, 0x32, 0x42, 0x01, 0x38, 0x0e, 0x68, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00,
+        ]
     }
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsDirectoryTreeBranchHeader::new();
+        let mut test_struct = XfsDirectoryListElementHeaderV2::new();
         test_struct.read_data(&test_data)?;
-
-        assert_eq!(test_struct.number_of_entries, 16);
 
         Ok(())
     }
@@ -73,8 +72,8 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsDirectoryTreeBranchHeader::new();
-        let result = test_struct.read_data(&test_data[0..3]);
+        let mut test_struct = XfsDirectoryListElementHeaderV2::new();
+        let result = test_struct.read_data(&test_data[0..15]);
         assert!(result.is_err());
     }
 }

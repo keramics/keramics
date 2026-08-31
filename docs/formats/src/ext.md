@@ -572,7 +572,7 @@ An indirect block number is 0 that is part of the data stream represents sparse 
 
 Extents were introduced in ext4 and are controlled by EXT4_FEATURE_INCOMPAT_EXTENTS.
 
-Extents form an extent B-Tree, where:
+Extents form an extent B-tree, where:
 
 * [extent indexes](#ext4_extent_index) are stored in the branch nodes and
 * [extent descriptors](#ext4_extent_descriptor) are stored in the leaf nodes.
