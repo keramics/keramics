@@ -385,7 +385,8 @@ impl XfsAttributesTree {
                         entry_index
                     )));
                 }
-                let value_data: Vec<u8> = file_system_block.data[name_end_offset..value_data_end_offset].to_vec();
+                let value_data: Vec<u8> =
+                    file_system_block.data[name_end_offset..value_data_end_offset].to_vec();
 
                 attributes.insert(name, XfsAttribute::InlineData(value_data));
             }
