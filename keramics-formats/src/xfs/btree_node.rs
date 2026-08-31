@@ -18,7 +18,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use super::btree_node_header_32bit::XfsBtreeNodeHeader32bit;
 use super::btree_node_header_64bit::XfsBtreeNodeHeader64bit;
 
-/// X File System (XFS) B-Tree node.
+/// X File System (XFS) B-tree node.
 pub struct XfsBtreeNode {
     /// Signature.
     pub signature: Vec<u8>,

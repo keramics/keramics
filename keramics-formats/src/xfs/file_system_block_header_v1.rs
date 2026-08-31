@@ -39,9 +39,6 @@ impl XfsFileSystemBlockHeaderV1 {
         if data.len() < 12 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        if &data[8..10] != &[0xfb, 0xee] {
-            return Err(keramics_core::error_trace_new!("Unsupported signature"));
-        }
         Ok(())
     }
 }
@@ -72,16 +69,6 @@ mod tests {
 
         let mut test_struct = XfsFileSystemBlockHeaderV1::new();
         let result = test_struct.read_data(&test_data[0..11]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_read_data_with_unsupported_signature() {
-        let mut test_data: Vec<u8> = get_test_data();
-        test_data[8] = 0xff;
-
-        let mut test_struct = XfsFileSystemBlockHeaderV1::new();
-        let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
 }

@@ -20,28 +20,28 @@ use keramics_types::ByteString;
 use crate::indexed_hash_map::IndexedHashMap;
 use crate::util::calculate_alignment_padding;
 
-use super::block_directory_entry_v2::XfsBlockDirectoryEntryV2;
-use super::block_directory_footer_v2::XfsBlockDirectoryFooterV2;
-use super::block_directory_header_v2::XfsBlockDirectoryHeaderV2;
-use super::block_directory_header_v3::XfsBlockDirectoryHeaderV3;
-use super::block_directory_unused_entry_v2::XfsBlockDirectoryUnusedEntryV2;
 use super::directory_entry::XfsDirectoryEntry;
+use super::directory_list_element_entry_v2::XfsDirectoryListElementEntryV2;
+use super::directory_list_element_footer_v2::XfsDirectoryListElementFooterV2;
+use super::directory_list_element_header_v2::XfsDirectoryListElementHeaderV2;
+use super::directory_list_element_header_v3::XfsDirectoryListElementHeaderV3;
+use super::directory_list_element_unused_entry_v2::XfsDirectoryListElementUnusedEntryV2;
 
-/// X File System (XFS) block directory node.
-pub struct XfsBlockDirectoryNode {
+/// X File System (XFS) directory list element.
+pub struct XfsDirectoryListElement {
     /// Character encoding.
     character_encoding: CharacterEncoding,
 }
 
-impl XfsBlockDirectoryNode {
-    /// Creates a new block directory node.
+impl XfsDirectoryListElement {
+    /// Creates a new directory list element.
     pub fn new(character_encoding: &CharacterEncoding) -> Self {
         Self {
             character_encoding: character_encoding.clone(),
         }
     }
 
-    /// Reads the block directory node from a buffer.
+    /// Reads the directory list element from a buffer.
     fn read_data(
         &self,
         has_file_type: bool,
@@ -61,35 +61,35 @@ impl XfsBlockDirectoryNode {
             _ => return Err(keramics_core::error_trace_new!("Unsupported signature")),
         };
         if format_version == 2 {
-            keramics_core::debug_trace_structure!(XfsBlockDirectoryHeaderV2::debug_read_data(
-                &data
-            ));
-            let mut block_directory_header: XfsBlockDirectoryHeaderV2 =
-                XfsBlockDirectoryHeaderV2::new();
+            keramics_core::debug_trace_structure!(
+                XfsDirectoryListElementHeaderV2::debug_read_data(&data)
+            );
+            let mut block_header: XfsDirectoryListElementHeaderV2 =
+                XfsDirectoryListElementHeaderV2::new();
 
-            match block_directory_header.read_data(&data) {
+            match block_header.read_data(&data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read version 2 block directory header"
+                        "Unable to read version 2 directory list element header"
                     );
                     return Err(error);
                 }
             }
         } else {
-            keramics_core::debug_trace_structure!(XfsBlockDirectoryHeaderV3::debug_read_data(
-                &data
-            ));
-            let mut block_directory_header: XfsBlockDirectoryHeaderV3 =
-                XfsBlockDirectoryHeaderV3::new();
+            keramics_core::debug_trace_structure!(
+                XfsDirectoryListElementHeaderV3::debug_read_data(&data)
+            );
+            let mut block_header: XfsDirectoryListElementHeaderV3 =
+                XfsDirectoryListElementHeaderV3::new();
 
-            match block_directory_header.read_data(&data) {
+            match block_header.read_data(&data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read version 3 block directory header"
+                        "Unable to read version 3 directory list element header"
                     );
                     return Err(error);
                 }
@@ -102,30 +102,28 @@ impl XfsBlockDirectoryNode {
         } else {
             let footer_offset: usize = data_size - 8;
 
-            keramics_core::debug_trace_structure!(XfsBlockDirectoryFooterV2::debug_read_data(
-                &data[footer_offset..]
-            ));
-            let mut block_directory_footer: XfsBlockDirectoryFooterV2 =
-                XfsBlockDirectoryFooterV2::new();
+            keramics_core::debug_trace_structure!(
+                XfsDirectoryListElementFooterV2::debug_read_data(&data[footer_offset..])
+            );
+            let mut block_footer: XfsDirectoryListElementFooterV2 =
+                XfsDirectoryListElementFooterV2::new();
 
-            match block_directory_footer.read_data(&data[footer_offset..]) {
+            match block_footer.read_data(&data[footer_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read version 2 block directory footer"
+                        "Unable to read version 2 directory list element footer"
                     );
                     return Err(error);
                 }
             }
-            if (block_directory_footer.number_of_entries as usize)
-                > (data_size - data_offset - 8) / 8
-            {
+            if (block_footer.number_of_entries as usize) > (data_size - data_offset - 8) / 8 {
                 return Err(keramics_core::error_trace_new!(
-                    "Invalid block directory footer - number of entries values out of bounds"
+                    "Invalid directory list element footer - number of entries values out of bounds"
                 ));
             }
-            (block_directory_footer.number_of_entries as usize) * 8
+            (block_footer.number_of_entries as usize) * 8
         };
         let entries_data_end_offset: usize = if !has_footer {
             data_size
@@ -137,10 +135,10 @@ impl XfsBlockDirectoryNode {
         while data_offset < entries_data_end_offset {
             if &data[data_offset..data_offset + 2] == &[0xff, 0xff] {
                 keramics_core::debug_trace_structure!(
-                    XfsBlockDirectoryUnusedEntryV2::debug_read_data(&data[data_offset..])
+                    XfsDirectoryListElementUnusedEntryV2::debug_read_data(&data[data_offset..])
                 );
-                let mut directory_block_entry: XfsBlockDirectoryUnusedEntryV2 =
-                    XfsBlockDirectoryUnusedEntryV2::new();
+                let mut directory_block_entry: XfsDirectoryListElementUnusedEntryV2 =
+                    XfsDirectoryListElementUnusedEntryV2::new();
 
                 match directory_block_entry.read_data(&data[data_offset..]) {
                     Ok(_) => {}
@@ -164,8 +162,8 @@ impl XfsBlockDirectoryNode {
             } else {
                 // TODO: debug trace name and file type
 
-                let mut directory_block_entry: XfsBlockDirectoryEntryV2 =
-                    XfsBlockDirectoryEntryV2::new();
+                let mut directory_block_entry: XfsDirectoryListElementEntryV2 =
+                    XfsDirectoryListElementEntryV2::new();
 
                 match directory_block_entry.read_data(&data[data_offset..]) {
                     Ok(_) => {}
@@ -189,14 +187,14 @@ impl XfsBlockDirectoryNode {
                     )));
                 }
                 keramics_core::debug_trace_data!(
-                    "XfsBlockDirectoryEntry",
+                    "XfsDirectoryListElementEntry",
                     data_offset,
                     &data[data_offset..data_offset + entry_size],
                     entry_size
                 );
-                keramics_core::debug_trace_structure!(XfsBlockDirectoryEntryV2::debug_read_data(
-                    &data[data_offset..]
-                ));
+                keramics_core::debug_trace_structure!(
+                    XfsDirectoryListElementEntryV2::debug_read_data(&data[data_offset..])
+                );
                 let name_offset: usize = data_offset + 9;
                 let name_end_offset: usize =
                     name_offset + (directory_block_entry.name_size as usize);
@@ -227,14 +225,14 @@ impl XfsBlockDirectoryNode {
         }
         #[cfg(feature = "debug-trace")]
         if hash_values_data_size > 0 {
-            keramics_core::debug_trace_structure!(XfsBlockDirectoryEntryV2::debug_read_data(
+            keramics_core::debug_trace_structure!(XfsDirectoryListElementEntryV2::debug_read_data(
                 &data[entries_data_end_offset..entries_data_end_offset + hash_values_data_size]
             ));
         }
         Ok(())
     }
 
-    /// Reads the block directory node from a specific position in a data stream.
+    /// Reads the directory list element from a specific position in a data stream.
     pub fn read_at_position(
         &self,
         has_file_type: bool,
@@ -248,7 +246,7 @@ impl XfsBlockDirectoryNode {
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
 
-        keramics_core::debug_trace_data!("XfsBlockDirectoryNode", offset, &data, block_size);
+        keramics_core::debug_trace_data!("XfsDirectoryListElement", offset, &data, block_size);
 
         match self.read_data(has_file_type, &data, entries) {
             Ok(_) => {}
@@ -256,7 +254,7 @@ impl XfsBlockDirectoryNode {
                 keramics_core::error_trace_add_frame!(
                     error,
                     format!(
-                        "Unable to read block directory node data at offset: {} (0x{:08x})",
+                        "Unable to read directory list element data at offset: {} (0x{:08x})",
                         offset, offset
                     )
                 );
@@ -577,7 +575,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let test_struct = XfsBlockDirectoryNode::new(&CharacterEncoding::Utf8);
+        let test_struct = XfsDirectoryListElement::new(&CharacterEncoding::Utf8);
         let mut entries: IndexedHashMap<ByteString, XfsDirectoryEntry> = IndexedHashMap::new();
         test_struct.read_data(true, &test_data, &mut entries)?;
 
@@ -588,7 +586,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let test_struct = XfsBlockDirectoryNode::new(&CharacterEncoding::Utf8);
+        let test_struct = XfsDirectoryListElement::new(&CharacterEncoding::Utf8);
 
         let test_data: Vec<u8> = get_test_data();
         let mut entries: IndexedHashMap<ByteString, XfsDirectoryEntry> = IndexedHashMap::new();
@@ -601,7 +599,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let test_struct = XfsBlockDirectoryNode::new(&CharacterEncoding::Utf8);
+        let test_struct = XfsDirectoryListElement::new(&CharacterEncoding::Utf8);
         let mut entries: IndexedHashMap<ByteString, XfsDirectoryEntry> = IndexedHashMap::new();
         test_struct.read_at_position(true, &data_stream, 4096, SeekFrom::Start(0), &mut entries)?;
 

@@ -13,39 +13,37 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::bytes_to_u16_be;
+use keramics_types::bytes_to_u32_be;
 
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "big",
-        field(name = "free_tag", data_type = "u16", format = "hex"),
-        field(name = "entry_size", data_type = "u16"),
-        field(name = "unknown1", data_type = "[u8; 2]"),
+        field(name = "number_of_used_entries", data_type = "u32"),
+        field(name = "number_of_unused_entries", data_type = "u32"),
     ),
     methods("debug_read_data")
 )]
-/// X File System (XFS) block directory unused entry version 2.
-pub struct XfsBlockDirectoryUnusedEntryV2 {
-    /// Entry size.
-    pub entry_size: u16,
+/// X File System (XFS) directory list element footer version 2.
+pub struct XfsDirectoryListElementFooterV2 {
+    /// Number of entries.
+    pub number_of_entries: u32,
 }
 
-impl XfsBlockDirectoryUnusedEntryV2 {
-    /// Creates a new entry.
+impl XfsDirectoryListElementFooterV2 {
+    /// Creates a new footer.
     pub fn new() -> Self {
-        Self { entry_size: 0 }
+        Self {
+            number_of_entries: 0,
+        }
     }
 
-    /// Reads the entry from a buffer.
+    /// Reads the footer from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 6 {
+        if data.len() < 8 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        if &data[0..2] != &[0xff, 0xff] {
-            return Err(keramics_core::error_trace_new!("Unsupported signature"));
-        }
-        self.entry_size = bytes_to_u16_be!(data, 2);
+        self.number_of_entries = bytes_to_u32_be!(data, 0);
 
         Ok(())
     }
@@ -56,20 +54,17 @@ mod tests {
     use super::*;
 
     fn get_test_data() -> Vec<u8> {
-        vec![
-            0xff, 0xff, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00,
-        ]
+        vec![0x00, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x00]
     }
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsBlockDirectoryUnusedEntryV2::new();
+        let mut test_struct = XfsDirectoryListElementFooterV2::new();
         test_struct.read_data(&test_data)?;
 
-        assert_eq!(test_struct.entry_size, 16);
+        assert_eq!(test_struct.number_of_entries, 11);
 
         Ok(())
     }
@@ -78,18 +73,8 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsBlockDirectoryUnusedEntryV2::new();
-        let result = test_struct.read_data(&test_data[0..5]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_read_data_with_unsupported_signature() {
-        let mut test_data: Vec<u8> = get_test_data();
-        test_data[0] = 0x00;
-
-        let mut test_struct = XfsBlockDirectoryUnusedEntryV2::new();
-        let result = test_struct.read_data(&test_data);
+        let mut test_struct = XfsDirectoryListElementFooterV2::new();
+        let result = test_struct.read_data(&test_data[0..7]);
         assert!(result.is_err());
     }
 }

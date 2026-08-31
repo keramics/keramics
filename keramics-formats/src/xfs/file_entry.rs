@@ -24,11 +24,12 @@ use crate::traits::{ExtendedAttributeIterator, FileEntryIterator};
 
 use super::attribute::XfsAttribute;
 use super::attributes_table::XfsAttributesTable;
-use super::block_directory::XfsBlockDirectory;
+use super::attributes_tree::XfsAttributesTree;
 use super::block_reader::XfsBlockReader;
 use super::block_stream::XfsBlockStream;
 use super::constants::*;
 use super::directory_entry::XfsDirectoryEntry;
+use super::directory_list::XfsDirectoryList;
 use super::directory_table::XfsDirectoryTable;
 use super::extended_attribute::XfsExtendedAttribute;
 use super::extended_attributes::XfsExtendedAttributesIterator;
@@ -451,8 +452,27 @@ impl XfsFileEntry {
                         }
                     }
                 }
-                // TODO: read attributes
-                todo!();
+                let attributes_tree: XfsAttributesTree = XfsAttributesTree::new(
+                    &self.character_encoding,
+                    self.inode_tree.format_version,
+                    self.inode_tree.allocation_group_size,
+                    self.inode_tree.number_of_relative_block_number_bits,
+                    self.inode_tree.block_size,
+                );
+                match attributes_tree.read_attributes(
+                    &self.data_stream,
+                    &extents,
+                    &mut self.attributes,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read attributes tree"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             _ => {
                 return Err(keramics_core::error_trace_new!(
@@ -490,12 +510,12 @@ impl XfsFileEntry {
             }
             XFS_FORK_TYPE_EXTENTS | XFS_FORK_TYPE_BTREE => {
                 if self.has_directory_v2 {
-                    let block_directory: XfsBlockDirectory = XfsBlockDirectory::new(
+                    let directory_list: XfsDirectoryList = XfsDirectoryList::new(
                         &self.character_encoding,
                         self.inode_tree.block_size,
                         self.inode_tree.directory_block_size,
                     );
-                    match block_directory.read_entries(
+                    match directory_list.read_entries(
                         self.has_file_type,
                         &self.data_stream,
                         self.inode.data_size,
@@ -506,7 +526,7 @@ impl XfsFileEntry {
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                "Unable to read block directory"
+                                "Unable to read directory list"
                             );
                             return Err(error);
                         }

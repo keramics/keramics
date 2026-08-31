@@ -26,11 +26,11 @@ use super::btree_entry::ApfsBtreeEntry;
     ),
     methods("debug_read_data")
 )]
-/// Apple File System (APFS) B-Tree fixed size entry.
+/// Apple File System (APFS) B-tree fixed size entry.
 pub struct ApfsBtreeEntryFixedSize {}
 
 impl ApfsBtreeEntryFixedSize {
-    /// Reads the B-Tree fixed size entry from a buffer.
+    /// Reads the B-tree fixed size entry from a buffer.
     pub fn read_data(entry: &mut ApfsBtreeEntry, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 4 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));

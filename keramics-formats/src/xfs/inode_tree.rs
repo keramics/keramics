@@ -106,7 +106,7 @@ impl XfsInodeTree {
                 "Invalid relative inode number value out of bounds"
             ));
         }
-        let mut read_node_numbers: HashSet<u32> = HashSet::new();
+        let mut read_block_numbers: HashSet<u32> = HashSet::new();
 
         match self.get_inode_by_identifier_from_node(
             data_stream,
@@ -114,7 +114,7 @@ impl XfsInodeTree {
             allocation_group_block_number,
             root_block_number,
             relative_inode_number as u32,
-            &mut read_node_numbers,
+            &mut read_block_numbers,
         ) {
             Ok(true) => {
                 let inode_offset: u64 = (allocation_group_block_number * (self.block_size as u64))
@@ -179,7 +179,7 @@ impl XfsInodeTree {
         allocation_group_block_number: u64,
         relative_inode_number: u32,
         btree_node: &XfsBtreeNode,
-        read_node_numbers: &mut HashSet<u32>,
+        read_block_numbers: &mut HashSet<u32>,
     ) -> Result<bool, ErrorTrace> {
         let data_size: usize = btree_node.data.len();
 
@@ -257,7 +257,7 @@ impl XfsInodeTree {
                 allocation_group_block_number,
                 branch_value.block_number,
                 relative_inode_number,
-                read_node_numbers,
+                read_block_numbers,
             ) {
                 Ok(result) => return Ok(result),
                 Err(mut error) => {
@@ -329,15 +329,15 @@ impl XfsInodeTree {
         allocation_group_block_number: u64,
         relative_block_number: u32,
         relative_inode_number: u32,
-        read_node_numbers: &mut HashSet<u32>,
+        read_block_numbers: &mut HashSet<u32>,
     ) -> Result<bool, ErrorTrace> {
-        if read_node_numbers.contains(&relative_block_number) {
+        if read_block_numbers.contains(&relative_block_number) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Inode tree node: {} already read",
                 relative_block_number
             )));
         }
-        let btree_node_offset: u64 = ((allocation_group_block_number as u64)
+        let btree_node_offset: u64 = (allocation_group_block_number
             + (relative_block_number as u64))
             * (self.block_size as u64);
 
@@ -362,13 +362,13 @@ impl XfsInodeTree {
                 return Err(error);
             }
         }
-        read_node_numbers.insert(relative_block_number);
+        read_block_numbers.insert(relative_block_number);
 
         if &btree_node.signature != &XFS_INODE_TREE_SIGNATURE
             && &btree_node.signature != &XFS_INODE_TREE_V5_SIGNATURE
         {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported inode B-Tree node signature"
+                "Unsupported inode B-tree node signature"
             ));
         }
         if btree_node.is_branch() {
@@ -378,7 +378,7 @@ impl XfsInodeTree {
                 allocation_group_block_number,
                 relative_inode_number,
                 &btree_node,
-                read_node_numbers,
+                read_block_numbers,
             ) {
                 Ok(result) => Ok(result),
                 Err(mut error) => {

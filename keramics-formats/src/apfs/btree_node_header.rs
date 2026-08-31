@@ -33,7 +33,7 @@ use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
     ),
     methods("debug_read_data")
 )]
-/// Apple File System (APFS) B-Tree node header.
+/// Apple File System (APFS) B-tree node header.
 pub struct ApfsBtreeNodeHeader {
     /// Flags.
     pub flags: u16,
@@ -52,7 +52,7 @@ pub struct ApfsBtreeNodeHeader {
 }
 
 impl ApfsBtreeNodeHeader {
-    /// Creates a new B-Tree node header.
+    /// Creates a new B-tree node header.
     pub fn new() -> Self {
         Self {
             flags: 0,
@@ -63,7 +63,7 @@ impl ApfsBtreeNodeHeader {
         }
     }
 
-    /// Reads the B-Tree node header from a buffer.
+    /// Reads the B-tree node header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 24 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));

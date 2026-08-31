@@ -18,30 +18,23 @@ use keramics_layout_map::LayoutMap;
 #[layout_map(
     structure(
         byte_order = "big",
-        field(name = "next_block_number", data_type = "u32"),
-        field(name = "previous_block_number", data_type = "u32"),
-        field(name = "signature", data_type = "[u8; 2]", format = "hex"),
-        field(name = "unknown1", data_type = "[u8; 2]"),
-        field(name = "checksum", data_type = "u32", format = "hex"),
-        field(name = "block_number", data_type = "u64"),
-        field(name = "log_sequence_number", data_type = "u64"),
-        field(name = "block_type_identifier", data_type = "Uuid"),
-        field(name = "owner_inode_number", data_type = "u64"),
+        field(name = "offset", data_type = "u16"),
+        field(name = "size", data_type = "u16"),
     ),
     methods("debug_read_data")
 )]
-/// X File System (XFS) file system block header version 1.
-pub struct XfsFileSystemBlockHeaderV3 {}
+/// X File System (XFS) block free region version 2.
+pub struct XfsBlockFreeRegion {}
 
-impl XfsFileSystemBlockHeaderV3 {
-    /// Creates a new header.
+impl XfsBlockFreeRegion {
+    /// Creates a new block free region.
     pub fn new() -> Self {
         Self {}
     }
 
-    /// Reads the header from a buffer.
+    /// Reads the block free region from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 56 {
+        if data.len() < 4 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         Ok(())
@@ -53,19 +46,14 @@ mod tests {
     use super::*;
 
     fn get_test_data() -> Vec<u8> {
-        vec![
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3b, 0xee, 0x00, 0x00, 0x83, 0x64,
-            0x08, 0x8a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2b, 0x38, 0x00, 0x00, 0x00, 0x01,
-            0x00, 0x00, 0x00, 0x02, 0xeb, 0xd6, 0x54, 0x96, 0xec, 0xd8, 0x49, 0x90, 0x95, 0x48,
-            0x47, 0x85, 0x39, 0x5a, 0x1b, 0x6c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2b, 0x4f,
-        ]
+        vec![0x20, 0x00, 0x00, 0x10]
     }
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsFileSystemBlockHeaderV3::new();
+        let mut test_struct = XfsBlockFreeRegion::new();
         test_struct.read_data(&test_data)?;
 
         Ok(())
@@ -75,8 +63,8 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsFileSystemBlockHeaderV3::new();
-        let result = test_struct.read_data(&test_data[0..55]);
+        let mut test_struct = XfsBlockFreeRegion::new();
+        let result = test_struct.read_data(&test_data[0..3]);
         assert!(result.is_err());
     }
 }

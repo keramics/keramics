@@ -36,7 +36,7 @@ use keramics_types::{bytes_to_u16_be, bytes_to_u64_be};
     ),
     methods("debug_read_data")
 )]
-/// X File System (XFS) B-Tree node header 64-bit.
+/// X File System (XFS) B-tree node header 64-bit.
 pub struct XfsBtreeNodeHeader64bit {
     /// Signature.
     pub signature: Vec<u8>,

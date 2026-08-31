@@ -66,7 +66,7 @@ impl XfsExtentTree {
         data_stream: &DataStreamReference,
         btree_node: &XfsBtreeNode,
         extents: &mut Vec<XfsPackedExtent>,
-        read_node_numbers: &mut HashSet<u64>,
+        read_block_numbers: &mut HashSet<u64>,
     ) -> Result<(), ErrorTrace> {
         let data_size: usize = btree_node.data.len();
 
@@ -135,7 +135,7 @@ impl XfsExtentTree {
                 data_stream,
                 branch_value.block_number,
                 extents,
-                read_node_numbers,
+                read_block_numbers,
             ) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -159,9 +159,9 @@ impl XfsExtentTree {
         data_stream: &DataStreamReference,
         block_number: u64,
         extents: &mut Vec<XfsPackedExtent>,
-        read_node_numbers: &mut HashSet<u64>,
+        read_block_numbers: &mut HashSet<u64>,
     ) -> Result<(), ErrorTrace> {
-        if read_node_numbers.contains(&block_number) {
+        if read_block_numbers.contains(&block_number) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Extent tree node: {} already read",
                 block_number
@@ -172,9 +172,8 @@ impl XfsExtentTree {
             allocation_group_index * (self.allocation_group_size as u64);
         let relative_block_number: u64 = block_number & self.relative_block_number_bit_mask;
 
-        let btree_node_offset: u64 = ((allocation_group_block_number as u64)
-            + (relative_block_number as u64))
-            * (self.block_size as u64);
+        let btree_node_offset: u64 =
+            (allocation_group_block_number + relative_block_number) * (self.block_size as u64);
 
         let mut btree_node: XfsBtreeNode = XfsBtreeNode::new();
 
@@ -197,13 +196,13 @@ impl XfsExtentTree {
                 return Err(error);
             }
         }
-        read_node_numbers.insert(block_number);
+        read_block_numbers.insert(block_number);
 
         if &btree_node.signature != &XFS_EXTENT_TREE_SIGNATURE
             && &btree_node.signature != &XFS_EXTENT_TREE_V5_SIGNATURE
         {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported extent B-Tree node signature"
+                "Unsupported extent B-tree node signature"
             ));
         }
         if btree_node.is_branch() {
@@ -211,7 +210,7 @@ impl XfsExtentTree {
                 data_stream,
                 &btree_node,
                 extents,
-                read_node_numbers,
+                read_block_numbers,
             ) {
                 Ok(result) => Ok(result),
                 Err(mut error) => {
@@ -253,7 +252,7 @@ impl XfsExtentTree {
 
         keramics_core::debug_trace_data!("XfsExtentTreeRootNode", 0, &root_node_data, data_size);
 
-        let mut read_node_numbers: HashSet<u64> = HashSet::new();
+        let mut read_block_numbers: HashSet<u64> = HashSet::new();
 
         keramics_core::debug_trace_structure!(XfsExtentTreeBranchHeader::debug_read_data(
             &root_node_data
@@ -334,7 +333,7 @@ impl XfsExtentTree {
                 data_stream,
                 branch_value.block_number,
                 extents,
-                &mut read_node_numbers,
+                &mut read_block_numbers,
             ) {
                 Ok(_) => {}
                 Err(mut error) => {

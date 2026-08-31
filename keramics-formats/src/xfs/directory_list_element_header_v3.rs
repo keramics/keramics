@@ -14,26 +14,31 @@
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 
+#[cfg(feature = "debug-trace")]
+use super::block_free_region::XfsBlockFreeRegion;
+
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "big",
-        field(name = "next_block_number", data_type = "u32"),
-        field(name = "previous_block_number", data_type = "u32"),
-        field(name = "signature", data_type = "[u8; 2]", format = "hex"),
-        field(name = "unknown1", data_type = "[u8; 2]"),
+        field(name = "signature", data_type = "ByteString<4>"),
         field(name = "checksum", data_type = "u32", format = "hex"),
         field(name = "block_number", data_type = "u64"),
         field(name = "log_sequence_number", data_type = "u64"),
         field(name = "block_type_identifier", data_type = "Uuid"),
         field(name = "owner_inode_number", data_type = "u64"),
+        field(
+            name = "free_regions",
+            data_type = "[Struct<XfsBlockFreeRegion; 4>; 3]"
+        ),
+        field(name = "unknown1", data_type = "[u8; 4]"),
     ),
     methods("debug_read_data")
 )]
-/// X File System (XFS) file system block header version 1.
-pub struct XfsFileSystemBlockHeaderV3 {}
+/// X File System (XFS) directory list element header version 3.
+pub struct XfsDirectoryListElementHeaderV3 {}
 
-impl XfsFileSystemBlockHeaderV3 {
+impl XfsDirectoryListElementHeaderV3 {
     /// Creates a new header.
     pub fn new() -> Self {
         Self {}
@@ -41,7 +46,7 @@ impl XfsFileSystemBlockHeaderV3 {
 
     /// Reads the header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 56 {
+        if data.len() < 16 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         Ok(())
@@ -54,10 +59,11 @@ mod tests {
 
     fn get_test_data() -> Vec<u8> {
         vec![
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3b, 0xee, 0x00, 0x00, 0x83, 0x64,
-            0x08, 0x8a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2b, 0x38, 0x00, 0x00, 0x00, 0x01,
-            0x00, 0x00, 0x00, 0x02, 0xeb, 0xd6, 0x54, 0x96, 0xec, 0xd8, 0x49, 0x90, 0x95, 0x48,
-            0x47, 0x85, 0x39, 0x5a, 0x1b, 0x6c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2b, 0x4f,
+            0x58, 0x44, 0x42, 0x33, 0x05, 0x5c, 0x65, 0x4d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x2b, 0x18, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x1a, 0x76, 0x3f, 0x17, 0x32,
+            0x5c, 0xbf, 0x4d, 0x80, 0x90, 0x10, 0x6f, 0xab, 0xe2, 0xb7, 0x8c, 0xe2, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x2b, 0x44, 0x0a, 0xb0, 0x01, 0xd0, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ]
     }
 
@@ -65,7 +71,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsFileSystemBlockHeaderV3::new();
+        let mut test_struct = XfsDirectoryListElementHeaderV3::new();
         test_struct.read_data(&test_data)?;
 
         Ok(())
@@ -75,8 +81,8 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsFileSystemBlockHeaderV3::new();
-        let result = test_struct.read_data(&test_data[0..55]);
+        let mut test_struct = XfsDirectoryListElementHeaderV3::new();
+        let result = test_struct.read_data(&test_data[0..15]);
         assert!(result.is_err());
     }
 }

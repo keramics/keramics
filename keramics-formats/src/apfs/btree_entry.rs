@@ -11,7 +11,7 @@
  * under the License.
  */
 
-/// Apple File System (APFS) B-Tree entry.
+/// Apple File System (APFS) B-tree entry.
 #[derive(Clone)]
 pub struct ApfsBtreeEntry {
     /// Key data offset.

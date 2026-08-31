@@ -20,12 +20,12 @@ use keramics_types::ByteString;
 
 use crate::indexed_hash_map::IndexedHashMap;
 
-use super::block_directory_node::XfsBlockDirectoryNode;
 use super::directory_entry::XfsDirectoryEntry;
+use super::directory_list_element::XfsDirectoryListElement;
 use super::packed_extent::XfsPackedExtent;
 
-/// X File System (XFS) block directory.
-pub struct XfsBlockDirectory {
+/// X File System (XFS) directory list.
+pub struct XfsDirectoryList {
     /// Character encoding.
     character_encoding: CharacterEncoding,
 
@@ -36,8 +36,8 @@ pub struct XfsBlockDirectory {
     directory_block_size: u32,
 }
 
-impl XfsBlockDirectory {
-    /// Creates a new block directory.
+impl XfsDirectoryList {
+    /// Creates a new directory list.
     pub fn new(
         character_encoding: &CharacterEncoding,
         block_size: u32,
@@ -59,7 +59,7 @@ impl XfsBlockDirectory {
         extents: &[XfsPackedExtent],
         entries: &mut IndexedHashMap<ByteString, XfsDirectoryEntry>,
     ) -> Result<(), ErrorTrace> {
-        let mut read_node_numbers: HashSet<u64> = HashSet::new();
+        let mut read_block_numbers: HashSet<u64> = HashSet::new();
         let mut extent_offset: u64 = 0;
 
         for extent in extents.iter() {
@@ -84,22 +84,22 @@ impl XfsBlockDirectory {
                 }
                 if (self.directory_block_size as u64) > extent_end_offset - extent_offset {
                     return Err(keramics_core::error_trace_new!(
-                        "Unsupported directory block spanning multiple extents"
+                        "Unsupported directory list element spanning multiple extents"
                     ));
                 }
-                match self.read_entries_from_node(
+                match self.read_entries_from_element(
                     has_file_type,
                     data_stream,
                     physical_block_number,
                     entries,
-                    &mut read_node_numbers,
+                    &mut read_block_numbers,
                 ) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
                             format!(
-                                "Unable to read entries from block directory node: {}",
+                                "Unable to read entries from directory list element: {}",
                                 physical_block_number
                             )
                         );
@@ -113,27 +113,27 @@ impl XfsBlockDirectory {
         Ok(())
     }
 
-    /// Reads the directory entries from a block directory node.
-    pub fn read_entries_from_node(
+    /// Reads the directory entries from a directory list element.
+    pub fn read_entries_from_element(
         &self,
         has_file_type: bool,
         data_stream: &DataStreamReference,
         physical_block_number: u64,
         entries: &mut IndexedHashMap<ByteString, XfsDirectoryEntry>,
-        read_node_numbers: &mut HashSet<u64>,
+        read_block_numbers: &mut HashSet<u64>,
     ) -> Result<(), ErrorTrace> {
-        if read_node_numbers.contains(&physical_block_number) {
+        if read_block_numbers.contains(&physical_block_number) {
             return Err(keramics_core::error_trace_new!(format!(
-                "Block directory node: {} already read",
+                "Directory list element: {} already read",
                 physical_block_number
             )));
         }
-        let block_directory_node: XfsBlockDirectoryNode =
-            XfsBlockDirectoryNode::new(&self.character_encoding);
+        let directory_list_element: XfsDirectoryListElement =
+            XfsDirectoryListElement::new(&self.character_encoding);
 
         let physical_offset: u64 = physical_block_number * (self.block_size as u64);
 
-        match block_directory_node.read_at_position(
+        match directory_list_element.read_at_position(
             has_file_type,
             data_stream,
             self.directory_block_size,
@@ -145,14 +145,14 @@ impl XfsBlockDirectory {
                 keramics_core::error_trace_add_frame!(
                     error,
                     format!(
-                        "Unable to read block directory node: {}",
+                        "Unable to read directory list element: {}",
                         physical_block_number
                     )
                 );
                 return Err(error);
             }
         }
-        read_node_numbers.insert(physical_block_number);
+        read_block_numbers.insert(physical_block_number);
 
         Ok(())
     }
