@@ -69,3 +69,31 @@ impl ExFatDirectoryEntry {
         &self.name
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_types::constants::UCS2_CASE_MAPPINGS;
+
+    #[test]
+    fn test_get_lookup_name() {
+        let mut test_struct = ExFatDirectoryEntry::new(7);
+        test_struct.name = Ucs2String::from("TeSt");
+
+        let mappings: Arc<Ucs2CharacterMappings> =
+            Arc::new(Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice()));
+
+        let lookup_name: Ucs2String = test_struct.get_lookup_name(&mappings);
+        assert_eq!(lookup_name, Ucs2String::from("TEST"));
+    }
+
+    #[test]
+    fn test_get_name() {
+        let mut test_struct = ExFatDirectoryEntry::new(7);
+        test_struct.name = Ucs2String::from("TeSt");
+
+        let name: &Ucs2String = test_struct.get_name();
+        assert_eq!(name, &Ucs2String::from("TeSt"));
+    }
+}

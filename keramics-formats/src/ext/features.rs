@@ -124,3 +124,91 @@ impl ExtFeatures {
         self.incompatible_feature_flags & !(supported_flags) != 0
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_encodings::CharacterEncoding;
+
+    #[test]
+    fn test_get_format_version() {
+        let test_struct: ExtFeatures = ExtFeatures::new();
+
+        assert_eq!(test_struct.get_format_version(), 2);
+
+        let mut test_struct: ExtFeatures = ExtFeatures::new();
+        test_struct.incompatible_feature_flags = 0x00000004;
+
+        assert_eq!(test_struct.get_format_version(), 3);
+
+        let mut test_struct: ExtFeatures = ExtFeatures::new();
+        test_struct.incompatible_feature_flags = 0x00000040;
+
+        assert_eq!(test_struct.get_format_version(), 4);
+    }
+
+    #[test]
+    fn test_get_group_descriptor_size() {
+        let mut test_struct: ExtFeatures = ExtFeatures::new();
+        assert_eq!(test_struct.get_group_descriptor_size(), 32);
+
+        test_struct.incompatible_feature_flags = EXT_INCOMPATIBLE_FEATURE_FLAG_64BIT_SUPPORT;
+        assert_eq!(test_struct.get_group_descriptor_size(), 64);
+    }
+
+    #[test]
+    fn test_has_meta_block_groups() {
+        let mut test_struct: ExtFeatures = ExtFeatures::new();
+        test_struct.incompatible_feature_flags =
+            EXT_INCOMPATIBLE_FEATURE_FLAG_HAS_META_BLOCK_GROUPS;
+
+        assert!(test_struct.has_meta_block_groups());
+    }
+
+    #[test]
+    fn test_has_sparse_superblock() {
+        let mut test_struct: ExtFeatures = ExtFeatures::new();
+        test_struct.read_only_compatible_feature_flags =
+            EXT_READ_ONLY_COMPATIBLE_FEATURE_FLAG_SPARSE_SUPERBLOCK;
+
+        assert!(test_struct.has_sparse_superblock());
+    }
+
+    #[test]
+    fn test_has_sparse_superblock2() {
+        let mut test_struct: ExtFeatures = ExtFeatures::new();
+        test_struct.compatible_feature_flags = EXT_COMPATIBLE_FEATURE_FLAG_SPARSE_SUPERBLOCK2;
+
+        assert!(test_struct.has_sparse_superblock2());
+    }
+
+    #[test]
+    fn test_initialize() {
+        let mut superblock: ExtSuperblock = ExtSuperblock::new(&CharacterEncoding::Utf8);
+        superblock.compatible_feature_flags = 0x00000038;
+        superblock.incompatible_feature_flags = 0x00000002;
+        superblock.read_only_compatible_feature_flags = 0x00000403;
+        superblock.file_system_identifier = [0; 16];
+
+        let mut expected_context: ReversedCrc32Context = ReversedCrc32Context::new(0x82f63b78, 0);
+        expected_context.update(&superblock.file_system_identifier);
+        let expected_checksum: u32 = expected_context.finalize();
+
+        let mut test_struct: ExtFeatures = ExtFeatures::new();
+        test_struct.initialize(&superblock);
+
+        assert_eq!(
+            test_struct.get_metadata_checksum_seed(),
+            Some(expected_checksum)
+        );
+    }
+
+    #[test]
+    fn test_is_unsupported() {
+        let mut test_struct: ExtFeatures = ExtFeatures::new();
+        test_struct.incompatible_feature_flags |= 0x00000800;
+
+        assert!(test_struct.is_unsupported());
+    }
+}

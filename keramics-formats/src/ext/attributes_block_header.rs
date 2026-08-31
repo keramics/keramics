@@ -99,4 +99,14 @@ mod tests {
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_read_data_with_invalid_number_of_blocks() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[9] = 0xff;
+
+        let mut test_struct = ExtAttributesBlockHeader::new();
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
 }
