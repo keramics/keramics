@@ -213,7 +213,7 @@ The 4 LSB contain the version the remaining bits are used to store feature flags
 
 ### Compatible feature flags {#compatible_feature_flags}
 
-Current no compatible feature flags are defined.
+Currently no compatible feature flags are defined.
 
 ### Read-only compatible feature flags {#read_only_compatible_feature_flags}
 
@@ -242,7 +242,7 @@ Current no compatible feature flags are defined.
 
 ### Journal incompatible feature flags {#journal_incompatible_feature_flags}
 
-Current no journal incompatible feature flags are defined.
+Currently no journal incompatible feature flags are defined.
 
 ## Free block information
 
@@ -795,8 +795,6 @@ The extent tree branch node record consists of:
 * array of extent tree branch node entry keys
 * array of extent tree branch node entry values
 
-TODO: number of key-value pairs
-
 The number of key-value pairs is calculated as following:
 
 ```python
@@ -840,8 +838,10 @@ Directories entries are stored in the data fork of a directory inode. The direct
 stored in multiple ways:
 
 * as a short-form directory table
-* as an extent-based [directory list](#directory_list)
-* as an extent-based [directory tree](#directory_tree)
+* as an extent-based [directory list](#directory_list) if the XFS_SB_VERSION_DIRV2BIT flag in the
+  superblock is set
+* as an extent-based [directory tree](#directory_tree) if the XFS_SB_VERSION_DIRV2BIT flag in the
+  superblock is not set
 
 ### Short-form directory table
 
@@ -919,9 +919,6 @@ A directory list (xfs_dir2_block_t) consist of one or more elements (block) that
 * array of used and unused directory entries
 * hash values of the entries
 * a directory list element footer
-
-> Note that if the XFS_SB_VERSION_DIRV2BIT flag in the superblock is not set the directory is
-> stored using [a directory tree](#directory_tree) instead.
 
 #### Directory list element header
 
@@ -1036,9 +1033,6 @@ of:
 ### Directory tree {#directory_tree}
 
 The first block in the extents is the root block.
-
-> Note that if the XFS_SB_VERSION_DIRV2BIT flag in the superblock is set the directory is stored
-> using [a directory list](#directory_list) instead.
 
 #### Directory tree branch node {#directory_tree_branch_node}
 
