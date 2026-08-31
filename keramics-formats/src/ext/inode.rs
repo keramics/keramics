@@ -21,7 +21,7 @@ use crate::indexed_hash_map::IndexedHashMap;
 
 use super::attributes_entry::ExtAttributesEntry;
 use super::block_numbers_tree::ExtBlockNumbersTree;
-use super::block_range::{ExtBlockRange, ExtBlockRangeType};
+use super::block_range::ExtBlockRange;
 use super::constants::*;
 use super::extents_tree::ExtExtentsTree;
 use super::inode_ext2::Ext2Inode;
@@ -241,9 +241,10 @@ impl ExtInode {
 mod tests {
     use super::*;
 
+    use keramics_core::open_fake_data_stream;
     use keramics_datetime::{PosixTime32, PosixTime64Ns};
 
-    use keramics_core::open_fake_data_stream;
+    use crate::ext::block_range::ExtBlockRangeType;
 
     fn get_test_data_ext2() -> Vec<u8> {
         vec![

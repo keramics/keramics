@@ -33,7 +33,7 @@ pub struct XfsAttributesTreeRemoteValue {
     /// Value data size.
     pub value_data_size: u32,
 
-    /// name size.
+    /// Name size.
     pub name_size: u8,
 }
 

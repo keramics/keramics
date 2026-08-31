@@ -21,23 +21,19 @@ use keramics_types::ByteString;
 
 use crate::indexed_hash_map::IndexedHashMap;
 
-use super::attribute::XfsAttribute;
-use super::attributes_tree_leaf_entry::XfsAttributesTreeLeafEntry;
-use super::attributes_tree_local_value::XfsAttributesTreeLocalValue;
-use super::attributes_tree_remote_value::XfsAttributesTreeRemoteValue;
 use super::block_tree_branch_entry::XfsBlockTreeBranchEntry;
 use super::block_tree_branch_header::XfsBlockTreeBranchHeader;
 use super::block_tree_leaf_header::XfsBlockTreeLeafHeader;
+use super::directory_entry::XfsDirectoryEntry;
+use super::directory_tree_leaf_entry::XfsDirectoryTreeLeafEntry;
+use super::directory_tree_value::XfsDirectoryTreeValue;
 use super::file_system_block::XfsFileSystemBlock;
 use super::packed_extent::XfsPackedExtent;
 
-/// X File System (XFS) attributes tree.
-pub struct XfsAttributesTree {
+/// X File System (XFS) directory tree.
+pub struct XfsDirectoryTree {
     /// Character encoding.
     character_encoding: CharacterEncoding,
-
-    /// Format version.
-    format_version: u16,
 
     /// Allocation group size.
     allocation_group_size: u32,
@@ -52,18 +48,16 @@ pub struct XfsAttributesTree {
     relative_block_number_bit_mask: u64,
 }
 
-impl XfsAttributesTree {
-    /// Creates a new attributes tree.
+impl XfsDirectoryTree {
+    /// Creates a new directory tree.
     pub fn new(
         character_encoding: &CharacterEncoding,
-        format_version: u16,
         allocation_group_size: u32,
         number_of_relative_block_number_bits: u32,
         block_size: u32,
     ) -> Self {
         Self {
             character_encoding: character_encoding.clone(),
-            format_version,
             allocation_group_size,
             block_size,
             block_number_bit_shift: number_of_relative_block_number_bits as u64,
@@ -72,80 +66,56 @@ impl XfsAttributesTree {
         }
     }
 
-    /// Reads the attributes attributes.
-    pub fn read_attributes(
+    /// Reads the directory entries.
+    pub fn read_entries(
         &self,
         data_stream: &DataStreamReference,
         extents: &[XfsPackedExtent],
-        attributes: &mut IndexedHashMap<ByteString, XfsAttribute>,
+        entries: &mut IndexedHashMap<ByteString, XfsDirectoryEntry>,
     ) -> Result<(), ErrorTrace> {
         let mut read_block_numbers: HashSet<u32> = HashSet::new();
 
-        match self.read_attributes_from_node(
-            data_stream,
-            0,
-            extents,
-            attributes,
-            &mut read_block_numbers,
-        ) {
+        match self.read_entries_from_node(data_stream, 0, extents, entries, &mut read_block_numbers)
+        {
             Ok(_) => Ok(()),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    "Unable to read attributes from root node: 0"
+                    "Unable to read directory from root node: 0"
                 );
                 Err(error)
             }
         }
     }
 
-    /// Reads the attributes attributes from a attributes tree branch node.
-    pub fn read_attributes_from_branch_node(
+    /// Reads the directory entries from a directory tree branch node.
+    pub fn read_entries_from_branch_node(
         &self,
         file_system_block: &XfsFileSystemBlock,
         data_stream: &DataStreamReference,
         extents: &[XfsPackedExtent],
-        attributes: &mut IndexedHashMap<ByteString, XfsAttribute>,
+        entries: &mut IndexedHashMap<ByteString, XfsDirectoryEntry>,
         read_block_numbers: &mut HashSet<u32>,
     ) -> Result<(), ErrorTrace> {
-        let branch_header_offset: usize;
-        let branch_header_size: usize;
-
-        if self.format_version < 5 {
-            if file_system_block.signature != 0xfebe {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported file system block signature: 0x{:04x}",
-                    file_system_block.signature
-                )));
-            }
-            branch_header_offset = 12;
-            branch_header_size = 4;
-        } else {
-            if file_system_block.signature != 0x3ebe {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported file system block signature: 0x{:04x}",
-                    file_system_block.signature
-                )));
-            }
-            branch_header_offset = 56;
-            branch_header_size = 8;
+        if file_system_block.signature != 0xfebe {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported file system block signature: 0x{:04x}",
+                file_system_block.signature
+            )));
         }
         let data_size: usize = file_system_block.data.len();
-        let branch_header_end_offset: usize = branch_header_offset + branch_header_size;
 
-        if branch_header_end_offset > data_size {
+        if data_size < 16 {
             return Err(keramics_core::error_trace_new!(
                 "Invalid branch header size value out of bounds"
             ));
         }
         keramics_core::debug_trace_structure!(XfsBlockTreeBranchHeader::debug_read_data(
-            &file_system_block.data[branch_header_offset..branch_header_end_offset]
+            &file_system_block.data[12..16]
         ));
         let mut branch_header: XfsBlockTreeBranchHeader = XfsBlockTreeBranchHeader::new();
 
-        match branch_header
-            .read_data(&file_system_block.data[branch_header_offset..branch_header_end_offset])
-        {
+        match branch_header.read_data(&file_system_block.data[12..16]) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -155,15 +125,14 @@ impl XfsAttributesTree {
                 return Err(error);
             }
         }
-        let entries_data_end_offset: usize =
-            branch_header_end_offset + ((branch_header.number_of_entries as usize) * 8);
+        let entries_data_end_offset: usize = 16 + ((branch_header.number_of_entries as usize) * 8);
 
         if entries_data_end_offset > data_size {
             return Err(keramics_core::error_trace_new!(
                 "Invalid number of entries value out of bounds"
             ));
         }
-        let mut data_offset: usize = branch_header_end_offset;
+        let mut data_offset: usize = 16;
 
         for entry_index in 0..branch_header.number_of_entries {
             keramics_core::debug_trace_structure!(XfsBlockTreeBranchEntry::debug_read_data(
@@ -177,7 +146,7 @@ impl XfsAttributesTree {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to read attributes tree branch entry: {}",
+                            "Unable to read directory tree branch entry: {}",
                             entry_index
                         ),
                     );
@@ -186,11 +155,11 @@ impl XfsAttributesTree {
             }
             data_offset += 8;
 
-            match self.read_attributes_from_node(
+            match self.read_entries_from_node(
                 data_stream,
                 entry.block_number,
                 extents,
-                attributes,
+                entries,
                 read_block_numbers,
             ) {
                 Ok(_) => {}
@@ -198,7 +167,7 @@ impl XfsAttributesTree {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to read attributes from root node: {}",
+                            "Unable to read directory from root node: {}",
                             entry.block_number
                         ),
                     );
@@ -209,50 +178,31 @@ impl XfsAttributesTree {
         Ok(())
     }
 
-    /// Reads the attributes attributes from a attributes tree leaf node.
-    pub fn read_attributes_from_leaf_node(
+    /// Reads the directory entries from a directory tree leaf node.
+    pub fn read_entries_from_leaf_node(
         &self,
         file_system_block: &XfsFileSystemBlock,
-        attributes: &mut IndexedHashMap<ByteString, XfsAttribute>,
+        entries: &mut IndexedHashMap<ByteString, XfsDirectoryEntry>,
     ) -> Result<(), ErrorTrace> {
-        let leaf_header_offset: usize;
-        let leaf_header_size: usize;
-
-        if self.format_version < 5 {
-            if file_system_block.signature != 0xfbee {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported file system block signature: 0x{:04x}",
-                    file_system_block.signature
-                )));
-            }
-            leaf_header_offset = 12;
-            leaf_header_size = 20;
-        } else {
-            if file_system_block.signature != 0x3bee {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported file system block signature: 0x{:04x}",
-                    file_system_block.signature
-                )));
-            }
-            leaf_header_offset = 56;
-            leaf_header_size = 24;
+        if file_system_block.signature != 0xfeeb {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported file system block signature: 0x{:04x}",
+                file_system_block.signature
+            )));
         }
         let data_size: usize = file_system_block.data.len();
-        let leaf_header_end_offset: usize = leaf_header_offset + leaf_header_size;
 
-        if leaf_header_end_offset > data_size {
+        if data_size < 32 {
             return Err(keramics_core::error_trace_new!(
                 "Invalid leaf header size value out of bounds"
             ));
         }
         keramics_core::debug_trace_structure!(XfsBlockTreeLeafHeader::debug_read_data(
-            &file_system_block.data[leaf_header_offset..leaf_header_end_offset]
+            &file_system_block.data[12..32]
         ));
         let mut leaf_header: XfsBlockTreeLeafHeader = XfsBlockTreeLeafHeader::new();
 
-        match leaf_header
-            .read_data(&file_system_block.data[leaf_header_offset..leaf_header_end_offset])
-        {
+        match leaf_header.read_data(&file_system_block.data[12..32]) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -262,28 +212,27 @@ impl XfsAttributesTree {
                 return Err(error);
             }
         }
-        let entries_data_end_offset: usize =
-            leaf_header_end_offset + ((leaf_header.number_of_entries as usize) * 8);
+        let entries_data_end_offset: usize = 32 + ((leaf_header.number_of_entries as usize) * 8);
 
         if entries_data_end_offset > data_size {
             return Err(keramics_core::error_trace_new!(
                 "Invalid number of entries value out of bounds"
             ));
         }
-        let mut data_offset: usize = leaf_header_end_offset;
+        let mut data_offset: usize = 32;
 
         for entry_index in 0..leaf_header.number_of_entries {
-            keramics_core::debug_trace_structure!(XfsAttributesTreeLeafEntry::debug_read_data(
+            keramics_core::debug_trace_structure!(XfsDirectoryTreeLeafEntry::debug_read_data(
                 &file_system_block.data[data_offset..]
             ));
-            let mut entry: XfsAttributesTreeLeafEntry = XfsAttributesTreeLeafEntry::new();
+            let mut entry: XfsDirectoryTreeLeafEntry = XfsDirectoryTreeLeafEntry::new();
 
             match entry.read_data(&file_system_block.data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        format!("Unable to read attributes tree leaf entry: {}", entry_index),
+                        format!("Unable to read directory tree leaf entry: {}", entry_index),
                     );
                     return Err(error);
                 }
@@ -298,12 +247,7 @@ impl XfsAttributesTree {
                     entry_index
                 )));
             }
-            let value_size: usize = if entry.attribute_flags & 0x01 == 0 {
-                9
-            } else {
-                3
-            };
-            let value_end_offset: usize = value_offset + value_size;
+            let value_end_offset: usize = value_offset + 8;
 
             if value_end_offset > data_size {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -311,101 +255,51 @@ impl XfsAttributesTree {
                     entry_index
                 )));
             }
-            let name_size: usize;
-            let value_data_size: usize;
+            let mut value: XfsDirectoryTreeValue = XfsDirectoryTreeValue::new();
 
-            if entry.attribute_flags & 0x01 == 0 {
-                keramics_core::debug_trace_structure!(
-                    XfsAttributesTreeRemoteValue::debug_read_data(
-                        &file_system_block.data[value_offset..]
-                    )
-                );
-                let mut value: XfsAttributesTreeRemoteValue = XfsAttributesTreeRemoteValue::new();
-
-                match value.read_data(&file_system_block.data[value_offset..]) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to read attributes tree leaf entry: {} remote value",
-                                entry_index
-                            ),
-                        );
-                        return Err(error);
-                    }
+            match value.read_data(&file_system_block.data[value_offset..]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read directory tree leaf entry: {} remote value",
+                            entry_index
+                        ),
+                    );
+                    return Err(error);
                 }
-                value_data_size = value.value_data_size as usize;
-                name_size = value.name_size as usize;
-            } else {
-                keramics_core::debug_trace_structure!(
-                    XfsAttributesTreeLocalValue::debug_read_data(
-                        &file_system_block.data[value_offset..]
-                    )
-                );
-                let mut value: XfsAttributesTreeLocalValue = XfsAttributesTreeLocalValue::new();
-
-                match value.read_data(&file_system_block.data[value_offset..]) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to read attributes tree leaf entry: {} local value",
-                                entry_index
-                            ),
-                        );
-                        return Err(error);
-                    }
-                }
-                value_data_size = value.value_data_size as usize;
-                name_size = value.name_size as usize;
             }
-            let name_end_offset: usize = value_end_offset + name_size;
+            let name_end_offset: usize = value_end_offset + (entry.name_size as usize);
 
-            if name_size == 0 || name_end_offset > data_size {
+            if entry.name_size == 0 || name_end_offset > data_size {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Invalid entry: {} - name size value out of bounds",
                     entry_index
                 )));
             }
-            let name: ByteString = XfsAttribute::read_name(
-                &self.character_encoding,
-                entry.attribute_flags,
-                &file_system_block.data[value_end_offset..name_end_offset],
-            );
-            if entry.attribute_flags & 0x01 == 0 {
-                todo!();
-            } else {
-                let value_data_end_offset: usize = name_end_offset + value_data_size;
+            let mut name: ByteString = ByteString::new_with_encoding(&self.character_encoding);
+            name.read_data(&file_system_block.data[value_end_offset..name_end_offset]);
 
-                if value_data_end_offset > data_size {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Invalid entry: {} - value data size value out of bounds",
-                        entry_index
-                    )));
-                }
-                let value_data: Vec<u8> =
-                    file_system_block.data[name_end_offset..value_data_end_offset].to_vec();
-
-                attributes.insert(name, XfsAttribute::InlineData(value_data));
+            if name != "." && name != ".." {
+                entries.insert(name, XfsDirectoryEntry::new(value.inode_number, 0));
             }
         }
         Ok(())
     }
 
-    /// Reads the attributes attributes from a attributes tree node.
-    pub fn read_attributes_from_node(
+    /// Reads the directory entries from a directory tree node.
+    pub fn read_entries_from_node(
         &self,
         data_stream: &DataStreamReference,
         logical_block_number: u32,
         extents: &[XfsPackedExtent],
-        attributes: &mut IndexedHashMap<ByteString, XfsAttribute>,
+        entries: &mut IndexedHashMap<ByteString, XfsDirectoryEntry>,
         read_block_numbers: &mut HashSet<u32>,
     ) -> Result<(), ErrorTrace> {
         if read_block_numbers.contains(&logical_block_number) {
             return Err(keramics_core::error_trace_new!(format!(
-                "Attributes tree node: {} already read",
+                "Directory tree node: {} already read",
                 logical_block_number
             )));
         }
@@ -471,26 +365,26 @@ impl XfsAttributesTree {
         }
         read_block_numbers.insert(logical_block_number);
 
-        if file_system_block.signature == 0x3bee || file_system_block.signature == 0xfbee {
-            match self.read_attributes_from_leaf_node(&file_system_block, attributes) {
+        if file_system_block.signature == 0xfeeb {
+            match self.read_entries_from_leaf_node(&file_system_block, entries) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to read attributes from attributes tree leaf node: {}",
+                            "Unable to read directory from directory tree leaf node: {}",
                             logical_block_number
                         ),
                     );
                     return Err(error);
                 }
             }
-        } else if file_system_block.signature == 0x3ebe || file_system_block.signature == 0xfebe {
-            match self.read_attributes_from_branch_node(
+        } else if file_system_block.signature == 0xfebe {
+            match self.read_entries_from_branch_node(
                 &file_system_block,
                 data_stream,
                 extents,
-                attributes,
+                entries,
                 read_block_numbers,
             ) {
                 Ok(_) => {}
@@ -498,7 +392,7 @@ impl XfsAttributesTree {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to read attributes from attributes tree branch node: {}",
+                            "Unable to read directory from directory tree branch node: {}",
                             logical_block_number
                         ),
                     );

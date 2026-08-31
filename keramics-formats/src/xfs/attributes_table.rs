@@ -94,7 +94,7 @@ impl XfsAttributesTable {
             }
             // Ignore the parent attribute (XFS_ATTR_PARENT).
             if entry.attribute_flags & 0x08 == 0 {
-                let mut name: ByteString = XfsAttribute::read_name(
+                let name: ByteString = XfsAttribute::read_name(
                     &self.character_encoding,
                     entry.attribute_flags,
                     &data[data_offset..name_end_offset],
