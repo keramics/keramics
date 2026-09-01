@@ -51,11 +51,6 @@ impl ApmVolumeSystem {
         self.bytes_per_sector
     }
 
-    /// Retrieves the number of partitions.
-    pub fn get_number_of_partitions(&self) -> usize {
-        self.partition_map_entries.len()
-    }
-
     /// Retrieves a partitions iterator.
     pub fn partitions(&self) -> ApmPartitionsIterator<'_> {
         ApmPartitionsIterator::new(self, self.partition_map_entries.len())
@@ -82,7 +77,6 @@ impl ApmVolumeSystem {
     fn read_partition_map(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut partition_map_signature: [u8; 80] = [0; 80];
         let mut number_of_entries: u32 = 0;
-        let mut partition_map_entry_index: u32 = 0;
 
         for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter() {
             let offset: u64 = *bytes_per_sector as u64;
@@ -105,9 +99,11 @@ impl ApmVolumeSystem {
             ));
         }
         let mut partition_map_entry_offset: u64 = self.bytes_per_sector as u64;
+        let mut partition_map_entry_index: u32 = 0;
 
         loop {
-            let mut partition_map_entry: ApmPartitionMapEntry = ApmPartitionMapEntry::new();
+            let mut partition_map_entry: ApmPartitionMapEntry =
+                ApmPartitionMapEntry::new(partition_map_entry_index);
 
             match partition_map_entry
                 .read_at_position(data_stream, SeekFrom::Start(partition_map_entry_offset))
@@ -153,6 +149,11 @@ impl ApmVolumeSystem {
 
 impl PartitionIterator for ApmVolumeSystem {
     type PartitionItem = ApmPartition;
+
+    /// Retrieves the number of partitions.
+    fn get_number_of_partitions(&self) -> usize {
+        self.partition_map_entries.len()
+    }
 
     /// Retrieves a partition by index.
     fn get_partition_by_index(
@@ -254,7 +255,7 @@ mod tests {
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
         volume_system
             .partition_map_entries
-            .push(ApmPartitionMapEntry::new());
+            .push(ApmPartitionMapEntry::new(0));
 
         let result = volume_system.get_partition_by_index(0);
         assert!(result.is_err());
@@ -265,7 +266,7 @@ mod tests {
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
         volume_system
             .partition_map_entries
-            .push(ApmPartitionMapEntry::new());
+            .push(ApmPartitionMapEntry::new(0));
 
         let result = volume_system.get_partition_by_index(1);
         assert!(result.is_err());

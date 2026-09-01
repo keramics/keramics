@@ -46,6 +46,9 @@ use super::constants::*;
 )]
 /// Apple Partition Map (APM) partition map entry.
 pub struct ApmPartitionMapEntry {
+    /// Index.
+    pub index: u32,
+
     /// Number of entries.
     pub number_of_entries: u32,
 
@@ -67,9 +70,10 @@ pub struct ApmPartitionMapEntry {
 
 impl ApmPartitionMapEntry {
     /// Creates a new partition map entry.
-    pub fn new() -> Self {
+    pub fn new(index: u32) -> Self {
         let encoding: CharacterEncoding = CharacterEncoding::Ascii;
         Self {
+            index,
             number_of_entries: 0,
             start_sector: 0,
             number_of_sectors: 0,
@@ -152,7 +156,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = ApmPartitionMapEntry::new();
+        let mut test_struct = ApmPartitionMapEntry::new(0);
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.number_of_entries, 3);
@@ -167,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let mut test_struct = ApmPartitionMapEntry::new();
+        let mut test_struct = ApmPartitionMapEntry::new(0);
 
         let test_data: Vec<u8> = get_test_data();
         let result = test_struct.read_data(&test_data[0..511]);
@@ -179,7 +183,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
-        let mut test_struct = ApmPartitionMapEntry::new();
+        let mut test_struct = ApmPartitionMapEntry::new(0);
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
@@ -189,7 +193,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut test_struct = ApmPartitionMapEntry::new();
+        let mut test_struct = ApmPartitionMapEntry::new(0);
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.number_of_entries, 3);

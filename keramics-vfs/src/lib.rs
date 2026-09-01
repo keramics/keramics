@@ -24,7 +24,9 @@ mod file_entry;
 mod file_resolver;
 mod file_system;
 mod location;
+mod partition;
 mod path;
+mod traits;
 mod types;
 
 // Format specific back-ends.

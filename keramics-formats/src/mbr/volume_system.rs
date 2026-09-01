@@ -63,11 +63,6 @@ impl MbrVolumeSystem {
         self.disk_identity
     }
 
-    /// Retrieves the number of partitions.
-    pub fn get_number_of_partitions(&self) -> usize {
-        self.partition_entries.len()
-    }
-
     /// Retrieves a partitions iterator.
     pub fn partitions(&self) -> MbrPartitionsIterator<'_> {
         MbrPartitionsIterator::new(self, self.partition_entries.len())
@@ -340,6 +335,11 @@ impl MbrVolumeSystem {
 
 impl PartitionIterator for MbrVolumeSystem {
     type PartitionItem = MbrPartition;
+
+    /// Retrieves the number of partitions.
+    fn get_number_of_partitions(&self) -> usize {
+        self.partition_entries.len()
+    }
 
     /// Retrieves a partition by index.
     fn get_partition_by_index(

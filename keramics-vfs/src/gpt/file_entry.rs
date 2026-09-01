@@ -11,125 +11,41 @@
  * under the License.
  */
 
-use std::sync::Arc;
-
-use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_core::DataStreamReference;
 use keramics_formats::gpt::{GptPartition, GptVolumeSystem};
-use keramics_formats::{PartitionIterator, PathComponent};
 use keramics_types::Uuid;
 
-use crate::enums::VfsFileType;
+use crate::partition::{VfsPartitionFileEntry, VfsPartitionIdentifier};
+use crate::traits::VfsPartition;
 
 /// GUID Partition Table (GPT) file entry.
-pub enum GptFileEntry {
-    /// Partition file entry.
-    Partition {
-        /// File name index.
-        name_index: usize,
+pub type GptFileEntry = VfsPartitionFileEntry<GptPartition, GptVolumeSystem>;
 
-        /// Partition.
-        partition: GptPartition,
-    },
+impl VfsPartition for GptPartition {
+    const NAME_PREFIX: &'static str = "gpt";
 
-    /// Root file entry.
-    Root {
-        /// Volume system.
-        volume_system: Arc<GptVolumeSystem>,
-    },
-}
-
-impl GptFileEntry {
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
-        match self {
-            GptFileEntry::Partition { partition, .. } => Ok(Some(partition.get_data_stream())),
-            GptFileEntry::Root { .. } => Ok(None),
-        }
+    fn get_data_stream(&self) -> DataStreamReference {
+        GptPartition::get_data_stream(self)
     }
 
-    /// Retrieves the file type.
-    pub fn get_file_type(&self) -> VfsFileType {
-        match self {
-            GptFileEntry::Partition { .. } => VfsFileType::File,
-            GptFileEntry::Root { .. } => VfsFileType::Directory,
-        }
-    }
+    /// Retrieves the partition identifier.
+    fn get_identifier(&self) -> Option<VfsPartitionIdentifier> {
+        let identifier: &Uuid = GptPartition::get_identifier(self);
 
-    /// Retrieves the identifier.
-    pub fn get_identifier(&self) -> Option<&Uuid> {
-        match self {
-            GptFileEntry::Partition { partition, .. } => Some(partition.get_identifier()),
-            GptFileEntry::Root { .. } => None,
-        }
-    }
-
-    /// Retrieves the name.
-    pub fn get_name(&self) -> PathComponent {
-        match self {
-            GptFileEntry::Partition { name_index, .. } => {
-                PathComponent::from(format!("gpt{}", name_index + 1))
-            }
-            GptFileEntry::Root { .. } => PathComponent::Root,
-        }
+        Some(VfsPartitionIdentifier::Uuid(identifier.clone()))
     }
 
     /// Retrieves the partition number.
-    pub fn get_partition_number(&self) -> Option<usize> {
-        match self {
-            GptFileEntry::Partition { partition, .. } => Some(partition.get_partition_index() + 1),
-            GptFileEntry::Root { .. } => None,
-        }
+    fn get_partition_number(&self) -> usize {
+        let gpt_partition_index: usize = GptPartition::get_partition_index(self);
+
+        (gpt_partition_index as usize) + 1
     }
 
-    /// Retrieves the size.
-    pub fn get_size(&self) -> u64 {
-        match self {
-            GptFileEntry::Partition { partition, .. } => partition.get_partition_size(),
-            GptFileEntry::Root { .. } => 0,
-        }
-    }
-
-    /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&self) -> usize {
-        match self {
-            GptFileEntry::Partition { .. } => 0,
-            GptFileEntry::Root { volume_system } => volume_system.get_number_of_partitions(),
-        }
-    }
-
-    /// Retrieves a specific sub file entry.
-    pub fn get_sub_file_entry_by_index(
-        &self,
-        sub_file_entry_index: usize,
-    ) -> Result<GptFileEntry, ErrorTrace> {
-        match self {
-            GptFileEntry::Partition { .. } => {
-                Err(keramics_core::error_trace_new!("No sub file entries"))
-            }
-            GptFileEntry::Root { volume_system } => {
-                match volume_system.get_partition_by_index(sub_file_entry_index) {
-                    Ok(gpt_partition) => Ok(GptFileEntry::Partition {
-                        name_index: sub_file_entry_index,
-                        partition: gpt_partition,
-                    }),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to retrieve GPT partition: {}", sub_file_entry_index)
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-        }
-    }
-
-    /// Determines if the file entry is the root file entry.
-    pub fn is_root_file_entry(&self) -> bool {
-        match self {
-            GptFileEntry::Partition { .. } => false,
-            GptFileEntry::Root { .. } => true,
-        }
+    /// Retrieves the partition size.
+    fn get_partition_size(&self) -> u64 {
+        GptPartition::get_partition_size(self)
     }
 }
 
@@ -138,9 +54,12 @@ mod tests {
     use super::*;
 
     use std::path::PathBuf;
+    use std::sync::Arc;
 
-    use keramics_core::open_os_data_stream;
+    use keramics_core::{ErrorTrace, open_os_data_stream};
+    use keramics_formats::{PartitionIterator, PathComponent};
 
+    use crate::enums::VfsFileType;
     use crate::tests::get_test_data_path;
 
     fn get_volume_system() -> Result<GptVolumeSystem, ErrorTrace> {
@@ -211,12 +130,12 @@ mod tests {
 
         let file_entry: GptFileEntry = get_root_file_entry(&gpt_volume_system);
 
-        let result: Option<&Uuid> = file_entry.get_identifier();
+        let result: Option<VfsPartitionIdentifier> = file_entry.get_identifier();
         assert!(result.is_none());
 
         let file_entry: GptFileEntry = get_partition_file_entry(&gpt_volume_system)?;
 
-        let identifier: &Uuid = file_entry.get_identifier().unwrap();
+        let identifier: VfsPartitionIdentifier = file_entry.get_identifier().unwrap();
         assert_eq!(
             identifier.to_string(),
             "0b119671-75ff-4e2a-a31a-0bc83f857fdd"

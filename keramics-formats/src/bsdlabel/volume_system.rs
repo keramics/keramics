@@ -49,11 +49,6 @@ impl BsdDiskLabelVolumeSystem {
         self.bytes_per_sector
     }
 
-    /// Retrieves the number of partitions.
-    pub fn get_number_of_partitions(&self) -> usize {
-        self.disklabel_entries.len()
-    }
-
     /// Retrieves a partitions iterator.
     pub fn partitions(&self) -> BsdDiskLabelPartitionsIterator<'_> {
         BsdDiskLabelPartitionsIterator::new(self, self.disklabel_entries.len())
@@ -87,6 +82,11 @@ impl BsdDiskLabelVolumeSystem {
 
 impl PartitionIterator for BsdDiskLabelVolumeSystem {
     type PartitionItem = BsdDiskLabelPartition;
+
+    /// Retrieves the number of partitions.
+    fn get_number_of_partitions(&self) -> usize {
+        self.disklabel_entries.len()
+    }
 
     /// Retrieves a partition by index.
     fn get_partition_by_index(
