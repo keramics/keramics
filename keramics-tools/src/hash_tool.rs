@@ -50,6 +50,10 @@ struct CommandLineArguments {
     #[arg(short, long, default_value_t = DigestHashType::Md5, value_enum)]
     digest_hash_type: DigestHashType,
 
+    #[arg(long, default_value_t = false)]
+    /// Include data streams of extended attributes
+    extended_attributes: bool,
+
     #[arg(long, default_value_t = 0)]
     /// Layer within the storage media image, where 1 represents the first layer. The default is
     /// all layers.
@@ -105,6 +109,9 @@ struct HashTool {
     /// The digest hash type.
     digest_hash_type: DigestHashType,
 
+    /// Value to indicate extended attributes should be included.
+    include_extended_attributes: bool,
+
     /// Value to indicate to stop on error.
     stop_on_error: bool,
 }
@@ -116,11 +123,13 @@ impl HashTool {
     fn new(
         digest_hash_type: &DigestHashType,
         display_path_type: &DisplayPathType,
+        include_extended_attributes: bool,
         stop_on_error: bool,
     ) -> Self {
         Self {
             display_path: DisplayPath::new(display_path_type),
             digest_hash_type: digest_hash_type.clone(),
+            include_extended_attributes,
             stop_on_error,
         }
     }
@@ -272,6 +281,49 @@ impl HashTool {
                     }
                     println!("N/A (error)\t{}", display_path);
                 }
+            }
+        }
+        if self.include_extended_attributes {
+            for (attribute_index, result) in file_entry.extended_attributes().enumerate() {
+                match result {
+                    Ok(extended_attribute) => {
+                        let name: PathComponent = extended_attribute.get_name();
+                        let data_stream: &DataStreamReference =
+                            extended_attribute.get_data_stream();
+
+                        let hash_string: String =
+                            match self.calculate_hash_from_data_stream(data_stream) {
+                                Ok(hash_string) => hash_string,
+                                Err(mut error) => {
+                                    if self.stop_on_error {
+                                        keramics_core::error_trace_add_frame!(
+                                            error,
+                                            format!(
+                                                "Unable to calculate hash of data stream: {}:{}",
+                                                display_path, name
+                                            )
+                                        );
+                                        return Err(error);
+                                    }
+                                    String::from("N/A (error)")
+                                }
+                            };
+                        println!(
+                            "{}\t{}{}:{}",
+                            hash_string, file_system_display_path, display_path, name
+                        );
+                    }
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve extended attribute: {} of file entry: {}",
+                                attribute_index, display_path
+                            )
+                        );
+                        return Err(error);
+                    }
+                };
             }
         }
         Ok(())
@@ -545,6 +597,7 @@ fn main() -> ExitCode {
     let hash_tool: HashTool = HashTool::new(
         &arguments.digest_hash_type,
         &arguments.volume_path_type,
+        arguments.extended_attributes,
         arguments.stop_on_error,
     );
     match arguments.source {
@@ -690,7 +743,7 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let hash_tool: HashTool =
-            HashTool::new(&DigestHashType::Md5, &DisplayPathType::Index, true);
+            HashTool::new(&DigestHashType::Md5, &DisplayPathType::Index, false, true);
         let md5: String = hash_tool.calculate_hash_from_data_stream(&data_stream)?;
         assert_eq!(md5, "f19106bcf25fa9cabc1b5ac91c726001");
 
@@ -703,7 +756,7 @@ mod tests {
         let mut reader: Cursor<&[u8]> = Cursor::new(&test_data);
 
         let hash_tool: HashTool =
-            HashTool::new(&DigestHashType::Md5, &DisplayPathType::Index, true);
+            HashTool::new(&DigestHashType::Md5, &DisplayPathType::Index, false, true);
         let md5: String = hash_tool.calculate_hash_from_reader(&mut reader)?;
         assert_eq!(md5, "f19106bcf25fa9cabc1b5ac91c726001");
 

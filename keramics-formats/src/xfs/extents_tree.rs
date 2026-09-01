@@ -18,14 +18,14 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::btree_node::XfsBtreeNode;
 use super::constants::*;
-use super::extent_list::XfsExtentList;
-use super::extent_tree_branch_header::XfsExtentTreeBranchHeader;
-use super::extent_tree_branch_key::XfsExtentTreeBranchKey;
-use super::extent_tree_branch_value::XfsExtentTreeBranchValue;
+use super::extents_list::XfsExtentsList;
+use super::extents_tree_branch_header::XfsExtentsTreeBranchHeader;
+use super::extents_tree_branch_key::XfsExtentsTreeBranchKey;
+use super::extents_tree_branch_value::XfsExtentsTreeBranchValue;
 use super::packed_extent::XfsPackedExtent;
 
-/// X File System (XFS) extent tree
-pub struct XfsExtentTree {
+/// X File System (XFS) extents tree
+pub struct XfsExtentsTree {
     /// Format version.
     format_version: u16,
 
@@ -42,8 +42,8 @@ pub struct XfsExtentTree {
     relative_block_number_bit_mask: u64,
 }
 
-impl XfsExtentTree {
-    /// Creates a new extent tree.
+impl XfsExtentsTree {
+    /// Creates a new extents tree.
     pub fn new(
         format_version: u16,
         allocation_group_size: u32,
@@ -85,10 +85,10 @@ impl XfsExtentTree {
         let mut value_data_offset: usize = values_data_offset;
 
         for record_index in 0..btree_node.number_of_records {
-            keramics_core::debug_trace_structure!(XfsExtentTreeBranchKey::debug_read_data(
+            keramics_core::debug_trace_structure!(XfsExtentsTreeBranchKey::debug_read_data(
                 &btree_node.data[key_data_offset..]
             ));
-            let mut branch_key: XfsExtentTreeBranchKey = XfsExtentTreeBranchKey::new();
+            let mut branch_key: XfsExtentsTreeBranchKey = XfsExtentsTreeBranchKey::new();
 
             match branch_key.read_data(&btree_node.data[key_data_offset..]) {
                 Ok(_) => {}
@@ -105,10 +105,10 @@ impl XfsExtentTree {
             }
             key_data_offset += 8;
 
-            keramics_core::debug_trace_structure!(XfsExtentTreeBranchValue::debug_read_data(
+            keramics_core::debug_trace_structure!(XfsExtentsTreeBranchValue::debug_read_data(
                 &btree_node.data[value_data_offset..]
             ));
-            let mut branch_value: XfsExtentTreeBranchValue = XfsExtentTreeBranchValue::new();
+            let mut branch_value: XfsExtentsTreeBranchValue = XfsExtentsTreeBranchValue::new();
 
             match branch_value.read_data(&btree_node.data[value_data_offset..]) {
                 Ok(_) => {}
@@ -225,16 +225,16 @@ impl XfsExtentTree {
                 }
             }
         } else {
-            let extent_list: XfsExtentList = XfsExtentList::new();
+            let extents_list: XfsExtentsList = XfsExtentsList::new();
 
-            match extent_list.read_data(
+            match extents_list.read_data(
                 btree_node.number_of_records as u64,
                 &btree_node.data[btree_node.records_offset..],
                 extents,
             ) {
                 Ok(_) => Ok(()),
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read extent list");
+                    keramics_core::error_trace_add_frame!(error, "Unable to read extents list");
                     Err(error)
                 }
             }
@@ -250,14 +250,14 @@ impl XfsExtentTree {
     ) -> Result<(), ErrorTrace> {
         let data_size: usize = root_node_data.len();
 
-        keramics_core::debug_trace_data!("XfsExtentTreeRootNode", 0, &root_node_data, data_size);
+        keramics_core::debug_trace_data!("XfsExtentsTreeRootNode", 0, &root_node_data, data_size);
 
         let mut read_block_numbers: HashSet<u64> = HashSet::new();
 
-        keramics_core::debug_trace_structure!(XfsExtentTreeBranchHeader::debug_read_data(
+        keramics_core::debug_trace_structure!(XfsExtentsTreeBranchHeader::debug_read_data(
             &root_node_data
         ));
-        let mut branch_header: XfsExtentTreeBranchHeader = XfsExtentTreeBranchHeader::new();
+        let mut branch_header: XfsExtentsTreeBranchHeader = XfsExtentsTreeBranchHeader::new();
 
         match branch_header.read_data(root_node_data) {
             Ok(_) => {}
@@ -283,10 +283,10 @@ impl XfsExtentTree {
         let mut value_data_offset: usize = values_data_offset;
 
         for record_index in 0..branch_header.number_of_records {
-            keramics_core::debug_trace_structure!(XfsExtentTreeBranchKey::debug_read_data(
+            keramics_core::debug_trace_structure!(XfsExtentsTreeBranchKey::debug_read_data(
                 &root_node_data[key_data_offset..]
             ));
-            let mut branch_key: XfsExtentTreeBranchKey = XfsExtentTreeBranchKey::new();
+            let mut branch_key: XfsExtentsTreeBranchKey = XfsExtentsTreeBranchKey::new();
 
             match branch_key.read_data(&root_node_data[key_data_offset..]) {
                 Ok(_) => {}
@@ -303,10 +303,10 @@ impl XfsExtentTree {
             }
             key_data_offset += 8;
 
-            keramics_core::debug_trace_structure!(XfsExtentTreeBranchValue::debug_read_data(
+            keramics_core::debug_trace_structure!(XfsExtentsTreeBranchValue::debug_read_data(
                 &root_node_data[value_data_offset..]
             ));
-            let mut branch_value: XfsExtentTreeBranchValue = XfsExtentTreeBranchValue::new();
+            let mut branch_value: XfsExtentsTreeBranchValue = XfsExtentsTreeBranchValue::new();
 
             match branch_value.read_data(&root_node_data[value_data_offset..]) {
                 Ok(_) => {}

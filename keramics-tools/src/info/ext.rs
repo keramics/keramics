@@ -642,7 +642,7 @@ impl ExtInfo {
 
             for (attribute_index, result) in file_entry.extended_attributes().enumerate() {
                 let ext_extended_attribute: ExtExtendedAttribute = match result {
-                    Ok(ext_extended_attribute) => ext_extended_attribute,
+                    Ok(extended_attribute) => extended_attribute,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,

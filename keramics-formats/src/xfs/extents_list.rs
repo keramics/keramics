@@ -13,18 +13,19 @@
 
 use keramics_core::ErrorTrace;
 
+use super::enums::XfsExtentType;
 use super::packed_extent::XfsPackedExtent;
 
-/// X File System (XFS) extent list.
-pub struct XfsExtentList {}
+/// X File System (XFS) extents list.
+pub struct XfsExtentsList {}
 
-impl XfsExtentList {
-    /// Creates a new extent list.
+impl XfsExtentsList {
+    /// Creates a new extents list.
     pub fn new() -> Self {
         Self {}
     }
 
-    /// Reads the extent list from a buffer.
+    /// Reads the extents list from a buffer.
     pub fn read_data(
         &self,
         number_of_extents: u64,
@@ -39,6 +40,12 @@ impl XfsExtentList {
                 "Invalid number of extents value out of bounds"
             ));
         }
+        let mut logical_block_number: u64 = match extents.last() {
+            Some(packed_extent) => {
+                packed_extent.logical_block_number + (packed_extent.number_of_blocks as u64)
+            }
+            None => 0,
+        };
         for (extent_index, chunk) in data[0..data_end_offset].chunks_exact(16).enumerate() {
             keramics_core::debug_trace_structure!(XfsPackedExtent::debug_read_data(chunk));
 
@@ -54,6 +61,18 @@ impl XfsExtentList {
                     return Err(error);
                 }
             }
+            if logical_block_number < packed_extent.logical_block_number {
+                let mut sparse_extent: XfsPackedExtent = XfsPackedExtent::new();
+                sparse_extent.number_of_blocks =
+                    (packed_extent.logical_block_number - logical_block_number) as u32;
+                sparse_extent.logical_block_number = logical_block_number;
+                sparse_extent.extent_type = XfsExtentType::Sparse;
+
+                extents.push(sparse_extent);
+            }
+            logical_block_number =
+                packed_extent.logical_block_number + (packed_extent.number_of_blocks as u64);
+
             extents.push(packed_extent);
         }
         Ok(())
@@ -87,7 +106,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let test_struct = XfsExtentList::new();
+        let test_struct = XfsExtentsList::new();
         let mut extents: Vec<XfsPackedExtent> = Vec::new();
         test_struct.read_data(1, &test_data, &mut extents)?;
 
@@ -98,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let test_struct = XfsExtentList::new();
+        let test_struct = XfsExtentsList::new();
 
         let test_data: Vec<u8> = get_test_data();
         let mut extents: Vec<XfsPackedExtent> = Vec::new();

@@ -25,6 +25,7 @@ use keramics_formats::linuxlvm::LinuxLvmVolumeSystem;
 use keramics_formats::mbr::MbrVolumeSystem;
 use keramics_formats::pdi::PdiImage;
 use keramics_formats::qcow::QcowImage;
+use keramics_formats::sgilabel::SgiDiskLabelVolumeSystem;
 use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::splitraw::SplitRawImage;
@@ -48,6 +49,7 @@ use crate::mbr::MbrFileSystem;
 use crate::pdi::PdiFileSystem;
 use crate::qcow::QcowFileSystem;
 use crate::resolver::VfsResolver;
+use crate::sgilabel::SgiDiskLabelFileSystem;
 use crate::sparsebundle::SparseBundleFileSystem;
 use crate::sparseimage::SparseImageFileSystem;
 use crate::splitraw::SplitRawFileSystem;
@@ -139,6 +141,7 @@ impl VfsScanner {
         self.phase1_volume_system_scanner.add_gpt_signatures();
         self.phase1_volume_system_scanner.add_linuxlvm_signatures();
         self.phase1_volume_system_scanner.add_luksde_signatures();
+        self.phase1_volume_system_scanner.add_sgilabel_signatures();
 
         match self.phase1_volume_system_scanner.build() {
             Ok(_) => {}
@@ -222,6 +225,7 @@ impl VfsScanner {
             FormatIdentifier::Ntfs => Some(VfsType::Ntfs),
             FormatIdentifier::Pdi => Some(VfsType::Pdi),
             FormatIdentifier::Qcow => Some(VfsType::Qcow),
+            FormatIdentifier::SgiDiskLabel => Some(VfsType::SgiDiskLabel),
             FormatIdentifier::SparseBundle => Some(VfsType::SparseBundle),
             FormatIdentifier::SparseImage => Some(VfsType::SparseImage),
             FormatIdentifier::SplitRaw => Some(VfsType::SplitRaw),
@@ -385,7 +389,11 @@ impl VfsScanner {
             | VfsType::Xfs => Err(keramics_core::error_trace_new!(
                 "Unsupported VFS location type"
             )),
-            VfsType::Apm | VfsType::Gpt | VfsType::LinuxLvm | VfsType::Mbr => {
+            VfsType::Apm
+            | VfsType::Gpt
+            | VfsType::LinuxLvm
+            | VfsType::Mbr
+            | VfsType::SgiDiskLabel => {
                 let mut result: Option<FormatIdentifier> = match self
                     .scan_for_sub_volume_system_format(&data_stream)
                 {
@@ -1044,6 +1052,43 @@ impl VfsScanner {
                     }
                 }
             }
+            VfsType::SgiDiskLabel => {
+                let mut sgilabel_volume_system: SgiDiskLabelVolumeSystem =
+                    SgiDiskLabelVolumeSystem::new();
+
+                match SgiDiskLabelFileSystem::open_volume_system(
+                    &mut sgilabel_volume_system,
+                    file_system,
+                    path,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open sgilabel volume system"
+                        );
+                        return Err(error);
+                    }
+                }
+                let number_of_partitions: usize = sgilabel_volume_system.get_number_of_partitions();
+
+                match self.scan_for_volume_system_sub_nodes(
+                    scan_options,
+                    vfs_location,
+                    scan_node,
+                    SgiDiskLabelFileSystem::PATH_PREFIX,
+                    number_of_partitions,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan sgilabel volume system"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
             VfsType::SparseBundle => {
                 let mut sparsebundle_image: SparseBundleImage = SparseBundleImage::new();
 
@@ -1294,6 +1339,9 @@ impl VfsScanner {
             Some(FormatIdentifier::Gpt) => return Ok(Some(FormatIdentifier::Gpt)),
             Some(FormatIdentifier::LinuxLvm) => return Ok(Some(FormatIdentifier::LinuxLvm)),
             Some(FormatIdentifier::Luks) => return Ok(Some(FormatIdentifier::Luks)),
+            Some(FormatIdentifier::SgiDiskLabel) => {
+                return Ok(Some(FormatIdentifier::SgiDiskLabel));
+            }
             Some(format_identifier) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Found unsupported non-overlapping volume system format signature: {}",
@@ -1396,7 +1444,7 @@ impl VfsScanner {
             };
 
         match vfs_type {
-            VfsType::Apm | VfsType::Gpt | VfsType::Mbr => {
+            VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel => {
                 if scan_options.partitions == VfsScanOptionGroup::NotSet {
                     // TODO: invoke mediator to ask which partitions to include.
                 }
@@ -1412,7 +1460,7 @@ impl VfsScanner {
             let vfs_type: &VfsType = scan_node.get_type();
 
             match vfs_type {
-                VfsType::Apm | VfsType::Gpt | VfsType::Mbr => {
+                VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel => {
                     if scan_options.partitions != VfsScanOptionGroup::NotSet
                         && !scan_options.partitions.contains_index(volume_index + 1)
                     {
@@ -2033,6 +2081,21 @@ mod tests {
             .unwrap();
 
         assert_eq!(format_identifier, FormatIdentifier::Mbr);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_volume_system_format_with_sgilabel() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        let path_string: String = get_test_data_path("sgilabel/sgilabel.raw");
+        let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_volume_system_format(&data_stream)?
+            .unwrap();
+
+        assert_eq!(format_identifier, FormatIdentifier::SgiDiskLabel);
 
         Ok(())
     }

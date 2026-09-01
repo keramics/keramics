@@ -18,6 +18,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 
 use crate::traits::BlockReader;
 
+use super::enums::XfsExtentType;
 use super::packed_extent::XfsPackedExtent;
 
 /// X File System (XFS) block reader.
@@ -25,8 +26,17 @@ pub struct XfsBlockReader {
     /// The data stream.
     data_stream: DataStreamReference,
 
+    /// Allocation group size.
+    allocation_group_size: u32,
+
     /// Block size.
     block_size: u32,
+
+    /// Block number bit shift.
+    block_number_bit_shift: u64,
+
+    /// Relative block number bit mask.
+    relative_block_number_bit_mask: u64,
 
     /// Extents.
     extents: Vec<XfsPackedExtent>,
@@ -39,13 +49,19 @@ impl XfsBlockReader {
     /// Creates a new block reader.
     pub(super) fn new(
         data_stream: &DataStreamReference,
+        allocation_group_size: u32,
+        number_of_relative_block_number_bits: u32,
         block_size: u32,
         extents: &[XfsPackedExtent],
         size: u64,
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
+            allocation_group_size,
             block_size,
+            block_number_bit_shift: number_of_relative_block_number_bits as u64,
+            relative_block_number_bit_mask: (1 << (number_of_relative_block_number_bits as u64))
+                - 1,
             extents: extents.to_vec(),
             size,
         }
@@ -109,16 +125,28 @@ impl BlockReader for XfsBlockReader {
                 min(read_size - data_offset, range_remainder_size as usize);
             let data_end_offset: usize = data_offset + range_read_size;
 
-            // TODO: add support for sparse extent.
-            // data[data_offset..data_end_offset].fill(0);
-            let range_physical_offset: u64 =
-                extent.physical_block_number * (self.block_size as u64);
+            match &extent.extent_type {
+                XfsExtentType::InFile => {
+                    let allocation_group_index: u64 =
+                        extent.physical_block_number >> self.block_number_bit_shift;
+                    let allocation_group_block_number: u64 =
+                        allocation_group_index * (self.allocation_group_size as u64);
+                    let mut physical_block_number: u64 =
+                        extent.physical_block_number & self.relative_block_number_bit_mask;
 
-            keramics_core::data_stream_read_exact_at_position!(
-                &self.data_stream,
-                &mut data[data_offset..data_end_offset],
-                SeekFrom::Start(range_physical_offset + range_relative_offset)
-            );
+                    let range_physical_offset: u64 =
+                        physical_block_number * (self.block_size as u64);
+
+                    keramics_core::data_stream_read_exact_at_position!(
+                        &self.data_stream,
+                        &mut data[data_offset..data_end_offset],
+                        SeekFrom::Start(range_physical_offset + range_relative_offset)
+                    );
+                }
+                XfsExtentType::Sparse => {
+                    data[data_offset..data_end_offset].fill(0);
+                }
+            }
             data_offset = data_end_offset;
             current_offset += range_read_size as u64;
             extent_index += 1;

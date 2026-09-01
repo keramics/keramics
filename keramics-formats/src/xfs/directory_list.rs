@@ -22,6 +22,7 @@ use crate::indexed_hash_map::IndexedHashMap;
 
 use super::directory_entry::XfsDirectoryEntry;
 use super::directory_list_element::XfsDirectoryListElement;
+use super::enums::XfsExtentType;
 use super::packed_extent::XfsPackedExtent;
 
 /// X File System (XFS) directory list.
@@ -87,7 +88,7 @@ impl XfsDirectoryList {
             }
             let extent_size: u64 = (extent.number_of_blocks as u64) * (self.block_size as u64);
 
-            if extent.uninitialized_flag != 0 {
+            if extent.extent_type == XfsExtentType::Sparse {
                 extent_offset += extent_size;
                 continue;
             }

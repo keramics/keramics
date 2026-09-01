@@ -74,6 +74,7 @@ impl VfsScanNode {
             | VfsType::Os
             | VfsType::Pdi
             | VfsType::Qcow
+            | VfsType::SgiDiskLabel
             | VfsType::SparseBundle
             | VfsType::SparseImage
             | VfsType::SplitRaw

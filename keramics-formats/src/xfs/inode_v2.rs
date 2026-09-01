@@ -109,7 +109,8 @@ impl XfsInodeV2 {
             DateTime::PosixTime64Ns(PosixTime64Ns::new(timestamp as i64, nanoseconds))
         };
         inode.data_size = bytes_to_u64_be!(data, 56);
-        inode.number_of_extents = bytes_to_u32_be!(data, 76) as u64;
+        inode.number_of_blocks = bytes_to_u64_be!(data, 64);
+        inode.number_of_data_extents = bytes_to_u32_be!(data, 76) as u64;
         inode.number_of_attributes_extents = bytes_to_u16_be!(data, 80);
         inode.attributes_fork_offset = data[82];
         inode.attributes_fork_type = data[83];
@@ -174,7 +175,8 @@ mod tests {
             })
         );
         assert_eq!(test_struct.data_size, 4096);
-        assert_eq!(test_struct.number_of_extents, 1);
+        assert_eq!(test_struct.number_of_blocks, 1);
+        assert_eq!(test_struct.number_of_data_extents, 1);
         assert_eq!(test_struct.number_of_attributes_extents, 0);
         assert_eq!(test_struct.attributes_fork_offset, 0);
         assert_eq!(test_struct.attributes_fork_type, 2);

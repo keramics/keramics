@@ -20,13 +20,13 @@ use keramics_types::bytes_to_u64_be;
     structure(byte_order = "big", field(name = "block_number", data_type = "u64")),
     methods("debug_read_data")
 )]
-/// X File System (XFS) inode tree branch value.
-pub struct XfsExtentTreeBranchValue {
+/// X File System (XFS) extents tree branch value.
+pub struct XfsExtentsTreeBranchValue {
     /// Block number.
     pub block_number: u64,
 }
 
-impl XfsExtentTreeBranchValue {
+impl XfsExtentsTreeBranchValue {
     /// Creates a new value.
     pub fn new() -> Self {
         Self { block_number: 0 }
@@ -55,7 +55,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsExtentTreeBranchValue::new();
+        let mut test_struct = XfsExtentsTreeBranchValue::new();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.block_number, 16);
@@ -67,7 +67,7 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsExtentTreeBranchValue::new();
+        let mut test_struct = XfsExtentsTreeBranchValue::new();
         let result = test_struct.read_data(&test_data[0..7]);
         assert!(result.is_err());
     }
