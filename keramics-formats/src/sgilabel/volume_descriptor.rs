@@ -19,8 +19,8 @@ use keramics_layout_map::LayoutMap;
     structure(
         byte_order = "big",
         field(name = "volume_name", data_type = "ByteString<8>"),
-        field(name = "logical_block_number", data_type = "u32"),
-        field(name = "number_of_blocks", data_type = "u32"),
+        field(name = "logical_sector_number", data_type = "u32"),
+        field(name = "number_of_sectors", data_type = "u32"),
     ),
     methods("debug_read_data")
 )]

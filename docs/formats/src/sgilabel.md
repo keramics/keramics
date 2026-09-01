@@ -19,8 +19,6 @@ Certain paritions have a predefined meaning, such as:
 | Date and time values | N/A |
 | Character strings | ASCII |
 
-The number of bytes per sector is 512.
-
 ## SGI disklabel
 
 The SGI disklabel is stored at offset 0.
@@ -75,8 +73,8 @@ The volume descriptor is 16 bytes of size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 8 | | Volume name, with consists of an ASCII string |
-| 8 | 4 | | Logical block number |
-| 12 | 4 | | Number of blocks |
+| 8 | 4 | | Logical sector number |
+| 12 | 4 | | Number of sectors |
 
 ### Partition entry {#partition_entry}
 
@@ -84,8 +82,8 @@ The partition entry is 12 bytes of size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 4 | | Number of blocks |
-| 4 | 4 | | Start block number |
+| 0 | 4 | | Number of sectors |
+| 4 | 4 | | Start sector number |
 | 8 | 4 | | Partition type |
 
 ### Partition types

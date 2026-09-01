@@ -41,14 +41,14 @@ impl SgiDiskLabelPartition {
     /// Creates a new partition.
     pub(super) fn new(
         data_stream: &DataStreamReference,
-        bytes_per_sector: u32,
+        bytes_per_sector: u16,
         partition_entry: &SgiDiskLabelPartitionEntry,
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
             entry_index: partition_entry.entry_index,
-            offset: (partition_entry.start_block_number as u64) * (bytes_per_sector as u64),
-            size: (partition_entry.number_of_blocks as u64) * (bytes_per_sector as u64),
+            offset: (partition_entry.start_sector_number as u64) * (bytes_per_sector as u64),
+            size: (partition_entry.number_of_sectors as u64) * (bytes_per_sector as u64),
             partition_type: partition_entry.partition_type,
         }
     }
@@ -100,8 +100,8 @@ mod tests {
 
         let mut partition_entry: SgiDiskLabelPartitionEntry = SgiDiskLabelPartitionEntry::new();
         partition_entry.entry_index = 0;
-        partition_entry.number_of_blocks = 2049;
-        partition_entry.start_block_number = 5040;
+        partition_entry.number_of_sectors = 2049;
+        partition_entry.start_sector_number = 5040;
         partition_entry.partition_type = 10;
 
         Ok(SgiDiskLabelPartition::new(

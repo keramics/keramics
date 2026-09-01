@@ -13,6 +13,7 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
+use keramics_types::bytes_to_u16_be;
 
 use super::constants::*;
 use super::partition_entry::SgiDiskLabelPartitionEntry;
@@ -50,6 +51,9 @@ use super::volume_descriptor::SgiDiskLabelVolumeDescriptor;
 )]
 /// SGI disklabel (sgilabel) disklabel.
 pub struct SgiDiskLabel {
+    /// Bytes per sector.
+    pub bytes_per_sector: u16,
+
     /// The partition entries.
     pub entries: Vec<SgiDiskLabelPartitionEntry>,
 }
@@ -58,6 +62,7 @@ impl SgiDiskLabel {
     /// Creates a new disklabel.
     pub fn new() -> Self {
         Self {
+            bytes_per_sector: 0,
             entries: Vec::new(),
         }
     }
@@ -70,6 +75,8 @@ impl SgiDiskLabel {
         if &data[0..4] != SGI_DISKLABEL_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
+        self.bytes_per_sector = bytes_to_u16_be!(data, 40);
+
         for (entry_index, data_offset) in (312..504).step_by(12).enumerate() {
             keramics_core::debug_trace_structure!(SgiDiskLabelPartitionEntry::debug_read_data(
                 &data[data_offset..]
@@ -87,7 +94,7 @@ impl SgiDiskLabel {
                 }
             }
             // Ignore empty, volume header and full volume partition entries.
-            if partition_entry.number_of_blocks != 0
+            if partition_entry.number_of_sectors != 0
                 && partition_entry.partition_type != 0
                 && partition_entry.partition_type != 6
             {
@@ -157,6 +164,7 @@ mod tests {
         let mut test_struct = SgiDiskLabel::new();
         test_struct.read_data(&test_data)?;
 
+        assert_eq!(test_struct.bytes_per_sector, 512);
         assert_eq!(test_struct.entries.len(), 2);
 
         Ok(())
@@ -188,6 +196,9 @@ mod tests {
 
         let mut test_struct = SgiDiskLabel::new();
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
+
+        assert_eq!(test_struct.bytes_per_sector, 512);
+        assert_eq!(test_struct.entries.len(), 2);
 
         Ok(())
     }
