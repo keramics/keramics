@@ -186,6 +186,7 @@ mod tests {
     use super::*;
 
     use keramics_core::open_fake_data_stream;
+    use keramics_encodings::CharacterEncoding;
 
     fn get_test_data() -> Vec<u8> {
         vec![
@@ -277,7 +278,69 @@ mod tests {
 
         assert_eq!(entries.len(), 1);
 
+        let name: ByteString = ByteString {
+            encoding: CharacterEncoding::Ascii,
+            elements: b"user.myxattr".to_vec(),
+        };
+        let entry: &ExtAttributesEntry = entries
+            .get_value_by_key(&name)
+            .expect("entry should be present");
+
+        assert_eq!(entry.value_data, b"My extended attribute".to_vec());
+
         Ok(())
+    }
+
+    #[test]
+    fn test_read_entries_with_invalid_value_data_offset() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[34] = 0xf0;
+        test_data[35] = 0xff;
+
+        let test_struct = ExtAttributesBlock::new(0);
+
+        let mut entries: IndexedHashMap<ByteString, ExtAttributesEntry> = IndexedHashMap::new();
+        let result = test_struct.read_entries(&test_data, 32, 1024, &mut entries);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_entries_with_invalid_value_data_size() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[40] = 0x00;
+        test_data[41] = 0x00;
+        test_data[42] = 0x00;
+        test_data[43] = 0x01;
+
+        let test_struct = ExtAttributesBlock::new(0);
+
+        let mut entries: IndexedHashMap<ByteString, ExtAttributesEntry> = IndexedHashMap::new();
+        let result = test_struct.read_entries(&test_data, 32, 1024, &mut entries);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_entries_with_invalid_name_size() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[32] = 0xff;
+
+        let test_struct = ExtAttributesBlock::new(0);
+
+        let mut entries: IndexedHashMap<ByteString, ExtAttributesEntry> = IndexedHashMap::new();
+        let result = test_struct.read_entries(&test_data, 32, 64, &mut entries);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_entries_with_unsupported_name_index() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[33] = 0x05;
+
+        let test_struct = ExtAttributesBlock::new(0);
+
+        let mut entries: IndexedHashMap<ByteString, ExtAttributesEntry> = IndexedHashMap::new();
+        let result = test_struct.read_entries(&test_data, 32, 1024, &mut entries);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -293,5 +356,50 @@ mod tests {
         assert_eq!(entries.len(), 1);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_read_at_position_with_unsupported_data_size() {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut test_struct = ExtAttributesBlock::new(0);
+
+        let mut entries: IndexedHashMap<ByteString, ExtAttributesEntry> = IndexedHashMap::new();
+        let result = test_struct.read_at_position(
+            &data_stream,
+            SeekFrom::Start(0),
+            u32::MAX as usize,
+            &mut entries,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_at_position_with_invalid_header() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[0] = 0xff;
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut test_struct = ExtAttributesBlock::new(0);
+
+        let mut entries: IndexedHashMap<ByteString, ExtAttributesEntry> = IndexedHashMap::new();
+        let result =
+            test_struct.read_at_position(&data_stream, SeekFrom::Start(0), 1024, &mut entries);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_at_position_with_invalid_entries() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[33] = 0x05;
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut test_struct = ExtAttributesBlock::new(0);
+
+        let mut entries: IndexedHashMap<ByteString, ExtAttributesEntry> = IndexedHashMap::new();
+        let result =
+            test_struct.read_at_position(&data_stream, SeekFrom::Start(0), 1024, &mut entries);
+        assert!(result.is_err());
     }
 }

@@ -80,3 +80,55 @@ impl fmt::Display for CdsaEncrEncryptionType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_display_with_not_set() {
+        let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType::new();
+
+        assert_eq!(encryption_type.to_string(), "N/A (not set)");
+    }
+
+    #[test]
+    fn test_display_with_des3_cbc_iv8() {
+        let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
+            method: 0x00000011,
+            mode: 5,
+            key_size: 24,
+        };
+        assert_eq!(encryption_type.to_string(), "DES3-192-CBC-IV8");
+    }
+
+    #[test]
+    fn test_display_with_aes_cbc_pad_iv8() {
+        let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
+            method: 0x80000001,
+            mode: 6,
+            key_size: 16,
+        };
+        assert_eq!(encryption_type.to_string(), "AES-128-CBC-PadIV8");
+    }
+
+    #[test]
+    fn test_display_with_aes_ecb() {
+        let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
+            method: 0x80000001,
+            mode: 2,
+            key_size: 32,
+        };
+        assert_eq!(encryption_type.to_string(), "AES-256-ECB");
+    }
+
+    #[test]
+    fn test_display_with_unknown_method_and_mode() {
+        let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
+            method: 0x00012345,
+            mode: 1,
+            key_size: 16,
+        };
+        assert_eq!(encryption_type.to_string(), "0x00012345-128-0x00012345");
+    }
+}

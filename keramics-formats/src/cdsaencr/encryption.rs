@@ -270,3 +270,383 @@ impl CdsaEncrEncryption {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_encryption::{AesContext, Des3Context};
+
+    #[test]
+    fn test_add_padding_with_no_padding() -> Result<(), ErrorTrace> {
+        let mut data: Vec<u8> = vec![0x01, 0x02, 0x03];
+        CdsaEncrEncryption::add_padding(0, 8, &mut data)?;
+
+        assert_eq!(data, vec![0x01, 0x02, 0x03]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_padding_with_zero_padding() -> Result<(), ErrorTrace> {
+        let mut data: Vec<u8> = vec![0x01, 0x02, 0x03, 0x04, 0x05];
+        CdsaEncrEncryption::add_padding(2, 8, &mut data)?;
+
+        assert_eq!(data, vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x00, 0x00, 0x00]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_padding_with_one_padding() -> Result<(), ErrorTrace> {
+        let mut data: Vec<u8> = vec![0x01, 0x02, 0x03, 0x04, 0x05];
+        CdsaEncrEncryption::add_padding(3, 8, &mut data)?;
+
+        assert_eq!(data, vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x01, 0x01, 0x01]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_padding_with_pkcs7_padding() -> Result<(), ErrorTrace> {
+        let mut data: Vec<u8> = vec![0x74, 0x65, 0x73, 0x74, 0x69];
+        CdsaEncrEncryption::add_padding(7, 8, &mut data)?;
+
+        assert_eq!(data, vec![0x74, 0x65, 0x73, 0x74, 0x69, 0x03, 0x03, 0x03]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_padding_with_unsupported_block_size() {
+        let mut data: Vec<u8> = vec![0x01, 0x02, 0x03];
+
+        let result = CdsaEncrEncryption::add_padding(2, 0, &mut data);
+        assert!(result.is_err());
+
+        let result = CdsaEncrEncryption::add_padding(7, 256, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_add_padding_with_unsupported_padding_type() {
+        let mut data: Vec<u8> = vec![0x01, 0x02, 0x03];
+
+        let result = CdsaEncrEncryption::add_padding(1, 8, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_encryption_context_with_aes() -> Result<(), ErrorTrace> {
+        let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
+            method: 0x80000001,
+            mode: 5,
+            key_size: 16,
+        };
+        let key: Vec<u8> = vec![
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+            0x0e, 0x0f,
+        ];
+        let encryption_context: CdsaEncrEncryptionContext =
+            CdsaEncrEncryption::get_encryption_context(&encryption_type, &key)?.unwrap();
+
+        assert!(matches!(
+            encryption_context,
+            CdsaEncrEncryptionContext::Aes(_)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_encryption_context_with_des3() -> Result<(), ErrorTrace> {
+        let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
+            method: 0x00000011,
+            mode: 6,
+            key_size: 24,
+        };
+        let key: Vec<u8> = vec![
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+            0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+        ];
+        let encryption_context: CdsaEncrEncryptionContext =
+            CdsaEncrEncryption::get_encryption_context(&encryption_type, &key)?.unwrap();
+
+        assert!(matches!(
+            encryption_context,
+            CdsaEncrEncryptionContext::Des3(_)
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_encryption_context_with_unsupported_method() -> Result<(), ErrorTrace> {
+        let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
+            method: 0x0000002a,
+            mode: 5,
+            key_size: 16,
+        };
+        let encryption_context: Option<CdsaEncrEncryptionContext> =
+            CdsaEncrEncryption::get_encryption_context(&encryption_type, &[])?;
+
+        assert!(encryption_context.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_encryption_context_with_unsupported_mode() -> Result<(), ErrorTrace> {
+        let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
+            method: 0x80000001,
+            mode: 2,
+            key_size: 16,
+        };
+        let key: Vec<u8> = vec![0; 16];
+
+        let encryption_context: Option<CdsaEncrEncryptionContext> =
+            CdsaEncrEncryption::get_encryption_context(&encryption_type, &key)?;
+
+        assert!(encryption_context.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_encryption_context_with_unsupported_key() {
+        let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
+            method: 0x80000001,
+            mode: 5,
+            key_size: 16,
+        };
+        let key: Vec<u8> = vec![0; 4];
+
+        let result = CdsaEncrEncryption::get_encryption_context(&encryption_type, &key);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encryption_context_decrypt_with_aes() -> Result<(), ErrorTrace> {
+        let initialization_vector: Vec<u8> = vec![
+            0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd,
+            0xee, 0xff,
+        ];
+        let key: Vec<u8> = vec![
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+            0x0e, 0x0f,
+        ];
+        let encrypted_data: Vec<u8> = vec![
+            0x76, 0xd0, 0x62, 0x7d, 0xa1, 0xd2, 0x90, 0x43, 0x6e, 0x21, 0xa4, 0xaf, 0x7f, 0xca,
+            0x94, 0xb7,
+        ];
+        let mut data: Vec<u8> = vec![0; 16];
+
+        let mut context: CdsaEncrEncryptionContext =
+            CdsaEncrEncryptionContext::Aes(AesContext::new());
+        context.set_key(&key)?;
+        context.decrypt(&initialization_vector, &encrypted_data, &mut data)?;
+
+        let expected_data: Vec<u8> = vec![
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+            0x0e, 0x0f,
+        ];
+        assert_eq!(data, expected_data);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_encryption_context_decrypt_with_des3() -> Result<(), ErrorTrace> {
+        let initialization_vector: Vec<u8> = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
+        let key: Vec<u8> = vec![
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+            0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+        ];
+        let encrypted_data: Vec<u8> = vec![
+            0x61, 0x09, 0xaa, 0xd6, 0xf5, 0xfa, 0xd5, 0xf5, 0x71, 0xf7, 0x7e, 0x2d, 0xcc, 0x05,
+            0x4d, 0x55,
+        ];
+        let mut data: Vec<u8> = vec![0; 16];
+
+        let mut context: CdsaEncrEncryptionContext =
+            CdsaEncrEncryptionContext::Des3(Des3Context::new());
+        context.set_key(&key)?;
+        context.decrypt(&initialization_vector, &encrypted_data, &mut data)?;
+
+        let expected_data: Vec<u8> = vec![
+            0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21,
+            0x22, 0x23,
+        ];
+        assert_eq!(data, expected_data);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_encryption_context_decrypt_with_no_context() {
+        let context: CdsaEncrEncryptionContext = CdsaEncrEncryptionContext::None;
+
+        let mut data: Vec<u8> = vec![0; 16];
+        let result = context.decrypt(&[], &[0u8; 16], &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encryption_context_set_key_with_no_context() {
+        let mut context: CdsaEncrEncryptionContext = CdsaEncrEncryptionContext::None;
+
+        let result = context.set_key(&[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_calculate_hmac_with_hmac_sha1() -> Result<(), ErrorTrace> {
+        let key: Vec<u8> = vec![0x0b; 20];
+
+        let mut hmac_context: CdsaEncrHmacContext =
+            CdsaEncrEncryption::get_hmac_context(91, &key)?.unwrap();
+
+        let hmac: Vec<u8> = hmac_context.calculate_hmac(b"Hi There")?;
+
+        let expected_hmac: Vec<u8> = vec![
+            0xb6, 0x17, 0x31, 0x86, 0x55, 0x05, 0x72, 0x64, 0xe2, 0x8b, 0xc0, 0xb6, 0xfb, 0x37,
+            0x8c, 0x8e, 0xf1, 0x46, 0xbe, 0x00,
+        ];
+        assert_eq!(hmac, expected_hmac);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_hmac_context_with_unsupported_method() -> Result<(), ErrorTrace> {
+        let hmac_context: Option<CdsaEncrHmacContext> =
+            CdsaEncrEncryption::get_hmac_context(92, &[])?;
+
+        assert!(hmac_context.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_calculate_hmac_with_no_context() {
+        let mut hmac_context: CdsaEncrHmacContext = CdsaEncrHmacContext::None;
+
+        let result = hmac_context.calculate_hmac(b"data");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_derive_key_with_pbkdf2_hmac_sha1() -> Result<(), ErrorTrace> {
+        let mut key_derivation_context: CdsaEncrKeyDerivationContext =
+            CdsaEncrEncryption::get_key_derivation_context(103, b"salt", 1)?.unwrap();
+
+        let mut key: Vec<u8> = vec![0; 20];
+        match &mut key_derivation_context {
+            CdsaEncrKeyDerivationContext::Pbkdf2HmacSha1(context) => {
+                context.derive_key(b"password", &mut key)?
+            }
+        }
+        let expected_key: Vec<u8> = vec![
+            0x0c, 0x60, 0xc8, 0x0f, 0x96, 0x1f, 0x0e, 0x71, 0xf3, 0xa9, 0xb5, 0x24, 0xaf, 0x60,
+            0x12, 0x06, 0x2f, 0xe0, 0x37, 0xa6,
+        ];
+        assert_eq!(key, expected_key);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_key_derivation_context_with_unsupported_method() -> Result<(), ErrorTrace> {
+        let key_derivation_context: Option<CdsaEncrKeyDerivationContext> =
+            CdsaEncrEncryption::get_key_derivation_context(104, b"salt", 1)?;
+
+        assert!(key_derivation_context.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove_padding_with_no_padding() -> Result<(), ErrorTrace> {
+        let data: &[u8] = CdsaEncrEncryption::remove_padding(0, 8, &[0x01, 0x02, 0x03])?;
+
+        assert_eq!(data, &[0x01, 0x02, 0x03]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove_padding_with_zero_padding() -> Result<(), ErrorTrace> {
+        let padded_data: &[u8] = &[
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00,
+        ];
+        let data: &[u8] = CdsaEncrEncryption::remove_padding(2, 8, padded_data)?;
+
+        assert_eq!(data, &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove_padding_with_one_padding() -> Result<(), ErrorTrace> {
+        let padded_data: &[u8] = &[
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+            0x01, 0x01,
+        ];
+        let data: &[u8] = CdsaEncrEncryption::remove_padding(3, 8, padded_data)?;
+
+        assert_eq!(data, &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove_padding_with_pkcs7_padding() -> Result<(), ErrorTrace> {
+        let data: &[u8] = CdsaEncrEncryption::remove_padding(
+            7,
+            8,
+            &[0x74, 0x65, 0x73, 0x74, 0x04, 0x04, 0x04, 0x04],
+        )?;
+        assert_eq!(data, &[0x74, 0x65, 0x73, 0x74]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove_padding_with_unsupported_block_size() {
+        let padded_data: &[u8] = &[0x01, 0x02, 0x03, 0x04];
+
+        let result = CdsaEncrEncryption::remove_padding(2, 0, padded_data);
+        assert!(result.is_err());
+
+        let result = CdsaEncrEncryption::remove_padding(7, 256, padded_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_remove_padding_with_invalid_padded_data_size() {
+        let padded_data: &[u8] = &[0x01, 0x02, 0x03];
+
+        let result = CdsaEncrEncryption::remove_padding(2, 8, padded_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_remove_padding_with_invalid_padding() {
+        let padded_data: &[u8] = &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x09];
+
+        let result = CdsaEncrEncryption::remove_padding(2, 8, padded_data);
+        assert!(result.is_err());
+
+        let padded_data: &[u8] = &[0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x10];
+
+        let result = CdsaEncrEncryption::remove_padding(7, 8, padded_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_remove_padding_with_unsupported_padding_type() {
+        let padded_data: &[u8] = &[0x01, 0x02, 0x03];
+
+        let result = CdsaEncrEncryption::remove_padding(1, 8, padded_data);
+        assert!(result.is_err());
+    }
+}
