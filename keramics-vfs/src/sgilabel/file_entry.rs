@@ -11,127 +11,39 @@
  * under the License.
  */
 
-use std::sync::Arc;
-
-use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_core::DataStreamReference;
 use keramics_formats::sgilabel::{SgiDiskLabelPartition, SgiDiskLabelVolumeSystem};
-use keramics_formats::{PartitionIterator, PathComponent};
 
-use crate::enums::VfsFileType;
+use crate::partition::{VfsPartitionFileEntry, VfsPartitionIdentifier};
+use crate::traits::VfsPartition;
 
 /// SGI disklabel (sgilabel) file entry.
-pub enum SgiDiskLabelFileEntry {
-    /// Partition file entry.
-    Partition {
-        /// File name index.
-        name_index: usize,
+pub type SgiDiskLabelFileEntry =
+    VfsPartitionFileEntry<SgiDiskLabelPartition, SgiDiskLabelVolumeSystem>;
 
-        /// Partition.
-        partition: SgiDiskLabelPartition,
-    },
+impl VfsPartition for SgiDiskLabelPartition {
+    const NAME_PREFIX: &'static str = "sgilabel";
 
-    /// Root file entry.
-    Root {
-        /// Volume system.
-        volume_system: Arc<SgiDiskLabelVolumeSystem>,
-    },
-}
-
-impl SgiDiskLabelFileEntry {
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
-        match self {
-            SgiDiskLabelFileEntry::Partition { partition, .. } => {
-                Ok(Some(partition.get_data_stream()))
-            }
-            SgiDiskLabelFileEntry::Root { .. } => Ok(None),
-        }
+    fn get_data_stream(&self) -> DataStreamReference {
+        SgiDiskLabelPartition::get_data_stream(self)
     }
 
-    /// Retrieves the file type.
-    pub fn get_file_type(&self) -> VfsFileType {
-        match self {
-            SgiDiskLabelFileEntry::Partition { .. } => VfsFileType::File,
-            SgiDiskLabelFileEntry::Root { .. } => VfsFileType::Directory,
-        }
-    }
-
-    /// Retrieves the name.
-    pub fn get_name(&self) -> PathComponent {
-        match self {
-            SgiDiskLabelFileEntry::Partition { name_index, .. } => {
-                PathComponent::from(format!("sgilabel{}", name_index + 1))
-            }
-            SgiDiskLabelFileEntry::Root { .. } => PathComponent::Root,
-        }
+    /// Retrieves the partition identifier.
+    fn get_identifier(&self) -> Option<VfsPartitionIdentifier> {
+        None
     }
 
     /// Retrieves the partition number.
-    pub fn get_partition_number(&self) -> Option<usize> {
-        match self {
-            SgiDiskLabelFileEntry::Partition { partition, .. } => {
-                let partition_index: u8 = partition.get_partition_index();
+    fn get_partition_number(&self) -> usize {
+        let sgilabel_partition_index: u8 = SgiDiskLabelPartition::get_partition_index(self);
 
-                Some((partition_index as usize) + 1)
-            }
-            SgiDiskLabelFileEntry::Root { .. } => None,
-        }
+        (sgilabel_partition_index as usize) + 1
     }
 
-    /// Retrieves the size.
-    pub fn get_size(&self) -> u64 {
-        match self {
-            SgiDiskLabelFileEntry::Partition { partition, .. } => partition.get_partition_size(),
-            SgiDiskLabelFileEntry::Root { .. } => 0,
-        }
-    }
-
-    /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&self) -> usize {
-        match self {
-            SgiDiskLabelFileEntry::Partition { .. } => 0,
-            SgiDiskLabelFileEntry::Root { volume_system } => {
-                volume_system.get_number_of_partitions()
-            }
-        }
-    }
-
-    /// Retrieves a specific sub file entry.
-    pub fn get_sub_file_entry_by_index(
-        &self,
-        sub_file_entry_index: usize,
-    ) -> Result<SgiDiskLabelFileEntry, ErrorTrace> {
-        match self {
-            SgiDiskLabelFileEntry::Partition { .. } => {
-                Err(keramics_core::error_trace_new!("No sub file entries"))
-            }
-            SgiDiskLabelFileEntry::Root { volume_system } => {
-                match volume_system.get_partition_by_index(sub_file_entry_index) {
-                    Ok(sgilabel_partition) => Ok(SgiDiskLabelFileEntry::Partition {
-                        name_index: sub_file_entry_index,
-                        partition: sgilabel_partition,
-                    }),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve sgilabel partition: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-        }
-    }
-
-    /// Determines if the file entry is the root file entry.
-    pub fn is_root_file_entry(&self) -> bool {
-        match self {
-            SgiDiskLabelFileEntry::Partition { .. } => false,
-            SgiDiskLabelFileEntry::Root { .. } => true,
-        }
+    /// Retrieves the partition size.
+    fn get_partition_size(&self) -> u64 {
+        SgiDiskLabelPartition::get_partition_size(self)
     }
 }
 
@@ -140,9 +52,12 @@ mod tests {
     use super::*;
 
     use std::path::PathBuf;
+    use std::sync::Arc;
 
-    use keramics_core::open_os_data_stream;
+    use keramics_core::{ErrorTrace, open_os_data_stream};
+    use keramics_formats::{PartitionIterator, PathComponent};
 
+    use crate::enums::VfsFileType;
     use crate::tests::get_test_data_path;
 
     fn get_volume_system() -> Result<SgiDiskLabelVolumeSystem, ErrorTrace> {

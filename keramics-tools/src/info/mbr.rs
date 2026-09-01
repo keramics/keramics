@@ -14,6 +14,7 @@
 use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::PartitionIterator;
 use keramics_formats::mbr::{MbrPartition, MbrVolumeSystem};
 
 use crate::formatters::ByteSize;

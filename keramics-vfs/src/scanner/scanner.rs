@@ -31,26 +31,23 @@ use keramics_formats::udif::UdifImage;
 use keramics_formats::vhd::VhdImage;
 use keramics_formats::vhdx::VhdxImage;
 use keramics_formats::vmdk::VmdkImage;
-use keramics_formats::{FormatIdentifier, FormatScanner, Path};
+use keramics_formats::{FormatIdentifier, FormatScanner, PartitionIterator, Path};
 
 use crate::apfs::ApfsContainerFileSystem;
-use crate::apm::ApmFileSystem;
 use crate::credential::VfsCredential;
 use crate::credential_store::VfsCredentialStore;
 use crate::enums::{VfsFileType, VfsType};
 use crate::ewf::EwfFileSystem;
 use crate::file_entry::VfsFileEntry;
-use crate::gpt::GptFileSystem;
 use crate::linuxlvm::LinuxLvmFileSystem;
 use crate::location::VfsLocation;
-use crate::mbr::MbrFileSystem;
 use crate::pdi::PdiFileSystem;
 use crate::qcow::QcowFileSystem;
 use crate::resolver::VfsResolver;
-use crate::sgilabel::SgiDiskLabelFileSystem;
 use crate::sparsebundle::SparseBundleFileSystem;
 use crate::sparseimage::SparseImageFileSystem;
 use crate::splitraw::SplitRawFileSystem;
+use crate::traits::VfsPartitionSystem;
 use crate::types::{VfsFileSystemReference, VfsResolverReference};
 use crate::udif::UdifFileSystem;
 use crate::vhd::VhdFileSystem;
@@ -801,7 +798,7 @@ impl VfsScanner {
             VfsType::Apm => {
                 let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
-                match ApmFileSystem::open_volume_system(&mut apm_volume_system, file_system, path) {
+                match apm_volume_system.open_from_vfs(file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -817,7 +814,7 @@ impl VfsScanner {
                     scan_options,
                     vfs_location,
                     scan_node,
-                    ApmFileSystem::PATH_PREFIX,
+                    ApmVolumeSystem::PATH_PREFIX,
                     number_of_partitions,
                 ) {
                     Ok(_) => {}
@@ -862,7 +859,7 @@ impl VfsScanner {
             VfsType::Gpt => {
                 let mut gpt_volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
-                match GptFileSystem::open_volume_system(&mut gpt_volume_system, file_system, path) {
+                match gpt_volume_system.open_from_vfs(file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -878,7 +875,7 @@ impl VfsScanner {
                     scan_options,
                     vfs_location,
                     scan_node,
-                    GptFileSystem::PATH_PREFIX,
+                    GptVolumeSystem::PATH_PREFIX,
                     number_of_partitions,
                 ) {
                     Ok(_) => {}
@@ -930,7 +927,7 @@ impl VfsScanner {
             VfsType::Mbr => {
                 let mut mbr_volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
-                match MbrFileSystem::open_volume_system(&mut mbr_volume_system, file_system, path) {
+                match mbr_volume_system.open_from_vfs(file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -948,7 +945,7 @@ impl VfsScanner {
                     scan_options,
                     vfs_location,
                     scan_node,
-                    MbrFileSystem::PATH_PREFIX,
+                    MbrVolumeSystem::PATH_PREFIX,
                     number_of_partitions,
                 ) {
                     Ok(_) => {}
@@ -1060,11 +1057,7 @@ impl VfsScanner {
                 let mut sgilabel_volume_system: SgiDiskLabelVolumeSystem =
                     SgiDiskLabelVolumeSystem::new();
 
-                match SgiDiskLabelFileSystem::open_volume_system(
-                    &mut sgilabel_volume_system,
-                    file_system,
-                    path,
-                ) {
+                match sgilabel_volume_system.open_from_vfs(file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -1080,7 +1073,7 @@ impl VfsScanner {
                     scan_options,
                     vfs_location,
                     scan_node,
-                    SgiDiskLabelFileSystem::PATH_PREFIX,
+                    SgiDiskLabelVolumeSystem::PATH_PREFIX,
                     number_of_partitions,
                 ) {
                     Ok(_) => {}

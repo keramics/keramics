@@ -11,163 +11,28 @@
  * under the License.
  */
 
-use std::sync::Arc;
-
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::Path;
 use keramics_formats::apm::{ApmPartition, ApmVolumeSystem};
-use keramics_formats::{PartitionIterator, Path};
 
-use crate::location::VfsLocation;
-use crate::path::VfsPath;
+use crate::partition::VfsPartitionFileSystem;
+use crate::traits::VfsPartitionSystem;
 use crate::types::VfsFileSystemReference;
 
-use super::file_entry::ApmFileEntry;
-
 /// Apple Partition Map (APM) file system.
-pub struct ApmFileSystem {
-    /// Volume system.
-    volume_system: Arc<ApmVolumeSystem>,
+pub type ApmFileSystem = VfsPartitionFileSystem<ApmPartition, ApmVolumeSystem>;
 
-    /// Number of partitions.
-    number_of_partitions: usize,
-}
+impl VfsPartitionSystem for ApmVolumeSystem {
+    const PATH_PREFIX: &'static str = "/apm";
 
-impl ApmFileSystem {
-    pub const PATH_PREFIX: &'static str = "/apm";
-
-    /// Creates a new file system.
-    pub fn new() -> Self {
-        Self {
-            volume_system: Arc::new(ApmVolumeSystem::new()),
-            number_of_partitions: 0,
-        }
+    /// Creates a new partition (volume) system.
+    fn new() -> Self {
+        ApmVolumeSystem::new()
     }
 
-    /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, path: &Path) -> bool {
-        if path.is_relative() {
-            return false;
-        }
-        match path.get_component_by_index(1) {
-            Some(path_component) => {
-                if path.get_number_of_components() > 2 {
-                    return false;
-                }
-                let partition_index: usize =
-                    match VfsPath::get_numeric_suffix(path_component, "apm") {
-                        Some(partition_index) => partition_index,
-                        None => return false,
-                    };
-                if partition_index == 0 || partition_index > self.number_of_partitions {
-                    false
-                } else {
-                    true
-                }
-            }
-            None => {
-                if path.is_empty() {
-                    false
-                } else {
-                    true
-                }
-            }
-        }
-    }
-
-    /// Retrieves the file entry with the specific location.
-    pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<ApmFileEntry>, ErrorTrace> {
-        if path.is_relative() {
-            return Ok(None);
-        }
-        match path.get_component_by_index(1) {
-            Some(path_component) => {
-                if path.get_number_of_components() > 2 {
-                    return Ok(None);
-                }
-                let mut partition_index: usize =
-                    match VfsPath::get_numeric_suffix(path_component, "apm") {
-                        Some(partition_index) => partition_index,
-                        None => return Ok(None),
-                    };
-                if partition_index == 0 || partition_index > self.number_of_partitions {
-                    return Ok(None);
-                }
-                partition_index -= 1;
-
-                let apm_partition: ApmPartition =
-                    match self.volume_system.get_partition_by_index(partition_index) {
-                        Ok(apm_partition) => apm_partition,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!("Unable to retrieve APM partition: {}", partition_index)
-                            );
-                            return Err(error);
-                        }
-                    };
-                Ok(Some(ApmFileEntry::Partition {
-                    name_index: partition_index,
-                    partition: apm_partition,
-                }))
-            }
-            None => {
-                if path.is_empty() {
-                    return Ok(None);
-                }
-                Ok(Some(self.get_root_file_entry()))
-            }
-        }
-    }
-
-    /// Retrieves the root file entry.
-    pub fn get_root_file_entry(&self) -> ApmFileEntry {
-        ApmFileEntry::Root {
-            volume_system: self.volume_system.clone(),
-        }
-    }
-
-    /// Opens the file system.
-    pub fn open(
+    /// Opens the partition system from VFS.
+    fn open_from_vfs(
         &mut self,
-        parent_file_system: Option<&VfsFileSystemReference>,
-        vfs_location: &VfsLocation,
-    ) -> Result<(), ErrorTrace> {
-        let file_system: &VfsFileSystemReference = match parent_file_system {
-            Some(file_system) => file_system,
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Missing parent file system"
-                ));
-            }
-        };
-        let path: &Path = vfs_location.get_path();
-
-        match Arc::get_mut(&mut self.volume_system) {
-            Some(volume_system) => {
-                match Self::open_volume_system(volume_system, file_system, path) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to open APM volume system"
-                        );
-                        return Err(error);
-                    }
-                }
-                self.number_of_partitions = volume_system.get_number_of_partitions();
-            }
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unable to obtain mutable reference to APM volume system"
-                ));
-            }
-        }
-        Ok(())
-    }
-
-    /// Opens an APM volume system.
-    pub(crate) fn open_volume_system(
-        volume_system: &mut ApmVolumeSystem,
         file_system: &VfsFileSystemReference,
         path: &Path,
     ) -> Result<(), ErrorTrace> {
@@ -181,7 +46,7 @@ impl ApmFileSystem {
                 return Err(error);
             }
         };
-        match volume_system.read_data_stream(&data_stream) {
+        match self.read_data_stream(&data_stream) {
             Ok(()) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -201,9 +66,10 @@ mod tests {
 
     use keramics_formats::PathComponent;
 
+    use crate::apm::ApmFileEntry;
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
-
+    use crate::location::VfsLocation;
     use crate::tests::get_test_data_path;
 
     fn get_file_system() -> Result<ApmFileSystem, ErrorTrace> {

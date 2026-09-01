@@ -25,6 +25,9 @@ pub struct ApmPartition {
     /// The data stream.
     data_stream: DataStreamReference,
 
+    /// The index of the corresponding partition table entry.
+    partition_index: u32,
+
     /// The offset of the partition relative to start of the volume system.
     pub(super) offset: u64,
 
@@ -50,6 +53,7 @@ impl ApmPartition {
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
+            partition_index: partition_entry.index,
             offset: (partition_entry.start_sector as u64) * (bytes_per_sector as u64),
             type_identifier: partition_entry.type_identifier.clone(),
             name: partition_entry.name.clone(),
@@ -70,6 +74,11 @@ impl ApmPartition {
     /// Retrieves the name.
     pub fn get_name(&self) -> &ByteString {
         &self.name
+    }
+
+    /// Retrieves the partition (table entry) index.
+    pub fn get_partition_index(&self) -> u32 {
+        self.partition_index
     }
 
     /// Retrieves the partition offset.
@@ -108,7 +117,7 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
-        let mut partition_entry: ApmPartitionMapEntry = ApmPartitionMapEntry::new();
+        let mut partition_entry: ApmPartitionMapEntry = ApmPartitionMapEntry::new(0);
         partition_entry.start_sector = 64;
         partition_entry.number_of_sectors = 8112;
         partition_entry.name = ByteString::from("identifier");
@@ -133,6 +142,16 @@ mod tests {
 
         let name: &ByteString = partition.get_name();
         assert_eq!(name, &ByteString::from("identifier"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_partition_index() -> Result<(), ErrorTrace> {
+        let partition: ApmPartition = get_partition()?;
+
+        let partition_index: u32 = partition.get_partition_index();
+        assert_eq!(partition_index, 0);
 
         Ok(())
     }

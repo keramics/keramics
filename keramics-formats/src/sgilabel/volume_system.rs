@@ -49,11 +49,6 @@ impl SgiDiskLabelVolumeSystem {
         self.bytes_per_sector
     }
 
-    /// Retrieves the number of partitions.
-    pub fn get_number_of_partitions(&self) -> usize {
-        self.disklabel_entries.len()
-    }
-
     /// Retrieves a partitions iterator.
     pub fn partitions(&self) -> SgiDiskLabelPartitionsIterator<'_> {
         SgiDiskLabelPartitionsIterator::new(self, self.disklabel_entries.len())
@@ -87,6 +82,11 @@ impl SgiDiskLabelVolumeSystem {
 
 impl PartitionIterator for SgiDiskLabelVolumeSystem {
     type PartitionItem = SgiDiskLabelPartition;
+
+    /// Retrieves the number of partitions.
+    fn get_number_of_partitions(&self) -> usize {
+        self.disklabel_entries.len()
+    }
 
     /// Retrieves a partition by index.
     fn get_partition_by_index(

@@ -66,11 +66,6 @@ impl GptVolumeSystem {
         &self.disk_identifier
     }
 
-    /// Retrieves the number of partitions.
-    pub fn get_number_of_partitions(&self) -> usize {
-        self.partition_entries.len()
-    }
-
     // TODO: add get_partition_index_by_identifier
 
     /// Retrieves a partitions iterator.
@@ -263,6 +258,11 @@ impl GptVolumeSystem {
 
 impl PartitionIterator for GptVolumeSystem {
     type PartitionItem = GptPartition;
+
+    /// Retrieves the number of partitions.
+    fn get_number_of_partitions(&self) -> usize {
+        self.partition_entries.len()
+    }
 
     /// Retrieves a partition by index.
     fn get_partition_by_index(
