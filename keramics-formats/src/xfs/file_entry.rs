@@ -420,7 +420,8 @@ impl XfsFileEntry {
                     let mut attributes_table: XfsAttributesTable =
                         XfsAttributesTable::new(&self.character_encoding);
 
-                    match attributes_table.read_data(&self.inode.attributes_fork, &mut self.attributes)
+                    match attributes_table
+                        .read_data(&self.inode.attributes_fork, &mut self.attributes)
                     {
                         Ok(_) => {}
                         Err(mut error) => {
