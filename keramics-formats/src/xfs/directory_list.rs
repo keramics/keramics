@@ -29,24 +29,39 @@ pub struct XfsDirectoryList {
     /// Character encoding.
     character_encoding: CharacterEncoding,
 
+    /// Allocation group size.
+    allocation_group_size: u32,
+
     /// Block size.
     block_size: u32,
 
     /// Directory block size.
     directory_block_size: u32,
+
+    /// Block number bit shift.
+    block_number_bit_shift: u64,
+
+    /// Relative block number bit mask.
+    relative_block_number_bit_mask: u64,
 }
 
 impl XfsDirectoryList {
     /// Creates a new directory list.
     pub fn new(
         character_encoding: &CharacterEncoding,
+        allocation_group_size: u32,
+        number_of_relative_block_number_bits: u32,
         block_size: u32,
         directory_block_size: u32,
     ) -> Self {
         Self {
             character_encoding: character_encoding.clone(),
+            allocation_group_size,
             block_size,
             directory_block_size,
+            block_number_bit_shift: number_of_relative_block_number_bits as u64,
+            relative_block_number_bit_mask: (1 << (number_of_relative_block_number_bits as u64))
+                - 1,
         }
     }
 
@@ -62,6 +77,8 @@ impl XfsDirectoryList {
         let mut read_block_numbers: HashSet<u64> = HashSet::new();
         let mut extent_offset: u64 = 0;
 
+        let blocks_per_directory_block: u32 = self.directory_block_size / self.block_size;
+
         for extent in extents.iter() {
             let logical_offset: u64 = extent.logical_block_number * (self.block_size as u64);
 
@@ -74,7 +91,12 @@ impl XfsDirectoryList {
                 extent_offset += extent_size;
                 continue;
             }
-            let mut physical_block_number: u64 = extent.physical_block_number;
+            let allocation_group_index: u64 =
+                extent.physical_block_number >> self.block_number_bit_shift;
+            let allocation_group_block_number: u64 =
+                allocation_group_index * (self.allocation_group_size as u64);
+            let mut physical_block_number: u64 =
+                extent.physical_block_number & self.relative_block_number_bit_mask;
 
             let extent_end_offset: u64 = extent_offset + extent_size;
 
@@ -90,6 +112,7 @@ impl XfsDirectoryList {
                 match self.read_entries_from_element(
                     has_file_type,
                     data_stream,
+                    allocation_group_block_number,
                     physical_block_number,
                     entries,
                     &mut read_block_numbers,
@@ -106,7 +129,7 @@ impl XfsDirectoryList {
                         return Err(error);
                     }
                 }
-                physical_block_number += 1;
+                physical_block_number += blocks_per_directory_block as u64;
                 extent_offset += self.directory_block_size as u64;
             }
         }
@@ -118,6 +141,7 @@ impl XfsDirectoryList {
         &self,
         has_file_type: bool,
         data_stream: &DataStreamReference,
+        allocation_group_block_number: u64,
         physical_block_number: u64,
         entries: &mut IndexedHashMap<ByteString, XfsDirectoryEntry>,
         read_block_numbers: &mut HashSet<u64>,
@@ -131,7 +155,8 @@ impl XfsDirectoryList {
         let directory_list_element: XfsDirectoryListElement =
             XfsDirectoryListElement::new(&self.character_encoding);
 
-        let physical_offset: u64 = physical_block_number * (self.block_size as u64);
+        let physical_offset: u64 =
+            (allocation_group_block_number + physical_block_number) * (self.block_size as u64);
 
         match directory_list_element.read_at_position(
             has_file_type,

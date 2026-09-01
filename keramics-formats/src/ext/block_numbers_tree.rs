@@ -14,7 +14,6 @@
 use std::cmp::min;
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u32_le;
 
@@ -22,9 +21,6 @@ use super::block_range::{ExtBlockRange, ExtBlockRangeType};
 
 /// Extended File System (ext) block numbers tree.
 pub struct ExtBlockNumbersTree {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Block size.
     block_size: u32,
 
@@ -39,7 +35,6 @@ impl ExtBlockNumbersTree {
     /// Creates new block numbers tree.
     pub fn new(block_size: u32, number_of_blocks: u64) -> Self {
         Self {
-            mediator: Mediator::current(),
             block_size,
             number_of_blocks_per_block: block_size / 4,
             number_of_blocks,
@@ -116,13 +111,6 @@ impl ExtBlockNumbersTree {
                 return Err(error);
             }
         }
-        let number_of_ranges: usize = block_ranges.len();
-        if self.mediator.debug_output && number_of_ranges > 0 {
-            let last_block_range: &ExtBlockRange = &block_ranges[number_of_ranges - 1];
-
-            self.mediator
-                .debug_print(format!("{:#?}\n\n", last_block_range));
-        }
         if logical_block_number < self.number_of_blocks {
             let block_range: ExtBlockRange = ExtBlockRange::new(
                 logical_block_number,
@@ -130,9 +118,6 @@ impl ExtBlockNumbersTree {
                 self.number_of_blocks - logical_block_number,
                 ExtBlockRangeType::Sparse,
             );
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!("{:#?}\n\n", block_range));
-            }
             block_ranges.push(block_range);
         }
         Ok(())
@@ -216,14 +201,6 @@ impl ExtBlockNumbersTree {
                 }
             }
             if create_new_block_range {
-                if self.mediator.debug_output {
-                    if number_of_ranges > 0 {
-                        let last_block_range: &ExtBlockRange = &block_ranges[number_of_ranges - 1];
-
-                        self.mediator
-                            .debug_print(format!("{:#?}\n\n", last_block_range));
-                    }
-                }
                 let range_type: ExtBlockRangeType = if block_number == 0 {
                     ExtBlockRangeType::Sparse
                 } else {

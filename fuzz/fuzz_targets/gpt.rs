@@ -16,6 +16,7 @@
 use libfuzzer_sys::fuzz_target;
 
 use keramics_core::{DataStreamReference, open_fake_data_stream};
+use keramics_formats::PartitionIterator;
 use keramics_formats::gpt::GptVolumeSystem;
 
 // GUID Partition Table (GPT) volume system fuzz target.
@@ -24,4 +25,13 @@ fuzz_target!(|data: &[u8]| {
 
     let data_stream: DataStreamReference = open_fake_data_stream(&data);
     _ = gpt_volume_system.read_data_stream(&data_stream);
+
+    if let Ok(gpt_partition) = gpt_volume_system.get_partition_by_index(0) {
+        _ = gpt_partition.get_data_stream();
+        _ = gpt_partition.get_identifier();
+        _ = gpt_partition.get_partition_index();
+        _ = gpt_partition.get_partition_offset();
+        _ = gpt_partition.get_partition_size();
+        _ = gpt_partition.get_type_identifier();
+    }
 });

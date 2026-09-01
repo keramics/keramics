@@ -58,7 +58,7 @@ impl BlockReader for ExtBlockReader {
         self.size
     }
 
-    /// Reads media data based on the block ranges.
+    /// Reads data based on the block ranges.
     fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;

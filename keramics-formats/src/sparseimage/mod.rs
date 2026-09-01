@@ -12,6 +12,8 @@
  */
 
 mod block_range;
+mod block_reader;
+mod block_stream;
 pub(crate) mod constants;
 mod file;
 mod file_header;

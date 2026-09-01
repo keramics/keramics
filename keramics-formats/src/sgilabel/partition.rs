@@ -19,7 +19,7 @@ use crate::range_stream::RangeStream;
 
 use super::partition_entry::SgiDiskLabelPartitionEntry;
 
-/// SGI disklabel (bsdlabel) partition.
+/// SGI disklabel (sgilabel) partition.
 pub struct SgiDiskLabelPartition {
     /// The data stream.
     data_stream: DataStreamReference,
@@ -94,7 +94,7 @@ mod tests {
     use crate::tests::get_test_data_path;
 
     fn get_partition() -> Result<SgiDiskLabelPartition, ErrorTrace> {
-        let path_string: String = get_test_data_path("bsdlabel/bsdlabel.raw");
+        let path_string: String = get_test_data_path("sgilabel/sgilabel.raw");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 

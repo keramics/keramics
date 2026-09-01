@@ -25,6 +25,7 @@ use keramics_types::bytes_to_u64_be;
     methods("debug_read_data")
 )]
 /// X File System (XFS) directory table entry version 1.
+#[allow(dead_code)]
 pub struct XfsDirectoryTableEntryV1 {
     /// Inode number.
     pub inode_number: u64,
@@ -35,6 +36,7 @@ pub struct XfsDirectoryTableEntryV1 {
 
 impl XfsDirectoryTableEntryV1 {
     /// Creates a new entry.
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             inode_number: 0,
@@ -43,6 +45,7 @@ impl XfsDirectoryTableEntryV1 {
     }
 
     /// Reads the entry from a buffer.
+    #[allow(dead_code)]
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 9 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));

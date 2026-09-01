@@ -15,8 +15,12 @@ use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 
 use super::constants::*;
-use super::device_parameters::SgiDeviceParameters;
 use super::partition_entry::SgiDiskLabelPartitionEntry;
+
+#[cfg(feature = "debug-trace")]
+use super::device_parameters::SgiDeviceParameters;
+
+#[cfg(feature = "debug-trace")]
 use super::volume_descriptor::SgiDiskLabelVolumeDescriptor;
 
 #[derive(LayoutMap)]
@@ -44,7 +48,7 @@ use super::volume_descriptor::SgiDiskLabelVolumeDescriptor;
     ),
     methods("debug_read_data", "read_at_position")
 )]
-/// SGI disklabel (bsdlabel) disklabel.
+/// SGI disklabel (sgilabel) disklabel.
 pub struct SgiDiskLabel {
     /// The partition entries.
     pub entries: Vec<SgiDiskLabelPartitionEntry>,

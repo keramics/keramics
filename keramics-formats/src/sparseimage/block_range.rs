@@ -11,16 +11,42 @@
  * under the License.
  */
 
+/// Mac OS sparse image (.sparseimage) block range type.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SparseImageBlockRangeType {
+    InFile,
+    Sparse,
+}
+
 /// Mac OS sparse image (.sparseimage) block range.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SparseImageBlockRange {
-    /// Data offset.
-    pub data_offset: u64,
+    /// Logical offset.
+    pub logical_offset: u64,
+
+    /// Physical band number.
+    pub physical_band_number: u32,
+
+    /// Number of bands.
+    pub number_of_bands: u32,
+
+    /// Range type.
+    pub range_type: SparseImageBlockRangeType,
 }
 
 impl SparseImageBlockRange {
     /// Creates a new block range.
-    pub fn new(data_offset: u64) -> Self {
-        Self { data_offset }
+    pub fn new(
+        logical_offset: u64,
+        physical_band_number: u32,
+        number_of_bands: u32,
+        range_type: SparseImageBlockRangeType,
+    ) -> Self {
+        Self {
+            logical_offset,
+            physical_band_number,
+            number_of_bands,
+            range_type,
+        }
     }
 }

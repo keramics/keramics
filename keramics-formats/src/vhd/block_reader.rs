@@ -115,25 +115,25 @@ impl VhdBlockReader {
                 }
             }
         } else {
-            let block_media_offset: u64 = block_number * (self.block_size as u64);
+            let block_logical_offset: u64 = block_number * (self.block_size as u64);
 
             let block_range: VhdBlockRange = if self.disk_type == VhdDiskType::Dynamic {
                 VhdBlockRange::new(
-                    block_media_offset,
+                    block_logical_offset,
                     0,
                     self.block_size as u64,
                     VhdBlockRangeType::Sparse,
                 )
             } else {
                 VhdBlockRange::new(
-                    block_media_offset,
+                    block_logical_offset,
                     0,
                     self.block_size as u64,
                     VhdBlockRangeType::InParent,
                 )
             };
             match self.block_tree.insert_value(
-                block_media_offset,
+                block_logical_offset,
                 self.block_size as u64,
                 block_range,
             ) {
@@ -170,27 +170,27 @@ impl VhdBlockReader {
                 return Err(error);
             }
         }
-        let mut range_media_offset: u64 = block_number * (self.block_size as u64);
+        let mut range_logical_offset: u64 = block_number * (self.block_size as u64);
         let mut range_data_offset: u64 = sector_bitmap_offset + (self.sector_bitmap_size as u64);
 
         for bitmap_range in sector_bitmap.ranges.iter() {
             let block_range: VhdBlockRange = if bitmap_range.is_set {
                 VhdBlockRange::new(
-                    range_media_offset,
+                    range_logical_offset,
                     range_data_offset,
                     bitmap_range.size,
                     VhdBlockRangeType::InFile,
                 )
             } else if self.disk_type == VhdDiskType::Dynamic {
                 VhdBlockRange::new(
-                    range_media_offset,
+                    range_logical_offset,
                     0,
                     bitmap_range.size,
                     VhdBlockRangeType::Sparse,
                 )
             } else {
                 VhdBlockRange::new(
-                    range_media_offset,
+                    range_logical_offset,
                     0,
                     bitmap_range.size,
                     VhdBlockRangeType::InParent,
@@ -198,7 +198,7 @@ impl VhdBlockReader {
             };
             match self
                 .block_tree
-                .insert_value(range_media_offset, bitmap_range.size, block_range)
+                .insert_value(range_logical_offset, bitmap_range.size, block_range)
             {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -209,7 +209,7 @@ impl VhdBlockReader {
                     return Err(error);
                 }
             }
-            range_media_offset += bitmap_range.size;
+            range_logical_offset += bitmap_range.size;
             range_data_offset += bitmap_range.size;
         }
         Ok(())
@@ -222,7 +222,7 @@ impl BlockReader for VhdBlockReader {
         self.size
     }
 
-    /// Reads media data based on the block ranges in the block tree.
+    /// Reads data based on the block ranges in the block tree.
     fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
@@ -269,7 +269,7 @@ impl BlockReader for VhdBlockReader {
                     return Err(error);
                 }
             };
-            let range_relative_offset: u64 = current_offset - block_range.media_offset;
+            let range_relative_offset: u64 = current_offset - block_range.logical_offset;
             let range_remainder_size: u64 = block_range.size - range_relative_offset;
 
             let range_read_size: usize =
@@ -278,10 +278,12 @@ impl BlockReader for VhdBlockReader {
 
             let range_read_count: usize = match block_range.range_type {
                 VhdBlockRangeType::InFile => {
+                    let physical_offset: u64 = block_range.physical_offset + range_relative_offset;
+
                     keramics_core::data_stream_read_at_position!(
                         &self.data_stream,
                         &mut data[data_offset..data_end_offset],
-                        SeekFrom::Start(block_range.data_offset + range_relative_offset)
+                        SeekFrom::Start(physical_offset)
                     )
                 }
                 VhdBlockRangeType::InParent => match &self.parent_data_stream {

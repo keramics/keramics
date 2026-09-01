@@ -18,11 +18,15 @@ use keramics_types::{ByteString, bytes_to_u32_be, bytes_to_u64_be};
 use crate::indexed_hash_map::IndexedHashMap;
 
 use super::directory_entry::XfsDirectoryEntry;
-use super::directory_table_entry_v1::XfsDirectoryTableEntryV1;
-use super::directory_table_entry_v2::XfsDirectoryTableEntryV2;
 use super::directory_table_header_v1::XfsDirectoryTableHeaderV1;
 use super::directory_table_header_v2_32bit::XfsDirectoryTableHeader32bitV2;
 use super::directory_table_header_v2_64bit::XfsDirectoryTableHeader64bitV2;
+
+#[cfg(feature = "debug-trace")]
+use {
+    super::directory_table_entry_v1::XfsDirectoryTableEntryV1,
+    super::directory_table_entry_v2::XfsDirectoryTableEntryV2, keramics_core::DebugTrace,
+};
 
 /// X File System (XFS) directory table.
 pub struct XfsDirectoryTable {
@@ -155,17 +159,22 @@ impl XfsDirectoryTable {
                     entry_index
                 )));
             }
-            if !has_directory_v2 {
-                keramics_core::debug_trace_structure!(XfsDirectoryTableEntryV1::debug_read_data(
-                    &data[data_offset..data_end_offset]
-                ));
-                // TODO: debug trace name
-            } else {
-                keramics_core::debug_trace_structure!(XfsDirectoryTableEntryV2::debug_read_data(
-                    &data[data_offset..data_end_offset]
-                ));
-                // TODO: debug trace name and file type
-            }
+            #[cfg(feature = "debug-trace")]
+            DebugTrace::static_scope(|debug_trace| {
+                if !has_directory_v2 {
+                    debug_trace.print_structure(
+                        XfsDirectoryTableEntryV1::debug_read_data,
+                        &data[data_offset..data_end_offset],
+                    );
+                    // TODO: debug trace name
+                } else {
+                    debug_trace.print_structure(
+                        XfsDirectoryTableEntryV2::debug_read_data,
+                        &data[data_offset..data_end_offset],
+                    );
+                    // TODO: debug trace name and file type
+                }
+            });
             let inode_number: u64 = if !has_directory_v2 {
                 bytes_to_u64_be!(data, data_offset)
             } else if is_64bit {

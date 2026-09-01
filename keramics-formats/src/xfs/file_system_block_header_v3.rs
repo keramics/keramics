@@ -31,15 +31,18 @@ use keramics_layout_map::LayoutMap;
     methods("debug_read_data")
 )]
 /// X File System (XFS) file system block header version 1.
+#[allow(dead_code)]
 pub struct XfsFileSystemBlockHeaderV3 {}
 
 impl XfsFileSystemBlockHeaderV3 {
     /// Creates a new header.
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {}
     }
 
     /// Reads the header from a buffer.
+    #[allow(dead_code)]
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 56 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));

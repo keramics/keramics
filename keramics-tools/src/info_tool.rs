@@ -468,13 +468,7 @@ fn main() -> ExitCode {
     }
     let info_tool: InfoTool =
         InfoTool::new(&arguments.encoding, arguments.contents, arguments.offset);
-    #[cfg(feature = "debug-trace")]
-    {
-        Mediator {
-            debug_output: arguments.debug,
-        }
-        .make_current();
-    }
+
     let data_stream: DataStreamReference =
         match info_tool.get_data_stream(&arguments.source, arguments.image_layer) {
             Ok(data_stream) => data_stream,
@@ -532,6 +526,13 @@ fn main() -> ExitCode {
             }
         }
     };
+    #[cfg(feature = "debug-trace")]
+    {
+        Mediator {
+            debug_output: arguments.debug,
+        }
+        .make_current();
+    }
     let result: Result<(), ErrorTrace> = match arguments.command {
         Some(Commands::Identifier(command_arguments)) => match &format_identifier {
             FormatIdentifier::Apfs => ApfsInfo::print_file_entry_by_identifier(

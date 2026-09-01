@@ -104,20 +104,6 @@ impl ExtFileEntry {
         self.inode.access_time.as_ref()
     }
 
-    /// Retrieves the block stream.
-    fn get_block_stream(
-        &self,
-        block_ranges: &Vec<ExtBlockRange>,
-        data_size: u64,
-    ) -> Result<ExtBlockStream, ErrorTrace> {
-        Ok(ExtBlockStream::new(ExtBlockReader::new(
-            &self.data_stream,
-            self.inode_table.block_size,
-            block_ranges,
-            data_size,
-        )))
-    }
-
     /// Retrieves the change time.
     pub fn get_change_time(&self) -> Option<&DateTime> {
         self.inode.change_time.as_ref()

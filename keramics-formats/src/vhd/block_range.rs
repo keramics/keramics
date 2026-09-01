@@ -22,11 +22,11 @@ pub enum VhdBlockRangeType {
 /// Virtual Hard Disk (VHD) block range.
 #[derive(Debug, PartialEq)]
 pub struct VhdBlockRange {
-    /// Media offset.
-    pub media_offset: u64,
+    /// Logical offset.
+    pub logical_offset: u64,
 
-    /// Data offset.
-    pub data_offset: u64,
+    /// Physical offset.
+    pub physical_offset: u64,
 
     /// Size.
     pub size: u64,
@@ -38,14 +38,14 @@ pub struct VhdBlockRange {
 impl VhdBlockRange {
     /// Creates a new block range.
     pub fn new(
-        media_offset: u64,
-        data_offset: u64,
+        logical_offset: u64,
+        physical_offset: u64,
         size: u64,
         range_type: VhdBlockRangeType,
     ) -> Self {
         Self {
-            media_offset,
-            data_offset,
+            logical_offset,
+            physical_offset,
             size,
             range_type,
         }

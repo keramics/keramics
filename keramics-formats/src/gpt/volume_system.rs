@@ -14,9 +14,11 @@
 use std::io::SeekFrom;
 
 use keramics_checksums::ReversedCrc32Context;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
+
+#[cfg(feature = "debug-trace")]
+use keramics_core::DebugTrace;
 
 use crate::traits::PartitionIterator;
 
@@ -27,9 +29,6 @@ use super::partitions::GptPartitionsIterator;
 
 /// GUID Partition Table (GPT) volume system.
 pub struct GptVolumeSystem {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Data stream.
     data_stream: Option<DataStreamReference>,
 
@@ -50,7 +49,6 @@ impl GptVolumeSystem {
     /// Creates a volume system.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             data_stream: None,
             disk_identifier: Uuid::new(),
             bytes_per_sector: 0,
@@ -146,11 +144,10 @@ impl GptVolumeSystem {
             {
                 Ok(read_count) => read_count,
                 Err(_) => {
-                    if self.mediator.debug_output {
-                        self.mediator.debug_print(
-                            "Invalid backup partition table block number falling back to last block"
-                        );
-                    }
+                    #[cfg(feature = "debug-trace")]
+                    DebugTrace::static_scope(|debug_trace| {
+                        debug_trace.print("Invalid backup partition table block number falling back to last block");
+                    });
                     match backup_partition_table_header.read_at_position(
                         data_stream,
                         SeekFrom::End(-(self.bytes_per_sector as i64)),

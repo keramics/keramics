@@ -16,8 +16,11 @@ use std::io::SeekFrom;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u16_be;
 
-use super::file_system_block_header_v1::XfsFileSystemBlockHeaderV1;
-use super::file_system_block_header_v3::XfsFileSystemBlockHeaderV3;
+#[cfg(feature = "debug-trace")]
+use {
+    super::file_system_block_header_v1::XfsFileSystemBlockHeaderV1,
+    super::file_system_block_header_v3::XfsFileSystemBlockHeaderV3, keramics_core::DebugTrace,
+};
 
 /// X File System (XFS) file system block.
 pub struct XfsFileSystemBlock {
@@ -46,20 +49,14 @@ impl XfsFileSystemBlock {
         }
         self.signature = bytes_to_u16_be!(data, 8);
 
-        if self.signature == 0xfbee || self.signature == 0xfebe || self.signature == 0xfeeb {
-            keramics_core::debug_trace_structure!(XfsFileSystemBlockHeaderV1::debug_read_data(
-                &data
-            ));
-        } else if self.signature == 0x3bee || self.signature == 0x3ebe {
-            keramics_core::debug_trace_structure!(XfsFileSystemBlockHeaderV3::debug_read_data(
-                &data
-            ));
-        } else {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported signature: 0x{:04x}",
-                self.signature
-            )));
-        }
+        #[cfg(feature = "debug-trace")]
+        DebugTrace::static_scope(|debug_trace| {
+            if self.signature == 0xfbee || self.signature == 0xfebe || self.signature == 0xfeeb {
+                debug_trace.print_structure(XfsFileSystemBlockHeaderV1::debug_read_data, data);
+            } else if self.signature == 0x3bee || self.signature == 0x3ebe {
+                debug_trace.print_structure(XfsFileSystemBlockHeaderV3::debug_read_data, data);
+            }
+        });
         Ok(())
     }
 

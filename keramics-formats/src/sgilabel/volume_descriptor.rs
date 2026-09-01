@@ -25,15 +25,18 @@ use keramics_layout_map::LayoutMap;
     methods("debug_read_data")
 )]
 /// SGI disklabel (sgilabel) volume descriptor.
+#[allow(dead_code)]
 pub struct SgiDiskLabelVolumeDescriptor {}
 
 impl SgiDiskLabelVolumeDescriptor {
     /// Creates a new volume descriptor.
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {}
     }
 
     /// Reads the volume descriptor from a buffer.
+    #[allow(dead_code)]
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 16 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));

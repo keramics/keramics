@@ -51,7 +51,7 @@ impl<T> BlockTree<T> {
     }
 
     /// Creates the root node.
-    fn create_root_node(&mut self, size: u64) {
+    fn create_root_node(&mut self) {
         let mut element_size: u64 = self.leaf_value_size;
 
         if self.elements_per_node * element_size > self.leaf_value_size {
@@ -127,7 +127,7 @@ impl<T> BlockTree<T> {
             )));
         }
         if self.root_node.is_none() {
-            self.create_root_node(size);
+            self.create_root_node();
         }
         match self.root_node.as_mut() {
             Some(root_node) => {
