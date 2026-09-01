@@ -68,13 +68,16 @@ The device parameters are 48 bytes of size and consist of:
 
 ### Volume descriptor {#volume_descriptor}
 
+The volume descriptors contain a flat file system, where each individual descriptor describes a
+execute boot file.
+
 The volume descriptor is 16 bytes of size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 8 | | Volume name, with consists of an ASCII string |
-| 8 | 4 | | Logical sector number |
-| 12 | 4 | | Number of sectors |
+| 0 | 8 | | File name, with consists of an ASCII string |
+| 8 | 4 | | Start sector number |
+| 12 | 4 | | Size, in number of bytes |
 
 ### Partition entry {#partition_entry}
 
