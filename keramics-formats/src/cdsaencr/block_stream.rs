@@ -11,8 +11,9 @@
  * under the License.
  */
 
-mod block_reader;
-mod block_stream;
-mod image;
+use crate::block_stream::BlockStream;
 
-pub use image::SparseBundleImage;
+use super::block_reader::CdsaEncrBlockReader;
+
+/// Mac OS Encrypted Encoding (cdsaencr) block stream.
+pub type CdsaEncrBlockStream = BlockStream<CdsaEncrBlockReader>;

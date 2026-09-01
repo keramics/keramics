@@ -13,7 +13,6 @@
 
 use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
-use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
@@ -271,7 +270,14 @@ impl UdifSegmentStream {
                     return Err(error);
                 }
             }
-            data_stream = Arc::new(RwLock::new(cdsaencr_container));
+            data_stream = match cdsaencr_container.get_data_stream() {
+                Some(data_stream) => data_stream,
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Missing encrypted container data stream",
+                    ));
+                }
+            };
         }
         let mut segment_file: UdifFile = UdifFile::new();
 
@@ -619,9 +625,16 @@ impl UdifSegmentStream {
         if result {
             self.credentials = credentials.to_vec();
 
-            data_stream = Arc::new(RwLock::new(cdsaencr_container));
-
+            data_stream = match cdsaencr_container.get_data_stream() {
+                Some(data_stream) => data_stream,
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Missing encrypted container data stream",
+                    ));
+                }
+            };
             let path_component: PathComponent = PathComponent::from(&segment_file_name);
+
             match self.read_first_segment_file(&data_stream, &path_component) {
                 Ok(_) => {}
                 Err(mut error) => {

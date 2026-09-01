@@ -32,9 +32,6 @@ pub struct XfsBlockReader {
     /// Block size.
     block_size: u32,
 
-    /// Block number bit shift.
-    block_number_bit_shift: u64,
-
     /// Relative block number bit mask.
     relative_block_number_bit_mask: u64,
 
@@ -59,7 +56,6 @@ impl XfsBlockReader {
             data_stream: data_stream.clone(),
             allocation_group_size,
             block_size,
-            block_number_bit_shift: number_of_relative_block_number_bits as u64,
             relative_block_number_bit_mask: (1 << (number_of_relative_block_number_bits as u64))
                 - 1,
             extents: extents.to_vec(),
@@ -127,11 +123,7 @@ impl BlockReader for XfsBlockReader {
 
             match &extent.extent_type {
                 XfsExtentType::InFile => {
-                    let allocation_group_index: u64 =
-                        extent.physical_block_number >> self.block_number_bit_shift;
-                    let allocation_group_block_number: u64 =
-                        allocation_group_index * (self.allocation_group_size as u64);
-                    let mut physical_block_number: u64 =
+                    let physical_block_number: u64 =
                         extent.physical_block_number & self.relative_block_number_bit_mask;
 
                     let range_physical_offset: u64 =

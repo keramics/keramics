@@ -19,14 +19,15 @@ use keramics_encryption::{
 
 use super::encryption_type::CdsaEncrEncryptionType;
 
-/// Mac OS Encrypted Encoding (cdsaencr) encryption context.
-pub enum CdsaEncrEncryptionContext {
+/// Mac OS Encrypted Encoding (cdsaencr) cipher context.
+#[derive(Clone)]
+pub enum CdsaEncrCipherContext {
     Aes(AesContext),
     Des3(Des3Context),
     None,
 }
 
-impl CdsaEncrEncryptionContext {
+impl CdsaEncrCipherContext {
     /// Decrypts data.
     pub fn decrypt(
         &self,
@@ -35,13 +36,13 @@ impl CdsaEncrEncryptionContext {
         data: &mut [u8],
     ) -> Result<(), ErrorTrace> {
         match self {
-            CdsaEncrEncryptionContext::Aes(context) => {
+            CdsaEncrCipherContext::Aes(context) => {
                 context.decrypt_cbc(initialization_vector, encrypted_data, data)
             }
-            CdsaEncrEncryptionContext::Des3(context) => {
+            CdsaEncrCipherContext::Des3(context) => {
                 context.decrypt_cbc(initialization_vector, encrypted_data, data)
             }
-            CdsaEncrEncryptionContext::None => {
+            CdsaEncrCipherContext::None => {
                 return Err(keramics_core::error_trace_new!("Unable to decrypt data"));
             }
         }
@@ -50,16 +51,68 @@ impl CdsaEncrEncryptionContext {
     /// Sets the key.
     pub fn set_key(&mut self, key: &[u8]) -> Result<(), ErrorTrace> {
         match self {
-            CdsaEncrEncryptionContext::Aes(context) => context.set_key(key),
-            CdsaEncrEncryptionContext::Des3(context) => context.set_key(key),
-            CdsaEncrEncryptionContext::None => {
+            CdsaEncrCipherContext::Aes(context) => context.set_key(key),
+            CdsaEncrCipherContext::Des3(context) => context.set_key(key),
+            CdsaEncrCipherContext::None => {
                 return Err(keramics_core::error_trace_new!("Unable to set key"));
             }
         }
     }
 }
 
+/// Mac OS Encrypted Encoding (cdsaencr) encryption context.
+#[derive(Clone)]
+pub struct CdsaEncrEncryptionContext {
+    /// Cipher context.
+    pub cipher_context: CdsaEncrCipherContext,
+
+    /// HMAC context.
+    pub hmac_context: CdsaEncrHmacContext,
+}
+
+impl CdsaEncrEncryptionContext {
+    /// Decrypts a block.
+    pub(crate) fn decrypt_block(
+        &mut self,
+        block_number: u32,
+        encrypted_data: &[u8],
+        data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        let block_number_data: [u8; 4] = block_number.to_be_bytes();
+
+        let mut initialization_vector: Vec<u8> =
+            match self.hmac_context.calculate_hmac(&block_number_data) {
+                Ok(data) => data,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to HMAC initialization vector for decrypting block: {}",
+                            block_number
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+        match self
+            .cipher_context
+            .decrypt(&mut initialization_vector, encrypted_data, data)
+        {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to decrypt block: {}", block_number)
+                );
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Mac OS Encrypted Encoding (cdsaencr) HMAC context.
+#[derive(Clone)]
 pub enum CdsaEncrHmacContext {
     HmacSha1 {
         key: Vec<u8>,
@@ -146,30 +199,30 @@ impl CdsaEncrEncryption {
         }
     }
 
-    /// Retrieves an encryption context.
-    pub fn get_encryption_context(
+    /// Retrieves a cipher context.
+    pub fn get_cipher_context(
         encryption_type: &CdsaEncrEncryptionType,
         key: &[u8],
-    ) -> Result<Option<CdsaEncrEncryptionContext>, ErrorTrace> {
-        let mut encryption_context: CdsaEncrEncryptionContext = match encryption_type.method {
+    ) -> Result<Option<CdsaEncrCipherContext>, ErrorTrace> {
+        let mut cipher_context: CdsaEncrCipherContext = match encryption_type.method {
             0x00000011 => match encryption_type.mode {
-                5 | 6 => CdsaEncrEncryptionContext::Des3(Des3Context::new()),
+                5 | 6 => CdsaEncrCipherContext::Des3(Des3Context::new()),
                 _ => return Ok(None),
             },
             0x80000001 => match encryption_type.mode {
-                5 | 6 => CdsaEncrEncryptionContext::Aes(AesContext::new()),
+                5 | 6 => CdsaEncrCipherContext::Aes(AesContext::new()),
                 _ => return Ok(None),
             },
             _ => return Ok(None),
         };
-        match encryption_context.set_key(key) {
+        match cipher_context.set_key(key) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to set key in context");
                 return Err(error);
             }
         }
-        Ok(Some(encryption_context))
+        Ok(Some(cipher_context))
     }
 
     /// Retrieves a HMAC context.
@@ -337,7 +390,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_encryption_context_with_aes() -> Result<(), ErrorTrace> {
+    fn test_get_cipher_context_with_aes() -> Result<(), ErrorTrace> {
         let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
             method: 0x80000001,
             mode: 5,
@@ -347,18 +400,15 @@ mod tests {
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
             0x0e, 0x0f,
         ];
-        let encryption_context: CdsaEncrEncryptionContext =
-            CdsaEncrEncryption::get_encryption_context(&encryption_type, &key)?.unwrap();
+        let cipher_context: CdsaEncrCipherContext =
+            CdsaEncrEncryption::get_cipher_context(&encryption_type, &key)?.unwrap();
 
-        assert!(matches!(
-            encryption_context,
-            CdsaEncrEncryptionContext::Aes(_)
-        ));
+        assert!(matches!(cipher_context, CdsaEncrCipherContext::Aes(_)));
         Ok(())
     }
 
     #[test]
-    fn test_get_encryption_context_with_des3() -> Result<(), ErrorTrace> {
+    fn test_get_cipher_context_with_des3() -> Result<(), ErrorTrace> {
         let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
             method: 0x00000011,
             mode: 6,
@@ -368,33 +418,30 @@ mod tests {
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
             0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
         ];
-        let encryption_context: CdsaEncrEncryptionContext =
-            CdsaEncrEncryption::get_encryption_context(&encryption_type, &key)?.unwrap();
+        let cipher_context: CdsaEncrCipherContext =
+            CdsaEncrEncryption::get_cipher_context(&encryption_type, &key)?.unwrap();
 
-        assert!(matches!(
-            encryption_context,
-            CdsaEncrEncryptionContext::Des3(_)
-        ));
+        assert!(matches!(cipher_context, CdsaEncrCipherContext::Des3(_)));
         Ok(())
     }
 
     #[test]
-    fn test_get_encryption_context_with_unsupported_method() -> Result<(), ErrorTrace> {
+    fn test_get_cipher_context_with_unsupported_method() -> Result<(), ErrorTrace> {
         let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
             method: 0x0000002a,
             mode: 5,
             key_size: 16,
         };
-        let encryption_context: Option<CdsaEncrEncryptionContext> =
-            CdsaEncrEncryption::get_encryption_context(&encryption_type, &[])?;
+        let cipher_context: Option<CdsaEncrCipherContext> =
+            CdsaEncrEncryption::get_cipher_context(&encryption_type, &[])?;
 
-        assert!(encryption_context.is_none());
+        assert!(cipher_context.is_none());
 
         Ok(())
     }
 
     #[test]
-    fn test_get_encryption_context_with_unsupported_mode() -> Result<(), ErrorTrace> {
+    fn test_get_cipher_context_with_unsupported_mode() -> Result<(), ErrorTrace> {
         let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
             method: 0x80000001,
             mode: 2,
@@ -402,16 +449,16 @@ mod tests {
         };
         let key: Vec<u8> = vec![0; 16];
 
-        let encryption_context: Option<CdsaEncrEncryptionContext> =
-            CdsaEncrEncryption::get_encryption_context(&encryption_type, &key)?;
+        let cipher_context: Option<CdsaEncrCipherContext> =
+            CdsaEncrEncryption::get_cipher_context(&encryption_type, &key)?;
 
-        assert!(encryption_context.is_none());
+        assert!(cipher_context.is_none());
 
         Ok(())
     }
 
     #[test]
-    fn test_get_encryption_context_with_unsupported_key() {
+    fn test_get_cipher_context_with_unsupported_key() {
         let encryption_type: CdsaEncrEncryptionType = CdsaEncrEncryptionType {
             method: 0x80000001,
             mode: 5,
@@ -419,12 +466,12 @@ mod tests {
         };
         let key: Vec<u8> = vec![0; 4];
 
-        let result = CdsaEncrEncryption::get_encryption_context(&encryption_type, &key);
+        let result = CdsaEncrEncryption::get_cipher_context(&encryption_type, &key);
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_encryption_context_decrypt_with_aes() -> Result<(), ErrorTrace> {
+    fn test_cipher_context_decrypt_with_aes() -> Result<(), ErrorTrace> {
         let initialization_vector: Vec<u8> = vec![
             0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd,
             0xee, 0xff,
@@ -439,8 +486,7 @@ mod tests {
         ];
         let mut data: Vec<u8> = vec![0; 16];
 
-        let mut context: CdsaEncrEncryptionContext =
-            CdsaEncrEncryptionContext::Aes(AesContext::new());
+        let mut context: CdsaEncrCipherContext = CdsaEncrCipherContext::Aes(AesContext::new());
         context.set_key(&key)?;
         context.decrypt(&initialization_vector, &encrypted_data, &mut data)?;
 
@@ -454,7 +500,7 @@ mod tests {
     }
 
     #[test]
-    fn test_encryption_context_decrypt_with_des3() -> Result<(), ErrorTrace> {
+    fn test_cipher_context_decrypt_with_des3() -> Result<(), ErrorTrace> {
         let initialization_vector: Vec<u8> = vec![0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
         let key: Vec<u8> = vec![
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
@@ -466,8 +512,7 @@ mod tests {
         ];
         let mut data: Vec<u8> = vec![0; 16];
 
-        let mut context: CdsaEncrEncryptionContext =
-            CdsaEncrEncryptionContext::Des3(Des3Context::new());
+        let mut context: CdsaEncrCipherContext = CdsaEncrCipherContext::Des3(Des3Context::new());
         context.set_key(&key)?;
         context.decrypt(&initialization_vector, &encrypted_data, &mut data)?;
 
@@ -481,8 +526,8 @@ mod tests {
     }
 
     #[test]
-    fn test_encryption_context_decrypt_with_no_context() {
-        let context: CdsaEncrEncryptionContext = CdsaEncrEncryptionContext::None;
+    fn test_cipher_context_decrypt_with_no_context() {
+        let context: CdsaEncrCipherContext = CdsaEncrCipherContext::None;
 
         let mut data: Vec<u8> = vec![0; 16];
         let result = context.decrypt(&[], &[0u8; 16], &mut data);
@@ -490,8 +535,8 @@ mod tests {
     }
 
     #[test]
-    fn test_encryption_context_set_key_with_no_context() {
-        let mut context: CdsaEncrEncryptionContext = CdsaEncrEncryptionContext::None;
+    fn test_cipher_context_set_key_with_no_context() {
+        let mut context: CdsaEncrCipherContext = CdsaEncrCipherContext::None;
 
         let result = context.set_key(&[]);
         assert!(result.is_err());

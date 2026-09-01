@@ -17,9 +17,7 @@ use keramics_types::{Uuid, bytes_to_u32_be};
 
 use super::constants::*;
 use super::credential::CdsaEncrCredential;
-use super::encryption::{
-    CdsaEncrEncryption, CdsaEncrEncryptionContext, CdsaEncrKeyDerivationContext,
-};
+use super::encryption::{CdsaEncrCipherContext, CdsaEncrEncryption, CdsaEncrKeyDerivationContext};
 use super::encryption_type::CdsaEncrEncryptionType;
 
 #[derive(LayoutMap)]
@@ -283,11 +281,8 @@ impl CdsaEncrContainerFooter {
                         return Err(error);
                     }
                 }
-                let encryption_context: CdsaEncrEncryptionContext =
-                    match CdsaEncrEncryption::get_encryption_context(
-                        &self.kek_encryption_type,
-                        &key,
-                    ) {
+                let cipher_context: CdsaEncrCipherContext =
+                    match CdsaEncrEncryption::get_cipher_context(&self.kek_encryption_type, &key) {
                         Ok(Some(context)) => context,
                         Ok(None) => {
                             return Err(keramics_core::error_trace_new!(format!(
@@ -299,14 +294,14 @@ impl CdsaEncrContainerFooter {
                             keramics_core::error_trace_add_frame!(
                                 error,
                                 format!(
-                                    "Unable to retrieve encryption context for type: {}",
+                                    "Unable to retrieve cipher context for type: {}",
                                     self.kek_encryption_type
                                 )
                             );
                             return Err(error);
                         }
                     };
-                match self.unwrap_key(&encryption_context, &self.wrapped_block_key_data) {
+                match self.unwrap_key(&cipher_context, &self.wrapped_block_key_data) {
                     Ok(Some(key_data)) => self.block_key_data = key_data,
                     Ok(None) => return Ok(false),
                     Err(mut error) => {
@@ -317,7 +312,7 @@ impl CdsaEncrContainerFooter {
                         return Err(error);
                     }
                 }
-                match self.unwrap_key(&encryption_context, &self.wrapped_hmac_key_data) {
+                match self.unwrap_key(&cipher_context, &self.wrapped_hmac_key_data) {
                     Ok(Some(key_data)) => self.hmac_key_data = key_data,
                     Ok(None) => return Ok(false),
                     Err(mut error) => {
@@ -337,7 +332,7 @@ impl CdsaEncrContainerFooter {
     /// Unwraps a key.
     fn unwrap_key(
         &self,
-        encryption_context: &CdsaEncrEncryptionContext,
+        cipher_context: &CdsaEncrCipherContext,
         wrapped_key_data: &[u8],
     ) -> Result<Option<Vec<u8>>, ErrorTrace> {
         let mut initialization_vector: Vec<u8> = vec![
@@ -353,7 +348,7 @@ impl CdsaEncrContainerFooter {
         }
         let mut intermediate_key_data: Vec<u8> = vec![0; intermediate_key_data_size];
 
-        match encryption_context.decrypt(
+        match cipher_context.decrypt(
             &mut initialization_vector,
             &wrapped_key_data,
             &mut intermediate_key_data,
@@ -398,7 +393,7 @@ impl CdsaEncrContainerFooter {
         }
         let mut final_key_data: Vec<u8> = vec![0; final_key_data_size];
 
-        match encryption_context.decrypt(
+        match cipher_context.decrypt(
             &mut initialization_vector,
             &reversed_key_data[8..],
             &mut final_key_data,

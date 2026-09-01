@@ -374,8 +374,14 @@ impl InfoTool {
                 Ok(false) => {}
                 Ok(true) => {
                     let container_data_stream: DataStreamReference =
-                        Arc::new(RwLock::new(cdsaencr_container));
-
+                        match cdsaencr_container.get_data_stream() {
+                            Some(data_stream) => data_stream,
+                            None => {
+                                return Err(keramics_core::error_trace_new!(
+                                    "Missing encrypted container data stream",
+                                ));
+                            }
+                        };
                     result = match format_scanner.scan_data_stream(&container_data_stream) {
                         Ok(scan_results) => match self.check_scan_results(&scan_results) {
                             Ok(result) => result,

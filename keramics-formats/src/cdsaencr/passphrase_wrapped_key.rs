@@ -17,9 +17,7 @@ use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
 
 use super::constants::*;
 use super::credential::CdsaEncrCredential;
-use super::encryption::{
-    CdsaEncrEncryption, CdsaEncrEncryptionContext, CdsaEncrKeyDerivationContext,
-};
+use super::encryption::{CdsaEncrCipherContext, CdsaEncrEncryption, CdsaEncrKeyDerivationContext};
 use super::encryption_type::CdsaEncrEncryptionType;
 
 #[derive(LayoutMap)]
@@ -189,8 +187,8 @@ impl CdsaEncrPassphraseWrappedKey {
                         return Err(error);
                     }
                 };
-                let encryption_context: CdsaEncrEncryptionContext =
-                    match CdsaEncrEncryption::get_encryption_context(&self.encryption_type, &key) {
+                let cipher_context: CdsaEncrCipherContext =
+                    match CdsaEncrEncryption::get_cipher_context(&self.encryption_type, &key) {
                         Ok(Some(context)) => context,
                         Ok(None) => {
                             return Err(keramics_core::error_trace_new!(format!(
@@ -211,7 +209,7 @@ impl CdsaEncrPassphraseWrappedKey {
                     };
                 let mut padded_key_data: Vec<u8> = vec![0; self.wrapped_key_data.len()];
 
-                match encryption_context.decrypt(
+                match cipher_context.decrypt(
                     &mut initialization_vector,
                     &self.wrapped_key_data,
                     &mut padded_key_data,
