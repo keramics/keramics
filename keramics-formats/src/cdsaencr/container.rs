@@ -11,19 +11,21 @@
  * under the License.
  */
 
-use std::cmp::min;
 use std::io::SeekFrom;
+use std::sync::{Arc, RwLock};
 
-use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
-use crate::lru_cache::LruCache;
-
+use super::block_reader::CdsaEncrBlockReader;
+use super::block_stream::CdsaEncrBlockStream;
 use super::constants::*;
 use super::container_footer::CdsaEncrContainerFooter;
 use super::container_header::CdsaEncrContainerHeader;
 use super::credential::CdsaEncrCredential;
-use super::encryption::{CdsaEncrEncryption, CdsaEncrEncryptionContext, CdsaEncrHmacContext};
+use super::encryption::{
+    CdsaEncrCipherContext, CdsaEncrEncryption, CdsaEncrEncryptionContext, CdsaEncrHmacContext,
+};
 use super::encryption_type::CdsaEncrEncryptionType;
 use super::enums::CdsaEncrKeyProtectorType;
 use super::key_protector::CdsaEncrKeyProtector;
@@ -66,19 +68,10 @@ pub struct CdsaEncrContainer {
     key_protectors: Vec<CdsaEncrKeyProtector>,
 
     /// Encryption context.
-    encryption_context: CdsaEncrEncryptionContext,
-
-    /// HMAC context.
-    hmac_context: CdsaEncrHmacContext,
-
-    /// Decrypted block cache.
-    block_cache: LruCache<u32, Vec<u8>>,
+    pub(crate) encryption_context: Option<CdsaEncrEncryptionContext>,
 
     /// Value to indicate the container is locked.
     is_locked: bool,
-
-    /// The current offset.
-    current_offset: u64,
 
     /// Size.
     size: u64,
@@ -99,11 +92,8 @@ impl CdsaEncrContainer {
             hmac_method: 0,
             hmac_key_size: 0,
             key_protectors: Vec::new(),
-            encryption_context: CdsaEncrEncryptionContext::None,
-            hmac_context: CdsaEncrHmacContext::None,
-            block_cache: LruCache::new(64),
+            encryption_context: None,
             is_locked: true,
-            current_offset: 0,
             size: 0,
         }
     }
@@ -116,6 +106,25 @@ impl CdsaEncrContainer {
     /// Retrieves the container identifier.
     pub fn get_container_identifier(&self) -> &Uuid {
         &self.container_identifier
+    }
+
+    /// Retrieves a data stream.
+    pub fn get_data_stream(&self) -> Option<DataStreamReference> {
+        match &self.data_stream {
+            Some(data_stream) => match &self.encryption_context {
+                Some(encryption_context) => Some(Arc::new(RwLock::new(CdsaEncrBlockStream::new(
+                    CdsaEncrBlockReader::new(
+                        data_stream,
+                        self.data_fork_offset,
+                        self.block_size,
+                        encryption_context,
+                        self.size,
+                    ),
+                )))),
+                None => None,
+            },
+            None => None,
+        }
     }
 
     /// Retrieves the encryption type.
@@ -244,151 +253,6 @@ impl CdsaEncrContainer {
         self.size = self.data_fork_size;
 
         Ok(())
-    }
-
-    /// Decrypts a block.
-    pub(crate) fn decrypt_block(
-        &mut self,
-        block_number: u32,
-        encrypted_data: &[u8],
-        data: &mut [u8],
-    ) -> Result<(), ErrorTrace> {
-        let block_number_data: [u8; 4] = block_number.to_be_bytes();
-
-        let mut initialization_vector: Vec<u8> =
-            match self.hmac_context.calculate_hmac(&block_number_data) {
-                Ok(data) => data,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to HMAC initialization vector for decrypting block: {}",
-                            block_number
-                        )
-                    );
-                    return Err(error);
-                }
-            };
-        match self
-            .encryption_context
-            .decrypt(&mut initialization_vector, encrypted_data, data)
-        {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Unable to decrypt block: {}", block_number)
-                );
-                return Err(error);
-            }
-        }
-        Ok(())
-    }
-
-    /// Reads and decrypts a block.
-    fn read_block(
-        &mut self,
-        block_number: u32,
-        block_data_offset: u64,
-    ) -> Result<Vec<u8>, ErrorTrace> {
-        let mut encrypted_data: Vec<u8> = vec![0; self.block_size as usize];
-
-        match self.data_stream.as_ref() {
-            Some(data_stream) => {
-                keramics_core::data_stream_read_exact_at_position!(
-                    data_stream,
-                    &mut encrypted_data,
-                    SeekFrom::Start(block_data_offset)
-                );
-            }
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-        }
-        let mut block_data: Vec<u8> = vec![0; self.block_size as usize];
-
-        match self.decrypt_block(block_number, &encrypted_data, &mut block_data) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Unable to decrypt block: {}", block_number)
-                );
-                return Err(error);
-            }
-        }
-        Ok(block_data)
-    }
-
-    /// Reads container data based on the encrypted blocks.
-    fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
-        if self.is_locked {
-            return Err(keramics_core::error_trace_new!("Container is locked"));
-        }
-        let read_size: usize = data.len();
-        let mut data_offset: usize = 0;
-        let mut current_offset: u64 = offset;
-
-        let mut block_number: u64 = current_offset / (self.block_size as u64);
-        let mut block_offset: u64 = block_number * (self.block_size as u64);
-
-        while data_offset < read_size {
-            if current_offset >= self.size {
-                break;
-            }
-            let range_relative_offset: u64 = current_offset - block_offset;
-            let range_remainder_size: u64 = (self.block_size as u64) - range_relative_offset;
-
-            let range_read_size: usize =
-                min(read_size - data_offset, range_remainder_size as usize);
-
-            if range_read_size == 0 {
-                break;
-            }
-            if block_number > u32::MAX as u64 {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid block number value out of bounds"
-                ));
-            }
-            if !self.block_cache.contains(&(block_number as u32)) {
-                let block_data_offset: u64 = self.data_fork_offset + block_offset;
-
-                let block_data: Vec<u8> =
-                    match self.read_block(block_number as u32, block_data_offset) {
-                        Ok(data) => data,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!("Unable to read block: {}", block_number)
-                            );
-                            return Err(error);
-                        }
-                    };
-                self.block_cache.insert(block_number as u32, block_data);
-            }
-            let range_data: &[u8] = match self.block_cache.get(&(block_number as u32)) {
-                Some(data) => data,
-                None => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unable to retrieve block: {} from cache",
-                        block_number
-                    )));
-                }
-            };
-            let data_end_offset: usize = data_offset + range_read_size;
-            let range_data_offset: usize = range_relative_offset as usize;
-            let range_data_end_offset: usize = range_data_offset + range_read_size;
-
-            data[data_offset..data_end_offset]
-                .copy_from_slice(&range_data[range_data_offset..range_data_end_offset]);
-
-            data_offset = data_end_offset;
-
-            current_offset += range_read_size as u64;
-            block_offset += self.block_size as u64;
-            block_number += 1;
-        }
-        Ok(data_offset)
     }
 
     /// Unlocks a locked container.
@@ -565,9 +429,8 @@ impl CdsaEncrContainer {
             keramics_core::debug_trace_data!("CdsaEncrBlockKey", 0, &block_key, block_key.len());
             keramics_core::debug_trace_data!("CdsaEncrBlockHmacKey", 0, &hmac_key, hmac_key.len());
 
-            self.encryption_context =
-                match CdsaEncrEncryption::get_encryption_context(&self.encryption_type, &block_key)
-                {
+            let cipher_context: CdsaEncrCipherContext =
+                match CdsaEncrEncryption::get_cipher_context(&self.encryption_type, &block_key) {
                     Ok(Some(context)) => context,
                     Ok(None) => {
                         return Err(keramics_core::error_trace_new!(format!(
@@ -579,14 +442,14 @@ impl CdsaEncrContainer {
                         keramics_core::error_trace_add_frame!(
                             error,
                             format!(
-                                "Unable to retrieve encryption context for type: {}",
+                                "Unable to retrieve cipher context for type: {}",
                                 self.encryption_type
                             )
                         );
                         return Err(error);
                     }
                 };
-            self.hmac_context =
+            let hmac_context: CdsaEncrHmacContext =
                 match CdsaEncrEncryption::get_hmac_context(self.hmac_method, &hmac_key) {
                     Ok(Some(context)) => context,
                     Ok(None) => {
@@ -606,71 +469,13 @@ impl CdsaEncrContainer {
                         return Err(error);
                     }
                 };
+            self.encryption_context = Some(CdsaEncrEncryptionContext {
+                cipher_context,
+                hmac_context,
+            });
             self.is_locked = false;
         }
         Ok(!self.is_locked)
-    }
-}
-
-impl DataStream for CdsaEncrContainer {
-    /// Retrieves the current position.
-    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
-        Ok(self.current_offset)
-    }
-
-    /// Retrieves the size of the data.
-    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
-        Ok(self.size)
-    }
-
-    /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
-        if self.current_offset >= self.size {
-            return Ok(0);
-        }
-        let remaining_size: u64 = self.size - self.current_offset;
-        let mut read_size: usize = buf.len();
-
-        if (read_size as u64) > remaining_size {
-            read_size = remaining_size as usize;
-        }
-        let read_count: usize =
-            match self.read_data_from_blocks(&mut buf[..read_size], self.current_offset) {
-                Ok(read_count) => read_count,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
-                    return Err(error);
-                }
-            };
-        self.current_offset += read_count as u64;
-
-        Ok(read_count)
-    }
-
-    /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
-        self.current_offset = match pos {
-            SeekFrom::Current(relative_offset) => {
-                match self.current_offset.checked_add_signed(relative_offset) {
-                    Some(offset) => offset,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Invalid offset value out of bounds"
-                        ));
-                    }
-                }
-            }
-            SeekFrom::End(relative_offset) => match self.size.checked_add_signed(relative_offset) {
-                Some(offset) => offset,
-                None => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Invalid offset value out of bounds"
-                    ));
-                }
-            },
-            SeekFrom::Start(offset) => offset,
-        };
-        Ok(self.current_offset)
     }
 }
 

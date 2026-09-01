@@ -302,17 +302,23 @@ impl SparseImageFile {
             }
         };
         if result {
-            let data_stream: DataStreamReference = Arc::new(RwLock::new(cdsaencr_container));
-
-            match self.read_header_block(&data_stream) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read header block");
-                    return Err(error);
+            match cdsaencr_container.get_data_stream() {
+                Some(data_stream) => {
+                    match self.read_header_block(&data_stream) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read header block"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    self.data_stream = Some(data_stream);
+                    self.is_locked = false;
                 }
+                None => {}
             }
-            self.data_stream = Some(data_stream);
-            self.is_locked = false;
         }
         Ok(!self.is_locked)
     }

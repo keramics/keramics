@@ -11,8 +11,6 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
-
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use keramics_formats::apfs::{ApfsContainer, ApfsVolume};
@@ -596,8 +594,14 @@ impl VfsScanner {
                 Ok(false) => {}
                 Ok(true) => {
                     let container_data_stream: DataStreamReference =
-                        Arc::new(RwLock::new(cdsaencr_container));
-
+                        match cdsaencr_container.get_data_stream() {
+                            Some(data_stream) => data_stream,
+                            None => {
+                                return Err(keramics_core::error_trace_new!(
+                                    "Missing encrypted container data stream",
+                                ));
+                            }
+                        };
                     format_identifier = match self
                         .storage_media_image_scanner
                         .scan_data_stream(&container_data_stream)

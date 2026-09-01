@@ -11,6 +11,8 @@
  * under the License.
  */
 
+mod block_reader;
+mod block_stream;
 pub mod constants;
 mod container;
 mod container_footer;

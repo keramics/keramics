@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
@@ -24,16 +24,13 @@ pub enum SparseBundleFileEntry {
     /// Layer file entry.
     Layer {
         /// File.
-        image: Arc<RwLock<SparseBundleImage>>,
-
-        /// Size.
-        size: u64,
+        image: Arc<SparseBundleImage>,
     },
 
     /// Root file entry.
     Root {
         /// File.
-        image: Arc<RwLock<SparseBundleImage>>,
+        image: Arc<SparseBundleImage>,
     },
 }
 
@@ -41,7 +38,7 @@ impl SparseBundleFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
-            SparseBundleFileEntry::Layer { image, .. } => Ok(Some(image.clone())),
+            SparseBundleFileEntry::Layer { image, .. } => Ok(Some(image.get_data_stream())),
             SparseBundleFileEntry::Root { .. } => Ok(None),
         }
     }
@@ -65,7 +62,7 @@ impl SparseBundleFileEntry {
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
-            SparseBundleFileEntry::Layer { size, .. } => *size,
+            SparseBundleFileEntry::Layer { image, .. } => image.get_media_size(),
             SparseBundleFileEntry::Root { .. } => 0,
         }
     }
@@ -94,25 +91,8 @@ impl SparseBundleFileEntry {
                         sub_file_entry_index
                     )));
                 }
-                let media_size: u64 = match image.read() {
-                    Ok(sparsebundle_image) => {
-                        if sparsebundle_image.is_locked() {
-                            return Err(keramics_core::error_trace_new!(
-                                "sparsebundle image is locked"
-                            ));
-                        }
-                        sparsebundle_image.get_media_size()
-                    }
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain read lock on sparsebundle image",
-                            error
-                        ));
-                    }
-                };
                 Ok(SparseBundleFileEntry::Layer {
                     image: image.clone(),
-                    size: media_size,
                 })
             }
         }
@@ -155,7 +135,7 @@ mod tests {
     fn test_get_file_type() -> Result<(), ErrorTrace> {
         let sparsebundle_image: SparseBundleImage = get_image()?;
 
-        let test_image: Arc<RwLock<SparseBundleImage>> = Arc::new(RwLock::new(sparsebundle_image));
+        let test_image: Arc<SparseBundleImage> = Arc::new(sparsebundle_image);
 
         let file_entry = SparseBundleFileEntry::Root {
             image: test_image.clone(),
@@ -169,9 +149,8 @@ mod tests {
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
         let sparsebundle_image: SparseBundleImage = get_image()?;
-        let media_size: u64 = sparsebundle_image.get_media_size();
 
-        let test_image: Arc<RwLock<SparseBundleImage>> = Arc::new(RwLock::new(sparsebundle_image));
+        let test_image: Arc<SparseBundleImage> = Arc::new(sparsebundle_image);
 
         let file_entry = SparseBundleFileEntry::Root {
             image: test_image.clone(),
@@ -181,7 +160,6 @@ mod tests {
 
         let file_entry = SparseBundleFileEntry::Layer {
             image: test_image.clone(),
-            size: media_size,
         };
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::from("sparsebundle1"));
@@ -192,9 +170,8 @@ mod tests {
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
         let sparsebundle_image: SparseBundleImage = get_image()?;
-        let media_size: u64 = sparsebundle_image.get_media_size();
 
-        let test_image: Arc<RwLock<SparseBundleImage>> = Arc::new(RwLock::new(sparsebundle_image));
+        let test_image: Arc<SparseBundleImage> = Arc::new(sparsebundle_image);
 
         let file_entry = SparseBundleFileEntry::Root {
             image: test_image.clone(),
@@ -204,7 +181,6 @@ mod tests {
 
         let file_entry = SparseBundleFileEntry::Layer {
             image: test_image.clone(),
-            size: media_size,
         };
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 4194304);
@@ -215,9 +191,8 @@ mod tests {
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let sparsebundle_image: SparseBundleImage = get_image()?;
-        let media_size: u64 = sparsebundle_image.get_media_size();
 
-        let test_image: Arc<RwLock<SparseBundleImage>> = Arc::new(RwLock::new(sparsebundle_image));
+        let test_image: Arc<SparseBundleImage> = Arc::new(sparsebundle_image);
 
         let file_entry = SparseBundleFileEntry::Root {
             image: test_image.clone(),
@@ -227,7 +202,6 @@ mod tests {
 
         let file_entry = SparseBundleFileEntry::Layer {
             image: test_image.clone(),
-            size: media_size,
         };
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 0);
@@ -239,7 +213,7 @@ mod tests {
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
         let sparsebundle_image: SparseBundleImage = get_image()?;
 
-        let test_image: Arc<RwLock<SparseBundleImage>> = Arc::new(RwLock::new(sparsebundle_image));
+        let test_image: Arc<SparseBundleImage> = Arc::new(sparsebundle_image);
 
         let file_entry = SparseBundleFileEntry::Root {
             image: test_image.clone(),
@@ -259,9 +233,8 @@ mod tests {
     #[test]
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
         let sparsebundle_image: SparseBundleImage = get_image()?;
-        let media_size: u64 = sparsebundle_image.get_media_size();
 
-        let test_image: Arc<RwLock<SparseBundleImage>> = Arc::new(RwLock::new(sparsebundle_image));
+        let test_image: Arc<SparseBundleImage> = Arc::new(sparsebundle_image);
 
         let file_entry = SparseBundleFileEntry::Root {
             image: test_image.clone(),
@@ -270,7 +243,6 @@ mod tests {
 
         let file_entry = SparseBundleFileEntry::Layer {
             image: test_image.clone(),
-            size: media_size,
         };
         assert_eq!(file_entry.is_root_file_entry(), false);
 

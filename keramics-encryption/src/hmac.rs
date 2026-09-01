@@ -40,6 +40,7 @@ pub type HmacSha384Context = HmacContext<Sha384Context, 128, 48>;
 pub type HmacSha512Context = HmacContext<Sha512Context, 128, 64>;
 
 /// Context for HMAC.
+#[derive(Clone)]
 pub struct HmacContext<T: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize> {
     /// Digest hash context.
     digest_context: T,

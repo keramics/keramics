@@ -50,7 +50,7 @@ pub enum StorageMediaImage {
         data_stream: DataStreamReference,
     },
     SparseBundle {
-        sparsebundle_image: Arc<RwLock<SparseBundleImage>>,
+        sparsebundle_image: Arc<SparseBundleImage>,
     },
     SparseImage {
         sparseimage_file: Arc<SparseImageFile>,
@@ -110,7 +110,7 @@ impl StorageMediaImage {
                 qcow_image_layer, ..
             } => qcow_image_layer.get_data_stream(),
             Self::Raw { data_stream } => Some(data_stream.clone()),
-            Self::SparseBundle { sparsebundle_image } => Some(sparsebundle_image.clone()),
+            Self::SparseBundle { sparsebundle_image } => Some(sparsebundle_image.get_data_stream()),
             Self::SparseImage { sparseimage_file } => sparseimage_file.get_data_stream(),
             Self::SplitRaw { splitraw_image } => Some(splitraw_image.clone()),
             Self::Udif { udif_image } => Some(udif_image.clone()),
@@ -540,7 +540,7 @@ impl StorageMediaImage {
             }
         }
         Ok(Self::SparseBundle {
-            sparsebundle_image: Arc::new(RwLock::new(sparsebundle_image)),
+            sparsebundle_image: Arc::new(sparsebundle_image),
         })
     }
 

@@ -113,6 +113,7 @@ const DES3_PERMUTED_CHOICE_VALUES2: [u8; 48] = [
 const DES3_SHIFT_ITERATIONS: [u8; 16] = [1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1];
 
 /// Context for DES3 encryption.
+#[derive(Clone)]
 pub struct Des3Context {
     /// Key values.
     key_values: Vec<u64>,

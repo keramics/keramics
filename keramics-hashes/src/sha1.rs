@@ -273,6 +273,7 @@ macro_rules! sha1_transform_group_step4 {
 }
 
 /// Context for calculating a SHA-1 hash.
+#[derive(Clone)]
 pub struct Sha1Context {
     /// Hash values.
     hash_values: [u32; 5],
