@@ -52,6 +52,13 @@ doc = false
 required-features = ["fuzzing"]
 
 [[bin]]
+name = "cdsaencr"
+path = "fuzz_targets/cdsaencr.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
 name = "deflate"
 path = "fuzz_targets/deflate.rs"
 test = false
@@ -103,6 +110,13 @@ required-features = ["fuzzing"]
 [[bin]]
 name = "linuxlvm"
 path = "fuzz_targets/linuxlvm.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
+name = "luksde"
+path = "fuzz_targets/luksde.rs"
 test = false
 doc = false
 required-features = ["fuzzing"]
@@ -208,6 +222,13 @@ required-features = ["fuzzing"]
 [[bin]]
 name = "sha512"
 path = "fuzz_targets/sha512.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
+name = "sgilabel"
+path = "fuzz_targets/sgilabel.rs"
 test = false
 doc = false
 required-features = ["fuzzing"]

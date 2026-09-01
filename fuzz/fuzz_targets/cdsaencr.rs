@@ -16,22 +16,16 @@
 use libfuzzer_sys::fuzz_target;
 
 use keramics_core::{DataStreamReference, open_fake_data_stream};
-use keramics_formats::PartitionIterator;
-use keramics_formats::apm::ApmVolumeSystem;
+use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
 
-// Apple Partition Map (APM) volume system fuzz target.
+// Mac OS Encrypted Encoding (cdsaencr) container fuzz target.
 fuzz_target!(|data: &[u8]| {
-    let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
+    let mut cdsaencr_container: CdsaEncrContainer = CdsaEncrContainer::new();
 
     let data_stream: DataStreamReference = open_fake_data_stream(&data);
-    _ = apm_volume_system.read_data_stream(&data_stream);
+    _ = cdsaencr_container.read_data_stream(&data_stream);
 
-    if let Ok(apm_partition) = apm_volume_system.get_partition_by_index(0) {
-        _ = apm_partition.get_data_stream();
-        _ = apm_partition.get_name();
-        _ = apm_partition.get_partition_offset();
-        _ = apm_partition.get_partition_size();
-        _ = apm_partition.get_status_flags();
-        _ = apm_partition.get_type_identifier();
-    }
+    let credentials: Vec<CdsaEncrCredential> =
+        vec![CdsaEncrCredential::Passphrase(b"KeRaMiCs".to_vec())];
+    _ = cdsaencr_container.unlock(&credentials);
 });

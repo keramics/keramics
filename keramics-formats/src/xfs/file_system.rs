@@ -433,8 +433,6 @@ mod tests {
 
     #[test]
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
-        // keramics_core::mediator::Mediator { debug_output: true }.make_current();
-
         let file_system: XfsFileSystem = get_file_system()?;
 
         let path: Path = Path::from("/");

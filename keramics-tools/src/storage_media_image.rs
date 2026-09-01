@@ -53,7 +53,7 @@ pub enum StorageMediaImage {
         sparsebundle_image: Arc<RwLock<SparseBundleImage>>,
     },
     SparseImage {
-        sparseimage_file: Arc<RwLock<SparseImageFile>>,
+        sparseimage_file: Arc<SparseImageFile>,
     },
     SplitRaw {
         splitraw_image: Arc<RwLock<SplitRawImage>>,
@@ -111,7 +111,7 @@ impl StorageMediaImage {
             } => qcow_image_layer.get_data_stream(),
             Self::Raw { data_stream } => Some(data_stream.clone()),
             Self::SparseBundle { sparsebundle_image } => Some(sparsebundle_image.clone()),
-            Self::SparseImage { sparseimage_file } => Some(sparseimage_file.clone()),
+            Self::SparseImage { sparseimage_file } => sparseimage_file.get_data_stream(),
             Self::SplitRaw { splitraw_image } => Some(splitraw_image.clone()),
             Self::Udif { udif_image } => Some(udif_image.clone()),
             Self::Vhd {
@@ -593,7 +593,7 @@ impl StorageMediaImage {
             }
         }
         Ok(Self::SparseImage {
-            sparseimage_file: Arc::new(RwLock::new(sparseimage_file)),
+            sparseimage_file: Arc::new(sparseimage_file),
         })
     }
 

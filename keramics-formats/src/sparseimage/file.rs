@@ -11,22 +11,21 @@
  * under the License.
  */
 
-use std::cmp::min;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::mediator::Mediator;
-use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u32_be;
 
 #[cfg(feature = "debug-trace")]
-use keramics_core::DebugTrace;
+use {keramics_core::DebugTrace, keramics_core::formatters::debug_format_array};
 
-use crate::block_tree::BlockTree;
 use crate::cdsaencr::constants::*;
 use crate::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential, CdsaEncrEncryptionType};
 
-use super::block_range::SparseImageBlockRange;
+use super::block_range::{SparseImageBlockRange, SparseImageBlockRangeType};
+use super::block_reader::SparseImageBlockReader;
+use super::block_stream::SparseImageBlockStream;
 use super::file_header::SparseImageFileHeader;
 
 /// Mac OS sparse image (.sparseimage) file.
@@ -34,23 +33,20 @@ pub struct SparseImageFile {
     /// Data stream.
     data_stream: Option<DataStreamReference>,
 
-    /// Block tree.
-    block_tree: BlockTree<SparseImageBlockRange>,
-
     /// Bytes per sector.
     bytes_per_sector: u16,
 
     /// Band size.
     band_size: u32,
 
+    /// Block ranges.
+    block_ranges: Vec<SparseImageBlockRange>,
+
     /// Encryption type.
     encryption_type: Option<CdsaEncrEncryptionType>,
 
     /// Value to indicate the (encrypted) image is locked.
     is_locked: bool,
-
-    /// The current offset.
-    current_offset: u64,
 
     /// Media size.
     media_size: u64,
@@ -61,12 +57,11 @@ impl SparseImageFile {
     pub fn new() -> Self {
         Self {
             data_stream: None,
-            block_tree: BlockTree::<SparseImageBlockRange>::new(0, 0, 0),
             bytes_per_sector: 0,
             band_size: 0,
+            block_ranges: Vec::new(),
             encryption_type: None,
             is_locked: false,
-            current_offset: 0,
             media_size: 0,
         }
     }
@@ -79,6 +74,21 @@ impl SparseImageFile {
     /// Retrieves the bytes per sector.
     pub fn get_bytes_per_sector(&self) -> u16 {
         self.bytes_per_sector
+    }
+
+    /// Retrieves a data stream.
+    pub fn get_data_stream(&self) -> Option<DataStreamReference> {
+        match &self.data_stream {
+            Some(data_stream) => Some(Arc::new(RwLock::new(SparseImageBlockStream::new(
+                SparseImageBlockReader::new(
+                    data_stream,
+                    self.band_size,
+                    &self.block_ranges,
+                    self.media_size,
+                ),
+            )))),
+            None => None,
+        }
     }
 
     /// Retrieves the encryption type.
@@ -181,19 +191,15 @@ impl SparseImageFile {
                 number_of_bands
             )));
         }
-        #[cfg(feature = "debug-trace")]
-        DebugTrace::static_scope(|debug_trace| {
-            let array_data_size: usize = (number_of_bands as usize) * 4;
-            let array_data_end_offset: usize = 64 + array_data_size;
+        let array_data_size: usize = (number_of_bands as usize) * 4;
+        let array_data_end_offset: usize = 64 + array_data_size;
 
-            debug_trace.print_data(
-                "SparseImageBandNumbersArray",
-                64,
-                &data[64..array_data_end_offset],
-                array_data_size,
-                true,
-            );
-        });
+        keramics_core::debug_trace_data!(
+            "SparseImageBandNumbersArray",
+            64,
+            &data[64..array_data_end_offset],
+            array_data_size,
+        );
         if file_header.sectors_per_band > u32::MAX / 512 {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid sectors per band: {} value out of bounds",
@@ -204,124 +210,65 @@ impl SparseImageFile {
         self.band_size = file_header.sectors_per_band * (self.bytes_per_sector as u32);
         self.media_size = (file_header.number_of_sectors as u64) * (self.bytes_per_sector as u64);
 
-        let block_tree_size: u64 = (number_of_bands as u64) * (self.band_size as u64);
+        #[cfg(feature = "debug-trace")]
+        DebugTrace::static_scope(|debug_trace| {
+            let band_numbers: Vec<u32> = data[64..array_data_end_offset]
+                .chunks_exact(4)
+                .map(|chunk| u32::from_be_bytes(chunk.try_into().unwrap()))
+                .collect();
 
-        self.block_tree = BlockTree::<SparseImageBlockRange>::new(
-            block_tree_size,
-            file_header.sectors_per_band as u64,
-            512,
-        );
-        let mut data_offset: usize = 64;
+            debug_trace.print_start("SparseImageBandNumbersArray");
+            debug_trace.print_field(
+                "band_numbers",
+                debug_format_array(
+                    &band_numbers
+                        .iter()
+                        .map(|&element| element.to_string())
+                        .collect::<Vec<String>>()
+                        .as_slice(),
+                ),
+            );
+            debug_trace.print_end();
+        });
+        let mut block_ranges: Vec<SparseImageBlockRange> = Vec::new();
 
-        let mediator = Mediator::current();
-        if mediator.debug_output {
-            mediator.debug_print("SparseImageBandNumbersArray {\n");
-            mediator.debug_print("    band_numbers: [\n");
-        }
-        for array_index in 0..number_of_bands {
-            let band_number: u32 = bytes_to_u32_be!(data, data_offset);
-            data_offset += 4;
+        for (array_index, chunk) in data[64..array_data_end_offset].chunks_exact(4).enumerate() {
+            let band_number: u32 = bytes_to_u32_be!(chunk, 0);
 
-            if mediator.debug_output {
-                if array_index % 16 == 0 {
-                    mediator.debug_print(format!("        {}", band_number));
-                } else if array_index % 16 == 15 {
-                    mediator.debug_print(format!(", {},\n", band_number));
-                } else {
-                    mediator.debug_print(format!(", {}", band_number));
-                }
-            }
             if band_number == 0 {
                 continue;
             }
-            let band_media_offset: u64 = ((band_number - 1) as u64) * (self.band_size as u64);
-            let band_data_offset: u64 = 4096 + ((array_index as u64) * (self.band_size as u64));
+            let band_logical_offset: u64 = ((band_number - 1) as u64) * (self.band_size as u64);
 
-            let block_range: SparseImageBlockRange = SparseImageBlockRange::new(band_data_offset);
-            match self.block_tree.insert_value(
-                band_media_offset,
-                self.band_size as u64,
-                block_range,
-            ) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to insert block range into block tree"
-                    );
-                    return Err(error);
-                }
-            }
+            block_ranges.push(SparseImageBlockRange::new(
+                band_logical_offset,
+                array_index as u32,
+                1,
+                SparseImageBlockRangeType::InFile,
+            ));
         }
-        if mediator.debug_output {
-            if number_of_bands % 16 != 0 {
-                mediator.debug_print("\n");
+        block_ranges.sort_by_key(|block_range| block_range.logical_offset);
+
+        let mut media_offset: u64 = 0;
+
+        for block_range in block_ranges.drain(..) {
+            if media_offset < block_range.logical_offset {
+                let range_size: u64 = block_range.logical_offset - media_offset;
+                let number_of_bands: u64 = range_size / (self.band_size as u64);
+
+                self.block_ranges.push(SparseImageBlockRange::new(
+                    media_offset,
+                    0,
+                    number_of_bands as u32,
+                    SparseImageBlockRangeType::Sparse,
+                ));
+                media_offset += range_size;
             }
-            mediator.debug_print("    ],\n");
-            mediator.debug_print("}\n\n");
+            self.block_ranges.push(block_range);
+
+            media_offset += self.band_size as u64;
         }
         Ok(())
-    }
-
-    /// Reads media data based on the block ranges in the block tree.
-    fn read_data_from_bands(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
-        let read_size: usize = data.len();
-        let mut data_offset: usize = 0;
-        let mut current_offset: u64 = offset;
-
-        let band_number: u64 = current_offset / (self.band_size as u64);
-        let band_offset: u64 = band_number * (self.band_size as u64);
-        let mut range_relative_offset: u64 = current_offset - band_offset;
-        let mut range_remainder_size: u64 = (self.band_size as u64) - range_relative_offset;
-
-        while data_offset < read_size {
-            if current_offset >= self.media_size {
-                break;
-            }
-            let range_read_size: usize =
-                min(read_size - data_offset, range_remainder_size as usize);
-            let data_end_offset: usize = data_offset + range_read_size;
-
-            let range_read_count: usize = match self.block_tree.get_value(current_offset) {
-                Ok(Some(block_range)) => {
-                    let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-                        Some(data_stream) => data_stream,
-                        None => {
-                            return Err(keramics_core::error_trace_new!("Missing data stream"));
-                        }
-                    };
-                    keramics_core::data_stream_read_at_position!(
-                        data_stream,
-                        &mut data[data_offset..data_end_offset],
-                        SeekFrom::Start(block_range.data_offset + range_relative_offset)
-                    )
-                }
-                Ok(None) => {
-                    data[data_offset..data_end_offset].fill(0);
-
-                    range_read_size
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve block range for offset: {} (0x{:08x})",
-                            current_offset, current_offset
-                        )
-                    );
-                    return Err(error);
-                }
-            };
-            if range_read_count == 0 {
-                break;
-            }
-            data_offset += range_read_count;
-            current_offset += range_read_count as u64;
-
-            range_relative_offset = 0;
-            range_remainder_size = self.band_size as u64;
-        }
-        Ok(data_offset)
     }
 
     /// Unlocks a locked (encrypted) file.
@@ -371,70 +318,6 @@ impl SparseImageFile {
     }
 }
 
-impl DataStream for SparseImageFile {
-    /// Retrieves the current position.
-    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
-        Ok(self.current_offset)
-    }
-
-    /// Retrieves the size of the data.
-    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
-        Ok(self.media_size)
-    }
-
-    /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
-        if self.current_offset >= self.media_size {
-            return Ok(0);
-        }
-        let remaining_media_size: u64 = self.media_size - self.current_offset;
-        let mut read_size: usize = buf.len();
-
-        if (read_size as u64) > remaining_media_size {
-            read_size = remaining_media_size as usize;
-        }
-        let read_count: usize =
-            match self.read_data_from_bands(&mut buf[..read_size], self.current_offset) {
-                Ok(read_count) => read_count,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read data from bands");
-                    return Err(error);
-                }
-            };
-        self.current_offset += read_count as u64;
-
-        Ok(read_count)
-    }
-
-    /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
-        self.current_offset = match pos {
-            SeekFrom::Current(relative_offset) => {
-                match self.current_offset.checked_add_signed(relative_offset) {
-                    Some(offset) => offset,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Invalid offset value out of bounds"
-                        ));
-                    }
-                }
-            }
-            SeekFrom::End(relative_offset) => {
-                match self.media_size.checked_add_signed(relative_offset) {
-                    Some(offset) => offset,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Invalid offset value out of bounds"
-                        ));
-                    }
-                }
-            }
-            SeekFrom::Start(offset) => offset,
-        };
-        Ok(self.current_offset)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -475,6 +358,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_data_stream
 
     #[test]
     fn test_get_encryption_type() -> Result<(), ErrorTrace> {
@@ -540,8 +425,6 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add test for read_data_from_bands
-
     #[test]
     fn test_unlock() -> Result<(), ErrorTrace> {
         let mut file: SparseImageFile = get_file("sparseimage/hfsplus_aes128.sparseimage")?;
@@ -553,146 +436,6 @@ mod tests {
         file.unlock(&credentials)?;
 
         assert_eq!(file.is_locked, false);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_offset() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
-
-        file.seek(SeekFrom::Start(1024))?;
-
-        let offset: u64 = file.get_offset()?;
-        assert_eq!(offset, 1024);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
-
-        let size: u64 = file.get_size()?;
-        assert_eq!(size, 4194304);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_from_start() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
-
-        let offset: u64 = file.seek(SeekFrom::Start(1024))?;
-        assert_eq!(offset, 1024);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
-
-        let offset: u64 = file.seek(SeekFrom::End(-512))?;
-        assert_eq!(offset, file.media_size - 512);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
-
-        let offset = file.seek(SeekFrom::Start(1024))?;
-        assert_eq!(offset, 1024);
-
-        let offset: u64 = file.seek(SeekFrom::Current(-512))?;
-        assert_eq!(offset, 512);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_before_zero() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
-
-        let result: Result<u64, ErrorTrace> = file.seek(SeekFrom::Current(-512));
-        assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
-
-        let offset: u64 = file.seek(SeekFrom::End(512))?;
-        assert_eq!(offset, file.media_size + 512);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
-        file.seek(SeekFrom::Start(1024))?;
-
-        let mut data: Vec<u8> = vec![0; 512];
-        let read_size: usize = file.read(&mut data)?;
-        assert_eq!(read_size, 512);
-
-        let expected_data: Vec<u8> = vec![
-            0x00, 0x53, 0x46, 0x48, 0x00, 0x00, 0xaa, 0x11, 0xaa, 0x11, 0x00, 0x30, 0x65, 0x43,
-            0xec, 0xac, 0x48, 0x6f, 0x33, 0x32, 0x41, 0x86, 0x9c, 0x40, 0x86, 0x15, 0x80, 0x36,
-            0xc8, 0xec, 0x25, 0x7b, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd7, 0x1f,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x64, 0x00, 0x69, 0x00, 0x73, 0x00, 0x6b, 0x00, 0x20, 0x00, 0x69, 0x00, 0x6d, 0x00,
-            0x61, 0x00, 0x67, 0x00, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-        assert_eq!(data, expected_data);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_and_read_beyond_media_size() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
-        file.seek(SeekFrom::End(512))?;
-
-        let mut data: Vec<u8> = vec![0; 512];
-        let read_size: usize = file.read(&mut data)?;
-        assert_eq!(read_size, 0);
 
         Ok(())
     }

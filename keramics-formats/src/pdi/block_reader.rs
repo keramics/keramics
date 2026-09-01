@@ -133,7 +133,7 @@ impl BlockReader for PdiBlockReader {
         self.size
     }
 
-    /// Reads media data based on the block ranges.
+    /// Reads data based on the block ranges.
     fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
@@ -151,7 +151,7 @@ impl BlockReader for PdiBlockReader {
             Ok(extent_index) => extent_index,
             Err(_) => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Missing extent for media offset: {} (0x{:08x})",
+                    "Missing extent for offset: {} (0x{:08x})",
                     current_offset, current_offset
                 )));
             }
@@ -160,7 +160,7 @@ impl BlockReader for PdiBlockReader {
             Some(extent) => extent,
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Unable to retrieve extent: {} for media offset: {} (0x{:08x})",
+                    "Unable to retrieve extent: {} for offset: {} (0x{:08x})",
                     extent_index, current_offset, current_offset
                 )));
             }

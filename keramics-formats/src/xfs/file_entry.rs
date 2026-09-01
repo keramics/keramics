@@ -513,6 +513,8 @@ impl XfsFileEntry {
                 if self.has_directory_v2 {
                     let directory_list: XfsDirectoryList = XfsDirectoryList::new(
                         &self.character_encoding,
+                        self.inode_tree.allocation_group_size,
+                        self.inode_tree.number_of_relative_block_number_bits,
                         self.inode_tree.block_size,
                         self.inode_tree.directory_block_size,
                     );

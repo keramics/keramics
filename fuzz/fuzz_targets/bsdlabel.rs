@@ -16,6 +16,7 @@
 use libfuzzer_sys::fuzz_target;
 
 use keramics_core::{DataStreamReference, open_fake_data_stream};
+use keramics_formats::PartitionIterator;
 use keramics_formats::bsdlabel::BsdDiskLabelVolumeSystem;
 
 // BSD disklabel (bsdlabel) volume system fuzz target.
@@ -24,4 +25,11 @@ fuzz_target!(|data: &[u8]| {
 
     let data_stream: DataStreamReference = open_fake_data_stream(&data);
     _ = bsdlabel_volume_system.read_data_stream(&data_stream);
+
+    if let Ok(bsdlabel_partition) = bsdlabel_volume_system.get_partition_by_index(0) {
+        _ = bsdlabel_partition.get_data_stream();
+        _ = bsdlabel_partition.get_partition_index();
+        _ = bsdlabel_partition.get_partition_offset();
+        _ = bsdlabel_partition.get_partition_size();
+    }
 });

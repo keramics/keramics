@@ -18,43 +18,41 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 
 use crate::traits::BlockReader;
 
-use super::block_range::HfsBlockRange;
+use super::block_range::{SparseImageBlockRange, SparseImageBlockRangeType};
 
-/// Hierarchical File System (HFS) block reader.
-pub struct HfsBlockReader {
-    /// The data stream.
+/// Mac OS sparse image (.sparseimage) block reader.
+pub struct SparseImageBlockReader {
+    /// Data stream.
     data_stream: DataStreamReference,
 
-    /// Block size.
-    block_size: u32,
+    /// Band size.
+    band_size: u32,
 
     /// Block ranges.
-    block_ranges: Vec<HfsBlockRange>,
+    block_ranges: Vec<SparseImageBlockRange>,
 
-    /// The size.
+    /// Size.
     size: u64,
 }
 
-impl HfsBlockReader {
-    /// Creates a new block stream.
-    pub(super) fn new(data_stream: &DataStreamReference, block_size: u32, size: u64) -> Self {
+impl SparseImageBlockReader {
+    /// Creates a new block reader.
+    pub fn new(
+        data_stream: &DataStreamReference,
+        band_size: u32,
+        block_ranges: &[SparseImageBlockRange],
+        size: u64,
+    ) -> Self {
         Self {
             data_stream: data_stream.clone(),
-            block_size,
-            block_ranges: Vec::new(),
+            band_size,
+            block_ranges: block_ranges.to_vec(),
             size,
         }
     }
-
-    /// Opens a block stream.
-    pub(super) fn open(&mut self, block_ranges: Vec<HfsBlockRange>) -> Result<(), ErrorTrace> {
-        self.block_ranges = block_ranges;
-
-        Ok(())
-    }
 }
 
-impl BlockReader for HfsBlockReader {
+impl BlockReader for SparseImageBlockReader {
     /// Retrieves the size of the data.
     fn get_size(&self) -> u64 {
         self.size
@@ -66,15 +64,13 @@ impl BlockReader for HfsBlockReader {
         let mut data_offset: usize = 0;
         let mut current_offset: u64 = offset;
 
-        let block_number: u64 = current_offset / (self.block_size as u64);
-
         let mut range_index: usize = match self.block_ranges.binary_search_by(|block_range| {
-            let range_end_block_number: u64 =
-                (block_range.logical_block_number as u64) + (block_range.number_of_blocks as u64);
+            let range_end_offset: u64 = block_range.logical_offset
+                + ((block_range.number_of_bands as u64) * (self.band_size as u64));
 
-            if block_number >= range_end_block_number {
+            if current_offset >= range_end_offset {
                 Ordering::Less
-            } else if block_number < (block_range.logical_block_number as u64) {
+            } else if current_offset < block_range.logical_offset {
                 Ordering::Greater
             } else {
                 Ordering::Equal
@@ -92,7 +88,7 @@ impl BlockReader for HfsBlockReader {
             if current_offset >= self.size {
                 break;
             }
-            let block_range: &HfsBlockRange = match self.block_ranges.get(range_index) {
+            let block_range: &SparseImageBlockRange = match self.block_ranges.get(range_index) {
                 Some(block_range) => block_range,
                 None => {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -101,59 +97,35 @@ impl BlockReader for HfsBlockReader {
                     )));
                 }
             };
-            let range_relative_offset: u64 = current_offset
-                - ((block_range.logical_block_number as u64) * (self.block_size as u64));
-            let range_remainder_size: u64 = ((block_range.number_of_blocks as u64)
-                * (self.block_size as u64))
+            let range_relative_offset: u64 = current_offset - block_range.logical_offset;
+            let range_remainder_size: u64 = ((block_range.number_of_bands as u64)
+                * (self.band_size as u64))
                 - range_relative_offset;
 
             let range_read_size: usize =
                 min(read_size - data_offset, range_remainder_size as usize);
             let data_end_offset: usize = data_offset + range_read_size;
 
-            let range_physical_offset: u64 =
-                (block_range.physical_block_number as u64) * (self.block_size as u64);
+            match &block_range.range_type {
+                SparseImageBlockRangeType::InFile => {
+                    let physical_offset: u64 = 4096
+                        + ((block_range.physical_band_number as u64) * (self.band_size as u64))
+                        + range_relative_offset;
 
-            keramics_core::data_stream_read_exact_at_position!(
-                &self.data_stream,
-                &mut data[data_offset..data_end_offset],
-                SeekFrom::Start(range_physical_offset + range_relative_offset)
-            );
+                    keramics_core::data_stream_read_exact_at_position!(
+                        &self.data_stream,
+                        &mut data[data_offset..data_end_offset],
+                        SeekFrom::Start(physical_offset)
+                    );
+                }
+                SparseImageBlockRangeType::Sparse => {
+                    data[data_offset..data_end_offset].fill(0);
+                }
+            }
             data_offset = data_end_offset;
             current_offset += range_read_size as u64;
             range_index += 1;
         }
         Ok(data_offset)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use std::path::PathBuf;
-
-    use keramics_core::open_os_data_stream;
-
-    use crate::tests::get_test_data_path;
-
-    #[test]
-    fn test_open() -> Result<(), ErrorTrace> {
-        let path_string: String = get_test_data_path("hfs/hfsplus.raw");
-        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-
-        let mut block_reader = HfsBlockReader::new(&data_stream, 4096, 11358);
-
-        let block_ranges: Vec<HfsBlockRange> = vec![HfsBlockRange {
-            logical_block_number: 0,
-            physical_block_number: 275,
-            number_of_blocks: 3,
-        }];
-        block_reader.open(block_ranges)?;
-
-        Ok(())
-    }
-
-    // TODO: add tests for read_data_from_blocks
 }

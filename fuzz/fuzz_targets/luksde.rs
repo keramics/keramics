@@ -16,22 +16,15 @@
 use libfuzzer_sys::fuzz_target;
 
 use keramics_core::{DataStreamReference, open_fake_data_stream};
-use keramics_formats::PartitionIterator;
-use keramics_formats::apm::ApmVolumeSystem;
+use keramics_formats::luksde::{LuksCredential, LuksEncryptedVolume};
 
-// Apple Partition Map (APM) volume system fuzz target.
+// Linux Unified Key Setup (LUKS) Disk Encryption encrypted volume system fuzz target.
 fuzz_target!(|data: &[u8]| {
-    let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
+    let mut luks_encrypted_volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
 
     let data_stream: DataStreamReference = open_fake_data_stream(&data);
-    _ = apm_volume_system.read_data_stream(&data_stream);
+    _ = luks_encrypted_volume.read_data_stream(&data_stream);
 
-    if let Ok(apm_partition) = apm_volume_system.get_partition_by_index(0) {
-        _ = apm_partition.get_data_stream();
-        _ = apm_partition.get_name();
-        _ = apm_partition.get_partition_offset();
-        _ = apm_partition.get_partition_size();
-        _ = apm_partition.get_status_flags();
-        _ = apm_partition.get_type_identifier();
-    }
+    let credentials: Vec<LuksCredential> = vec![LuksCredential::Passphrase(b"KeRaMiCs".to_vec())];
+    _ = luks_encrypted_volume.unlock(&credentials);
 });

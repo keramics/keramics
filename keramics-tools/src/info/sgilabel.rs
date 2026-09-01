@@ -20,41 +20,41 @@ use crate::formatters::ByteSize;
 
 /// SGI disklabel (sgilabel) partition information.
 struct SgiDiskLabelPartitionInfo<'a> {
-    /// The partition index.
-    index: usize,
-
     /// The partition.
     partition: &'a SgiDiskLabelPartition,
 }
 
 impl<'a> SgiDiskLabelPartitionInfo<'a> {
     /// Creates new partition information.
-    fn new(index: usize, partition: &'a SgiDiskLabelPartition) -> Self {
-        Self { index, partition }
+    fn new(partition: &'a SgiDiskLabelPartition) -> Self {
+        Self { partition }
     }
 }
 
 impl<'a> fmt::Display for SgiDiskLabelPartitionInfo<'a> {
     /// Formats partition information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(formatter, "Partition: {}", self.index + 1)?;
-
-        // let partition_index: u8 = self.partition.get_partition_index();
-        // TODO: print partition index
+        writeln!(
+            formatter,
+            "Partition: {}",
+            self.partition.get_partition_index() + 1
+        )?;
+        // TODO: print type description
 
         writeln!(
             formatter,
             "    Type\t\t\t\t\t: {}",
             self.partition.get_partition_type()
         )?;
-
         let partition_offset: u64 = self.partition.get_partition_offset();
+
         writeln!(
             formatter,
             "    Offset\t\t\t\t\t: {} (0x{:08x})",
             partition_offset, partition_offset,
         )?;
         let byte_size: ByteSize = ByteSize::new(self.partition.get_partition_size(), 1024);
+
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
         writeln!(formatter)
@@ -143,7 +143,7 @@ impl SgiDiskLabelInfo {
                 }
             };
             let partition_info: SgiDiskLabelPartitionInfo =
-                SgiDiskLabelPartitionInfo::new(partition_index, &sgilabel_partition);
+                SgiDiskLabelPartitionInfo::new(&sgilabel_partition);
 
             print!("{}", partition_info);
         }
@@ -172,7 +172,7 @@ mod tests {
         let sgilabel_partition: SgiDiskLabelPartition =
             sgilabel_volume_system.get_partition_by_index(0)?;
         let test_struct: SgiDiskLabelPartitionInfo =
-            SgiDiskLabelPartitionInfo::new(0, &sgilabel_partition);
+            SgiDiskLabelPartitionInfo::new(&sgilabel_partition);
 
         let expected_string: &str = concat!(
             "Partition: 1\n",

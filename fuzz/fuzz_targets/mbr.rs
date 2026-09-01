@@ -16,6 +16,7 @@
 use libfuzzer_sys::fuzz_target;
 
 use keramics_core::{DataStreamReference, open_fake_data_stream};
+use keramics_formats::PartitionIterator;
 use keramics_formats::mbr::MbrVolumeSystem;
 
 // Master Boot Record (MBR) volume system fuzz target.
@@ -24,4 +25,13 @@ fuzz_target!(|data: &[u8]| {
 
     let data_stream: DataStreamReference = open_fake_data_stream(&data);
     _ = mbr_volume_system.read_data_stream(&data_stream);
+
+    if let Ok(mbr_partition) = mbr_volume_system.get_partition_by_index(0) {
+        _ = mbr_partition.get_data_stream();
+        _ = mbr_partition.get_flags();
+        _ = mbr_partition.get_partition_index();
+        _ = mbr_partition.get_partition_offset();
+        _ = mbr_partition.get_partition_size();
+        _ = mbr_partition.get_partition_type();
+    }
 });

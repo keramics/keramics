@@ -12,8 +12,10 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_core::mediator::Mediator;
 use keramics_types::Ucs2String;
+
+#[cfg(feature = "debug-trace")]
+use keramics_core::DebugTrace;
 
 use super::cluster_group::NtfsClusterGroup;
 use super::data_run::NtfsDataRun;
@@ -205,18 +207,17 @@ impl NtfsMftAttribute {
                     return Err(error);
                 }
             }
-            let mediator = Mediator::current();
-
-            if mediator.debug_output {
+            #[cfg(feature = "debug-trace")]
+            DebugTrace::static_scope(|debug_trace| {
                 if self.is_compressed()
                     && non_resident_attribute.compression_unit_size == 0
                     && non_resident_attribute.data_first_vcn == 0
                 {
-                    mediator.debug_print(
-                        "Attribute data flags set compression type but no compression unit size set\n",
+                    debug_trace.print(
+                        "Attribute data flags set compression type but no compression unit size set",
                     );
                 }
-            }
+            });
             data_offset += non_resident_attribute.get_non_resident_data_size();
         }
         let data_size: usize = data.len();

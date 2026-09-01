@@ -48,8 +48,8 @@ impl<'a> fmt::Display for MbrPartitionInfo<'a> {
             "Partition: {}",
             self.partition.get_partition_index() + 1
         )?;
-
         let partition_type: u8 = self.partition.get_partition_type();
+
         match self.get_partition_type_string(&partition_type) {
             Some(partition_type_string) => {
                 writeln!(
@@ -63,12 +63,14 @@ impl<'a> fmt::Display for MbrPartitionInfo<'a> {
             }
         };
         let partition_offset: u64 = self.partition.get_partition_offset();
+
         writeln!(
             formatter,
             "    Offset\t\t\t\t\t: {} (0x{:08x})",
             partition_offset, partition_offset
         )?;
         let byte_size: ByteSize = ByteSize::new(self.partition.get_partition_size(), 1024);
+
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
         writeln!(

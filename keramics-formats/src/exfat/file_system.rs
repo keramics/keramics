@@ -507,8 +507,6 @@ mod tests {
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
-        keramics_core::mediator::Mediator { debug_output: true }.make_current();
-
         let mut file_system: ExFatFileSystem = ExFatFileSystem::new();
 
         let path_string: String = get_test_data_path("exfat/exfat.raw");

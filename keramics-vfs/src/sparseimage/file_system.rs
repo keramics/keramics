@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
@@ -28,7 +28,7 @@ use super::file_entry::SparseImageFileEntry;
 /// Mac OS sparse image (.sparseimage) storage media image file system.
 pub struct SparseImageFileSystem {
     /// File.
-    file: Arc<RwLock<SparseImageFile>>,
+    file: Arc<SparseImageFile>,
 
     /// Number of layers.
     number_of_layers: usize,
@@ -40,7 +40,7 @@ impl SparseImageFileSystem {
     /// Creates a new file system.
     pub fn new() -> Self {
         Self {
-            file: Arc::new(RwLock::new(SparseImageFile::new())),
+            file: Arc::new(SparseImageFile::new()),
             number_of_layers: 0,
         }
     }
@@ -73,15 +73,7 @@ impl SparseImageFileSystem {
 
     /// Retrieves the bytes per sector.
     pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
-        match self.file.read() {
-            Ok(sparseimage_file) => Ok(sparseimage_file.get_bytes_per_sector() as u32),
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain read lock on sparseimage file",
-                    error
-                ));
-            }
-        }
+        Ok(self.file.get_bytes_per_sector() as u32)
     }
 
     /// Retrieves the file entry with the specific location.
@@ -100,25 +92,8 @@ impl SparseImageFileSystem {
                 if path_component != "sparseimage1" {
                     return Ok(None);
                 }
-                let media_size: u64 = match self.file.read() {
-                    Ok(sparseimage_file) => {
-                        if sparseimage_file.is_locked() {
-                            return Err(keramics_core::error_trace_new!(
-                                "sparseimage file is locked"
-                            ));
-                        }
-                        sparseimage_file.get_media_size()
-                    }
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain read lock on sparseimage file",
-                            error
-                        ));
-                    }
-                };
                 Ok(Some(SparseImageFileEntry::Layer {
                     file: self.file.clone(),
-                    size: media_size,
                 }))
             }
             None => {
@@ -153,9 +128,9 @@ impl SparseImageFileSystem {
         };
         let path: &Path = vfs_location.get_path();
 
-        match self.file.write() {
-            Ok(mut file) => {
-                match Self::open_file(&mut file, file_system, path) {
+        match Arc::get_mut(&mut self.file) {
+            Some(file) => {
+                match Self::open_file(file, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -167,10 +142,9 @@ impl SparseImageFileSystem {
                 }
                 self.number_of_layers = 1;
             }
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain write lock on sparseimage file",
-                    error
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to sparseimage file"
                 ));
             }
         }

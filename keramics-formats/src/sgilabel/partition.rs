@@ -19,7 +19,7 @@ use crate::range_stream::RangeStream;
 
 use super::partition_entry::SgiDiskLabelPartitionEntry;
 
-/// SGI disklabel (bsdlabel) partition.
+/// SGI disklabel (sgilabel) partition.
 pub struct SgiDiskLabelPartition {
     /// The data stream.
     data_stream: DataStreamReference,
@@ -41,14 +41,14 @@ impl SgiDiskLabelPartition {
     /// Creates a new partition.
     pub(super) fn new(
         data_stream: &DataStreamReference,
-        bytes_per_sector: u32,
+        bytes_per_sector: u16,
         partition_entry: &SgiDiskLabelPartitionEntry,
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
             entry_index: partition_entry.entry_index,
-            offset: (partition_entry.start_block_number as u64) * (bytes_per_sector as u64),
-            size: (partition_entry.number_of_blocks as u64) * (bytes_per_sector as u64),
+            offset: (partition_entry.start_sector_number as u64) * (bytes_per_sector as u64),
+            size: (partition_entry.number_of_sectors as u64) * (bytes_per_sector as u64),
             partition_type: partition_entry.partition_type,
         }
     }
@@ -94,14 +94,14 @@ mod tests {
     use crate::tests::get_test_data_path;
 
     fn get_partition() -> Result<SgiDiskLabelPartition, ErrorTrace> {
-        let path_string: String = get_test_data_path("bsdlabel/bsdlabel.raw");
+        let path_string: String = get_test_data_path("sgilabel/sgilabel.raw");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let mut partition_entry: SgiDiskLabelPartitionEntry = SgiDiskLabelPartitionEntry::new();
         partition_entry.entry_index = 0;
-        partition_entry.number_of_blocks = 2049;
-        partition_entry.start_block_number = 5040;
+        partition_entry.number_of_sectors = 2049;
+        partition_entry.start_sector_number = 5040;
         partition_entry.partition_type = 10;
 
         Ok(SgiDiskLabelPartition::new(

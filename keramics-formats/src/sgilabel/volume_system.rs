@@ -28,7 +28,7 @@ pub struct SgiDiskLabelVolumeSystem {
     data_stream: Option<DataStreamReference>,
 
     /// Bytes per sector.
-    bytes_per_sector: u32,
+    bytes_per_sector: u16,
 
     /// Disklabel entries.
     disklabel_entries: Vec<SgiDiskLabelPartitionEntry>,
@@ -45,7 +45,7 @@ impl SgiDiskLabelVolumeSystem {
     }
 
     /// Retrieves the bytes per sector.
-    pub fn get_bytes_per_sector(&self) -> u32 {
+    pub fn get_bytes_per_sector(&self) -> u16 {
         self.bytes_per_sector
     }
 
@@ -76,7 +76,7 @@ impl SgiDiskLabelVolumeSystem {
                 return Err(error);
             }
         }
-        self.bytes_per_sector = 512;
+        self.bytes_per_sector = disklabel.bytes_per_sector;
         self.disklabel_entries = disklabel.entries;
 
         self.data_stream = Some(data_stream.clone());
@@ -173,7 +173,7 @@ mod tests {
     fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
         let volume_system: SgiDiskLabelVolumeSystem = get_volume_system()?;
 
-        let bytes_per_sector: u32 = volume_system.get_bytes_per_sector();
+        let bytes_per_sector: u16 = volume_system.get_bytes_per_sector();
         assert_eq!(bytes_per_sector, 512);
 
         Ok(())

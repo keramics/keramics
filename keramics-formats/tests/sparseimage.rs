@@ -13,99 +13,13 @@
 
 use std::path::PathBuf;
 
-use keramics_core::formatters::format_as_string;
-use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
+use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::sparseimage::SparseImageFile;
-use keramics_hashes::{DigestHashContext, Md5Context};
 
-use std::fs::File;
-use std::io::Write;
+mod util;
 
-#[allow(dead_code)]
-fn read_media_from_file_with_output_file(
-    file: &mut SparseImageFile,
-) -> Result<(u64, String), ErrorTrace> {
-    let mut data: Vec<u8> = vec![0; 512];
-    let mut md5_context: Md5Context = Md5Context::new();
-    let mut media_offset: u64 = 0;
-
-    let mut output_file: File = match File::create("test.raw") {
-        Ok(file) => file,
-        Err(error) => {
-            return Err(keramics_core::error_trace_new_with_error!(
-                "Unable to create output file",
-                error
-            ));
-        }
-    };
-    loop {
-        let read_count = match file.read(&mut data) {
-            Ok(read_count) => read_count,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to read from sparseimage file at offset {} (0x{:08x})",
-                        media_offset, media_offset
-                    )
-                );
-                return Err(error);
-            }
-        };
-        if read_count == 0 {
-            break;
-        }
-        md5_context.update(&data[..read_count]);
-
-        match output_file.write(&data[..read_count]) {
-            Ok(write_count) => write_count,
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to write to output file",
-                    error
-                ));
-            }
-        };
-        media_offset += read_count as u64;
-    }
-    let hash_value: Vec<u8> = md5_context.finalize();
-    let hash_string: String = format_as_string(&hash_value);
-
-    Ok((media_offset, hash_string))
-}
-
-fn read_media_from_file(file: &mut SparseImageFile) -> Result<(u64, String), ErrorTrace> {
-    let mut data: Vec<u8> = vec![0; 35891];
-    let mut md5_context: Md5Context = Md5Context::new();
-    let mut media_offset: u64 = 0;
-
-    loop {
-        let read_count = match file.read(&mut data) {
-            Ok(read_count) => read_count,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to read from sparseimage file at offset {} (0x{:08x})",
-                        media_offset, media_offset
-                    )
-                );
-                return Err(error);
-            }
-        };
-        if read_count == 0 {
-            break;
-        }
-        md5_context.update(&data[..read_count]);
-
-        media_offset += read_count as u64;
-    }
-    let hash_value: Vec<u8> = md5_context.finalize();
-    let hash_string: String = format_as_string(&hash_value);
-
-    Ok((media_offset, hash_string))
-}
+use util::read_data_stream;
 
 fn open_file(path: &PathBuf) -> Result<SparseImageFile, ErrorTrace> {
     let data_stream: DataStreamReference = match open_os_data_stream(path) {
@@ -135,9 +49,11 @@ fn open_file(path: &PathBuf) -> Result<SparseImageFile, ErrorTrace> {
 #[test]
 fn read_media() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/sparseimage/hfsplus.sparseimage");
-    let mut file: SparseImageFile = open_file(&path_buf)?;
+    let file: SparseImageFile = open_file(&path_buf)?;
+    let data_stream: DataStreamReference = file.get_data_stream().unwrap();
 
-    let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
+    let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+
     assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "22c35335e6fafcbfc2ef21f1839f228d");
 
@@ -151,8 +67,10 @@ fn read_media_encrypted() -> Result<(), ErrorTrace> {
     let credentials: Vec<CdsaEncrCredential> =
         vec![CdsaEncrCredential::Passphrase(b"KeRaMiCs".to_vec())];
     file.unlock(&credentials)?;
+    let data_stream: DataStreamReference = file.get_data_stream().unwrap();
 
-    let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
+    let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+
     assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "52da5f232d3910a366379bf4c3f004aa");
 
