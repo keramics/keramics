@@ -15,7 +15,9 @@ use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u64_be;
 
-#[derive(Clone, LayoutMap)]
+use super::enums::XfsExtentType;
+
+#[derive(Clone, Debug, LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "big",
@@ -37,8 +39,8 @@ pub struct XfsPackedExtent {
     /// Logical block number.
     pub logical_block_number: u64,
 
-    /// Uninitialized flag.
-    pub uninitialized_flag: u8,
+    /// Extent type.
+    pub extent_type: XfsExtentType,
 }
 
 impl XfsPackedExtent {
@@ -48,7 +50,7 @@ impl XfsPackedExtent {
             number_of_blocks: 0,
             physical_block_number: 0,
             logical_block_number: 0,
-            uninitialized_flag: 0,
+            extent_type: XfsExtentType::InFile,
         }
     }
 
@@ -63,8 +65,12 @@ impl XfsPackedExtent {
         self.number_of_blocks = (value_128bit_lower & 0x1fffff) as u32;
         self.physical_block_number = (value_128bit_lower >> 21) | (value_128bit_upper & 0x1ff);
         self.logical_block_number = (value_128bit_upper >> 9) & 0x3fffffffffffff;
-        self.uninitialized_flag = (value_128bit_upper >> 63) as u8;
 
+        self.extent_type = if (value_128bit_upper >> 63) == 0 {
+            XfsExtentType::InFile
+        } else {
+            XfsExtentType::Sparse
+        };
         Ok(())
     }
 }
@@ -90,7 +96,6 @@ mod tests {
         assert_eq!(test_struct.number_of_blocks, 1);
         assert_eq!(test_struct.physical_block_number, 2014);
         assert_eq!(test_struct.logical_block_number, 0);
-        assert_eq!(test_struct.uninitialized_flag, 0);
 
         Ok(())
     }

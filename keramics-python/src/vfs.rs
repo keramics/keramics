@@ -18,7 +18,7 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
 use keramics_core::DataStreamReference;
-use keramics_formats::{FileEntryIterator, Path, PathComponent};
+use keramics_formats::{ExtendedAttributeIterator, FileEntryIterator, Path, PathComponent};
 use keramics_vfs::{
     VfsDataFork, VfsExtendedAttribute, VfsFileEntry, VfsFileSystemReference, VfsFileType,
     VfsLocation, VfsResolver, VfsResolverReference, VfsType,

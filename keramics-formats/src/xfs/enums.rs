@@ -11,9 +11,9 @@
  * under the License.
  */
 
-use keramics_formats::ExtendedAttributesIterator;
-
-use super::file_entry::VfsFileEntry;
-
-/// Virtual File System (VFS) extended attributes iterator.
-pub type VfsExtendedAttributesIterator<'a> = ExtendedAttributesIterator<'a, VfsFileEntry>;
+/// X File System (XFS) extent type.
+#[derive(Clone, Debug, PartialEq)]
+pub enum XfsExtentType {
+    InFile,
+    Sparse,
+}

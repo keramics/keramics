@@ -34,8 +34,8 @@ use super::directory_table::XfsDirectoryTable;
 use super::directory_tree::XfsDirectoryTree;
 use super::extended_attribute::XfsExtendedAttribute;
 use super::extended_attributes::XfsExtendedAttributesIterator;
-use super::extent_list::XfsExtentList;
-use super::extent_tree::XfsExtentTree;
+use super::extents_list::XfsExtentsList;
+use super::extents_tree::XfsExtentsTree;
 use super::file_entries::XfsFileEntriesIterator;
 use super::inode::XfsInode;
 use super::inode_tree::XfsInodeTree;
@@ -190,11 +190,22 @@ impl XfsFileEntry {
                 ByteString::new_with_encoding(&self.character_encoding);
 
             match self.inode.fork_type {
-                XFS_FORK_TYPE_INLINE_DATA => byte_string.read_data(self.inode.data_fork.as_slice()),
+                XFS_FORK_TYPE_INLINE_DATA => {
+                    keramics_core::debug_trace_data!(
+                        "XfsSymbolicLink",
+                        0,
+                        &self.inode.data_fork,
+                        self.inode.data_size
+                    );
+
+                    byte_string.read_data(self.inode.data_fork.as_slice())
+                }
                 XFS_FORK_TYPE_EXTENTS | XFS_FORK_TYPE_BTREE => {
                     let mut block_stream: XfsBlockStream =
                         XfsBlockStream::new(XfsBlockReader::new(
                             &self.data_stream,
+                            self.inode_tree.allocation_group_size,
+                            self.inode_tree.number_of_relative_block_number_bits,
                             self.inode_tree.block_size,
                             &self.inode.extents,
                             self.inode.data_size,
@@ -211,6 +222,13 @@ impl XfsFileEntry {
                             return Err(error);
                         }
                     }
+                    keramics_core::debug_trace_data!(
+                        "XfsSymbolicLink",
+                        0,
+                        &data,
+                        self.inode.data_size
+                    );
+
                     byte_string.read_data(data.as_slice())
                 }
                 _ => {
@@ -237,6 +255,8 @@ impl XfsFileEntry {
             XFS_FORK_TYPE_EXTENTS | XFS_FORK_TYPE_BTREE => Ok(Some(Arc::new(RwLock::new(
                 XfsBlockStream::new(XfsBlockReader::new(
                     &self.data_stream,
+                    self.inode_tree.allocation_group_size,
+                    self.inode_tree.number_of_relative_block_number_bits,
                     self.inode_tree.block_size,
                     &self.inode.extents,
                     self.inode.data_size,
@@ -394,91 +414,95 @@ impl XfsFileEntry {
 
     /// Reads the attributes.
     fn read_attributes(&mut self) -> Result<(), ErrorTrace> {
-        match self.inode.attributes_fork_type {
-            XFS_FORK_TYPE_INLINE_DATA => {
-                let mut attributes_table: XfsAttributesTable =
-                    XfsAttributesTable::new(&self.character_encoding);
+        if self.inode.attributes_fork_offset > 0 {
+            match self.inode.attributes_fork_type {
+                XFS_FORK_TYPE_INLINE_DATA => {
+                    let mut attributes_table: XfsAttributesTable =
+                        XfsAttributesTable::new(&self.character_encoding);
 
-                match attributes_table.read_data(&self.inode.attributes_fork, &mut self.attributes)
-                {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read attributes table"
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            XFS_FORK_TYPE_EXTENTS | XFS_FORK_TYPE_BTREE => {
-                let mut extents: Vec<XfsPackedExtent> = Vec::new();
-
-                if self.inode.attributes_fork_type == XFS_FORK_TYPE_EXTENTS {
-                    let extent_list: XfsExtentList = XfsExtentList::new();
-
-                    match extent_list.read_data(
-                        self.inode.number_of_attributes_extents as u64,
-                        &self.inode.attributes_fork,
-                        &mut extents,
-                    ) {
+                    match attributes_table.read_data(&self.inode.attributes_fork, &mut self.attributes)
+                    {
                         Ok(_) => {}
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                "Unable to read extent list"
-                            );
-                            return Err(error);
-                        }
-                    }
-                } else {
-                    let extent_tree: XfsExtentTree = XfsExtentTree::new(
-                        self.inode_tree.format_version,
-                        self.inode_tree.allocation_group_size,
-                        self.inode_tree.number_of_relative_block_number_bits,
-                        self.inode_tree.block_size,
-                    );
-                    match extent_tree.read_extents(
-                        &self.data_stream,
-                        &self.inode.attributes_fork,
-                        &mut extents,
-                    ) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to read extent tree"
+                                "Unable to read attributes table"
                             );
                             return Err(error);
                         }
                     }
                 }
-                let attributes_tree: XfsAttributesTree = XfsAttributesTree::new(
-                    &self.character_encoding,
-                    self.inode_tree.format_version,
-                    self.inode_tree.allocation_group_size,
-                    self.inode_tree.number_of_relative_block_number_bits,
-                    self.inode_tree.block_size,
-                );
-                match attributes_tree.read_attributes(
-                    &self.data_stream,
-                    &extents,
-                    &mut self.attributes,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read attributes tree"
+                XFS_FORK_TYPE_EXTENTS | XFS_FORK_TYPE_BTREE => {
+                    if self.inode.number_of_attributes_extents > 0 {
+                        let mut extents: Vec<XfsPackedExtent> = Vec::new();
+
+                        if self.inode.attributes_fork_type == XFS_FORK_TYPE_EXTENTS {
+                            let extents_list: XfsExtentsList = XfsExtentsList::new();
+
+                            match extents_list.read_data(
+                                self.inode.number_of_attributes_extents as u64,
+                                &self.inode.attributes_fork,
+                                &mut extents,
+                            ) {
+                                Ok(_) => {}
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to read extents list"
+                                    );
+                                    return Err(error);
+                                }
+                            }
+                        } else {
+                            let extent_tree: XfsExtentsTree = XfsExtentsTree::new(
+                                self.inode_tree.format_version,
+                                self.inode_tree.allocation_group_size,
+                                self.inode_tree.number_of_relative_block_number_bits,
+                                self.inode_tree.block_size,
+                            );
+                            match extent_tree.read_extents(
+                                &self.data_stream,
+                                &self.inode.attributes_fork,
+                                &mut extents,
+                            ) {
+                                Ok(_) => {}
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to read extent tree"
+                                    );
+                                    return Err(error);
+                                }
+                            }
+                        }
+                        let attributes_tree: XfsAttributesTree = XfsAttributesTree::new(
+                            &self.character_encoding,
+                            self.inode_tree.format_version,
+                            self.inode_tree.allocation_group_size,
+                            self.inode_tree.number_of_relative_block_number_bits,
+                            self.inode_tree.block_size,
                         );
-                        return Err(error);
+                        match attributes_tree.read_attributes(
+                            &self.data_stream,
+                            &extents,
+                            &mut self.attributes,
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read attributes tree"
+                                );
+                                return Err(error);
+                            }
+                        }
                     }
                 }
-            }
-            _ => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported attributes fork type",
-                ));
+                _ => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported attributes fork type",
+                    ));
+                }
             }
         }
         self.attributes_read = true;

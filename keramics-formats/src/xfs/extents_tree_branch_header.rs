@@ -13,31 +13,37 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::bytes_to_u64_be;
+use keramics_types::bytes_to_u16_be;
 
 #[derive(LayoutMap)]
 #[layout_map(
-    structure(byte_order = "big", field(name = "data_offset", data_type = "u64")),
+    structure(
+        byte_order = "big",
+        field(name = "level", data_type = "u16"),
+        field(name = "number_of_records", data_type = "u16"),
+    ),
     methods("debug_read_data")
 )]
-/// X File System (XFS) extent tree branch key.
-pub struct XfsExtentTreeBranchKey {
-    /// Data offset.
-    pub data_offset: u64,
+/// X File System (XFS) extents tree branch header.
+pub struct XfsExtentsTreeBranchHeader {
+    /// Number of records.
+    pub number_of_records: u16,
 }
 
-impl XfsExtentTreeBranchKey {
-    /// Creates a new key.
+impl XfsExtentsTreeBranchHeader {
+    /// Creates a new header.
     pub fn new() -> Self {
-        Self { data_offset: 0 }
+        Self {
+            number_of_records: 0,
+        }
     }
 
-    /// Reads the key from a buffer.
+    /// Reads the header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 8 {
+        if data.len() < 4 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        self.data_offset = bytes_to_u64_be!(data, 0);
+        self.number_of_records = bytes_to_u16_be!(data, 2);
 
         Ok(())
     }
@@ -48,17 +54,17 @@ mod tests {
     use super::*;
 
     fn get_test_data() -> Vec<u8> {
-        vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00]
+        vec![0x00, 0x01, 0x00, 0x03]
     }
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsExtentTreeBranchKey::new();
+        let mut test_struct = XfsExtentsTreeBranchHeader::new();
         test_struct.read_data(&test_data)?;
 
-        assert_eq!(test_struct.data_offset, 8192);
+        assert_eq!(test_struct.number_of_records, 3);
 
         Ok(())
     }
@@ -67,8 +73,8 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = XfsExtentTreeBranchKey::new();
-        let result = test_struct.read_data(&test_data[0..7]);
+        let mut test_struct = XfsExtentsTreeBranchHeader::new();
+        let result = test_struct.read_data(&test_data[0..3]);
         assert!(result.is_err());
     }
 }

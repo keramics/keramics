@@ -422,7 +422,7 @@ impl XfsInfo {
 
             for (attribute_index, result) in file_entry.extended_attributes().enumerate() {
                 let xfs_extended_attribute: XfsExtendedAttribute = match result {
-                    Ok(xfs_extended_attribute) => xfs_extended_attribute,
+                    Ok(extended_attribute) => extended_attribute,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,

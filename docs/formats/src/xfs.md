@@ -512,12 +512,12 @@ The inode can be followed by:
 * data fork (descriptor)
   * device identifier (fork type is XFS_DINODE_FMT_DEV)
   * inline data fork (fork type is XFS_DINODE_FMT_LOCAL)
-  * extent list data fork (fork type is XFS_DINODE_FMT_EXTENTS)
-  * extent tree data fork (fork type is XFS_DINODE_FMT_BTREE)
+  * extents list data fork (fork type is XFS_DINODE_FMT_EXTENTS)
+  * extents tree data fork (fork type is XFS_DINODE_FMT_BTREE)
 * optional (extended) attributes data fork (descriptor)
   * inline attributes fork (fork type is XFS_DINODE_FMT_LOCAL)
-  * extent list attributes fork (fork type is XFS_DINODE_FMT_EXTENTS)
-  * extent tree attributes fork (fork type is XFS_DINODE_FMT_BTREE)
+  * extents list attributes fork (fork type is XFS_DINODE_FMT_EXTENTS)
+  * extents tree attributes fork (fork type is XFS_DINODE_FMT_BTREE)
 
 ### Inode version 1
 
@@ -709,8 +709,8 @@ The inode version 3 (xfs_dinode_core_t) is 176 bytes of size and consist of:
 | --- | --- | --- |
 | 0 | XFS_DINODE_FMT_DEV | Device identifier is stored inline (in the inode) |
 | 1 | XFS_DINODE_FMT_LOCAL | Data is stored inline (in the inode) |
-| 2 | XFS_DINODE_FMT_EXTENTS | Data is referrenced by extents stored in [an extent list](#extent_list) |
-| 3 | XFS_DINODE_FMT_BTREE | Data is referrence by extents stored in [an extent tree](#extent_tree) |
+| 2 | XFS_DINODE_FMT_EXTENTS | Data is referrenced by extents stored in [an extents list](#extents_list) |
+| 3 | XFS_DINODE_FMT_BTREE | Data is referrence by extents stored in [an extents tree](#extents_tree) |
 | 4 | XFS_DINODE_FMT_UUID | Unknown (currently not used) |
 | 5 | XFS_DINODE_FMT_RMAP | Data is referrence by a reverse mapping |
 
@@ -734,9 +734,9 @@ The inode version 3 (xfs_dinode_core_t) is 176 bytes of size and consist of:
 | 0x2000 | XFS_DIFLAG_NODEFRAG | Do not defragment |
 | 0x4000 | XFS_DIFLAG_FILESTREAM | Unknown (Use filestream allocator) |
 
-### Extent list {#extent_list}
+### Extents list {#extents_list}
 
-The extent list consists of:
+The extents list consists of:
 
 * one or more [packed extents](#packed_extent)
 
@@ -753,12 +753,12 @@ The packed extent (xfs_bmbt_rec_t) is 128 bits of size and consist of:
 
 > Note that uninitialized extents are treated as sparse extents when read.
 
-### Extent tree {#extent_tree}
+### Extents tree {#extents_tree}
 
-#### Extent tree root node
+#### Extents tree root node
 
-The root node of the extent tree is stored in the inode and equivalent to
-[an extent tree branch node](#extent_tree_branch_node).
+The root node of the extents tree is stored in the inode and equivalent to
+[an extents tree branch node](#extents_tree_branch_node).
 
 The number of key-value pairs is calculated as following:
 
@@ -769,31 +769,31 @@ number_of_key_value_pairs = (node_data_size - 4) / 16
 Where "node data size" is `(attributes_fork_descriptor_offset * 8)` if the value is not 0, or
 otherwise the remaining inode block size.
 
-#### Extent tree sub node block
+#### Extents tree sub node block
 
-An extent tree sub nodes is stored in [a B+ tree block](#btree_block).
+An extents tree sub nodes is stored in [a B+ tree block](#btree_block).
 
-The extent tree uses [the B+ tree block header 64-bit](#btree_block_header_64bit).
+The extents tree uses [the B+ tree block header 64-bit](#btree_block_header_64bit).
 
-##### Extent tree sub node block header
+##### Extents tree sub node block header
 
 The sub node block header (xfs_bmbt_block_t) is equivalent to
 [B+ tree block header](#btree_block_header).
 
-##### Extent tree sub node block header signatures
+##### Extents tree sub node block header signatures
 
 | Signature | Description |
 | --- | --- |
-| "BMA3" | Extent tree sub node block ((file system version 5) |
-| "BMAP" | Extent tree sub node block |
+| "BMA3" | Extents tree sub node block ((file system version 5) |
+| "BMAP" | Extents tree sub node block |
 
-#### Extent tree branch node {#extent_tree_branch_node}
+#### Extents tree branch node {#extents_tree_branch_node}
 
-The extent tree branch node record consists of:
+The extents tree branch node record consists of:
 
 * node header
-* array of extent tree branch node entry keys
-* array of extent tree branch node entry values
+* array of extents tree branch node entry keys
+* array of extents tree branch node entry values
 
 The number of key-value pairs is calculated as following:
 
@@ -801,7 +801,7 @@ The number of key-value pairs is calculated as following:
 number_of_key_value_pairs = node_records_data_size / 16
 ```
 
-##### Extent tree branch node header
+##### Extents tree branch node header
 
 The branch node header (xfs_bmdr_block_t) is 4 byte of size and consist of:
 
@@ -810,7 +810,7 @@ The branch node header (xfs_bmdr_block_t) is 4 byte of size and consist of:
 | 0 | 2 | | Node level |
 | 2 | 2 | | Number of used key-value pairs in the node |
 
-##### Extent tree branch node entry key
+##### Extents tree branch node entry key
 
 The branch node entry key (xfs_bmbt_key_t) is 8 byte of size and consist of:
 
@@ -818,17 +818,17 @@ The branch node entry key (xfs_bmbt_key_t) is 8 byte of size and consist of:
 | --- | --- | --- | --- |
 | 0 | 8 | | Data offset |
 
-##### Extent tree branch node entry value
+##### Extents tree branch node entry value
 
 The branch node entry value (xfs_bmbt_ptr_t or xfs_bmdr_ptr_t) is 8 byte of size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 8 | | Block number of the extent tree sub node, which contains a [file system block number](#file_system_block_number) |
+| 0 | 8 | | Block number of the extents tree sub node, which contains a [file system block number](#file_system_block_number) |
 
-#### Extent tree leaf block node
+#### Extents tree leaf block node
 
-The extent tree leaf block node consists of:
+The extents tree leaf block node consists of:
 
 * one or more [packed extents](#packed_extent)
 
@@ -1156,7 +1156,7 @@ The device identifier (xfs_dev_t) is 4 bytes of size and consists of:
 XFS supports multiple ways to store file content:
 
 * inline data (fork type is XFS_DINODE_FMT_LOCAL)
-* extents defined by either an extent list (fork type is XFS_DINODE_FMT_EXTENTS) or an extent
+* extents defined by either an extents list (fork type is XFS_DINODE_FMT_EXTENTS) or an extent
   B+ tree (fork type is XFS_DINODE_FMT_BTREE)
 
 ### Inline data
@@ -1272,7 +1272,7 @@ The short-form attributes table entry (xfs_attr_sf_entry) is variable of size an
 ### Attributes tree {#attributes_tree}
 
 If the inode attributes fork type is XFS_DINODE_FMT_BTREE the extended attributes are stored in an
-attributes tree. The attributes fork contains [an extent tree](#extent_tree).
+attributes tree. The attributes fork contains [an extents tree](#extents_tree).
 
 The first block in the extents is the B+ tree root block.
 
@@ -1330,7 +1330,7 @@ consist of:
 ### Attributes tree leaf node
 
 If the inode attributes fork type is XFS_DINODE_FMT_EXTENTS the extended attributes are stored as
-attributes tree. The attributes fork contains [an extent list](#extent_list).
+attributes tree. The attributes fork contains [an extents list](#extents_list).
 
 Attributes tree (xfs_attr_leafblock_t or xfs_attr3_leafblock_t) consist of:
 

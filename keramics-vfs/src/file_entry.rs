@@ -45,6 +45,7 @@ use super::mbr::MbrFileEntry;
 use super::os::OsFileEntry;
 use super::pdi::PdiFileEntry;
 use super::qcow::QcowFileEntry;
+use super::sgilabel::SgiDiskLabelFileEntry;
 use super::sparsebundle::SparseBundleFileEntry;
 use super::sparseimage::SparseImageFileEntry;
 use super::splitraw::SplitRawFileEntry;
@@ -71,6 +72,7 @@ pub enum VfsFileEntry {
     Os(OsFileEntry),
     Pdi(PdiFileEntry),
     Qcow(QcowFileEntry),
+    SgiDiskLabel(SgiDiskLabelFileEntry),
     SparseBundle(SparseBundleFileEntry),
     SparseImage(SparseImageFileEntry),
     SplitRaw(SplitRawFileEntry),
@@ -101,6 +103,7 @@ impl VfsFileEntry {
             VfsFileEntry::Os(_) => VfsType::Os,
             VfsFileEntry::Pdi(_) => VfsType::Pdi,
             VfsFileEntry::Qcow(_) => VfsType::Qcow,
+            VfsFileEntry::SgiDiskLabel(_) => VfsType::SgiDiskLabel,
             VfsFileEntry::SparseBundle(_) => VfsType::SparseBundle,
             VfsFileEntry::SparseImage(_) => VfsType::SparseImage,
             VfsFileEntry::SplitRaw(_) => VfsType::SplitRaw,
@@ -123,6 +126,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -155,6 +159,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -183,6 +188,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -221,6 +227,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -255,6 +262,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -358,6 +366,7 @@ impl VfsFileEntry {
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_file_type(),
             VfsFileEntry::Pdi(pdi_file_entry) => pdi_file_entry.get_file_type(),
             VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.get_file_type(),
+            VfsFileEntry::SgiDiskLabel(sgilabel_file_entry) => sgilabel_file_entry.get_file_type(),
             VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
                 sparsebundle_file_entry.get_file_type()
             }
@@ -396,6 +405,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -430,6 +440,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -461,6 +472,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -526,6 +538,7 @@ impl VfsFileEntry {
             },
             VfsFileEntry::Pdi(pdi_file_entry) => Some(pdi_file_entry.get_name()),
             VfsFileEntry::Qcow(qcow_file_entry) => Some(qcow_file_entry.get_name()),
+            VfsFileEntry::SgiDiskLabel(sgilabel_file_entry) => Some(sgilabel_file_entry.get_name()),
             VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
                 Some(sparsebundle_file_entry.get_name())
             }
@@ -559,6 +572,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -591,6 +605,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -627,6 +642,7 @@ impl VfsFileEntry {
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_size(),
             VfsFileEntry::Pdi(pdi_file_entry) => pdi_file_entry.get_size(),
             VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.get_size(),
+            VfsFileEntry::SgiDiskLabel(sgilabel_file_entry) => sgilabel_file_entry.get_size(),
             VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
                 sparsebundle_file_entry.get_size()
             }
@@ -654,6 +670,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -841,6 +858,10 @@ impl VfsFileEntry {
                 QcowFileEntry::Layer { .. } => 1,
                 QcowFileEntry::Root { .. } => 0,
             },
+            VfsFileEntry::SgiDiskLabel(sgilabel_file_entry) => match sgilabel_file_entry {
+                SgiDiskLabelFileEntry::Partition { .. } => 1,
+                SgiDiskLabelFileEntry::Root { .. } => 0,
+            },
             VfsFileEntry::SparseBundle(sparsebundle_file_entry) => match sparsebundle_file_entry {
                 SparseBundleFileEntry::Layer { .. } => 1,
                 SparseBundleFileEntry::Root { .. } => 0,
@@ -907,6 +928,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -997,6 +1019,9 @@ impl VfsFileEntry {
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_data_stream(),
             VfsFileEntry::Pdi(pdi_file_entry) => pdi_file_entry.get_data_stream(),
             VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.get_data_stream(),
+            VfsFileEntry::SgiDiskLabel(sgilabel_file_entry) => {
+                sgilabel_file_entry.get_data_stream()
+            }
             VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
                 sparsebundle_file_entry.get_data_stream()
             }
@@ -1040,6 +1065,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -1057,106 +1083,6 @@ impl VfsFileEntry {
             Ok(result) => Ok(result),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
-                Err(error)
-            }
-        }
-    }
-
-    /// Retrieves the number of extended attributes.
-    pub fn get_number_of_extended_attributes(&mut self) -> Result<usize, ErrorTrace> {
-        let result: Result<usize, ErrorTrace> = match self {
-            VfsFileEntry::ApfsContainer(_)
-            | VfsFileEntry::Apm(_)
-            | VfsFileEntry::Ewf(_)
-            | VfsFileEntry::ExFat(_)
-            | VfsFileEntry::Fake(_)
-            | VfsFileEntry::Fat(_)
-            | VfsFileEntry::Gpt(_)
-            | VfsFileEntry::LinuxLvm(_)
-            | VfsFileEntry::Mbr(_)
-            | VfsFileEntry::Ntfs(_)
-            | VfsFileEntry::Os(_)
-            | VfsFileEntry::Pdi(_)
-            | VfsFileEntry::Qcow(_)
-            | VfsFileEntry::SparseBundle(_)
-            | VfsFileEntry::SparseImage(_)
-            | VfsFileEntry::SplitRaw(_)
-            | VfsFileEntry::Udif(_)
-            | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_)
-            | VfsFileEntry::Vmdk(_) => Ok(0),
-            VfsFileEntry::Apfs(apfs_file_entry) => {
-                apfs_file_entry.get_number_of_extended_attributes()
-            }
-            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_extended_attributes(),
-            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_number_of_extended_attributes(),
-            VfsFileEntry::Xfs(xfs_file_entry) => xfs_file_entry.get_number_of_extended_attributes(),
-        };
-        match result {
-            Ok(number_of_extended_attributes) => Ok(number_of_extended_attributes),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to retrieve number of extended attributes"
-                );
-                Err(error)
-            }
-        }
-    }
-
-    /// Retrieves a specific extended attribute.
-    pub fn get_extended_attribute_by_index(
-        &mut self,
-        extended_attribute_index: usize,
-    ) -> Result<VfsExtendedAttribute, ErrorTrace> {
-        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> = match self {
-            VfsFileEntry::ApfsContainer(_)
-            | VfsFileEntry::Apm(_)
-            | VfsFileEntry::Ewf(_)
-            | VfsFileEntry::ExFat(_)
-            | VfsFileEntry::Fake(_)
-            | VfsFileEntry::Fat(_)
-            | VfsFileEntry::Gpt(_)
-            | VfsFileEntry::LinuxLvm(_)
-            | VfsFileEntry::Mbr(_)
-            | VfsFileEntry::Ntfs(_)
-            | VfsFileEntry::Os(_)
-            | VfsFileEntry::Pdi(_)
-            | VfsFileEntry::Qcow(_)
-            | VfsFileEntry::SparseBundle(_)
-            | VfsFileEntry::SparseImage(_)
-            | VfsFileEntry::SplitRaw(_)
-            | VfsFileEntry::Udif(_)
-            | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_)
-            | VfsFileEntry::Vmdk(_) => Ok(None),
-            VfsFileEntry::Apfs(apfs_file_entry) => Ok(Some(VfsExtendedAttribute::Apfs(
-                apfs_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
-            ))),
-            VfsFileEntry::Ext(ext_file_entry) => Ok(Some(VfsExtendedAttribute::Ext(
-                ext_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
-            ))),
-            VfsFileEntry::Hfs(hfs_file_entry) => Ok(Some(VfsExtendedAttribute::Hfs(
-                hfs_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
-            ))),
-            VfsFileEntry::Xfs(xfs_file_entry) => Ok(Some(VfsExtendedAttribute::Xfs(
-                xfs_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
-            ))),
-        };
-        match result {
-            Ok(Some(extended_attribute)) => Ok(extended_attribute),
-            Ok(None) => Err(keramics_core::error_trace_new!(format!(
-                "Missing extended attribute: {}",
-                extended_attribute_index
-            ))),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to retrieve extended attribute: {}",
-                        extended_attribute_index
-                    )
-                );
                 Err(error)
             }
         }
@@ -1181,6 +1107,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
             | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
@@ -1266,6 +1193,9 @@ impl VfsFileEntry {
             VfsFileEntry::Os(os_file_entry) => os_file_entry.is_root_file_entry(),
             VfsFileEntry::Pdi(pdi_file_entry) => pdi_file_entry.is_root_file_entry(),
             VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.is_root_file_entry(),
+            VfsFileEntry::SgiDiskLabel(sgilabel_file_entry) => {
+                sgilabel_file_entry.is_root_file_entry()
+            }
             VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
                 sparsebundle_file_entry.is_root_file_entry()
             }
@@ -1278,6 +1208,112 @@ impl VfsFileEntry {
             VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.is_root_file_entry(),
             VfsFileEntry::Vmdk(vmdk_file_entry) => vmdk_file_entry.is_root_file_entry(),
             VfsFileEntry::Xfs(xfs_file_entry) => xfs_file_entry.is_root_directory(),
+        }
+    }
+}
+
+impl ExtendedAttributeIterator for VfsFileEntry {
+    type ExtendedAttributeItem = VfsExtendedAttribute;
+
+    /// Retrieves the number of extended attributes.
+    fn get_number_of_extended_attributes(&mut self) -> Result<usize, ErrorTrace> {
+        let result: Result<usize, ErrorTrace> = match self {
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Ntfs(_)
+            | VfsFileEntry::Os(_)
+            | VfsFileEntry::Pdi(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
+            | VfsFileEntry::SparseBundle(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => Ok(0),
+            VfsFileEntry::Apfs(apfs_file_entry) => {
+                apfs_file_entry.get_number_of_extended_attributes()
+            }
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_extended_attributes(),
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_number_of_extended_attributes(),
+            VfsFileEntry::Xfs(xfs_file_entry) => xfs_file_entry.get_number_of_extended_attributes(),
+        };
+        match result {
+            Ok(number_of_extended_attributes) => Ok(number_of_extended_attributes),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve number of extended attributes"
+                );
+                Err(error)
+            }
+        }
+    }
+
+    /// Retrieves a specific extended attribute.
+    fn get_extended_attribute_by_index(
+        &mut self,
+        extended_attribute_index: usize,
+    ) -> Result<VfsExtendedAttribute, ErrorTrace> {
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> = match self {
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::ExFat(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::LinuxLvm(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Ntfs(_)
+            | VfsFileEntry::Os(_)
+            | VfsFileEntry::Pdi(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SgiDiskLabel(_)
+            | VfsFileEntry::SparseBundle(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => Ok(None),
+            VfsFileEntry::Apfs(apfs_file_entry) => Ok(Some(VfsExtendedAttribute::Apfs(
+                apfs_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
+            ))),
+            VfsFileEntry::Ext(ext_file_entry) => Ok(Some(VfsExtendedAttribute::Ext(
+                ext_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
+            ))),
+            VfsFileEntry::Hfs(hfs_file_entry) => Ok(Some(VfsExtendedAttribute::Hfs(
+                hfs_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
+            ))),
+            VfsFileEntry::Xfs(xfs_file_entry) => Ok(Some(VfsExtendedAttribute::Xfs(
+                xfs_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
+            ))),
+        };
+        match result {
+            Ok(Some(extended_attribute)) => Ok(extended_attribute),
+            Ok(None) => Err(keramics_core::error_trace_new!(format!(
+                "Missing extended attribute: {}",
+                extended_attribute_index
+            ))),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve extended attribute: {}",
+                        extended_attribute_index
+                    )
+                );
+                Err(error)
+            }
         }
     }
 }
@@ -1338,6 +1374,9 @@ impl FileEntryIterator for VfsFileEntry {
             )),
             VfsFileEntry::Qcow(qcow_file_entry) => Ok(VfsFileEntry::Qcow(
                 qcow_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::SgiDiskLabel(sgilabel_file_entry) => Ok(VfsFileEntry::SgiDiskLabel(
+                sgilabel_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
             VfsFileEntry::SparseBundle(sparsebundle_file_entry) => Ok(VfsFileEntry::SparseBundle(
                 sparsebundle_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
@@ -1417,6 +1456,9 @@ impl FileEntryIterator for VfsFileEntry {
             }
             VfsFileEntry::Qcow(qcow_file_entry) => {
                 Ok(qcow_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::SgiDiskLabel(sgilabel_file_entry) => {
+                Ok(sgilabel_file_entry.get_number_of_sub_file_entries())
             }
             VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
                 Ok(sparsebundle_file_entry.get_number_of_sub_file_entries())
@@ -6935,6 +6977,339 @@ mod tests {
         assert!(result.unwrap().is_ok());
 
         let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    // Tests with sgilabel.
+
+    fn get_sgilabel_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::SgiDiskLabel);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let path_string: String = get_test_data_path("sgilabel/sgilabel.raw");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_sgilabel_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_sgilabel_file_system()?;
+
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier();
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("sgilabel1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 1049088);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target_with_sgilabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_sgilabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add test for get_data_fork_by_index
+
+    #[test]
+    fn test_data_forks_with_sgilabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_sgilabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let mut vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_name_with_sgilabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let name: Option<PathComponent> = None;
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_some());
+
+        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_sgilabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_sgilabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_sgilabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extended_attributes_with_sgilabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let mut extended_attributes_iterator: VfsExtendedAttributesIterator =
+            vfs_file_entry.extended_attributes();
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_sgilabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 1);
+
+        let mut vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/sgilabel1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_sgilabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+
+        let name: Option<PathComponent> = sub_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("sgilabel1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_sgilabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sgilabel_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(1).next();
         assert!(result.is_none());
 
         Ok(())

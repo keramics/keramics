@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -18,8 +19,9 @@ use keramics_datetime::DateTime;
 use keramics_types::bytes_to_u32_le;
 
 use super::constants::*;
-use super::extent_list::XfsExtentList;
-use super::extent_tree::XfsExtentTree;
+use super::enums::XfsExtentType;
+use super::extents_list::XfsExtentsList;
+use super::extents_tree::XfsExtentsTree;
 use super::inode_v1::XfsInodeV1;
 use super::inode_v2::XfsInodeV2;
 use super::inode_v3::XfsInodeV3;
@@ -45,8 +47,11 @@ pub struct XfsInode {
     /// Data size.
     pub data_size: u64,
 
-    /// Number of extents.
-    pub number_of_extents: u64,
+    /// Number of blocks.
+    pub number_of_blocks: u64,
+
+    /// Number of data extents.
+    pub number_of_data_extents: u64,
 
     /// Access date and time.
     pub access_time: DateTime,
@@ -92,7 +97,8 @@ impl XfsInode {
             owner_identifier: 0,
             group_identifier: 0,
             data_size: 0,
-            number_of_extents: 0,
+            number_of_blocks: 0,
+            number_of_data_extents: 0,
             access_time: DateTime::NotSet,
             change_time: DateTime::NotSet,
             modification_time: DateTime::NotSet,
@@ -181,6 +187,9 @@ impl XfsInode {
 
             self.attributes_fork = data[attributes_fork_offset..data_size].to_vec();
         }
+        if self.fork_type == XFS_FORK_TYPE_INLINE_DATA {
+            data_fork_size = min(data_fork_size, self.data_size as usize);
+        }
         let data_fork_end_offset: usize = data_fork_offset + data_fork_size;
         self.data_fork = data[data_fork_offset..data_fork_end_offset].to_vec();
 
@@ -254,12 +263,16 @@ impl XfsInode {
         data_stream: &DataStreamReference,
         block_size: u32,
     ) -> Result<(), ErrorTrace> {
+        if self.number_of_data_extents == 0 {
+            return Ok(());
+        }
         match self.fork_type {
+            XFS_FORK_TYPE_DEVICE | XFS_FORK_TYPE_INLINE_DATA => return Ok(()),
             XFS_FORK_TYPE_EXTENTS => {
-                let extent_list: XfsExtentList = XfsExtentList::new();
+                let extents_list: XfsExtentsList = XfsExtentsList::new();
 
-                match extent_list.read_data(
-                    self.number_of_extents,
+                match extents_list.read_data(
+                    self.number_of_data_extents,
                     &self.data_fork,
                     &mut self.extents,
                 ) {
@@ -271,7 +284,7 @@ impl XfsInode {
                 }
             }
             XFS_FORK_TYPE_BTREE => {
-                let extent_tree: XfsExtentTree = XfsExtentTree::new(
+                let extent_tree: XfsExtentsTree = XfsExtentsTree::new(
                     format_version,
                     allocation_group_size,
                     number_of_relative_block_number_bits,
@@ -285,7 +298,29 @@ impl XfsInode {
                     }
                 }
             }
-            _ => {}
+            _ => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported data fork type"
+                ));
+            }
+        }
+        match self.extents.last() {
+            Some(packed_extent) => {
+                let number_of_blocks: u64 = self.data_size.div_ceil(block_size as u64);
+                let logical_block_number: u64 =
+                    packed_extent.logical_block_number + (packed_extent.number_of_blocks as u64);
+
+                if logical_block_number < number_of_blocks {
+                    let mut sparse_extent: XfsPackedExtent = XfsPackedExtent::new();
+                    sparse_extent.number_of_blocks =
+                        (number_of_blocks - logical_block_number) as u32;
+                    sparse_extent.logical_block_number = logical_block_number;
+                    sparse_extent.extent_type = XfsExtentType::Sparse;
+
+                    self.extents.push(sparse_extent);
+                }
+            }
+            None => {}
         }
         Ok(())
     }
@@ -421,7 +456,8 @@ mod tests {
             })
         );
         assert_eq!(test_struct.data_size, 6);
-        assert_eq!(test_struct.number_of_extents, 0);
+        assert_eq!(test_struct.number_of_blocks, 0);
+        assert_eq!(test_struct.number_of_data_extents, 0);
         assert_eq!(test_struct.number_of_attributes_extents, 0);
         assert_eq!(test_struct.attributes_fork_offset, 0);
         assert_eq!(test_struct.attributes_fork_type, 2);
@@ -458,7 +494,8 @@ mod tests {
             })
         );
         assert_eq!(test_struct.data_size, 4096);
-        assert_eq!(test_struct.number_of_extents, 1);
+        assert_eq!(test_struct.number_of_blocks, 1);
+        assert_eq!(test_struct.number_of_data_extents, 1);
         assert_eq!(test_struct.number_of_attributes_extents, 0);
         assert_eq!(test_struct.attributes_fork_offset, 0);
         assert_eq!(test_struct.attributes_fork_type, 2);
@@ -508,7 +545,8 @@ mod tests {
             }))
         );
         assert_eq!(test_struct.data_size, 196);
-        assert_eq!(test_struct.number_of_extents, 0);
+        assert_eq!(test_struct.number_of_blocks, 0);
+        assert_eq!(test_struct.number_of_data_extents, 0);
         assert_eq!(test_struct.number_of_attributes_extents, 0);
         assert_eq!(test_struct.attributes_fork_offset, 37);
         assert_eq!(test_struct.attributes_fork_type, 1);

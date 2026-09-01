@@ -339,7 +339,7 @@ impl DisplayPath {
                         }
                     },
                     VfsType::Apm => Some(path_string.replace("apm", "p")),
-                    VfsType::Gpt | VfsType::Mbr => {
+                    VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel => {
                         match self.vfs_resolver.get_file_entry_by_location(vfs_location) {
                             Ok(vfs_file_entry) => match vfs_file_entry {
                                 Some(VfsFileEntry::Gpt(gpt_file_entry)) => {
@@ -356,6 +356,14 @@ impl DisplayPath {
                                             Some(format!("/p{}", partition_number))
                                         }
                                         None => Some(path_string.replace("mbr", "p")),
+                                    }
+                                }
+                                Some(VfsFileEntry::SgiDiskLabel(sgilabel_file_entry)) => {
+                                    match sgilabel_file_entry.get_partition_number() {
+                                        Some(partition_number) => {
+                                            Some(format!("/p{}", partition_number))
+                                        }
+                                        None => Some(path_string.replace("sgilabel", "p")),
                                     }
                                 }
                                 _ => None,

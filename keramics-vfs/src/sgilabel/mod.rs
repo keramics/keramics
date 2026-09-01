@@ -11,9 +11,8 @@
  * under the License.
  */
 
-use keramics_formats::ExtendedAttributesIterator;
+mod file_entry;
+mod file_system;
 
-use super::file_entry::VfsFileEntry;
-
-/// Virtual File System (VFS) extended attributes iterator.
-pub type VfsExtendedAttributesIterator<'a> = ExtendedAttributesIterator<'a, VfsFileEntry>;
+pub use file_entry::SgiDiskLabelFileEntry;
+pub use file_system::SgiDiskLabelFileSystem;
