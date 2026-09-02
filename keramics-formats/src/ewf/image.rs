@@ -23,7 +23,6 @@ use keramics_core::DebugTrace;
 
 use crate::fake_file_resolver::FakeFileResolver;
 use crate::file_resolver::FileResolverReference;
-use crate::lru_cache::LruCache;
 use crate::path_component::PathComponent;
 
 use super::block_range::{EwfBlockRange, EwfBlockRangeType};
@@ -59,9 +58,6 @@ pub struct EwfImage {
     /// Segment file naming schema.
     naming_schema: Option<EwfNamingSchema>,
 
-    /// Segment file cache.
-    segment_file_cache: LruCache<u16, EwfFile>,
-
     /// Number of chunks.
     number_of_chunks: u32,
 
@@ -80,17 +76,11 @@ pub struct EwfImage {
     /// Block ranges.
     block_ranges: Vec<EwfBlockRange>,
 
-    /// Decompressed chunk cache.
-    chunk_cache: LruCache<u64, Vec<u8>>,
-
     /// Error granularity.
     error_granularity: u32,
 
     /// Media type.
     media_type: EwfMediaType,
-
-    /// The current offset.
-    current_offset: u64,
 
     /// Media size.
     media_size: u64,
@@ -113,17 +103,14 @@ impl EwfImage {
             segment_set_identifier: Uuid::new(),
             name: String::new(),
             naming_schema: None,
-            segment_file_cache: LruCache::new(16),
             number_of_chunks: 0,
             sectors_per_chunk: 0,
             bytes_per_sector: 0,
             number_of_sectors: 0,
             chunk_size: 0,
             block_ranges: Vec::new(),
-            chunk_cache: LruCache::new(64),
             error_granularity: 0,
             media_type: EwfMediaType::Unknown,
-            current_offset: 0,
             media_size: 0,
             header_values: HashMap::new(),
             md5_hash: [0; 16],
@@ -239,42 +226,6 @@ impl EwfImage {
         self.file_resolver = file_resolver.clone();
 
         Ok(())
-    }
-
-    /// Opens a segment file.
-    fn open_segment_file(&self, segment_file_name: &String) -> Result<EwfFile, ErrorTrace> {
-        let path_components: [PathComponent; 1] = [PathComponent::from(segment_file_name)];
-
-        let data_stream: DataStreamReference =
-            match self.file_resolver.get_data_stream(&path_components) {
-                Ok(Some(data_stream)) => data_stream,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Missing segment file: {}",
-                        segment_file_name
-                    )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!("Unable to open segment file: {}", segment_file_name)
-                    );
-                    return Err(error);
-                }
-            };
-        let mut segment_file: EwfFile = EwfFile::new();
-
-        match segment_file.read_data_stream(&data_stream) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Unable to read segment file: {}", segment_file_name)
-                );
-                return Err(error);
-            }
-        }
-        Ok(segment_file)
     }
 
     /// Reads the sections of a segment file.
@@ -627,8 +578,6 @@ impl EwfImage {
                     return Err(error);
                 }
             }
-            self.segment_file_cache.insert(segment_number, segment_file);
-
             segment_number += 1;
         }
         Ok(())
@@ -972,7 +921,6 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_segment_file
     // TODO: add tests for read_sections
     // TODO: add tests for read_table_section
     // TODO: add tests for read_volume_section
