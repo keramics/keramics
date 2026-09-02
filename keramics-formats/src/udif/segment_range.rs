@@ -12,6 +12,7 @@
  */
 
 /// Universal Disk Image Format (UDIF) segment range.
+#[derive(Clone, Debug)]
 pub struct UdifSegmentRange {
     /// Segment number.
     pub segment_number: u32,

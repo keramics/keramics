@@ -204,7 +204,6 @@ impl XfsFileEntry {
                     let mut block_stream: XfsBlockStream =
                         XfsBlockStream::new(XfsBlockReader::new(
                             &self.data_stream,
-                            self.inode_tree.allocation_group_size,
                             self.inode_tree.number_of_relative_block_number_bits,
                             self.inode_tree.block_size,
                             &self.inode.extents,
@@ -255,7 +254,6 @@ impl XfsFileEntry {
             XFS_FORK_TYPE_EXTENTS | XFS_FORK_TYPE_BTREE => Ok(Some(Arc::new(RwLock::new(
                 XfsBlockStream::new(XfsBlockReader::new(
                     &self.data_stream,
-                    self.inode_tree.allocation_group_size,
                     self.inode_tree.number_of_relative_block_number_bits,
                     self.inode_tree.block_size,
                     &self.inode.extents,

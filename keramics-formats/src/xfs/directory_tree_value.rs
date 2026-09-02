@@ -17,7 +17,7 @@ use keramics_types::bytes_to_u64_be;
 
 #[derive(LayoutMap)]
 #[layout_map(
-    structure(byte_order = "big", field(name = "inode_number", data_type = "u64"),),
+    structure(byte_order = "big", field(name = "inode_number", data_type = "u64")),
     methods("debug_read_data")
 )]
 /// X File System (XFS) directory tree value.
