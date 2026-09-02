@@ -1,7 +1,7 @@
 # Volume system formats
 
 A volume (or logical drive) is a single continous accessible storage area, typically containing a
-file system. A volume system format is used to manage the storage of one or more volumes.
+file system. A volume system is used to manage the storage of one or more volumes.
 
 A partition is a part of (typically) storage media. A partition is different conceptually, but
 its usage is comparable to a volume.
@@ -10,7 +10,8 @@ This documentation uses the term volume systems in a broad sense to describe:
 
 * encrypted volumes;
 * logical volume managers;
-* and partitioning schemes.
+* partitioning schemes;
+* and volume snapshots.
 
 ## Formats
 
