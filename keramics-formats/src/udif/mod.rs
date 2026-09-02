@@ -30,6 +30,7 @@ mod resource_map_entry;
 mod resource_map_header;
 mod resource_map_item;
 mod resource_map_value;
+mod segment_file;
 mod segment_range;
 mod segments_block_reader;
 mod segments_block_stream;

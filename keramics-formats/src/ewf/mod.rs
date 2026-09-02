@@ -12,6 +12,8 @@
  */
 
 mod block_range;
+mod block_reader;
+mod block_stream;
 pub(crate) mod constants;
 mod digest;
 mod enums;
@@ -29,6 +31,7 @@ mod image;
 mod ltree_header;
 mod object_storage;
 mod section_header;
+mod segment_file;
 mod table;
 mod table_entry;
 mod table_footer;

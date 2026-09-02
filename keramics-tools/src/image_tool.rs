@@ -1117,32 +1117,24 @@ fn main() -> ExitCode {
                 }
             };
             let stored_md5_hash: Option<Vec<u8>> = match storage_media_image.get_md5_hash() {
-                Ok(Some(stored_hash)) => {
+                Some(stored_hash) => {
                     if stored_hash != [0; 16] {
                         Some(stored_hash)
                     } else {
                         None
                     }
                 }
-                Ok(None) => None,
-                Err(error) => {
-                    println!("Unable to retrieve stored MD5 hash with error:\n{}", error);
-                    return ExitCode::FAILURE;
-                }
+                None => None,
             };
             let stored_sha1_hash: Option<Vec<u8>> = match storage_media_image.get_sha1_hash() {
-                Ok(Some(stored_hash)) => {
+                Some(stored_hash) => {
                     if stored_hash != [0; 20] {
                         Some(stored_hash)
                     } else {
                         None
                     }
                 }
-                Ok(None) => None,
-                Err(error) => {
-                    println!("Unable to retrieve stored SHA1 hash with error:\n{}", error);
-                    return ExitCode::FAILURE;
-                }
+                None => None,
             };
             let calculate_md5_hash: bool = stored_md5_hash.is_some() || stored_sha1_hash.is_none();
             let calculate_sha1_hash: bool = stored_sha1_hash.is_some();

@@ -24,6 +24,7 @@ use crate::path_component::PathComponent;
 use crate::traits::BlockReader;
 
 use super::file::UdifFile;
+use super::segment_file::UdifSegmentFile;
 use super::segment_range::UdifSegmentRange;
 
 /// Universal Disk Image Format (UDIF) segments block reader.
@@ -66,18 +67,9 @@ impl UdifSegmentsBlockReader {
         }
     }
 
-    /// Determines the segment file name.
-    fn get_segment_file_name(name: &String, segment_number: u32) -> String {
-        if segment_number == 1 {
-            format!("{}.dmg", name)
-        } else {
-            format!("{}.{:03}.dmgpart", name, segment_number)
-        }
-    }
-
     /// Opens a segment file.
     fn open_segment_file(&self, segment_number: u32) -> Result<UdifFile, ErrorTrace> {
-        let segment_file_name: String = Self::get_segment_file_name(&self.name, segment_number);
+        let segment_file_name: String = UdifSegmentFile::get_file_name(&self.name, segment_number);
 
         let path_components: [PathComponent; 1] = [PathComponent::from(&segment_file_name)];
 
