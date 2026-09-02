@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
@@ -24,16 +24,13 @@ pub enum EwfFileEntry {
     /// Layer file entry.
     Layer {
         /// File.
-        image: Arc<RwLock<EwfImage>>,
-
-        /// Size.
-        size: u64,
+        image: Arc<EwfImage>,
     },
 
     /// Root file entry.
     Root {
         /// File.
-        image: Arc<RwLock<EwfImage>>,
+        image: Arc<EwfImage>,
     },
 }
 
@@ -41,7 +38,7 @@ impl EwfFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
-            EwfFileEntry::Layer { image, .. } => Ok(Some(image.clone())),
+            EwfFileEntry::Layer { image, .. } => Ok(Some(image.get_data_stream())),
             EwfFileEntry::Root { .. } => Ok(None),
         }
     }
@@ -65,7 +62,7 @@ impl EwfFileEntry {
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
-            EwfFileEntry::Layer { size, .. } => *size,
+            EwfFileEntry::Layer { image, .. } => image.get_media_size(),
             EwfFileEntry::Root { .. } => 0,
         }
     }
@@ -94,18 +91,8 @@ impl EwfFileEntry {
                         sub_file_entry_index
                     )));
                 }
-                let media_size: u64 = match image.read() {
-                    Ok(ewf_image) => ewf_image.get_media_size(),
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain read lock on EWF image",
-                            error
-                        ));
-                    }
-                };
                 Ok(EwfFileEntry::Layer {
                     image: image.clone(),
-                    size: media_size,
                 })
             }
         }
@@ -130,7 +117,7 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_image() -> Result<Arc<RwLock<EwfImage>>, ErrorTrace> {
+    fn get_image() -> Result<Arc<EwfImage>, ErrorTrace> {
         let mut image: EwfImage = EwfImage::new();
 
         let path_string: String = get_test_data_path("ewf");
@@ -139,33 +126,19 @@ mod tests {
         let file_name: PathComponent = PathComponent::from("ext2.E01");
         image.open(&file_resolver, &file_name)?;
 
-        Ok(Arc::new(RwLock::new(image)))
+        Ok(Arc::new(image))
     }
 
     // TODO: implement get_layer_file_entry
     // TODO: implement get_root_file_entry
 
-    fn get_layer_file_entry(ewf_image: &Arc<RwLock<EwfImage>>) -> Result<EwfFileEntry, ErrorTrace> {
-        let media_size: u64;
-
-        match ewf_image.read() {
-            Ok(image) => {
-                media_size = image.get_media_size();
-            }
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain read lock on image",
-                    error
-                ));
-            }
-        }
+    fn get_layer_file_entry(ewf_image: &Arc<EwfImage>) -> Result<EwfFileEntry, ErrorTrace> {
         Ok(EwfFileEntry::Layer {
             image: ewf_image.clone(),
-            size: media_size,
         })
     }
 
-    fn get_root_file_entry(ewf_image: &Arc<RwLock<EwfImage>>) -> EwfFileEntry {
+    fn get_root_file_entry(ewf_image: &Arc<EwfImage>) -> EwfFileEntry {
         EwfFileEntry::Root {
             image: ewf_image.clone(),
         }
@@ -175,7 +148,7 @@ mod tests {
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
-        let test_image: Arc<RwLock<EwfImage>> = get_image()?;
+        let test_image: Arc<EwfImage> = get_image()?;
 
         let file_entry: EwfFileEntry = get_root_file_entry(&test_image);
 
@@ -192,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let test_image: Arc<RwLock<EwfImage>> = get_image()?;
+        let test_image: Arc<EwfImage> = get_image()?;
 
         let file_entry: EwfFileEntry = get_root_file_entry(&test_image);
 
@@ -209,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let test_image: Arc<RwLock<EwfImage>> = get_image()?;
+        let test_image: Arc<EwfImage> = get_image()?;
 
         let file_entry: EwfFileEntry = get_root_file_entry(&test_image);
 
@@ -226,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let test_image: Arc<RwLock<EwfImage>> = get_image()?;
+        let test_image: Arc<EwfImage> = get_image()?;
 
         let file_entry: EwfFileEntry = get_root_file_entry(&test_image);
 
@@ -243,7 +216,7 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let test_image: Arc<RwLock<EwfImage>> = get_image()?;
+        let test_image: Arc<EwfImage> = get_image()?;
 
         let file_entry: EwfFileEntry = get_root_file_entry(&test_image);
 
@@ -260,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
-        let test_image: Arc<RwLock<EwfImage>> = get_image()?;
+        let test_image: Arc<EwfImage> = get_image()?;
 
         let file_entry: EwfFileEntry = get_root_file_entry(&test_image);
         assert_eq!(file_entry.is_root_file_entry(), true);

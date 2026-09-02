@@ -44,7 +44,7 @@ pub enum EwfMediaType {
 }
 
 /// Segment file naming schema.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EwfNamingSchema {
     E01LowerCase,
     E01UpperCase,

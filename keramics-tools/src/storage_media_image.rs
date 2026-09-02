@@ -35,7 +35,7 @@ use keramics_vfs::{VfsCredential, VfsCredentialStore, VfsScanner};
 /// Storage media image.
 pub enum StorageMediaImage {
     Ewf {
-        ewf_image: Arc<RwLock<EwfImage>>,
+        ewf_image: Arc<EwfImage>,
     },
     Luks {
         luks_volume: LuksEncryptedVolume,
@@ -101,7 +101,7 @@ impl StorageMediaImage {
     /// Retrieves a data stream.
     pub fn get_data_stream(&self) -> Option<DataStreamReference> {
         match self {
-            Self::Ewf { ewf_image } => Some(ewf_image.clone()),
+            Self::Ewf { ewf_image } => Some(ewf_image.get_data_stream()),
             Self::Luks { luks_volume } => luks_volume.get_data_stream(),
             Self::Pdi {
                 pdi_image_layer, ..
@@ -128,31 +128,19 @@ impl StorageMediaImage {
 
     /// Retrieves the stored MD5 hash.
     #[allow(dead_code)]
-    pub fn get_md5_hash(&self) -> Result<Option<Vec<u8>>, ErrorTrace> {
+    pub fn get_md5_hash(&self) -> Option<Vec<u8>> {
         match self {
-            Self::Ewf { ewf_image } => match ewf_image.read() {
-                Ok(image) => Ok(Some(image.get_md5_hash().to_vec())),
-                Err(error) => Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain read lock on EWF image",
-                    error
-                )),
-            },
-            _ => Ok(None),
+            Self::Ewf { ewf_image } => Some(ewf_image.get_md5_hash().to_vec()),
+            _ => None,
         }
     }
 
     /// Retrieves the stored SHA1 hash.
     #[allow(dead_code)]
-    pub fn get_sha1_hash(&self) -> Result<Option<Vec<u8>>, ErrorTrace> {
+    pub fn get_sha1_hash(&self) -> Option<Vec<u8>> {
         match self {
-            Self::Ewf { ewf_image } => match ewf_image.read() {
-                Ok(image) => Ok(Some(image.get_sha1_hash().to_vec())),
-                Err(error) => Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain read lock on EWF image",
-                    error
-                )),
-            },
-            _ => Ok(None),
+            Self::Ewf { ewf_image } => Some(ewf_image.get_sha1_hash().to_vec()),
+            _ => None,
         }
     }
 
@@ -289,7 +277,7 @@ impl StorageMediaImage {
             }
         }
         Ok(Self::Ewf {
-            ewf_image: Arc::new(RwLock::new(ewf_image)),
+            ewf_image: Arc::new(ewf_image),
         })
     }
 

@@ -29,6 +29,7 @@ use super::block_stream::UdifBlockStream;
 use super::block_table_reader::UdifBlockTableReader;
 use super::enums::UdifCompressionMethod;
 use super::file::UdifFile;
+use super::segment_file::UdifSegmentFile;
 use super::segment_range::UdifSegmentRange;
 use super::segments_block_reader::UdifSegmentsBlockReader;
 use super::segments_block_stream::UdifSegmentsBlockStream;
@@ -147,15 +148,6 @@ impl UdifImage {
     /// Retrieves the number of segments.
     pub fn get_number_of_segments(&self) -> u32 {
         self.number_of_segments
-    }
-
-    /// Determines the segment file name.
-    fn get_segment_file_name(name: &String, segment_number: u32) -> String {
-        if segment_number == 1 {
-            format!("{}.dmg", name)
-        } else {
-            format!("{}.{:03}.dmgpart", name, segment_number)
-        }
     }
 
     /// Retrieves the segment set identifier.
@@ -289,7 +281,7 @@ impl UdifImage {
 
     /// Opens a segment file.
     fn open_segment_file(&self, segment_number: u32) -> Result<UdifFile, ErrorTrace> {
-        let segment_file_name: String = Self::get_segment_file_name(&self.name, segment_number);
+        let segment_file_name: String = UdifSegmentFile::get_file_name(&self.name, segment_number);
 
         let path_components: [PathComponent; 1] = [PathComponent::from(&segment_file_name)];
 
@@ -539,7 +531,7 @@ impl UdifImage {
         }
         let segment_number: u32 = 1;
 
-        let segment_file_name: String = Self::get_segment_file_name(&self.name, segment_number);
+        let segment_file_name: String = UdifSegmentFile::get_file_name(&self.name, segment_number);
 
         let path_components: [PathComponent; 1] = [PathComponent::from(&segment_file_name)];
 
@@ -712,20 +704,6 @@ mod tests {
         assert_eq!(number_of_segments, 2);
 
         Ok(())
-    }
-
-    #[test]
-    fn test_get_segment_file_name() {
-        let base_name: String = String::from("image");
-
-        let name: String = UdifImage::get_segment_file_name(&base_name, 1);
-        assert_eq!(name, "image.dmg");
-
-        let name: String = UdifImage::get_segment_file_name(&base_name, 9);
-        assert_eq!(name, "image.009.dmgpart");
-
-        let name: String = UdifImage::get_segment_file_name(&base_name, 1234);
-        assert_eq!(name, "image.1234.dmgpart");
     }
 
     #[test]

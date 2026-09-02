@@ -20,7 +20,7 @@ pub enum EwfBlockRangeType {
 }
 
 /// Expert Witness Compression Format (EWF) block range.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct EwfBlockRange {
     /// Media offset.
     pub media_offset: u64,
