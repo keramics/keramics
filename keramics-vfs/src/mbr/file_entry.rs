@@ -21,6 +21,7 @@ use crate::traits::VfsPartition;
 pub type MbrFileEntry = VfsPartitionFileEntry<MbrPartition, MbrVolumeSystem>;
 
 impl VfsPartition for MbrPartition {
+    /// Name prefix.
     const NAME_PREFIX: &'static str = "mbr";
 
     /// Retrieves the default data stream.

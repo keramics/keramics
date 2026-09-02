@@ -22,6 +22,7 @@ pub type SgiDiskLabelFileEntry =
     VfsPartitionFileEntry<SgiDiskLabelPartition, SgiDiskLabelVolumeSystem>;
 
 impl VfsPartition for SgiDiskLabelPartition {
+    /// Name prefix.
     const NAME_PREFIX: &'static str = "sgilabel";
 
     /// Retrieves the default data stream.

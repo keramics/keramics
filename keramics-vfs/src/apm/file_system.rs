@@ -23,6 +23,7 @@ use crate::types::VfsFileSystemReference;
 pub type ApmFileSystem = VfsPartitionFileSystem<ApmPartition, ApmVolumeSystem>;
 
 impl VfsPartitionSystem for ApmVolumeSystem {
+    /// Path prefix.
     const PATH_PREFIX: &'static str = "/apm";
 
     /// Creates a new partition (volume) system.

@@ -24,6 +24,7 @@ use crate::types::VfsFileSystemReference;
 pub type MbrFileSystem = VfsPartitionFileSystem<MbrPartition, MbrVolumeSystem>;
 
 impl VfsPartitionSystem for MbrVolumeSystem {
+    /// Path prefix.
     const PATH_PREFIX: &'static str = "/mbr";
 
     /// Creates a new partition (volume) system.
