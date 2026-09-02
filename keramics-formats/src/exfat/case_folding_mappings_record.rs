@@ -13,6 +13,7 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
+use keramics_types::{bytes_to_u32_le, bytes_to_u64_le};
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -28,12 +29,25 @@ use keramics_layout_map::LayoutMap;
     methods("debug_read_data")
 )]
 /// Extensible File Allocation Table (exFAT) case folding mappings (directory) record.
-pub struct ExFatCaseFoldingMappingsRecord {}
+pub struct ExFatCaseFoldingMappingsRecord {
+    /// Checksum.
+    pub checksum: u32,
+
+    /// Data start cluster.
+    pub data_start_cluster: u32,
+
+    /// Data size.
+    pub data_size: u64,
+}
 
 impl ExFatCaseFoldingMappingsRecord {
     /// Creates a new case folding mappings record.
     pub fn new() -> Self {
-        Self {}
+        Self {
+            checksum: 0,
+            data_start_cluster: 0,
+            data_size: 0,
+        }
     }
 
     /// Reads the case folding mappings record from a buffer.
@@ -49,6 +63,10 @@ impl ExFatCaseFoldingMappingsRecord {
                 type_code
             )));
         }
+        self.checksum = bytes_to_u32_le!(data, 4);
+        self.data_start_cluster = bytes_to_u32_le!(data, 20);
+        self.data_size = bytes_to_u64_le!(data, 24);
+
         Ok(())
     }
 }
@@ -71,6 +89,10 @@ mod tests {
 
         let mut test_struct = ExFatCaseFoldingMappingsRecord::new();
         test_struct.read_data(&test_data)?;
+
+        assert_eq!(test_struct.checksum, 0xe619d30d);
+        assert_eq!(test_struct.data_start_cluster, 3);
+        assert_eq!(test_struct.data_size, 5836);
 
         Ok(())
     }
