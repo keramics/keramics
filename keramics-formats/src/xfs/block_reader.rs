@@ -26,9 +26,6 @@ pub struct XfsBlockReader {
     /// The data stream.
     data_stream: DataStreamReference,
 
-    /// Allocation group size.
-    allocation_group_size: u32,
-
     /// Block size.
     block_size: u32,
 
@@ -46,7 +43,6 @@ impl XfsBlockReader {
     /// Creates a new block reader.
     pub(super) fn new(
         data_stream: &DataStreamReference,
-        allocation_group_size: u32,
         number_of_relative_block_number_bits: u32,
         block_size: u32,
         extents: &[XfsPackedExtent],
@@ -54,7 +50,6 @@ impl XfsBlockReader {
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
-            allocation_group_size,
             block_size,
             relative_block_number_bit_mask: (1 << (number_of_relative_block_number_bits as u64))
                 - 1,

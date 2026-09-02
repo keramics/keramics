@@ -75,10 +75,6 @@ struct CommandLineArguments {
     /// Password to unlock format
     password: Vec<String>,
 
-    #[arg(long, default_value_t = 0)]
-    /// Volume within the format, where 1 represents the first volume
-    volume: usize,
-
     /// Path of the source file
     source: PathBuf,
 
@@ -103,6 +99,10 @@ struct IdentifierCommandArguments {
     /// Format specific entry identifier
     #[arg(value_parser=maybe_hex::<u64>)]
     entry: u64,
+
+    #[arg(long, default_value_t = 0)]
+    /// Volume within the format, where 1 represents the first volume
+    volume: usize,
 }
 
 #[derive(Args, Debug)]
@@ -110,6 +110,10 @@ struct HierarchyCommandArguments {
     /// Path to start with
     #[arg(long)]
     path: Option<String>,
+
+    #[arg(long, default_value_t = 0)]
+    /// Volume within the format, where 1 represents the first volume
+    volume: usize,
 
     // TODO: allow to set the path component/segment separator
     // TODO: allow to set the data stream name separator
@@ -122,6 +126,10 @@ struct HierarchyCommandArguments {
 struct PathCommandArguments {
     /// Format specific path
     path: String,
+
+    #[arg(long, default_value_t = 0)]
+    /// Volume within the format, where 1 represents the first volume
+    volume: usize,
 }
 
 /// Tool for providing information about file formats.
@@ -543,7 +551,7 @@ fn main() -> ExitCode {
         Some(Commands::Identifier(command_arguments)) => match &format_identifier {
             FormatIdentifier::Apfs => ApfsInfo::print_file_entry_by_identifier(
                 &data_stream,
-                arguments.volume,
+                command_arguments.volume,
                 command_arguments.entry,
             ),
             FormatIdentifier::ExFat => {
@@ -576,7 +584,7 @@ fn main() -> ExitCode {
         Some(Commands::Hierarchy(command_arguments)) => match &format_identifier {
             FormatIdentifier::Apfs => ApfsInfo::print_hierarchy(
                 &data_stream,
-                arguments.volume,
+                command_arguments.volume,
                 &command_arguments.volume_path_type,
                 command_arguments.path.as_ref(),
             ),
@@ -608,14 +616,15 @@ fn main() -> ExitCode {
             ))),
         },
         Some(Commands::Path(command_arguments)) => {
-            // TODO: detect leading partion path component and suggest/check path exists without
-            // it.
+            // TODO: detect leading partion path component and suggest/check path exists without it.
             let path: Path = Path::from(&command_arguments.path);
 
             match &format_identifier {
-                FormatIdentifier::Apfs => {
-                    ApfsInfo::print_file_entry_by_path(&data_stream, arguments.volume, &path)
-                }
+                FormatIdentifier::Apfs => ApfsInfo::print_file_entry_by_path(
+                    &data_stream,
+                    command_arguments.volume,
+                    &path,
+                ),
                 FormatIdentifier::ExFat => ExFatInfo::print_file_entry_by_path(&data_stream, &path),
                 FormatIdentifier::Ext => ExtInfo::print_file_entry_by_path(
                     &data_stream,

@@ -13,10 +13,10 @@
 
 use crate::block_stream::BlockStream;
 
-use super::block_reader::SparseBundleBlockReader;
+use super::block_reader::UdifBlockReader;
 
-/// Mac OS sparse bundle (.sparsebundle) block stream.
-pub type SparseBundleBlockStream = BlockStream<SparseBundleBlockReader>;
+/// Universal Disk Image Format (UDIF) block stream.
+pub type UdifBlockStream = BlockStream<UdifBlockReader>;
 
 #[cfg(test)]
 mod tests {
@@ -27,31 +27,67 @@ mod tests {
 
     use keramics_core::{DataStream, ErrorTrace};
 
+    use crate::cdsaencr::CdsaEncrCredential;
     use crate::file_resolver::FileResolverReference;
     use crate::os_file_resolver::open_os_file_resolver;
     use crate::tests::get_test_data_path;
+    use crate::udif::segment_range::UdifSegmentRange;
 
-    fn get_block_stream() -> Result<SparseBundleBlockStream, ErrorTrace> {
-        let test_path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
-        let path_buf: PathBuf = PathBuf::from(test_path_string.as_str());
+    fn get_block_stream() -> Result<UdifBlockStream, ErrorTrace> {
+        let path_string: String = get_test_data_path("udif");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
 
-        Ok(SparseBundleBlockStream::new(SparseBundleBlockReader::new(
+        let segment_ranges: [UdifSegmentRange; 5] = [
+            UdifSegmentRange {
+                segment_number: 1,
+                start_offset: 0,
+                end_offset: 409600,
+                size: 409600,
+            },
+            UdifSegmentRange {
+                segment_number: 2,
+                start_offset: 409600,
+                end_offset: 818688,
+                size: 409600,
+            },
+            UdifSegmentRange {
+                segment_number: 3,
+                start_offset: 818688,
+                end_offset: 1227776,
+                size: 409600,
+            },
+            UdifSegmentRange {
+                segment_number: 4,
+                start_offset: 1227776,
+                end_offset: 1636864,
+                size: 409600,
+            },
+            UdifSegmentRange {
+                segment_number: 5,
+                start_offset: 1636864,
+                end_offset: 1955840,
+                size: 318976,
+            },
+        ];
+        let credentials: [CdsaEncrCredential; 0] = [];
+
+        Ok(UdifBlockStream::new(UdifBlockReader::new(
             &file_resolver,
-            8388608,
-            None,
-            0,
-            4194304,
+            "hfsplus_segments",
+            &segment_ranges,
+            &credentials,
+            1955840,
         )))
     }
 
     #[test]
     fn test_get_offset() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut segment_stream: UdifBlockStream = get_block_stream()?;
 
-        block_stream.seek(SeekFrom::Start(1024))?;
+        segment_stream.seek(SeekFrom::Start(1024))?;
 
-        let offset: u64 = block_stream.get_offset()?;
+        let offset: u64 = segment_stream.get_offset()?;
         assert_eq!(offset, 1024);
 
         Ok(())
@@ -59,19 +95,19 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut segment_stream: UdifBlockStream = get_block_stream()?;
 
-        let size: u64 = block_stream.get_size()?;
-        assert_eq!(size, 4194304);
+        let size: u64 = segment_stream.get_size()?;
+        assert_eq!(size, 1955840);
 
         Ok(())
     }
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut segment_stream: UdifBlockStream = get_block_stream()?;
 
-        let offset: u64 = block_stream.seek(SeekFrom::Start(1024))?;
+        let offset: u64 = segment_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
         Ok(())
@@ -79,10 +115,10 @@ mod tests {
 
     #[test]
     fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
-        let size: u64 = block_stream.get_size()?;
+        let mut segment_stream: UdifBlockStream = get_block_stream()?;
+        let size: u64 = segment_stream.get_size()?;
 
-        let offset: u64 = block_stream.seek(SeekFrom::End(-512))?;
+        let offset: u64 = segment_stream.seek(SeekFrom::End(-512))?;
         assert_eq!(offset, size - 512);
 
         Ok(())
@@ -90,12 +126,12 @@ mod tests {
 
     #[test]
     fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut segment_stream: UdifBlockStream = get_block_stream()?;
 
-        let offset = block_stream.seek(SeekFrom::Start(1024))?;
+        let offset = segment_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
-        let offset: u64 = block_stream.seek(SeekFrom::Current(-512))?;
+        let offset: u64 = segment_stream.seek(SeekFrom::Current(-512))?;
         assert_eq!(offset, 512);
 
         Ok(())
@@ -103,9 +139,9 @@ mod tests {
 
     #[test]
     fn test_seek_before_zero() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut segment_stream: UdifBlockStream = get_block_stream()?;
 
-        let result: Result<u64, ErrorTrace> = block_stream.seek(SeekFrom::Current(-512));
+        let result: Result<u64, ErrorTrace> = segment_stream.seek(SeekFrom::Current(-512));
         assert!(result.is_err());
 
         Ok(())
@@ -113,10 +149,10 @@ mod tests {
 
     #[test]
     fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
-        let size: u64 = block_stream.get_size()?;
+        let mut segment_stream: UdifBlockStream = get_block_stream()?;
+        let size: u64 = segment_stream.get_size()?;
 
-        let offset: u64 = block_stream.seek(SeekFrom::End(512))?;
+        let offset: u64 = segment_stream.seek(SeekFrom::End(512))?;
         assert_eq!(offset, size + 512);
 
         Ok(())
@@ -124,17 +160,17 @@ mod tests {
 
     #[test]
     fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
-        block_stream.seek(SeekFrom::Start(1024))?;
+        let mut segment_stream: UdifBlockStream = get_block_stream()?;
+        segment_stream.seek(SeekFrom::Start(1024))?;
 
         let mut data: Vec<u8> = vec![0; 512];
-        let read_size: usize = block_stream.read(&mut data)?;
+        let read_size: usize = segment_stream.read(&mut data)?;
         assert_eq!(read_size, 512);
 
         let expected_data: Vec<u8> = vec![
             0x00, 0x53, 0x46, 0x48, 0x00, 0x00, 0xaa, 0x11, 0xaa, 0x11, 0x00, 0x30, 0x65, 0x43,
-            0xec, 0xac, 0x89, 0xc9, 0xaf, 0xca, 0xee, 0xbd, 0x3f, 0x4a, 0xb3, 0xa6, 0x12, 0x85,
-            0x86, 0x38, 0xf8, 0xa6, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd7, 0x1f,
+            0xec, 0xac, 0xb2, 0xb3, 0x80, 0x60, 0xbe, 0x78, 0xa9, 0x4d, 0x8b, 0x19, 0x2f, 0xcc,
+            0x48, 0x39, 0xca, 0x2d, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd7, 0x0e,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x64, 0x00, 0x69, 0x00, 0x73, 0x00, 0x6b, 0x00, 0x20, 0x00, 0x69, 0x00, 0x6d, 0x00,
             0x61, 0x00, 0x67, 0x00, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -177,11 +213,11 @@ mod tests {
 
     #[test]
     fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
-        block_stream.seek(SeekFrom::End(512))?;
+        let mut segment_stream: UdifBlockStream = get_block_stream()?;
+        segment_stream.seek(SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];
-        let read_size: usize = block_stream.read(&mut data)?;
+        let read_size: usize = segment_stream.read(&mut data)?;
         assert_eq!(read_size, 0);
 
         Ok(())

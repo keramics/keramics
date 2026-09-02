@@ -69,11 +69,9 @@ impl<P: VfsPartition, V: PartitionIterator<PartitionItem = P>> VfsPartitionFileE
     /// Retrieves the name.
     pub fn get_name(&self) -> PathComponent {
         match self {
-            VfsPartitionFileEntry::Partition {
-                name_index,
-                partition,
-                ..
-            } => PathComponent::from(format!("{}{}", P::NAME_PREFIX, name_index + 1)),
+            VfsPartitionFileEntry::Partition { name_index, .. } => {
+                PathComponent::from(format!("{}{}", P::NAME_PREFIX, name_index + 1))
+            }
             VfsPartitionFileEntry::Root { .. } => PathComponent::Root,
         }
     }
