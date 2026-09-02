@@ -22,6 +22,7 @@ use crate::traits::VfsPartition;
 pub type GptFileEntry = VfsPartitionFileEntry<GptPartition, GptVolumeSystem>;
 
 impl VfsPartition for GptPartition {
+    /// Name prefix.
     const NAME_PREFIX: &'static str = "gpt";
 
     /// Retrieves the default data stream.

@@ -23,6 +23,7 @@ mod file_entries;
 mod file_entry;
 mod file_resolver;
 mod file_system;
+mod image;
 mod location;
 mod partition;
 mod path;

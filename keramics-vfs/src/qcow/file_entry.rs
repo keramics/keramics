@@ -11,122 +11,32 @@
  * under the License.
  */
 
-use std::sync::Arc;
+use keramics_core::DataStreamReference;
+use keramics_formats::qcow::{QcowFile, QcowImage};
 
-use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::PathComponent;
-use keramics_formats::qcow::{QcowImage, QcowImageLayer};
-
-use crate::enums::VfsFileType;
+use crate::image::{VfsImageFileEntry, VfsImageIdentifier};
+use crate::traits::VfsImageLayer;
 
 /// QEMU Copy-On-Write (QCOW) storage media image file entry.
-pub enum QcowFileEntry {
-    /// Layer file entry.
-    Layer {
-        /// File name index.
-        name_index: usize,
+pub type QcowFileEntry = VfsImageFileEntry<QcowImage, QcowFile>;
 
-        /// Layer.
-        layer: QcowImageLayer,
+impl VfsImageLayer for QcowFile {
+    /// Name prefix.
+    const NAME_PREFIX: &'static str = "qcow";
 
-        /// Size.
-        size: u64,
-    },
-
-    /// Root file entry.
-    Root {
-        /// Storage media image.
-        image: Arc<QcowImage>,
-    },
-}
-
-impl QcowFileEntry {
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
-        match self {
-            QcowFileEntry::Layer { layer, .. } => Ok(layer.get_data_stream()),
-            QcowFileEntry::Root { .. } => Ok(None),
-        }
+    fn get_data_stream(&self) -> Option<DataStreamReference> {
+        QcowFile::get_data_stream(self)
     }
 
-    /// Retrieves the file type.
-    pub fn get_file_type(&self) -> VfsFileType {
-        match self {
-            QcowFileEntry::Layer { .. } => VfsFileType::File,
-            QcowFileEntry::Root { .. } => VfsFileType::Directory,
-        }
+    /// Retrieves the identifier.
+    fn get_identifier(&self) -> Option<VfsImageIdentifier> {
+        None
     }
 
-    /// Retrieves the name.
-    pub fn get_name(&self) -> PathComponent {
-        match self {
-            QcowFileEntry::Layer { name_index, .. } => {
-                PathComponent::from(format!("qcow{}", name_index + 1))
-            }
-            QcowFileEntry::Root { .. } => PathComponent::Root,
-        }
-    }
-
-    /// Retrieves the (image) layer number.
-    pub fn get_layer_number(&self) -> Option<usize> {
-        match self {
-            QcowFileEntry::Layer { name_index, .. } => Some(name_index + 1),
-            QcowFileEntry::Root { .. } => None,
-        }
-    }
-
-    /// Retrieves the size.
-    pub fn get_size(&self) -> u64 {
-        match self {
-            QcowFileEntry::Layer { size, .. } => *size,
-            QcowFileEntry::Root { .. } => 0,
-        }
-    }
-
-    /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&self) -> usize {
-        match self {
-            QcowFileEntry::Layer { .. } => 0,
-            QcowFileEntry::Root { image } => image.get_number_of_layers(),
-        }
-    }
-
-    /// Retrieves a specific sub file entry.
-    pub fn get_sub_file_entry_by_index(
-        &self,
-        sub_file_entry_index: usize,
-    ) -> Result<QcowFileEntry, ErrorTrace> {
-        match self {
-            QcowFileEntry::Layer { .. } => {
-                Err(keramics_core::error_trace_new!("No sub file entries"))
-            }
-            QcowFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
-                Ok(image_layer) => {
-                    let media_size: u64 = image_layer.get_media_size();
-
-                    Ok(QcowFileEntry::Layer {
-                        name_index: sub_file_entry_index,
-                        layer: image_layer.clone(),
-                        size: media_size,
-                    })
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!("Unable to retrieve image layer: {}", sub_file_entry_index)
-                    );
-                    return Err(error);
-                }
-            },
-        }
-    }
-
-    /// Determines if the file entry is the root file entry.
-    pub fn is_root_file_entry(&self) -> bool {
-        match self {
-            QcowFileEntry::Layer { .. } => false,
-            QcowFileEntry::Root { .. } => true,
-        }
+    /// Retrieves the media size.
+    fn get_media_size(&self) -> u64 {
+        QcowFile::get_media_size(self)
     }
 }
 
@@ -135,9 +45,12 @@ mod tests {
     use super::*;
 
     use std::path::PathBuf;
+    use std::sync::Arc;
 
+    use keramics_core::ErrorTrace;
     use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
+    use crate::enums::VfsFileType;
     use crate::tests::get_test_data_path;
 
     fn get_image() -> Result<Arc<QcowImage>, ErrorTrace> {
@@ -153,14 +66,11 @@ mod tests {
     }
 
     fn get_layer_file_entry(image: &Arc<QcowImage>) -> Result<QcowFileEntry, ErrorTrace> {
-        let image_layer: QcowImageLayer = image.get_layer_by_index(0)?;
-
-        let media_size: u64 = image_layer.get_media_size();
+        let image_layer: Arc<QcowFile> = image.get_layer_by_index(0)?;
 
         Ok(QcowFileEntry::Layer {
             name_index: 0,
-            layer: image_layer.clone(),
-            size: media_size,
+            layer: image_layer,
         })
     }
 
@@ -181,6 +91,26 @@ mod tests {
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
 
+        let file_entry: QcowFileEntry = get_layer_file_entry(&test_image)?;
+
+        let file_type: VfsFileType = file_entry.get_file_type();
+        assert_eq!(file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_identifier() -> Result<(), ErrorTrace> {
+        let test_image: Arc<QcowImage> = get_image()?;
+
+        let file_entry: QcowFileEntry = get_root_file_entry(&test_image);
+        let result: Option<VfsImageIdentifier> = file_entry.get_identifier();
+        assert!(result.is_none());
+
+        let file_entry: QcowFileEntry = get_layer_file_entry(&test_image)?;
+        let result: Option<VfsImageIdentifier> = file_entry.get_identifier();
+        assert!(result.is_none());
+
         Ok(())
     }
 
@@ -197,6 +127,23 @@ mod tests {
 
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::from("qcow1"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_layer_number() -> Result<(), ErrorTrace> {
+        let test_image: Arc<QcowImage> = get_image()?;
+
+        let file_entry: QcowFileEntry = get_root_file_entry(&test_image);
+
+        let layer_number: Option<usize> = file_entry.get_layer_number();
+        assert_eq!(layer_number, None);
+
+        let file_entry: QcowFileEntry = get_layer_file_entry(&test_image)?;
+
+        let layer_number: Option<usize> = file_entry.get_layer_number();
+        assert_eq!(layer_number, Some(1));
 
         Ok(())
     }

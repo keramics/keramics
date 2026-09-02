@@ -14,168 +14,60 @@
 use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
-use keramics_formats::qcow::{QcowImage, QcowImageLayer};
+use keramics_formats::qcow::{QcowFile, QcowImage};
 use keramics_formats::{FileResolverReference, Path, PathComponent};
 
 use crate::file_resolver::new_vfs_file_resolver;
-use crate::location::VfsLocation;
-use crate::path::VfsPath;
+use crate::image::VfsImageFileSystem;
+use crate::traits::VfsImage;
 use crate::types::VfsFileSystemReference;
 
-use super::file_entry::QcowFileEntry;
-
 /// QEMU Copy-On-Write (QCOW) storage media image file system.
-pub struct QcowFileSystem {
-    /// Storage media image.
-    image: Arc<QcowImage>,
+pub type QcowFileSystem = VfsImageFileSystem<QcowImage, QcowFile>;
 
-    /// Number of layers.
-    number_of_layers: usize,
-}
+impl VfsImage for QcowImage {
+    /// Path prefix.
+    const PATH_PREFIX: &'static str = "/qcow";
 
-impl QcowFileSystem {
-    pub const PATH_PREFIX: &'static str = "/qcow";
+    /// Image layer type.
+    type Layer = QcowFile;
 
-    /// Creates a new file system.
-    pub fn new() -> Self {
-        Self {
-            image: Arc::new(QcowImage::new()),
-            number_of_layers: 0,
-        }
-    }
-
-    /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, path: &Path) -> bool {
-        if path.is_relative() {
-            return false;
-        }
-        match path.get_component_by_index(1) {
-            Some(path_component) => {
-                if path.get_number_of_components() > 2 {
-                    return false;
-                }
-                let layer_index: usize = match VfsPath::get_numeric_suffix(path_component, "qcow") {
-                    Some(layer_index) => layer_index,
-                    None => return false,
-                };
-                if layer_index == 0 || layer_index > self.number_of_layers {
-                    false
-                } else {
-                    true
-                }
-            }
-            None => {
-                if path.is_empty() {
-                    false
-                } else {
-                    true
-                }
-            }
-        }
+    /// Creates a new image.
+    fn new() -> Self {
+        QcowImage::new()
     }
 
     /// Retrieves the bytes per sector.
-    pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
-        Ok(self.image.get_bytes_per_sector() as u32)
+    fn get_bytes_per_sector(&self) -> u16 {
+        QcowImage::get_bytes_per_sector(self)
     }
 
-    /// Retrieves the file entry with the specific location.
-    pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<QcowFileEntry>, ErrorTrace> {
-        if path.is_relative() {
-            return Ok(None);
-        }
-        match path.get_component_by_index(1) {
-            Some(path_component) => {
-                if path.get_number_of_components() > 2 {
-                    return Ok(None);
-                }
-                let mut layer_index: usize =
-                    match VfsPath::get_numeric_suffix(path_component, "qcow") {
-                        Some(layer_index) => layer_index,
-                        None => return Ok(None),
-                    };
-                if layer_index == 0 || layer_index > self.number_of_layers {
-                    return Ok(None);
-                }
-                layer_index -= 1;
-
-                let image_layer: QcowImageLayer = match self.image.get_layer_by_index(layer_index) {
-                    Ok(image_layer) => image_layer,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to retrieve image layer: {}", layer_index)
-                        );
-                        return Err(error);
-                    }
-                };
-                let media_size: u64 = image_layer.get_media_size();
-
-                Ok(Some(QcowFileEntry::Layer {
-                    name_index: layer_index,
-                    layer: image_layer.clone(),
-                    size: media_size,
-                }))
-            }
-            None => {
-                if path.is_empty() {
-                    return Ok(None);
-                }
-                Ok(Some(self.get_root_file_entry()))
-            }
-        }
+    /// Retrieves the number of layers.
+    fn get_number_of_layers(&self) -> usize {
+        QcowImage::get_number_of_layers(self)
     }
 
-    /// Retrieves the root file entry.
-    pub fn get_root_file_entry(&self) -> QcowFileEntry {
-        QcowFileEntry::Root {
-            image: self.image.clone(),
-        }
+    /// Retrieves a layer by index.
+    fn get_layer_by_index(&self, layer_index: usize) -> Result<Arc<QcowFile>, ErrorTrace> {
+        QcowImage::get_layer_by_index(self, layer_index)
     }
 
-    /// Opens the file system.
-    pub fn open(
+    /// Opens the image from VFS.
+    fn open_from_vfs(
         &mut self,
-        parent_file_system: Option<&VfsFileSystemReference>,
-        vfs_location: &VfsLocation,
-    ) -> Result<(), ErrorTrace> {
-        let file_system: &VfsFileSystemReference = match parent_file_system {
-            Some(file_system) => file_system,
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Missing parent file system"
-                ));
-            }
-        };
-        let path: &Path = vfs_location.get_path();
-
-        match Arc::get_mut(&mut self.image) {
-            Some(image) => {
-                match Self::open_image(image, file_system, path) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
-                        return Err(error);
-                    }
-                }
-                self.number_of_layers = image.get_number_of_layers();
-            }
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unable to obtain mutable reference to QCOW image"
-                ));
-            }
-        }
-        Ok(())
-    }
-
-    /// Opens a QCOW image.
-    pub(crate) fn open_image(
-        image: &mut QcowImage,
         file_system: &VfsFileSystemReference,
         path: &Path,
     ) -> Result<(), ErrorTrace> {
         let parent_path: Path = path.new_with_parent_directory();
+        let file_name: &PathComponent = match path.file_name() {
+            Some(file_name) => file_name,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to retrieve file name"
+                ));
+            }
+        };
+
         let file_resolver: FileResolverReference =
             match new_vfs_file_resolver(file_system, parent_path) {
                 Ok(file_resolver) => file_resolver,
@@ -187,15 +79,7 @@ impl QcowFileSystem {
                     return Err(error);
                 }
             };
-        let file_name: &PathComponent = match path.file_name() {
-            Some(file_name) => file_name,
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unable to retrieve file name"
-                ));
-            }
-        };
-        match image.open(&file_resolver, file_name) {
+        match self.open(&file_resolver, file_name) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
@@ -210,9 +94,13 @@ impl QcowFileSystem {
 mod tests {
     use super::*;
 
+    use keramics_formats::PathComponent;
+
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
 
+    use crate::location::VfsLocation;
+    use crate::qcow::file_entry::QcowFileEntry;
     use crate::tests::get_test_data_path;
 
     fn get_file_system() -> Result<QcowFileSystem, ErrorTrace> {

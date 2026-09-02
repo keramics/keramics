@@ -41,17 +41,13 @@ use crate::ewf::EwfFileSystem;
 use crate::file_entry::VfsFileEntry;
 use crate::linuxlvm::LinuxLvmFileSystem;
 use crate::location::VfsLocation;
-use crate::pdi::PdiFileSystem;
-use crate::qcow::QcowFileSystem;
 use crate::resolver::VfsResolver;
 use crate::sparsebundle::SparseBundleFileSystem;
 use crate::sparseimage::SparseImageFileSystem;
 use crate::splitraw::SplitRawFileSystem;
-use crate::traits::VfsPartitionSystem;
+use crate::traits::{VfsImage, VfsPartitionSystem};
 use crate::types::{VfsFileSystemReference, VfsResolverReference};
 use crate::udif::UdifFileSystem;
-use crate::vhd::VhdFileSystem;
-use crate::vhdx::VhdxFileSystem;
 use crate::vmdk::VmdkFileSystem;
 
 use super::scan_context::VfsScanContext;
@@ -1002,7 +998,7 @@ impl VfsScanner {
             VfsType::Pdi => {
                 let mut pdi_image: PdiImage = PdiImage::new();
 
-                match PdiFileSystem::open_image(&mut pdi_image, file_system, path) {
+                match pdi_image.open_from_vfs(file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open PDI image");
@@ -1015,7 +1011,7 @@ impl VfsScanner {
                     scan_options,
                     vfs_location,
                     scan_node,
-                    PdiFileSystem::PATH_PREFIX,
+                    PdiImage::PATH_PREFIX,
                     number_of_layers,
                 ) {
                     Ok(_) => {}
@@ -1028,7 +1024,7 @@ impl VfsScanner {
             VfsType::Qcow => {
                 let mut qcow_image: QcowImage = QcowImage::new();
 
-                match QcowFileSystem::open_image(&mut qcow_image, file_system, path) {
+                match qcow_image.open_from_vfs(file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
@@ -1041,7 +1037,7 @@ impl VfsScanner {
                     scan_options,
                     vfs_location,
                     scan_node,
-                    QcowFileSystem::PATH_PREFIX,
+                    QcowImage::PATH_PREFIX,
                     number_of_layers,
                 ) {
                     Ok(_) => {}
@@ -1202,7 +1198,7 @@ impl VfsScanner {
             VfsType::Vhd => {
                 let mut vhd_image: VhdImage = VhdImage::new();
 
-                match VhdFileSystem::open_image(&mut vhd_image, file_system, path) {
+                match vhd_image.open_from_vfs(file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open VHD image");
@@ -1215,7 +1211,7 @@ impl VfsScanner {
                     scan_options,
                     vfs_location,
                     scan_node,
-                    VhdFileSystem::PATH_PREFIX,
+                    VhdImage::PATH_PREFIX,
                     number_of_layers,
                 ) {
                     Ok(_) => {}
@@ -1228,7 +1224,7 @@ impl VfsScanner {
             VfsType::Vhdx => {
                 let mut vhdx_image: VhdxImage = VhdxImage::new();
 
-                match VhdxFileSystem::open_image(&mut vhdx_image, file_system, path) {
+                match vhdx_image.open_from_vfs(file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open VHDX image");
@@ -1241,7 +1237,7 @@ impl VfsScanner {
                     scan_options,
                     vfs_location,
                     scan_node,
-                    VhdxFileSystem::PATH_PREFIX,
+                    VhdxImage::PATH_PREFIX,
                     number_of_layers,
                 ) {
                     Ok(_) => {}

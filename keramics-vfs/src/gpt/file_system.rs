@@ -23,6 +23,7 @@ use crate::types::VfsFileSystemReference;
 pub type GptFileSystem = VfsPartitionFileSystem<GptPartition, GptVolumeSystem>;
 
 impl VfsPartitionSystem for GptVolumeSystem {
+    /// Path prefix.
     const PATH_PREFIX: &'static str = "/gpt";
 
     /// Creates a new partition (volume) system.

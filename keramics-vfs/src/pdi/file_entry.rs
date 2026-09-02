@@ -11,123 +11,35 @@
  * under the License.
  */
 
-use std::sync::Arc;
-
-use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::PathComponent;
+use keramics_core::DataStreamReference;
 use keramics_formats::pdi::{PdiImage, PdiImageLayer};
 use keramics_types::Uuid;
 
-use crate::enums::VfsFileType;
+use crate::image::{VfsImageFileEntry, VfsImageIdentifier};
+use crate::traits::VfsImageLayer;
 
 /// Parallels Disk Image (PDI) storage media image file entry.
-pub enum PdiFileEntry {
-    /// Layer file entry.
-    Layer {
-        /// File name index.
-        name_index: usize,
+pub type PdiFileEntry = VfsImageFileEntry<PdiImage, PdiImageLayer>;
 
-        /// Layer.
-        layer: Arc<PdiImageLayer>,
-    },
+impl VfsImageLayer for PdiImageLayer {
+    /// Name prefix.
+    const NAME_PREFIX: &'static str = "pdi";
 
-    /// Root file entry.
-    Root {
-        /// Storage media image.
-        image: Arc<PdiImage>,
-    },
-}
-
-impl PdiFileEntry {
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
-        match self {
-            PdiFileEntry::Layer { layer, .. } => Ok(Some(layer.get_data_stream())),
-            PdiFileEntry::Root { .. } => Ok(None),
-        }
-    }
-
-    /// Retrieves the file type.
-    pub fn get_file_type(&self) -> VfsFileType {
-        match self {
-            PdiFileEntry::Layer { .. } => VfsFileType::File,
-            PdiFileEntry::Root { .. } => VfsFileType::Directory,
-        }
+    fn get_data_stream(&self) -> Option<DataStreamReference> {
+        Some(PdiImageLayer::get_data_stream(self))
     }
 
     /// Retrieves the identifier.
-    pub fn get_identifier(&self) -> Option<&Uuid> {
-        match self {
-            PdiFileEntry::Layer { layer, .. } => Some(layer.get_identifier()),
-            PdiFileEntry::Root { .. } => None,
-        }
+    fn get_identifier(&self) -> Option<VfsImageIdentifier> {
+        let identifier: &Uuid = PdiImageLayer::get_identifier(self);
+
+        Some(VfsImageIdentifier::Uuid(identifier.clone()))
     }
 
-    /// Retrieves the (image) layer number.
-    pub fn get_layer_number(&self) -> Option<usize> {
-        match self {
-            PdiFileEntry::Layer { name_index, .. } => Some(name_index + 1),
-            PdiFileEntry::Root { .. } => None,
-        }
-    }
-
-    /// Retrieves the name.
-    pub fn get_name(&self) -> PathComponent {
-        match self {
-            PdiFileEntry::Layer { name_index, .. } => {
-                PathComponent::from(format!("pdi{}", name_index + 1))
-            }
-            PdiFileEntry::Root { .. } => PathComponent::Root,
-        }
-    }
-
-    /// Retrieves the size.
-    pub fn get_size(&self) -> u64 {
-        match self {
-            PdiFileEntry::Layer { layer, .. } => layer.get_media_size(),
-            PdiFileEntry::Root { .. } => 0,
-        }
-    }
-
-    /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&self) -> usize {
-        match self {
-            PdiFileEntry::Layer { .. } => 0,
-            PdiFileEntry::Root { image } => image.get_number_of_layers(),
-        }
-    }
-
-    /// Retrieves a specific sub file entry.
-    pub fn get_sub_file_entry_by_index(
-        &self,
-        sub_file_entry_index: usize,
-    ) -> Result<PdiFileEntry, ErrorTrace> {
-        match self {
-            PdiFileEntry::Layer { .. } => {
-                Err(keramics_core::error_trace_new!("No sub file entries"))
-            }
-            PdiFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
-                Ok(image_layer) => Ok(PdiFileEntry::Layer {
-                    name_index: sub_file_entry_index,
-                    layer: image_layer.clone(),
-                }),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!("Unable to retrieve image layer: {}", sub_file_entry_index)
-                    );
-                    return Err(error);
-                }
-            },
-        }
-    }
-
-    /// Determines if the file entry is the root file entry.
-    pub fn is_root_file_entry(&self) -> bool {
-        match self {
-            PdiFileEntry::Layer { .. } => false,
-            PdiFileEntry::Root { .. } => true,
-        }
+    /// Retrieves the media size.
+    fn get_media_size(&self) -> u64 {
+        PdiImageLayer::get_media_size(self)
     }
 }
 
@@ -136,9 +48,12 @@ mod tests {
     use super::*;
 
     use std::path::PathBuf;
+    use std::sync::Arc;
 
+    use keramics_core::ErrorTrace;
     use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
+    use crate::enums::VfsFileType;
     use crate::tests::get_test_data_path;
 
     fn get_image() -> Result<Arc<PdiImage>, ErrorTrace> {
@@ -191,11 +106,11 @@ mod tests {
         let test_image: Arc<PdiImage> = get_image()?;
 
         let file_entry: PdiFileEntry = get_root_file_entry(&test_image);
-        let result: Option<&Uuid> = file_entry.get_identifier();
+        let result: Option<VfsImageIdentifier> = file_entry.get_identifier();
         assert!(result.is_none());
 
         let file_entry: PdiFileEntry = get_layer_file_entry(&test_image)?;
-        let identifier: &Uuid = file_entry.get_identifier().unwrap();
+        let identifier: VfsImageIdentifier = file_entry.get_identifier().unwrap();
         assert_eq!(
             identifier.to_string(),
             "5fbaabe3-6958-40ff-92a7-860e329aab41"

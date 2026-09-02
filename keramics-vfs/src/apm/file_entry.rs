@@ -21,6 +21,7 @@ use crate::traits::VfsPartition;
 pub type ApmFileEntry = VfsPartitionFileEntry<ApmPartition, ApmVolumeSystem>;
 
 impl VfsPartition for ApmPartition {
+    /// Name prefix.
     const NAME_PREFIX: &'static str = "apm";
 
     /// Retrieves the default data stream.

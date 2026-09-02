@@ -11,14 +11,61 @@
  * under the License.
  */
 
+use std::sync::Arc;
+
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
 
+use super::image::VfsImageIdentifier;
 use super::partition::VfsPartitionIdentifier;
 use super::types::VfsFileSystemReference;
 
+/// Virtual File System (VFS) image trait for VfsImageFileSystem.
+pub trait VfsImage: Sized {
+    /// Path prefix.
+    const PATH_PREFIX: &'static str;
+
+    /// Image layer type.
+    type Layer: VfsImageLayer;
+
+    /// Creates a new image.
+    fn new() -> Self;
+
+    /// Retrieves the bytes per sector.
+    fn get_bytes_per_sector(&self) -> u16;
+
+    /// Retrieves the number of layers.
+    fn get_number_of_layers(&self) -> usize;
+
+    /// Retrieves a layer by index.
+    fn get_layer_by_index(&self, layer_index: usize) -> Result<Arc<Self::Layer>, ErrorTrace>;
+
+    /// Opens the image from VFS.
+    fn open_from_vfs(
+        &mut self,
+        file_system: &VfsFileSystemReference,
+        path: &Path,
+    ) -> Result<(), ErrorTrace>;
+}
+
+/// Virtual File System (VFS) image layer trait for VfsImageFileEntry.
+pub trait VfsImageLayer {
+    /// Name prefix.
+    const NAME_PREFIX: &'static str;
+
+    /// Retrieves the default data stream.
+    fn get_data_stream(&self) -> Option<DataStreamReference>;
+
+    /// Retrieves the identifier.
+    fn get_identifier(&self) -> Option<VfsImageIdentifier>;
+
+    /// Retrieves the media size.
+    fn get_media_size(&self) -> u64;
+}
+
 /// Virtual File System (VFS) partition trait for VfsPartitionFileEntry.
 pub trait VfsPartition {
+    /// Name prefix.
     const NAME_PREFIX: &'static str;
 
     /// Retrieves the default data stream.
@@ -36,6 +83,7 @@ pub trait VfsPartition {
 
 /// Virtual File System (VFS) partition system trait for VfsPartitionFileSystem.
 pub trait VfsPartitionSystem {
+    /// Path prefix.
     const PATH_PREFIX: &'static str;
 
     /// Creates a new partition (volume) system.

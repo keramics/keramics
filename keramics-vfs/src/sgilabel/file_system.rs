@@ -24,6 +24,7 @@ pub type SgiDiskLabelFileSystem =
     VfsPartitionFileSystem<SgiDiskLabelPartition, SgiDiskLabelVolumeSystem>;
 
 impl VfsPartitionSystem for SgiDiskLabelVolumeSystem {
+    /// Path prefix.
     const PATH_PREFIX: &'static str = "/sgilabel";
 
     /// Creates a new partition (volume) system.
