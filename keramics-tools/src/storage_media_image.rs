@@ -59,7 +59,7 @@ pub enum StorageMediaImage {
         splitraw_image: Arc<RwLock<SplitRawImage>>,
     },
     Udif {
-        udif_image: Arc<RwLock<UdifImage>>,
+        udif_image: Arc<UdifImage>,
     },
     Vhd {
         vhd_image_layer: VhdImageLayer,
@@ -113,7 +113,7 @@ impl StorageMediaImage {
             Self::SparseBundle { sparsebundle_image } => Some(sparsebundle_image.get_data_stream()),
             Self::SparseImage { sparseimage_file } => sparseimage_file.get_data_stream(),
             Self::SplitRaw { splitraw_image } => Some(splitraw_image.clone()),
-            Self::Udif { udif_image } => Some(udif_image.clone()),
+            Self::Udif { udif_image } => udif_image.get_data_stream(),
             Self::Vhd {
                 vhd_image_layer, ..
             } => vhd_image_layer.get_data_stream(),
@@ -703,7 +703,7 @@ impl StorageMediaImage {
             }
         }
         Ok(Self::Udif {
-            udif_image: Arc::new(RwLock::new(udif_image)),
+            udif_image: Arc::new(udif_image),
         })
     }
 
