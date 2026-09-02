@@ -17,7 +17,6 @@ mod block_range;
 mod block_reader;
 mod block_stream;
 mod boot_record;
-mod case_folding_mappings;
 mod case_folding_mappings_record;
 mod checksum;
 mod constants;

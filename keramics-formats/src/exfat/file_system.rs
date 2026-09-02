@@ -15,7 +15,6 @@ use std::io::SeekFrom;
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_types::constants::UCS2_CASE_MAPPINGS;
 use keramics_types::{Ucs2CharacterMappings, Ucs2String, bytes_to_u16_le};
 
 use crate::path::Path;
