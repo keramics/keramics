@@ -238,7 +238,7 @@ offset = ( ( cluster_block_number - 2 ) * cluster_block_size ) + cluster_chain_o
 | --- | --- | --- | --- |
 | 0 | 1 | 0x82 | Entry type |
 | 1 | 3 | 0 | Unknown (Reserved) |
-| 4 | 4 | | Checksum |
+| 4 | 4 | | [Checksum](#checksum) of the case folding mappings data |
 | 8 | 12 | 0 | Unknown (Reserved) |
 | 20 | 4 | | Data start cluster |
 | 24 | 8 | | Data size |
@@ -323,6 +323,18 @@ offset = ( ( cluster_block_number - 2 ) * cluster_block_size ) + cluster_chain_o
 | 0x0020 | Archive |
 | 0x0040 | Is device |
 | 0x0080 | Unused (reserved) |
+
+## Checksum {#checksum}
+
+The checksum calculation uses Rotate Right by 1 (ROR1).
+
+```python
+checksum = 0
+
+for byte_value in data:
+    msb = 0x80000000 if (checksum & 1) else 0
+    checksum = (msb + (checksum >> 1) + byte_value) & 0xffffffff
+```
 
 ## References
 

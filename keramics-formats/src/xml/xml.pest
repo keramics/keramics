@@ -243,20 +243,35 @@ element_declaration = {
     "<!ELEMENT" ~ white_space ~ name ~ white_space ~ content_specification ~ white_space? ~ ">"
 }
 
+// grammar in specification:
+// children = {
+//     (choice | sequence) ~ ("?" | "*" | "+")?
+// }
+
 children = {
-    (choice | sequence) ~ ("?" | "*" | "+")?
+    choice_or_sequence ~ ("?" | "*" | "+")?
 }
 
-choice = {
-    "(" ~ white_space? ~ content_particle ~ ( white_space? ~ "|" ~ white_space? ~ content_particle)+ ~ white_space? ~ ")"
+// grammar in specification:
+// choice = {
+//     "(" ~ white_space? ~ content_particle ~ ( white_space? ~ "|" ~ white_space? ~ content_particle)+ ~ white_space? ~ ")"
+// }
+
+choice_or_sequence = {
+    "(" ~ white_space? ~ content_particle ~ ( white_space? ~ ("," | "|") ~ white_space? ~ content_particle )* ~ white_space? ~ ")"
 }
 
 content = {
     character_data? ~ ((element | reference | cdata_section | processing_instructions | comment) ~ character_data?)*
 }
 
+// grammar in specification:
+// content_particle = {
+//     (name | choice | sequence) ~ ("?" | "*" | "+")?
+// }
+
 content_particle = {
-    (name | choice | sequence) ~ ("?" | "*" | "+")?
+    (name | choice_or_sequence) ~ ("?" | "*" | "+")?
 }
 
 content_specification = {
@@ -271,9 +286,10 @@ mixed_content = {
     ("(" ~ white_space? ~ "#PCDATA" ~ white_space? ~ ")")
 }
 
-sequence = {
-    "(" ~ white_space? ~ content_particle ~ ( white_space? ~ "," ~ white_space? ~ content_particle )* ~ white_space? ~ ")"
-}
+// grammar in specification:
+// sequence = {
+//     "(" ~ white_space? ~ content_particle ~ ( white_space? ~ "," ~ white_space? ~ content_particle )* ~ white_space? ~ ")"
+// }
 
 attribute_list_declaration = {
     "<!ATTLIST" ~ white_space ~ name ~ attribute_definition* ~ white_space? ~ ">"

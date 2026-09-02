@@ -16,12 +16,15 @@ use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::constants::UCS2_CASE_MAPPINGS;
-use keramics_types::{Ucs2CharacterMappings, Ucs2String};
+use keramics_types::{Ucs2CharacterMappings, Ucs2String, bytes_to_u16_le};
 
 use crate::path::Path;
 
 use super::block_allocation_table::ExFatBlockAllocationTable;
 use super::boot_record::ExFatBootRecord;
+use super::case_folding_mappings_record::ExFatCaseFoldingMappingsRecord;
+use super::checksum::ExFatChecksum;
+use super::constants::*;
 use super::data_stream_record::ExFatDataStreamRecord;
 use super::directory_entries::ExFatDirectoryEntries;
 use super::directory_entry::ExFatDirectoryEntry;
@@ -69,9 +72,7 @@ impl ExFatFileSystem {
             first_cluster_offset: 0,
             root_directory_cluster_block_number: 0,
             block_allocation_table: None,
-            case_folding_mappings: Arc::new(Ucs2CharacterMappings::from(
-                UCS2_CASE_MAPPINGS.as_slice(),
-            )),
+            case_folding_mappings: Arc::new(Ucs2CharacterMappings::new()),
             volume_serial_number: 0,
             volume_label: None,
         }
@@ -202,6 +203,101 @@ impl ExFatFileSystem {
             None,
             directory_entries,
         ))
+    }
+
+    /// Reads the case folding mappings.
+    fn read_case_folding_mappings(
+        &mut self,
+        data_stream: &DataStreamReference,
+        case_folding_mappings_record: &ExFatCaseFoldingMappingsRecord,
+    ) -> Result<(), ErrorTrace> {
+        // The case folding mappings have a maximum of 65536 16-bit values.
+        if case_folding_mappings_record.data_size < 256
+            || case_folding_mappings_record.data_size > 131072
+        {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported case folding mappings data size: {} value out of bounds",
+                case_folding_mappings_record.data_size
+            )));
+        }
+        if case_folding_mappings_record.data_size % 2 != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported case folding mappings data size: {} not a multiple of 2",
+                case_folding_mappings_record.data_size
+            )));
+        }
+        let case_folding_mappings_offset: u64 = self.first_cluster_offset
+            + (((case_folding_mappings_record.data_start_cluster - 2) as u64)
+                * (self.cluster_block_size as u64));
+
+        let mut data: Vec<u8> = vec![0; case_folding_mappings_record.data_size as usize];
+
+        keramics_core::data_stream_read_exact_at_position!(
+            data_stream,
+            &mut data,
+            SeekFrom::Start(case_folding_mappings_offset)
+        );
+        keramics_core::debug_trace_data!(
+            "ExFatCaseFoldingMappings",
+            case_folding_mappings_offset,
+            &data,
+            case_folding_mappings_record.data_size,
+        );
+        if case_folding_mappings_record.checksum != 0 {
+            let calculated_checksum: u32 = ExFatChecksum::calculate(&data);
+
+            if case_folding_mappings_record.checksum != calculated_checksum {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:018} checksums",
+                    case_folding_mappings_record.checksum, calculated_checksum
+                )));
+            }
+        }
+        if &data[0..256] != EXFAT_FIRST_128_CASE_FOLDING_MAPPINGS {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported case folding mappings"
+            ));
+        }
+        let mut data_offset: usize = 0;
+        let data_size: usize = case_folding_mappings_record.data_size as usize;
+
+        let is_compressed: bool = data_size < 131072;
+        let mut character_value: u32 = 0;
+        let mut case_folding_mappings: Ucs2CharacterMappings = Ucs2CharacterMappings::new();
+
+        while data_offset < data_size {
+            let value_16bit: u32 = bytes_to_u16_le!(data, data_offset) as u32;
+            data_offset += 2;
+
+            // Note that 0xffff can be stored "uncompressed" at the end of a compressed table.
+            if is_compressed && value_16bit == 0xffff && data_offset < data_size {
+                let run_length: u32 = bytes_to_u16_le!(data, data_offset) as u32;
+                data_offset += 2;
+
+                if run_length > 0x10000 - character_value {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid compressed case folding mappings - run length value out of bounds"
+                    ));
+                }
+                character_value += run_length;
+            } else {
+                if character_value != value_16bit {
+                    case_folding_mappings.add(character_value as u16, value_16bit as u16);
+                }
+                character_value += 1;
+            }
+            if character_value > 0xffff {
+                break;
+            }
+        }
+        if data_offset != data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid case folding mappings"
+            ));
+        }
+        self.case_folding_mappings = Arc::new(case_folding_mappings);
+
+        Ok(())
     }
 
     /// Reads a file system from a data stream.
@@ -384,11 +480,31 @@ impl ExFatFileSystem {
                 return Err(error);
             }
         }
+        self.block_allocation_table = Some(block_allocation_table);
+
         if directory_entries.volume_label.is_some() {
             self.volume_label = directory_entries.volume_label;
         }
-        self.block_allocation_table = Some(block_allocation_table);
+        match &directory_entries.case_folding_mappings_record {
+            Some(case_folding_mappings_record) => {
+                match self.read_case_folding_mappings(data_stream, case_folding_mappings_record) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read case folding mappings"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            None => {
+                let case_folding_mappings: Ucs2CharacterMappings =
+                    Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice());
 
+                self.case_folding_mappings = Arc::new(case_folding_mappings);
+            }
+        }
         Ok(())
     }
 }

@@ -22,6 +22,7 @@ use crate::indexed_hash_map::IndexedHashMap;
 use crate::path_component::PathComponent;
 
 use super::block_allocation_table::ExFatBlockAllocationTable;
+use super::case_folding_mappings_record::ExFatCaseFoldingMappingsRecord;
 use super::constants::*;
 use super::data_stream_record::ExFatDataStreamRecord;
 use super::directory_entry::ExFatDirectoryEntry;
@@ -31,8 +32,6 @@ use super::volume_label_record::ExFatVolumeLabelRecord;
 
 #[cfg(feature = "debug-trace")]
 use super::allocation_bitmap_record::ExFatAllocationBitmapRecord;
-#[cfg(feature = "debug-trace")]
-use super::case_folding_mappings_record::ExFatCaseFoldingMappingsRecord;
 #[cfg(feature = "debug-trace")]
 use super::file_entry_record::ExFatFileEntryRecord;
 
@@ -46,6 +45,9 @@ pub struct ExFatDirectoryEntries {
 
     /// Volume label.
     pub volume_label: Option<Ucs2String>,
+
+    /// Case folding mappings record.
+    pub case_folding_mappings_record: Option<ExFatCaseFoldingMappingsRecord>,
 
     /// Value to indicate the directory entries are those of the root directory.
     is_root: bool,
@@ -61,6 +63,7 @@ impl ExFatDirectoryEntries {
             entries: IndexedHashMap::new(),
             case_folding_mappings: case_folding_mappings.clone(),
             volume_label: None,
+            case_folding_mappings_record: None,
             is_root,
             is_read: false,
         }
@@ -145,6 +148,25 @@ impl ExFatDirectoryEntries {
                             "Unsupported case folding mappings record in non-root directory"
                         ));
                     }
+                    let mut case_folding_mappings_record: ExFatCaseFoldingMappingsRecord =
+                        ExFatCaseFoldingMappingsRecord::new();
+
+                    match case_folding_mappings_record.read_data(&data[data_offset..]) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read case folding mappings record"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    if self.case_folding_mappings_record.is_some() {
+                        return Err(keramics_core::error_trace_new!(
+                            "Case folding mappings record already set"
+                        ));
+                    }
+                    self.case_folding_mappings_record = Some(case_folding_mappings_record);
                 }
                 ExFatDirectoryEntryType::DataStream => {
                     keramics_core::debug_trace_structure!(ExFatDataStreamRecord::debug_read_data(
