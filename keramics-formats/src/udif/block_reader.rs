@@ -14,162 +14,113 @@
 use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
 
+use keramics_compression::{AdcContext, Bzip2Context, LzfseContext};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
-use crate::cdsaencr::constants::*;
-use crate::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
-use crate::file_resolver::FileResolverReference;
 use crate::lru_cache::LruCache;
-use crate::path_component::PathComponent;
 use crate::traits::BlockReader;
 
-use super::file::UdifFile;
-use super::segment_range::UdifSegmentRange;
+use super::block_range::{UdifBlockRange, UdifBlockRangeType};
+use super::enums::UdifCompressionMethod;
 
 /// Universal Disk Image Format (UDIF) block reader.
 pub struct UdifBlockReader {
-    /// File resolver.
-    file_resolver: FileResolverReference,
+    /// Segments data stream.
+    segments_data_stream: DataStreamReference,
 
-    /// Name.
-    name: String,
+    /// Block ranges.
+    block_ranges: Vec<UdifBlockRange>,
 
-    /// Segment ranges.
-    segment_ranges: Vec<UdifSegmentRange>,
+    /// Compression method.
+    compression_method: UdifCompressionMethod,
 
-    /// Segment file cache.
-    segment_file_cache: LruCache<u32, UdifFile>,
+    /// Decompressed block cache.
+    block_cache: LruCache<u64, Vec<u8>>,
 
-    /// Credentials.
-    credentials: Vec<CdsaEncrCredential>,
-
-    /// The size.
+    /// Size.
     size: u64,
 }
 
 impl UdifBlockReader {
-    /// Creates a new segment stream.
-    pub(super) fn new(
-        file_resolver: &FileResolverReference,
-        name: &str,
-        segment_ranges: &[UdifSegmentRange],
-        credentials: &[CdsaEncrCredential],
+    /// Creates a new storage media image.
+    pub fn new(
+        segments_data_stream: &DataStreamReference,
+        block_ranges: &[UdifBlockRange],
+        compression_method: &UdifCompressionMethod,
         size: u64,
     ) -> Self {
         Self {
-            file_resolver: file_resolver.clone(),
-            name: name.to_string(),
-            segment_ranges: segment_ranges.to_vec(),
-            segment_file_cache: LruCache::new(16),
-            credentials: credentials.to_vec(),
+            segments_data_stream: segments_data_stream.clone(),
+            block_ranges: block_ranges.to_vec(),
+            compression_method: compression_method.clone(),
+            block_cache: LruCache::new(64),
             size,
         }
     }
 
-    /// Determines the segment file name.
-    fn get_segment_file_name(name: &String, segment_number: u32) -> String {
-        if segment_number == 1 {
-            format!("{}.dmg", name)
-        } else {
-            format!("{}.{:03}.dmgpart", name, segment_number)
-        }
-    }
+    /// Decompressed a block.
+    fn decompress_block(&self, compressed_data: &[u8], data: &mut [u8]) -> Result<(), ErrorTrace> {
+        match self.compression_method {
+            UdifCompressionMethod::Adc => {
+                let mut adc_context: AdcContext = AdcContext::new();
 
-    /// Opens a segment file.
-    fn open_segment_file(&self, segment_number: u32) -> Result<UdifFile, ErrorTrace> {
-        let segment_file_name: String = Self::get_segment_file_name(&self.name, segment_number);
-
-        let path_components: [PathComponent; 1] = [PathComponent::from(&segment_file_name)];
-
-        let mut data_stream: DataStreamReference =
-            match self.file_resolver.get_data_stream(&path_components) {
-                Ok(Some(data_stream)) => data_stream,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Missing segment file: {}",
-                        segment_file_name
-                    )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!("Unable to open segment file: {}", segment_file_name)
-                    );
-                    return Err(error);
-                }
-            };
-        let mut footer_signature: [u8; 8] = [0; 8];
-        let mut header_signature: [u8; 8] = [0; 8];
-
-        keramics_core::data_stream_read_exact_at_position!(
-            data_stream,
-            &mut header_signature,
-            SeekFrom::Start(0)
-        );
-        keramics_core::data_stream_read_exact_at_position!(
-            data_stream,
-            &mut footer_signature,
-            SeekFrom::End(-8)
-        );
-        if &header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
-            || &footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
-        {
-            let mut cdsaencr_container: CdsaEncrContainer = CdsaEncrContainer::new();
-
-            match cdsaencr_container.read_data_stream(&data_stream) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to open encrypted container of segment file: {}",
-                            segment_file_name
-                        ),
-                    );
-                    return Err(error);
+                match adc_context.decompress(&compressed_data, data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress ADC data"
+                        );
+                        return Err(error);
+                    }
                 }
             }
-            match cdsaencr_container.unlock(&self.credentials) {
-                Ok(true) => {}
-                Ok(false) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unable to unlock encrypted container of segment file: {}",
-                        segment_file_name,
-                    )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Failed to unlock encrypted container of segment file: {}",
-                            segment_file_name
-                        ),
-                    );
-                    return Err(error);
+            UdifCompressionMethod::Bzip2 => {
+                let mut bzip2_context: Bzip2Context = Bzip2Context::new();
+
+                match bzip2_context.decompress(&compressed_data, data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress bzip2 data"
+                        );
+                        return Err(error);
+                    }
                 }
             }
-            data_stream = match cdsaencr_container.get_data_stream() {
-                Some(data_stream) => data_stream,
-                None => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Missing encrypted container data stream",
-                    ));
-                }
-            };
-        }
-        let mut segment_file: UdifFile = UdifFile::new();
+            UdifCompressionMethod::Lzfse => {
+                let mut lzfse_context: LzfseContext = LzfseContext::new();
 
-        match segment_file.read_data_stream(&data_stream) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Unable to read segment file: {}", segment_file_name)
+                match lzfse_context.decompress(&compressed_data, data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress LZFSE data"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            UdifCompressionMethod::Lzma => {
+                // TODO: add support for UdifCompressionMethod::Lzma,
+                todo!();
+            }
+            UdifCompressionMethod::Zlib => {
+                _ = crate::zlib_decompress!(
+                    &compressed_data,
+                    data,
+                    "Unable to decompress zlib data"
                 );
-                return Err(error);
+            }
+            _ => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported compression method"
+                ));
             }
         }
-        Ok(segment_file)
+        Ok(())
     }
 }
 
@@ -185,19 +136,21 @@ impl BlockReader for UdifBlockReader {
         let mut data_offset: usize = 0;
         let mut current_offset: u64 = offset;
 
-        let mut segment_index: usize = match self.segment_ranges.binary_search_by(|segment_range| {
-            if current_offset >= segment_range.end_offset {
+        let mut range_index: usize = match self.block_ranges.binary_search_by(|block_range| {
+            let range_end_offset: u64 = block_range.media_offset + block_range.size;
+
+            if current_offset >= range_end_offset {
                 Ordering::Less
-            } else if current_offset < segment_range.start_offset {
+            } else if current_offset < block_range.media_offset {
                 Ordering::Greater
             } else {
                 Ordering::Equal
             }
         }) {
-            Ok(extent_index) => extent_index,
+            Ok(range_index) => range_index,
             Err(_) => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Missing segment ragnage for segment offset: {} (0x{:08x})",
+                    "Missing block range for offset: {} (0x{:08x})",
                     current_offset, current_offset
                 )));
             }
@@ -206,17 +159,17 @@ impl BlockReader for UdifBlockReader {
             if current_offset >= self.size {
                 break;
             }
-            let segment_range: &UdifSegmentRange = match self.segment_ranges.get(segment_index) {
-                Some(segment_range) => segment_range,
+            let block_range: &UdifBlockRange = match self.block_ranges.get(range_index) {
+                Some(block_range) => block_range,
                 None => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unable to retrieve segment range for offset: {} (0x{:08x})",
-                        current_offset, current_offset
+                        "Unable to retrieve block range: {} for offset: {} (0x{:08x})",
+                        range_index, current_offset, current_offset,
                     )));
                 }
             };
-            let range_relative_offset: u64 = current_offset - segment_range.start_offset;
-            let range_remainder_size: u64 = segment_range.size - range_relative_offset;
+            let range_relative_offset: u64 = current_offset - block_range.media_offset;
+            let range_remainder_size: u64 = block_range.size - range_relative_offset;
 
             let range_read_size: usize =
                 min(read_size - data_offset, range_remainder_size as usize);
@@ -226,57 +179,69 @@ impl BlockReader for UdifBlockReader {
             }
             let data_end_offset: usize = data_offset + range_read_size;
 
-            if !self
-                .segment_file_cache
-                .contains(&segment_range.segment_number)
-            {
-                let segment_file: UdifFile =
-                    match self.open_segment_file(segment_range.segment_number) {
-                        Ok(udif_file) => udif_file,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to open segment file: {}",
-                                    segment_range.segment_number
-                                )
-                            );
-                            return Err(error);
+            match block_range.range_type {
+                UdifBlockRangeType::Compressed => {
+                    let range_data_offset: usize = range_relative_offset as usize;
+                    let range_data_end_offset: usize = range_data_offset + range_read_size;
+
+                    if !self.block_cache.contains(&block_range.data_offset) {
+                        let mut compressed_data: Vec<u8> =
+                            vec![0; block_range.compressed_data_size as usize];
+
+                        keramics_core::data_stream_read_exact_at_position!(
+                            &self.segments_data_stream,
+                            &mut compressed_data,
+                            SeekFrom::Start(block_range.data_offset),
+                        );
+                        let mut data: Vec<u8> = vec![0; block_range.size as usize];
+
+                        match self.decompress_block(&compressed_data, &mut data) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable to decompress block at offset: {} (0x{:08x})",
+                                        block_range.data_offset, block_range.data_offset
+                                    )
+                                );
+                                return Err(error);
+                            }
+                        }
+                        self.block_cache.insert(block_range.data_offset, data);
+                    }
+                    let range_data: &[u8] = match self.block_cache.get(&block_range.data_offset) {
+                        Some(data) => data,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unable to retrieve data from cache"
+                            )));
                         }
                     };
-                self.segment_file_cache
-                    .insert(segment_range.segment_number, segment_file);
-            }
-            let segment_file: &mut UdifFile = match self
-                .segment_file_cache
-                .get_mut(&segment_range.segment_number)
-            {
-                Some(file) => file,
-                None => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unable to retrieve segment file: {} from cache",
-                        segment_range.segment_number
-                    )));
+                    if range_data.len() != (block_range.size as usize) {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unable to retrieve block range data",
+                        ));
+                    }
+                    data[data_offset..data_end_offset]
+                        .copy_from_slice(&range_data[range_data_offset..range_data_end_offset]);
                 }
-            };
-            match segment_file
-                .read_exact_at_position(&mut data[data_offset..data_end_offset], current_offset)
-            {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to read from segment file: {} at offset: {} (0x{:08x})",
-                            segment_range.segment_number, current_offset, current_offset
-                        )
+                UdifBlockRangeType::InFile => {
+                    let range_data_offset: u64 = block_range.data_offset + range_relative_offset;
+
+                    keramics_core::data_stream_read_exact_at_position!(
+                        &self.segments_data_stream,
+                        &mut data[data_offset..data_end_offset],
+                        SeekFrom::Start(range_data_offset),
                     );
-                    return Err(error);
+                }
+                UdifBlockRangeType::Sparse => {
+                    data[data_offset..data_end_offset].fill(0);
                 }
             }
-            data_offset += range_read_size;
+            data_offset = data_end_offset;
             current_offset += range_read_size as u64;
-            segment_index += 1;
+            range_index += 1;
         }
         Ok(data_offset)
     }

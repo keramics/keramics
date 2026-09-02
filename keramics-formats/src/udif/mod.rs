@@ -31,6 +31,8 @@ mod resource_map_header;
 mod resource_map_item;
 mod resource_map_value;
 mod segment_range;
+mod segments_block_reader;
+mod segments_block_stream;
 
 pub use enums::UdifCompressionMethod;
 pub use file::UdifFile;

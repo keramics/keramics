@@ -13,10 +13,10 @@
 
 use crate::block_stream::BlockStream;
 
-use super::block_reader::UdifBlockReader;
+use super::segments_block_reader::UdifSegmentsBlockReader;
 
-/// Universal Disk Image Format (UDIF) block stream.
-pub type UdifBlockStream = BlockStream<UdifBlockReader>;
+/// Universal Disk Image Format (UDIF) segments block stream.
+pub type UdifSegmentsBlockStream = BlockStream<UdifSegmentsBlockReader>;
 
 #[cfg(test)]
 mod tests {
@@ -25,128 +25,65 @@ mod tests {
     use std::io::SeekFrom;
     use std::path::PathBuf;
 
-    use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
+    use keramics_core::{DataStream, ErrorTrace};
 
+    use crate::cdsaencr::CdsaEncrCredential;
+    use crate::file_resolver::FileResolverReference;
+    use crate::os_file_resolver::open_os_file_resolver;
     use crate::tests::get_test_data_path;
-    use crate::udif::block_range::{UdifBlockRange, UdifBlockRangeType};
-    use crate::udif::enums::UdifCompressionMethod;
+    use crate::udif::segment_range::UdifSegmentRange;
 
-    fn get_block_stream() -> Result<UdifBlockStream, ErrorTrace> {
-        let path_string: String = get_test_data_path("udif/hfsplus_zlib.dmg");
+    fn get_block_stream() -> Result<UdifSegmentsBlockStream, ErrorTrace> {
+        let path_string: String = get_test_data_path("udif");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
 
-        let block_ranges: [UdifBlockRange; 14] = [
-            UdifBlockRange {
-                media_offset: 0,
-                data_offset: 6392,
-                size: 512,
-                compressed_data_size: 31,
-                range_type: UdifBlockRangeType::Compressed,
+        let segment_ranges: [UdifSegmentRange; 5] = [
+            UdifSegmentRange {
+                segment_number: 1,
+                start_offset: 0,
+                end_offset: 409600,
+                size: 409600,
             },
-            UdifBlockRange {
-                media_offset: 512,
-                data_offset: 6315,
-                size: 512,
-                compressed_data_size: 77,
-                range_type: UdifBlockRangeType::Compressed,
+            UdifSegmentRange {
+                segment_number: 2,
+                start_offset: 409600,
+                end_offset: 818688,
+                size: 409600,
             },
-            UdifBlockRange {
-                media_offset: 1024,
-                data_offset: 0,
-                size: 16384,
-                compressed_data_size: 177,
-                range_type: UdifBlockRangeType::Compressed,
+            UdifSegmentRange {
+                segment_number: 3,
+                start_offset: 818688,
+                end_offset: 1227776,
+                size: 409600,
             },
-            UdifBlockRange {
-                media_offset: 17408,
-                data_offset: 0,
-                size: 3072,
-                compressed_data_size: 0,
-                range_type: UdifBlockRangeType::Sparse,
+            UdifSegmentRange {
+                segment_number: 4,
+                start_offset: 1227776,
+                end_offset: 1636864,
+                size: 409600,
             },
-            UdifBlockRange {
-                media_offset: 20480,
-                data_offset: 10251,
-                size: 1029120,
-                compressed_data_size: 6158,
-                range_type: UdifBlockRangeType::Compressed,
-            },
-            UdifBlockRange {
-                media_offset: 1049600,
-                data_offset: 0,
-                size: 19456,
-                compressed_data_size: 0,
-                range_type: UdifBlockRangeType::Sparse,
-            },
-            UdifBlockRange {
-                media_offset: 1069056,
-                data_offset: 0,
-                size: 843776,
-                compressed_data_size: 0,
-                range_type: UdifBlockRangeType::Sparse,
-            },
-            UdifBlockRange {
-                media_offset: 1912832,
-                data_offset: 6423,
-                size: 28672,
-                compressed_data_size: 3358,
-                range_type: UdifBlockRangeType::Compressed,
-            },
-            UdifBlockRange {
-                media_offset: 1941504,
-                data_offset: 0,
-                size: 3072,
-                compressed_data_size: 0,
-                range_type: UdifBlockRangeType::Sparse,
-            },
-            UdifBlockRange {
-                media_offset: 1944576,
-                data_offset: 9781,
-                size: 512,
-                compressed_data_size: 132,
-                range_type: UdifBlockRangeType::Compressed,
-            },
-            UdifBlockRange {
-                media_offset: 1945088,
-                data_offset: 0,
-                size: 512,
-                compressed_data_size: 0,
-                range_type: UdifBlockRangeType::Sparse,
-            },
-            UdifBlockRange {
-                media_offset: 1945600,
-                data_offset: 0,
-                size: 1536,
-                compressed_data_size: 0,
-                range_type: UdifBlockRangeType::Sparse,
-            },
-            UdifBlockRange {
-                media_offset: 1947136,
-                data_offset: 9996,
-                size: 16384,
-                compressed_data_size: 177,
-                range_type: UdifBlockRangeType::Compressed,
-            },
-            UdifBlockRange {
-                media_offset: 1963520,
-                data_offset: 10173,
-                size: 512,
-                compressed_data_size: 78,
-                range_type: UdifBlockRangeType::Compressed,
+            UdifSegmentRange {
+                segment_number: 5,
+                start_offset: 1636864,
+                end_offset: 1955840,
+                size: 318976,
             },
         ];
-        Ok(UdifBlockStream::new(UdifBlockReader::new(
-            &data_stream,
-            &block_ranges,
-            &UdifCompressionMethod::Zlib,
-            1964032,
+        let credentials: [CdsaEncrCredential; 0] = [];
+
+        Ok(UdifSegmentsBlockStream::new(UdifSegmentsBlockReader::new(
+            &file_resolver,
+            "hfsplus_segments",
+            &segment_ranges,
+            &credentials,
+            1955840,
         )))
     }
 
     #[test]
     fn test_get_offset() -> Result<(), ErrorTrace> {
-        let mut block_stream: UdifBlockStream = get_block_stream()?;
+        let mut block_stream: UdifSegmentsBlockStream = get_block_stream()?;
 
         block_stream.seek(SeekFrom::Start(1024))?;
 
@@ -158,17 +95,17 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: UdifBlockStream = get_block_stream()?;
+        let mut block_stream: UdifSegmentsBlockStream = get_block_stream()?;
 
         let size: u64 = block_stream.get_size()?;
-        assert_eq!(size, 1964032);
+        assert_eq!(size, 1955840);
 
         Ok(())
     }
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
-        let mut block_stream: UdifBlockStream = get_block_stream()?;
+        let mut block_stream: UdifSegmentsBlockStream = get_block_stream()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
@@ -178,7 +115,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let mut block_stream: UdifBlockStream = get_block_stream()?;
+        let mut block_stream: UdifSegmentsBlockStream = get_block_stream()?;
         let size: u64 = block_stream.get_size()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::End(-512))?;
@@ -189,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let mut block_stream: UdifBlockStream = get_block_stream()?;
+        let mut block_stream: UdifSegmentsBlockStream = get_block_stream()?;
 
         let offset = block_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
@@ -202,7 +139,7 @@ mod tests {
 
     #[test]
     fn test_seek_before_zero() -> Result<(), ErrorTrace> {
-        let mut block_stream: UdifBlockStream = get_block_stream()?;
+        let mut block_stream: UdifSegmentsBlockStream = get_block_stream()?;
 
         let result: Result<u64, ErrorTrace> = block_stream.seek(SeekFrom::Current(-512));
         assert!(result.is_err());
@@ -212,7 +149,7 @@ mod tests {
 
     #[test]
     fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: UdifBlockStream = get_block_stream()?;
+        let mut block_stream: UdifSegmentsBlockStream = get_block_stream()?;
         let size: u64 = block_stream.get_size()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::End(512))?;
@@ -223,7 +160,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let mut block_stream: UdifBlockStream = get_block_stream()?;
+        let mut block_stream: UdifSegmentsBlockStream = get_block_stream()?;
         block_stream.seek(SeekFrom::Start(1024))?;
 
         let mut data: Vec<u8> = vec![0; 512];
@@ -276,7 +213,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: UdifBlockStream = get_block_stream()?;
+        let mut block_stream: UdifSegmentsBlockStream = get_block_stream()?;
         block_stream.seek(SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];

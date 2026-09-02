@@ -20,7 +20,7 @@ pub enum UdifBlockRangeType {
 }
 
 /// Universal Disk Image Format (UDIF) block range.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct UdifBlockRange {
     /// Media offset.
     pub media_offset: u64,
