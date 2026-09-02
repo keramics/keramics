@@ -11,7 +11,10 @@
  * under the License.
  */
 
+mod block_reader;
+mod block_stream;
 mod enums;
 mod image;
+mod segment_file;
 
 pub use image::SplitRawImage;

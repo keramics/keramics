@@ -12,7 +12,7 @@
  */
 
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::cdsaencr::CdsaEncrCredential;
@@ -56,7 +56,7 @@ pub enum StorageMediaImage {
         sparseimage_file: Arc<SparseImageFile>,
     },
     SplitRaw {
-        splitraw_image: Arc<RwLock<SplitRawImage>>,
+        splitraw_image: Arc<SplitRawImage>,
     },
     Udif {
         udif_image: Arc<UdifImage>,
@@ -112,7 +112,7 @@ impl StorageMediaImage {
             Self::Raw { data_stream } => Some(data_stream.clone()),
             Self::SparseBundle { sparsebundle_image } => Some(sparsebundle_image.get_data_stream()),
             Self::SparseImage { sparseimage_file } => sparseimage_file.get_data_stream(),
-            Self::SplitRaw { splitraw_image } => Some(splitraw_image.clone()),
+            Self::SplitRaw { splitraw_image } => Some(splitraw_image.get_data_stream()),
             Self::Udif { udif_image } => udif_image.get_data_stream(),
             Self::Vhd {
                 vhd_image_layer, ..
@@ -626,7 +626,7 @@ impl StorageMediaImage {
             }
         }
         Ok(Self::SplitRaw {
-            splitraw_image: Arc::new(RwLock::new(splitraw_image)),
+            splitraw_image: Arc::new(splitraw_image),
         })
     }
 

@@ -754,8 +754,6 @@ impl VfsScanner {
                         return Err(error);
                     }
                 }
-                let number_of_volumes: usize = apfs_container.get_number_of_volumes();
-
                 // TODO: invoke mediator to ask which volumes to include.
                 for (volume_index, result) in apfs_container.volumes().enumerate() {
                     let apfs_volume: ApfsVolume = match result {
