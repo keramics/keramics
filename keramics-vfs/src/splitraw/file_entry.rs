@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
@@ -24,16 +24,13 @@ pub enum SplitRawFileEntry {
     /// Layer file entry.
     Layer {
         /// File.
-        image: Arc<RwLock<SplitRawImage>>,
-
-        /// Size.
-        size: u64,
+        image: Arc<SplitRawImage>,
     },
 
     /// Root file entry.
     Root {
         /// File.
-        image: Arc<RwLock<SplitRawImage>>,
+        image: Arc<SplitRawImage>,
     },
 }
 
@@ -41,7 +38,7 @@ impl SplitRawFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
-            SplitRawFileEntry::Layer { image, .. } => Ok(Some(image.clone())),
+            SplitRawFileEntry::Layer { image, .. } => Ok(Some(image.get_data_stream())),
             SplitRawFileEntry::Root { .. } => Ok(None),
         }
     }
@@ -65,7 +62,7 @@ impl SplitRawFileEntry {
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
-            SplitRawFileEntry::Layer { size, .. } => *size,
+            SplitRawFileEntry::Layer { image, .. } => image.get_media_size(),
             SplitRawFileEntry::Root { .. } => 0,
         }
     }
@@ -94,18 +91,8 @@ impl SplitRawFileEntry {
                         sub_file_entry_index
                     )));
                 }
-                let media_size: u64 = match image.read() {
-                    Ok(splitraw_image) => splitraw_image.media_size,
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain read lock on split raw image",
-                            error
-                        ));
-                    }
-                };
                 Ok(SplitRawFileEntry::Layer {
                     image: image.clone(),
-                    size: media_size,
                 })
             }
         }
@@ -148,7 +135,7 @@ mod tests {
     fn test_get_file_type() -> Result<(), ErrorTrace> {
         let splitraw_image: SplitRawImage = get_image()?;
 
-        let test_image: Arc<RwLock<SplitRawImage>> = Arc::new(RwLock::new(splitraw_image));
+        let test_image: Arc<SplitRawImage> = Arc::new(splitraw_image);
 
         let file_entry = SplitRawFileEntry::Root {
             image: test_image.clone(),
@@ -163,9 +150,8 @@ mod tests {
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
         let splitraw_image: SplitRawImage = get_image()?;
-        let media_size: u64 = splitraw_image.media_size;
 
-        let test_image: Arc<RwLock<SplitRawImage>> = Arc::new(RwLock::new(splitraw_image));
+        let test_image: Arc<SplitRawImage> = Arc::new(splitraw_image);
 
         let file_entry = SplitRawFileEntry::Root {
             image: test_image.clone(),
@@ -176,7 +162,6 @@ mod tests {
 
         let file_entry = SplitRawFileEntry::Layer {
             image: test_image.clone(),
-            size: media_size,
         };
 
         let name: PathComponent = file_entry.get_name();
@@ -188,9 +173,8 @@ mod tests {
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
         let splitraw_image: SplitRawImage = get_image()?;
-        let media_size: u64 = splitraw_image.media_size;
 
-        let test_image: Arc<RwLock<SplitRawImage>> = Arc::new(RwLock::new(splitraw_image));
+        let test_image: Arc<SplitRawImage> = Arc::new(splitraw_image);
 
         let file_entry = SplitRawFileEntry::Root {
             image: test_image.clone(),
@@ -201,7 +185,6 @@ mod tests {
 
         let file_entry = SplitRawFileEntry::Layer {
             image: test_image.clone(),
-            size: media_size,
         };
 
         let size: u64 = file_entry.get_size();
@@ -213,9 +196,8 @@ mod tests {
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let splitraw_image: SplitRawImage = get_image()?;
-        let media_size: u64 = splitraw_image.media_size;
 
-        let test_image: Arc<RwLock<SplitRawImage>> = Arc::new(RwLock::new(splitraw_image));
+        let test_image: Arc<SplitRawImage> = Arc::new(splitraw_image);
 
         let file_entry = SplitRawFileEntry::Root {
             image: test_image.clone(),
@@ -226,7 +208,6 @@ mod tests {
 
         let file_entry = SplitRawFileEntry::Layer {
             image: test_image.clone(),
-            size: media_size,
         };
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
@@ -238,7 +219,7 @@ mod tests {
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
         let splitraw_image: SplitRawImage = get_image()?;
-        let test_image: Arc<RwLock<SplitRawImage>> = Arc::new(RwLock::new(splitraw_image));
+        let test_image: Arc<SplitRawImage> = Arc::new(splitraw_image);
 
         let file_entry = SplitRawFileEntry::Root {
             image: test_image.clone(),
@@ -259,9 +240,8 @@ mod tests {
     #[test]
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
         let splitraw_image: SplitRawImage = get_image()?;
-        let media_size: u64 = splitraw_image.media_size;
 
-        let test_image: Arc<RwLock<SplitRawImage>> = Arc::new(RwLock::new(splitraw_image));
+        let test_image: Arc<SplitRawImage> = Arc::new(splitraw_image);
 
         let file_entry = SplitRawFileEntry::Root {
             image: test_image.clone(),
@@ -271,7 +251,6 @@ mod tests {
 
         let file_entry = SplitRawFileEntry::Layer {
             image: test_image.clone(),
-            size: media_size,
         };
 
         assert_eq!(file_entry.is_root_file_entry(), false);

@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
 use keramics_formats::splitraw::SplitRawImage;
@@ -26,7 +26,7 @@ use super::file_entry::SplitRawFileEntry;
 /// Split raw storage media image file system.
 pub struct SplitRawFileSystem {
     /// Image.
-    image: Arc<RwLock<SplitRawImage>>,
+    image: Arc<SplitRawImage>,
 
     /// Number of layers.
     number_of_layers: usize,
@@ -38,7 +38,7 @@ impl SplitRawFileSystem {
     /// Creates a new file system.
     pub fn new() -> Self {
         Self {
-            image: Arc::new(RwLock::new(SplitRawImage::new())),
+            image: Arc::new(SplitRawImage::new()),
             number_of_layers: 0,
         }
     }
@@ -85,18 +85,8 @@ impl SplitRawFileSystem {
                 if path_component != "raw1" {
                     return Ok(None);
                 }
-                let media_size: u64 = match self.image.read() {
-                    Ok(splitraw_image) => splitraw_image.media_size,
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain read lock on split raw image",
-                            error
-                        ));
-                    }
-                };
                 Ok(Some(SplitRawFileEntry::Layer {
                     image: self.image.clone(),
-                    size: media_size,
                 }))
             }
             None => {
@@ -131,9 +121,9 @@ impl SplitRawFileSystem {
         };
         let path: &Path = vfs_location.get_path();
 
-        match self.image.write() {
-            Ok(mut image) => {
-                match Self::open_image(&mut image, file_system, path) {
+        match Arc::get_mut(&mut self.image) {
+            Some(image) => {
+                match Self::open_image(image, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -145,10 +135,9 @@ impl SplitRawFileSystem {
                 }
                 self.number_of_layers = 1;
             }
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain write lock on split raw image",
-                    error
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to split raw image"
                 ));
             }
         }

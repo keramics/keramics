@@ -12,12 +12,14 @@
  */
 
 /// Segment file naming schema.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SplitRawNamingSchema {
     /// Alphabetic naming schema such as imageaa
     Alphabetic,
+
     /// Numeric naming schema such as image.1, image.001 or image_001
     Numeric,
+
     /// "X of N" naming schema such as image.1of5
     XOfN,
 }
