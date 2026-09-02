@@ -41,7 +41,6 @@ use crate::ewf::EwfFileSystem;
 use crate::file_entry::VfsFileEntry;
 use crate::linuxlvm::LinuxLvmFileSystem;
 use crate::location::VfsLocation;
-use crate::qcow::QcowFileSystem;
 use crate::resolver::VfsResolver;
 use crate::sparsebundle::SparseBundleFileSystem;
 use crate::sparseimage::SparseImageFileSystem;
@@ -1025,7 +1024,7 @@ impl VfsScanner {
             VfsType::Qcow => {
                 let mut qcow_image: QcowImage = QcowImage::new();
 
-                match QcowFileSystem::open_image(&mut qcow_image, file_system, path) {
+                match qcow_image.open_from_vfs(file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
@@ -1038,7 +1037,7 @@ impl VfsScanner {
                     scan_options,
                     vfs_location,
                     scan_node,
-                    QcowFileSystem::PATH_PREFIX,
+                    QcowImage::PATH_PREFIX,
                     number_of_layers,
                 ) {
                     Ok(_) => {}
