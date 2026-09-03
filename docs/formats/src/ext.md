@@ -1097,7 +1097,7 @@ bytes in size and consists of:
 
 #### The ext4 extended attributes block header
 
-The ext4 extended attributes block header (ext4_xattr_header) is 32 bytes of size and consists of:
+The ext4 extended attributes block header (ext4_xattr_header) is 32 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |

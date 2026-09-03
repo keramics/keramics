@@ -59,7 +59,7 @@ An allocation group consists of:
 
 ## The superblock
 
-The XFS superblock (xfs_sb_t) is (at least) 512 bytes of size and consists of:
+The XFS superblock (xfs_sb_t) is (at least) 512 bytes in size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -251,7 +251,7 @@ The free block information stores references:
 * the block offset B+ tree, that tracks the free space by block number
 * the block count B+ tree, that tracks the size of the free space block
 
-The free block information (xfs_agf_t) is 64 or 224 bytes of size and consists of:
+The free block information (xfs_agf_t) is 64 or 224 bytes in size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -296,7 +296,7 @@ A free list consists of:
 
 ### Free list header
 
-The free list header is 36 bytes of size and consist of:
+The free list header is 36 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -310,7 +310,7 @@ TODO: describe sb_uuid or sb_meta_uuid
 
 ## Inode information
 
-The inode information (xfs_agi_t) is (at least) 512 bytes of size and consists of:
+The inode information (xfs_agi_t) is (at least) 512 bytes in size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -383,7 +383,7 @@ size and consist of:
 
 #### B+ tree block header 64-bit {#btree_block_header_64bit}
 
-The B+ tree block header 64-bit (xfs_btree_lblock_t) is 24 or 72 bytes of size and consist of:
+The B+ tree block header 64-bit (xfs_btree_lblock_t) is 24 or 72 bytes in size and consist of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -430,7 +430,7 @@ TODO: complete section
 
 #### Free space B+ tree branch node record
 
-The free space B+ tree branch node record (xfs_alloc_ptr_t) is 4 bytes of size and consist of:
+The free space B+ tree branch node record (xfs_alloc_ptr_t) is 4 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -438,7 +438,7 @@ The free space B+ tree branch node record (xfs_alloc_ptr_t) is 4 bytes of size a
 
 #### Free space B+ tree leaf node record
 
-The free space B+ tree leaf node record (xfs_alloc_key_t) is 8 bytes of size and consist of:
+The free space B+ tree leaf node record (xfs_alloc_key_t) is 8 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -465,7 +465,7 @@ number_of_key_value_pairs = node_records_data_size / 8
 
 ##### Inode tree branch node key
 
-The inode tree branch node key (xfs_inobt_key_t) is 4 bytes of size and consist of:
+The inode tree branch node key (xfs_inobt_key_t) is 4 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -475,7 +475,7 @@ The inode tree branch node key (xfs_inobt_key_t) is 4 bytes of size and consist 
 
 ##### Inode tree branch node value
 
-The inode tree branch node key is 4 bytes of size and consist of:
+The inode tree branch node key is 4 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -490,7 +490,7 @@ The inode tree branch node consists of:
 
 ##### Inode tree leaf node record
 
-The inode tree leaf node record (xfs_inobt_rec_t) is 16 bytes of size and consist of:
+The inode tree leaf node record (xfs_inobt_rec_t) is 16 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -521,7 +521,7 @@ The inode can be followed by:
 
 ### Inode version 1
 
-The inode version 1 (xfs_dinode_core_t) is 100 bytes of size and consist of:
+The inode version 1 (xfs_dinode_core_t) is 100 bytes in size and consist of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -560,7 +560,7 @@ The inode version 1 (xfs_dinode_core_t) is 100 bytes of size and consist of:
 
 ### Inode version 2
 
-The inode version 2 (xfs_dinode_core_t) is 100 bytes of size and consist of:
+The inode version 2 (xfs_dinode_core_t) is 100 bytes in size and consist of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -601,7 +601,7 @@ The inode version 2 (xfs_dinode_core_t) is 100 bytes of size and consist of:
 
 ### Inode version 3
 
-The inode version 3 (xfs_dinode_core_t) is 176 bytes of size and consist of:
+The inode version 3 (xfs_dinode_core_t) is 176 bytes in size and consist of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -855,7 +855,7 @@ The XFS_SB_VERSION_DIRV2BIT flag in the superblock indicates if version 2 is use
 
 #### Short-form directory table header version 1
 
-The short-form directory table header version 1 (xfs_dir_sf_hdr_t) is 9 bytes of size and consists
+The short-form directory table header version 1 (xfs_dir_sf_hdr_t) is 9 bytes in size and consists
 of:
 
 | Offset | Size | Value | Description |
@@ -865,7 +865,7 @@ of:
 
 #### Short-form directory table header version 2
 
-The short-form directory table header version 2 (xfs_dir2_sf_hdr_t) is 6 or 10 bytes of size and
+The short-form directory table header version 2 (xfs_dir2_sf_hdr_t) is 6 or 10 bytes in size and
 consists of:
 
 | Offset | Size | Value | Description |
@@ -880,7 +880,7 @@ consists of:
 
 #### Short-form directory table entry version 1
 
-The short-form directory table entry version 1 (xfs_dir_sf_entry_t) is variable of size and
+The short-form directory table entry version 1 (xfs_dir_sf_entry_t) is of variable size and
 consists of:
 
 | Offset | Size | Value | Description |
@@ -891,7 +891,7 @@ consists of:
 
 #### Short-form directory table entry version 2
 
-The short-form directory table entry version 2 (xfs_dir2_sf_entry_t) is variable of size and
+The short-form directory table entry version 2 (xfs_dir2_sf_entry_t) is of variable size and
 consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
@@ -924,7 +924,7 @@ A directory list (xfs_dir2_block_t) consist of one or more elements (block) that
 
 ##### Directory list element header version 2
 
-The directory list element header version 2 (xfs_dir2_data_hdr_t) is 16 bytes of size and consist
+The directory list element header version 2 (xfs_dir2_data_hdr_t) is 16 bytes in size and consist
 of:
 
 | Offset | Size | Value | Description |
@@ -934,7 +934,7 @@ of:
 
 ##### Directory list element header version 3
 
-The directory list element header version 3 (xfs_dir3_data_hdr_t) is 64 bytes of size and consist
+The directory list element header version 3 (xfs_dir3_data_hdr_t) is 64 bytes in size and consist
 of:
 
 <!-- rumdl-disable MD033 MD056 -->
@@ -967,7 +967,7 @@ of:
 
 ##### Block free region version 2 {#block_free_region_v2}
 
-The block free region version 2 (xfs_dir2_data_free_t) is 4 bytes of size and consist of:
+The block free region version 2 (xfs_dir2_data_free_t) is 4 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -978,7 +978,7 @@ The block free region version 2 (xfs_dir2_data_free_t) is 4 bytes of size and co
 
 ##### Directory list element entry version 2
 
-The directory list element entry version 2 (xfs_dir2_data_entry_t) is variable of size and consists
+The directory list element entry version 2 (xfs_dir2_data_entry_t) is of variable size and consists
 of:
 
 <!-- rumdl-disable MD033 MD056 -->
@@ -998,7 +998,7 @@ of:
 
 ##### Unused directory list element entry version 2
 
-The unused directory list element entry version 2 (xfs_dir2_data_unused_t) is variable of size
+The unused directory list element entry version 2 (xfs_dir2_data_unused_t) is of variable size
 and consists of:
 
 | Offset | Size | Value | Description |
@@ -1022,7 +1022,7 @@ size and consists of:
 
 ##### Directory list element footer version 2
 
-The directory list element footer version 2 (xfs_dir2_block_tail_t) is 8 bytes of size and consists
+The directory list element footer version 2 (xfs_dir2_block_tail_t) is 8 bytes in size and consists
 of:
 
 | Offset | Size | Value | Description |
@@ -1043,7 +1043,7 @@ A directory tree branch node consist of:
 
 ##### Directory tree branch node header {#directory_tree_branch_node_header}
 
-A directory tree branch node header is 16 bytes of size and consist of:
+A directory tree branch node header is 16 bytes in size and consist of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -1058,7 +1058,7 @@ A directory tree branch node header is 16 bytes of size and consist of:
 
 ##### Directory tree branch node entry
 
-A directory tree branch node entry is 8 bytes of size and consists of:
+A directory tree branch node entry is 8 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1083,7 +1083,7 @@ A directory tree leaf node (xfs_dir_leafblock_t) consist of:
 
 ##### Directory tree leaf node header version 1
 
-A directory tree leaf node header version 1 (xfs_dir_leaf_hdr_t) is 16 bytes of size and consists
+A directory tree leaf node header version 1 (xfs_dir_leaf_hdr_t) is 16 bytes in size and consists
 of:
 
 <!-- rumdl-disable MD033 MD056 -->
@@ -1106,7 +1106,7 @@ of:
 
 ##### Directory tree leaf node entry version 1
 
-The directory tree leaf node entry (xfs_dir_leaf_entry_t) is 8 bytes of size and consist of:
+The directory tree leaf node entry (xfs_dir_leaf_entry_t) is 8 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1120,7 +1120,7 @@ The directory tree leaf node entry (xfs_dir_leaf_entry_t) is 8 bytes of size and
 
 ##### Directory tree leaf node value
 
-The directory tree leaf node value (xfs_dir_leaf_name_t) is variable of size and consist of:
+The directory tree leaf node value (xfs_dir_leaf_name_t) is of variable size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1129,7 +1129,7 @@ The directory tree leaf node value (xfs_dir_leaf_name_t) is variable of size and
 
 ##### Directory tree leaf node footer version 1
 
-A directory tree leaf node footer version 1 (xfs_dir_leaf_tail_t) is 4 bytes of size and consists
+A directory tree leaf node footer version 1 (xfs_dir_leaf_tail_t) is 4 bytes in size and consists
 of:
 
 | Offset | Size | Value | Description |
@@ -1144,7 +1144,7 @@ of:
 Character and block devices identifiers are stored as inline data with fork type is
 XFS_DINODE_FMT_DEV.
 
-The device identifier (xfs_dev_t) is 4 bytes of size and consists of:
+The device identifier (xfs_dev_t) is 4 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1181,7 +1181,7 @@ The file system block B+ tree is a structure used to store the directory and att
 #### File system block header version 1 {#file_system_block_header_version_1}
 
 If the superblock format version <= 4 the file system block header version 1 is used. The file
-system block header version 1 (xfs_da_blkinfo_t) is 12 bytes of size and consist of:
+system block header version 1 (xfs_da_blkinfo_t) is 12 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1195,7 +1195,7 @@ system block header version 1 (xfs_da_blkinfo_t) is 12 bytes of size and consist
 #### File system block header version 3 {#file_system_block_header_version_3}
 
 If the superblock format version >= 5 the file system block header version 3 is used. The file
-system block header version 3 (xfs_da3_blkinfo_t) is 56 bytes of size and consist of:
+system block header version 3 (xfs_da3_blkinfo_t) is 56 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1246,7 +1246,7 @@ attributes table consist of:
 
 #### The short-form attributes table header
 
-The short-form attributes table header (xfs_attr_sf_hdr) is 4 bytes of size and consists of:
+The short-form attributes table header (xfs_attr_sf_hdr) is 4 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1259,7 +1259,7 @@ The short-form attributes table header (xfs_attr_sf_hdr) is 4 bytes of size and 
 
 #### The short-form attribute entry
 
-The short-form attributes table entry (xfs_attr_sf_entry) is variable of size and consists of:
+The short-form attributes table entry (xfs_attr_sf_entry) is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1288,7 +1288,7 @@ An attributes tree branch node consist of:
 ##### Attributes tree branch node header version 2
 
 If the superblock format version <= 4 the attributes tree branch node header version 2 is used.
-The attributes tree branch node header version 2 (xfs_da_blkinfo_t) is 16 bytes of size and
+The attributes tree branch node header version 2 (xfs_da_blkinfo_t) is 16 bytes in size and
 consist of:
 
 <!-- rumdl-disable MD033 MD056 -->
@@ -1305,7 +1305,7 @@ consist of:
 ##### Attributes tree branch node header version 3
 
 If the superblock format version >= 5 the attributes tree branch node header version 3 is used.
-The attributes tree branch node header version 3 (xfs_da3_blkinfo_t) is 64 bytes of size and
+The attributes tree branch node header version 3 (xfs_da3_blkinfo_t) is 64 bytes in size and
 consist of:
 
 <!-- rumdl-disable MD033 MD056 -->
@@ -1349,7 +1349,7 @@ If more than one block is needed to store the extended attributes
 ##### Attributes tree leaf node header version 2
 
 If the superblock format version <= 4 the attributes tree leaf node header version 2 is used. The
-attributes tree leaf node header version 2 (xfs_attr_leaf_hdr_t) is 32 bytes of size and consist of:
+attributes tree leaf node header version 2 (xfs_attr_leaf_hdr_t) is 32 bytes in size and consist of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -1369,7 +1369,7 @@ attributes tree leaf node header version 2 (xfs_attr_leaf_hdr_t) is 32 bytes of 
 ##### Attributes tree leaf node header version 3
 
 If the superblock format version >= 5 the attributes tree leaf node header version 3 is used. The
-attributes tree leaf node header version 3 (xfs_attr3_leaf_hdr_t) is 80 bytes of size and consist
+attributes tree leaf node header version 3 (xfs_attr3_leaf_hdr_t) is 80 bytes in size and consist
 of:
 
 <!-- rumdl-disable MD033 MD056 -->
@@ -1390,7 +1390,7 @@ of:
 
 #### Attributes tree leaf node entry
 
-The attributes tree leaf node entry (xfs_attr_leaf_entry_t) is 8 bytes of size and consist of:
+The attributes tree leaf node entry (xfs_attr_leaf_entry_t) is 8 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1407,7 +1407,7 @@ value are stored in [a remote attribute value data block](#remote_attribute_valu
 
 ##### Local attribute value
 
-The local attributes value (xfs_attr_leaf_name_local_t) is variable of size and consist of:
+The local attributes value (xfs_attr_leaf_name_local_t) is of variable size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1417,7 +1417,7 @@ The local attributes value (xfs_attr_leaf_name_local_t) is variable of size and 
 
 ##### Remote attribute value
 
-The remote attributes value (xfs_attr_leaf_name_remote_t) is variable of size and consist of:
+The remote attributes value (xfs_attr_leaf_name_remote_t) is of variable size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1453,7 +1453,7 @@ blocks.
 
 ##### Remote attribute value data block header version 3
 
-The remote attribute value data block header (xfs_attr3_rmt_hdr) is 52 bytes of size and consist of:
+The remote attribute value data block header (xfs_attr3_rmt_hdr) is 52 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1468,7 +1468,7 @@ The remote attribute value data block header (xfs_attr3_rmt_hdr) is 52 bytes of 
 
 ##### Parent directory attribute value data {#parent_directory_attribute_value_data}
 
-The parent directory attribute value data (xfs_parent_rec) is 12 bytes of size and consist of:
+The parent directory attribute value data (xfs_parent_rec) is 12 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |

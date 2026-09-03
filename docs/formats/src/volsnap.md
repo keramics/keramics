@@ -60,7 +60,7 @@ size, but presumably 512 bytes, and consists of:
 ## Catalog
 
 The catalog contains information about the individual stores. The catalog consists of one or more
-catalog blocks. Each catalog block is 16384 (0x4000) bytes of size and consists of:
+catalog blocks. Each catalog block is 16384 (0x4000) bytes in size and consists of:
 
 * catalog block header
 * an array of catalog entries
@@ -72,7 +72,7 @@ enabled.
 
 ### Catalog block header
 
-The catalog block header is 128 bytes of size and consists of:
+The catalog block header is 128 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -104,7 +104,7 @@ entirely of 0-bytes.
 
 #### Unused catalog entry (type 0x01)
 
-An unused catalog entry (type 0x01) is 128 bytes of size and consists of:
+An unused catalog entry (type 0x01) is 128 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -113,7 +113,7 @@ An unused catalog entry (type 0x01) is 128 bytes of size and consists of:
 
 #### Catalog entry type 0x02
 
-A catalog entry type 0x02 is 128 bytes of size and consists of:
+A catalog entry type 0x02 is 128 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -127,7 +127,7 @@ A catalog entry type 0x02 is 128 bytes of size and consists of:
 
 #### Catalog entry type 0x03
 
-A catalog entry type 0x03 is 128 bytes of size and consists of:
+A catalog entry type 0x03 is 128 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -163,7 +163,7 @@ The store consists of:
 
 ### Store block header
 
-The store block header is 128 bytes of size and consists of:
+The store block header is 128 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -192,7 +192,7 @@ The store block header is 128 bytes of size and consists of:
 
 The store information is stored directly after the store header.
 
-The store information is variable of size and consists of:
+The store information is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -272,7 +272,7 @@ consists of:
 
 #### Block descriptor
 
-The block descriptor is 32 bytes of size and consists of:
+The block descriptor is 32 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -363,7 +363,7 @@ block consists of:
 
 #### Store block range entry
 
-The store block range entry is 24 bytes of size and consists of:
+The store block range entry is 24 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |

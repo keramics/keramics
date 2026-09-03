@@ -104,7 +104,7 @@ The checksum is calculated as following:
 
 ### Partition entry {#partition_entry}
 
-The partition entry is 16 bytes of size and consists of:
+The partition entry is 16 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |

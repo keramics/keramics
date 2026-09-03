@@ -48,7 +48,7 @@ A physical volume consist of:
 ### Physical volume label
 
 The physical volume label is stored in the second sector of the physical volume. The physical
-volume label is currently 512 bytes of size and consists of:
+volume label is currently 512 bytes in size and consists of:
 
 * physical volume label header
 * physical volume header

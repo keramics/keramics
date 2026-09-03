@@ -112,7 +112,7 @@ The compressed data starts with metadata that contains the offsets of the compre
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 x ... | | Array of compressed data block offsets, where an offset is relative from the start of the LZFSE compressed data |
-| ... | ... | | LZFSE compressed data blocks |
+| ... | ... | | [LZFSE compressed data](lzfse.md) blocks |
 
 ### LZFSE compressed data block
 
@@ -124,7 +124,7 @@ otherwise the block should start with a LZFSE block marker.
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 x ... | | Array of compressed data block offsets, where an offset is relative from the start of the LZVN compressed data |
-| ... | ... | | LZVN compressed data blocks |
+| ... | ... | | [LZVN compressed data](lzvn.md) blocks |
 
 ### LZVN compressed data block
 

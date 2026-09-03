@@ -147,7 +147,7 @@ Decryption uses:
 * The initialization vector of the AES-CBC is dependent on the initialization vector mode defined
   in the volume header. In recent versions of Linux, AES-CBC is combined with the ESSIV
   initialization vector mode by default.
-* The initialization vector is 16 bytes of size.
+* The initialization vector is 16 bytes in size.
 
 ### AES-ECB
 
@@ -155,13 +155,13 @@ Decryption uses:
 
 * AES-ECB with Master Key (MK) decryption of sector data
 * No initialization vector is used.
-* The initialization vector is 16 bytes of size.
+* The initialization vector is 16 bytes in size.
 
 ### AES-XTS
 
 TODO: complete section
 
-* The initialization vector is 16 bytes of size.
+* The initialization vector is 16 bytes in size.
 
 ### Anubis
 
@@ -253,7 +253,7 @@ The volume header - format version 2 (or binary header) is 4096 bytes in size an
 ## JSON area {#json_area}
 
 The JSON area is stored directly after the volume header and must be 4096-byte aligned. The JSON
-area is variable of size and constists of:
+area is of variable size and constists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
