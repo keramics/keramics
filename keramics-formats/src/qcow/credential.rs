@@ -11,24 +11,9 @@
  * under the License.
  */
 
-mod block_range;
-mod block_reader;
-mod block_stream;
-mod cluster_table;
-mod constants;
-mod credential;
-mod encryption;
-mod encryption_type;
-mod enums;
-mod features;
-mod file;
-mod file_header;
-mod file_header_v1;
-mod file_header_v2;
-mod file_header_v3;
-mod image;
-
-pub use credential::QcowCredential;
-pub use enums::{QcowCompressionMethod, QcowEncryptionMethod};
-pub use file::QcowFile;
-pub use image::{QcowImage, QcowImageLayer};
+/// Linux Unified Key Setup (LUKS) Disk Encryption credential.
+#[derive(Clone, Debug, PartialEq)]
+pub enum QcowCredential {
+    None,
+    Passphrase(Vec<u8>),
+}

@@ -115,10 +115,7 @@ impl NtfsFileEntry {
     }
 
     /// Retrieves the change time from the $STANDARD_INFORMATION attribute.
-    #[deprecated(
-        since = "0.0.1",
-        note = "Please use `get_entry_modification_time` instead."
-    )]
+    #[deprecated(since = "0.0.1", note = "Use `get_entry_modification_time` instead.")]
     pub fn get_change_time(&self) -> Option<&DateTime> {
         self.get_entry_modification_time()
     }

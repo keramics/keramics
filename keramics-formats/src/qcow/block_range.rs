@@ -15,6 +15,7 @@
 #[derive(Debug, PartialEq)]
 pub enum QcowBlockRangeType {
     Compressed,
+    Encrypted,
     InBackingFile,
     InFile,
     Sparse,

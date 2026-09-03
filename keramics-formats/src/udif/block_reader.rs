@@ -193,9 +193,9 @@ impl BlockReader for UdifBlockReader {
                             &mut compressed_data,
                             SeekFrom::Start(block_range.data_offset),
                         );
-                        let mut data: Vec<u8> = vec![0; block_range.size as usize];
+                        let mut block_data: Vec<u8> = vec![0; block_range.size as usize];
 
-                        match self.decompress_block(&compressed_data, &mut data) {
+                        match self.decompress_block(&compressed_data, &mut block_data) {
                             Ok(_) => {}
                             Err(mut error) => {
                                 keramics_core::error_trace_add_frame!(
@@ -208,10 +208,10 @@ impl BlockReader for UdifBlockReader {
                                 return Err(error);
                             }
                         }
-                        self.block_cache.insert(block_range.data_offset, data);
+                        self.block_cache.insert(block_range.data_offset, block_data);
                     }
                     let range_data: &[u8] = match self.block_cache.get(&block_range.data_offset) {
-                        Some(data) => data,
+                        Some(block_data) => block_data,
                         None => {
                             return Err(keramics_core::error_trace_new!(format!(
                                 "Unable to retrieve data from cache"

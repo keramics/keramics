@@ -159,7 +159,7 @@ impl HfsAttributesFile {
                                 return Err(error);
                             }
                         };
-                        let mut attribute_record: HfsAttributeRecord = match self
+                        let attribute_record: HfsAttributeRecord = match self
                             .read_attribute_record(&key, record_data)
                         {
                             Ok(attribute_record) => attribute_record,

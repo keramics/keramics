@@ -18,6 +18,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use crate::file_resolver::FileResolverReference;
 use crate::path_component::PathComponent;
 
+use super::credential::QcowCredential;
 use super::file::QcowFile;
 
 pub type QcowImageLayer = Arc<QcowFile>;
@@ -29,6 +30,9 @@ pub struct QcowImage {
 
     /// Bytes per sector.
     bytes_per_sector: u16,
+
+    /// Value to indicate the (encrypted) image is locked.
+    is_locked: bool,
 }
 
 impl QcowImage {
@@ -37,6 +41,7 @@ impl QcowImage {
         Self {
             layers: Vec::new(),
             bytes_per_sector: 0,
+            is_locked: false,
         }
     }
 
@@ -59,6 +64,11 @@ impl QcowImage {
                 layer_index
             ))),
         }
+    }
+
+    /// Determines if the (encrypted) image is locked.
+    pub fn is_locked(&self) -> bool {
+        self.is_locked
     }
 
     /// Opens a storage media image.
@@ -97,6 +107,7 @@ impl QcowImage {
             }
         }
         self.bytes_per_sector = file.bytes_per_sector;
+        self.is_locked = file.is_locked();
 
         while let Some(file_name) = file.get_backing_file_name() {
             let backing_file_name: String = file_name.to_string();
@@ -147,6 +158,37 @@ impl QcowImage {
             file_index += 1;
         }
         Ok(())
+    }
+
+    /// Unlocks a locked (encrypted) image.
+    pub fn unlock(&mut self, credentials: &[QcowCredential]) -> Result<bool, ErrorTrace> {
+        if !self.is_locked {
+            return Ok(true);
+        }
+        let layer: &mut Arc<QcowFile> = match self.layers.last_mut() {
+            Some(layer) => layer,
+            None => return Err(keramics_core::error_trace_new!("Missing upper layer")),
+        };
+        match Arc::get_mut(&mut *layer) {
+            Some(file) => {
+                let result: bool = match file.unlock(credentials) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to unlock QCOW file");
+                        return Err(error);
+                    }
+                };
+                if result {
+                    self.is_locked = false;
+                }
+            }
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to QCOW file"
+                ));
+            }
+        }
+        Ok(!self.is_locked)
     }
 }
 

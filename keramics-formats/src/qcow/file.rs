@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
@@ -19,7 +20,11 @@ use keramics_types::ByteString;
 
 use super::block_reader::QcowBlockReader;
 use super::block_stream::QcowBlockStream;
+use super::credential::QcowCredential;
+use super::encryption::{QcowEncryption, QcowEncryptionContext};
+use super::encryption_type::QcowEncryptionType;
 use super::enums::{QcowCompressionMethod, QcowEncryptionMethod};
+use super::features::QcowFeatures;
 use super::file_header::QcowFileHeader;
 
 /// QEMU Copy-On-Write (QCOW) file.
@@ -29,6 +34,9 @@ pub struct QcowFile {
 
     /// Format version.
     format_version: u32,
+
+    /// Features.
+    features: QcowFeatures,
 
     /// Bytes per sector.
     pub(super) bytes_per_sector: u16,
@@ -61,7 +69,7 @@ pub struct QcowFile {
     cluster_block_bit_mask: u64,
 
     /// Cluster block size.
-    cluster_block_size: u64,
+    cluster_block_size: u32,
 
     /// Compression bit shift.
     compression_bit_shift: u32,
@@ -76,13 +84,19 @@ pub struct QcowFile {
     compression_method: QcowCompressionMethod,
 
     /// Encryption method.
-    encryption_method: QcowEncryptionMethod,
+    encryption_type: Option<QcowEncryptionType>,
+
+    /// Encryption context.
+    encryption_context: Option<QcowEncryptionContext>,
 
     /// Backing file name.
     backing_file_name: Option<ByteString>,
 
     /// Backing file.
     backing_file: Option<Arc<QcowFile>>,
+
+    /// Value to indicate the (encrypted) file is locked.
+    is_locked: bool,
 
     /// Media size.
     pub(super) media_size: u64,
@@ -94,6 +108,7 @@ impl QcowFile {
         Self {
             data_stream: None,
             format_version: 0,
+            features: QcowFeatures::new(),
             bytes_per_sector: 0,
             file_header_size: 0,
             offset_bit_mask: 0,
@@ -109,9 +124,11 @@ impl QcowFile {
             compression_bit_mask: 0,
             compression_flag_bit_mask: 0,
             compression_method: QcowCompressionMethod::Zlib,
-            encryption_method: QcowEncryptionMethod::None,
+            encryption_type: None,
+            encryption_context: None,
             backing_file_name: None,
             backing_file: None,
+            is_locked: false,
             media_size: 0,
         }
     }
@@ -121,9 +138,19 @@ impl QcowFile {
         self.backing_file_name.as_ref()
     }
 
+    /// Retrieves the block size.
+    pub fn get_block_size(&self) -> u32 {
+        self.cluster_block_size
+    }
+
     /// Retrieves the bytes per sector.
     pub fn get_bytes_per_sector(&self) -> u16 {
         self.bytes_per_sector
+    }
+
+    /// Retrieves the compatible feature flags.
+    pub fn get_compatible_feature_flags(&self) -> u64 {
+        self.features.compatible_feature_flags
     }
 
     /// Retrieves the compression method.
@@ -133,6 +160,9 @@ impl QcowFile {
 
     /// Retrieves a data stream.
     pub fn get_data_stream(&self) -> Option<DataStreamReference> {
+        if self.features.is_unsupported() || self.is_locked {
+            return None;
+        }
         match &self.data_stream {
             Some(data_stream) => {
                 let backing_file_data_stream: Option<DataStreamReference> = match &self.backing_file
@@ -143,6 +173,7 @@ impl QcowFile {
                 Some(Arc::new(RwLock::new(QcowBlockStream::new(
                     QcowBlockReader::new(
                         data_stream,
+                        self.bytes_per_sector,
                         self.offset_bit_mask,
                         self.level1_index_bit_shift,
                         self.level1_table_offset,
@@ -152,6 +183,8 @@ impl QcowFile {
                         self.number_of_cluster_block_bits,
                         self.cluster_block_size,
                         self.compression_flag_bit_mask,
+                        &self.compression_method,
+                        self.encryption_context.as_ref(),
                         backing_file_data_stream,
                         self.media_size,
                     ),
@@ -162,8 +195,21 @@ impl QcowFile {
     }
 
     /// Retrieves the encryption method.
-    pub fn get_encryption_method(&self) -> &QcowEncryptionMethod {
-        &self.encryption_method
+    #[deprecated(since = "0.0.1", note = "Use `get_encryption_type` instead.")]
+    pub fn get_encryption_method(&self) -> QcowEncryptionMethod {
+        match &self.encryption_type {
+            Some(encryption_type) => match encryption_type.method {
+                1 => QcowEncryptionMethod::AesCbc128,
+                2 => QcowEncryptionMethod::Luks,
+                _ => QcowEncryptionMethod::Unknown,
+            },
+            None => QcowEncryptionMethod::None,
+        }
+    }
+
+    /// Retrieves the encryption type.
+    pub fn get_encryption_type(&self) -> Option<&QcowEncryptionType> {
+        self.encryption_type.as_ref()
     }
 
     /// Retrieves the format version.
@@ -171,9 +217,19 @@ impl QcowFile {
         self.format_version
     }
 
+    /// Retrieves the incompatible feature flags.
+    pub fn get_incompatible_feature_flags(&self) -> u64 {
+        self.features.incompatible_feature_flags
+    }
+
     /// Retrieves the media size.
     pub fn get_media_size(&self) -> u64 {
         self.media_size
+    }
+
+    /// Determines if the (encrypted) image is locked.
+    pub fn is_locked(&self) -> bool {
+        self.is_locked
     }
 
     /// Reads a data stream.
@@ -204,21 +260,28 @@ impl QcowFile {
                 return Err(error);
             }
         }
+        if file_header.number_of_cluster_block_bits >= 32 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid number of cluster block bits value out of bounds"
+            ));
+        }
         self.format_version = file_header.format_version;
+
+        self.features.initialize(&file_header);
+
         self.bytes_per_sector = 512;
         self.file_header_size = file_header.header_size;
         self.number_of_cluster_block_bits = file_header.number_of_cluster_block_bits;
         self.media_size = file_header.media_size;
 
-        self.encryption_method = match file_header.encryption_method {
-            0 => QcowEncryptionMethod::None,
-            1 => QcowEncryptionMethod::AesCbc128,
-            2 => QcowEncryptionMethod::Luks,
-            _ => QcowEncryptionMethod::Unknown,
+        self.encryption_type = match file_header.encryption_method {
+            0 => None,
+            _ => Some(QcowEncryptionType::new(file_header.encryption_method)),
         };
         if self.format_version == 3 {
             self.compression_method = match file_header.compression_method {
                 0 => QcowCompressionMethod::Zlib,
+                1 => QcowCompressionMethod::Zstd,
                 _ => QcowCompressionMethod::Unknown,
             };
         }
@@ -247,7 +310,6 @@ impl QcowFile {
         self.cluster_block_bit_mask = !(u64::MAX << self.number_of_cluster_block_bits);
         self.compression_bit_mask = !(u64::MAX << self.compression_bit_shift);
         self.cluster_block_size = 1 << self.number_of_cluster_block_bits;
-
         self.level2_table_number_of_references =
             1 << (file_header.number_of_level2_table_bits as u64);
 
@@ -255,15 +317,17 @@ impl QcowFile {
             file_header.level1_table_number_of_references as u64;
 
         if self.format_version == 1 {
-            if self.cluster_block_size > u64::MAX / self.level2_table_number_of_references {
+            if (self.cluster_block_size as u64)
+                > (u32::MAX as u64) / self.level2_table_number_of_references
+            {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Invalid level 2 table number of references: {} value out of bounds",
                     self.level2_table_number_of_references
                 )));
             }
-            level1_table_number_of_references = self
-                .media_size
-                .div_ceil(self.cluster_block_size * self.level2_table_number_of_references);
+            level1_table_number_of_references = self.media_size.div_ceil(
+                (self.cluster_block_size as u64) * self.level2_table_number_of_references,
+            );
 
             if level1_table_number_of_references > u32::MAX as u64 {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -302,11 +366,8 @@ impl QcowFile {
                 }
             }
         }
-        if self.encryption_method != QcowEncryptionMethod::None {
-            // TODO: handle encryption
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported encryption method"
-            ));
+        if self.encryption_type.is_some() {
+            self.is_locked = true;
         }
         Ok(())
     }
@@ -354,6 +415,62 @@ impl QcowFile {
 
         Ok(())
     }
+
+    /// Unlocks a locked (encrypted) file.
+    pub fn unlock(&mut self, credentials: &[QcowCredential]) -> Result<bool, ErrorTrace> {
+        if !self.is_locked {
+            return Ok(true);
+        }
+        let encryption_type: &QcowEncryptionType = match &self.encryption_type {
+            Some(encryption_type) => encryption_type,
+            None => return Err(keramics_core::error_trace_new!("Missing encryption type")),
+        };
+        let mut user_key: Vec<u8> = vec![0; 16];
+        let mut key_unlocked: bool = false;
+
+        for credential in credentials.iter() {
+            match credential {
+                QcowCredential::Passphrase(passphrase) => {
+                    if encryption_type.method == 1 {
+                        let data_size: usize = min(passphrase.len(), 16);
+
+                        user_key[0..data_size].copy_from_slice(&passphrase[0..data_size]);
+
+                        key_unlocked = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if key_unlocked {
+            let encryption_context: QcowEncryptionContext =
+                match QcowEncryption::get_encryption_context(encryption_type, &user_key) {
+                    Ok(Some(context)) => context,
+                    Ok(None) => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported encryption type: {}",
+                            encryption_type
+                        )));
+                    }
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve encryption context for type: {}",
+                                encryption_type
+                            )
+                        );
+                        return Err(error);
+                    }
+                };
+            // Note that for the AES-128-CBC encryption method there is no way, other than
+            // inspecting the media data, to ensure the correct key was provided.
+
+            self.encryption_context = Some(encryption_context);
+            self.is_locked = false;
+        }
+        Ok(!self.is_locked)
+    }
 }
 
 #[cfg(test)]
@@ -366,11 +483,11 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_file() -> Result<QcowFile, ErrorTrace> {
+    fn get_file(path_string: &str) -> Result<QcowFile, ErrorTrace> {
         let mut file: QcowFile = QcowFile::new();
 
-        let path_string: String = get_test_data_path("qcow/ext2.qcow2");
-        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let test_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
@@ -379,7 +496,7 @@ mod tests {
 
     #[test]
     fn test_get_backing_file_name() -> Result<(), ErrorTrace> {
-        let file: QcowFile = get_file()?;
+        let file: QcowFile = get_file("qcow/ext2.qcow2")?;
 
         let backing_file_name: Option<&ByteString> = file.get_backing_file_name();
         assert_eq!(backing_file_name, None);
@@ -388,8 +505,18 @@ mod tests {
     }
 
     #[test]
+    fn test_get_block_size() -> Result<(), ErrorTrace> {
+        let file: QcowFile = get_file("qcow/ext2.qcow2")?;
+
+        let block_size: u32 = file.get_block_size();
+        assert_eq!(block_size, 65536);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
-        let file: QcowFile = get_file()?;
+        let file: QcowFile = get_file("qcow/ext2.qcow2")?;
 
         let bytes_per_sector: u16 = file.get_bytes_per_sector();
         assert_eq!(bytes_per_sector, 512);
@@ -398,8 +525,18 @@ mod tests {
     }
 
     #[test]
+    fn test_get_compatible_feature_flags() -> Result<(), ErrorTrace> {
+        let file: QcowFile = get_file("qcow/ext2.qcow2")?;
+
+        let compatible_feature_flags: u64 = file.get_compatible_feature_flags();
+        assert_eq!(compatible_feature_flags, 0x0000000000000000);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_compression_method() -> Result<(), ErrorTrace> {
-        let file: QcowFile = get_file()?;
+        let file: QcowFile = get_file("qcow/ext2.qcow2")?;
 
         let compression_method: &QcowCompressionMethod = file.get_compression_method();
         assert_eq!(compression_method, &QcowCompressionMethod::Zlib);
@@ -409,17 +546,27 @@ mod tests {
 
     #[test]
     fn test_get_encryption_method() -> Result<(), ErrorTrace> {
-        let file: QcowFile = get_file()?;
+        let file: QcowFile = get_file("qcow/ext2_aes128.qcow2")?;
 
-        let encryption_method: &QcowEncryptionMethod = file.get_encryption_method();
-        assert_eq!(encryption_method, &QcowEncryptionMethod::None);
+        let encryption_method: QcowEncryptionMethod = file.get_encryption_method();
+        assert_eq!(encryption_method, QcowEncryptionMethod::AesCbc128);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_encryption_type() -> Result<(), ErrorTrace> {
+        let file: QcowFile = get_file("qcow/ext2_aes128.qcow2")?;
+
+        let encryption_type: &QcowEncryptionType = file.get_encryption_type().unwrap();
+        assert_eq!(encryption_type.method, 0x00000001);
 
         Ok(())
     }
 
     #[test]
     fn test_get_format_version() -> Result<(), ErrorTrace> {
-        let file: QcowFile = get_file()?;
+        let file: QcowFile = get_file("qcow/ext2.qcow2")?;
 
         let format_version: u32 = file.get_format_version();
         assert_eq!(format_version, 3);
@@ -428,11 +575,31 @@ mod tests {
     }
 
     #[test]
+    fn test_get_incompatible_feature_flags() -> Result<(), ErrorTrace> {
+        let file: QcowFile = get_file("qcow/ext2.qcow2")?;
+
+        let incompatible_feature_flags: u64 = file.get_incompatible_feature_flags();
+        assert_eq!(incompatible_feature_flags, 0x0000000000000000);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_media_size() -> Result<(), ErrorTrace> {
-        let file: QcowFile = get_file()?;
+        let file: QcowFile = get_file("qcow/ext2.qcow2")?;
 
         let media_size: u64 = file.get_media_size();
         assert_eq!(media_size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_locked() -> Result<(), ErrorTrace> {
+        let file: QcowFile = get_file("qcow/ext2.qcow2")?;
+
+        let is_locked: bool = file.is_locked();
+        assert_eq!(is_locked, false);
 
         Ok(())
     }
@@ -467,4 +634,19 @@ mod tests {
 
     // TODO: add tests for read_backing_file_name
     // TODO: add tests for set_backing_file
+
+    #[test]
+    fn test_unlock() -> Result<(), ErrorTrace> {
+        let mut file: QcowFile = get_file("qcow/ext2_aes128.qcow2")?;
+
+        assert_eq!(file.is_locked, true);
+
+        let credentials: Vec<QcowCredential> =
+            vec![QcowCredential::Passphrase(b"KeRaMiCs".to_vec())];
+        file.unlock(&credentials)?;
+
+        assert_eq!(file.is_locked, false);
+
+        Ok(())
+    }
 }

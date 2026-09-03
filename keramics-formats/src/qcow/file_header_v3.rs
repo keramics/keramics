@@ -30,14 +30,14 @@ use super::file_header::QcowFileHeader;
         field(name = "media_size", data_type = "u64"),
         field(name = "encryption_method", data_type = "u32"),
         field(name = "level1_table_number_of_references", data_type = "u32"),
-        field(name = "level1_table_offset", data_type = "u64"),
+        field(name = "level1_table_offset", data_type = "u64", format = "hex"),
         field(name = "reference_count_table_offset", data_type = "u64"),
         field(name = "reference_count_table_clusters", data_type = "u32"),
         field(name = "number_of_snapshots", data_type = "u32"),
         field(name = "snapshots_offset", data_type = "u64"),
-        field(name = "incompatible_feature_flags", data_type = "u64"),
-        field(name = "compatible_feature_flags", data_type = "u64"),
-        field(name = "auto_clear_feature_flags", data_type = "u64"),
+        field(name = "incompatible_feature_flags", data_type = "u64", format = "hex"),
+        field(name = "compatible_feature_flags", data_type = "u64", format = "hex"),
+        field(name = "auto_clear_feature_flags", data_type = "u64", format = "hex"),
         field(name = "reference_count_order", data_type = "u32"),
         field(name = "header_size", data_type = "u32"),
         field(name = "compression_method", data_type = "u8"),
@@ -62,24 +62,6 @@ impl QcowFileHeaderV3 {
                 "Unsupported format version"
             ));
         }
-        let supported_flags: u64 = 1;
-
-        let incompatible_feature_flags: u64 = bytes_to_u64_be!(data, 72);
-
-        if incompatible_feature_flags & !(supported_flags) != 0 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported incompatible feature flags: 0x{:016x}",
-                incompatible_feature_flags
-            )));
-        }
-        let compatible_feature_flags: u64 = bytes_to_u64_be!(data, 80);
-
-        if compatible_feature_flags & !(supported_flags) != 0 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported compatible feature flags: 0x{:016x}",
-                compatible_feature_flags
-            )));
-        }
         file_header.backing_file_name_offset = bytes_to_u64_be!(data, 8);
         file_header.backing_file_name_size = bytes_to_u32_be!(data, 16);
         file_header.number_of_cluster_block_bits = bytes_to_u32_be!(data, 20);
@@ -89,6 +71,8 @@ impl QcowFileHeaderV3 {
         file_header.level1_table_offset = bytes_to_u64_be!(data, 40);
         file_header.number_of_snapshots = bytes_to_u32_be!(data, 60);
         file_header.snapshots_offset = bytes_to_u64_be!(data, 64);
+        file_header.incompatible_feature_flags = bytes_to_u64_be!(data, 72);
+        file_header.compatible_feature_flags = bytes_to_u64_be!(data, 80);
         file_header.header_size = bytes_to_u32_be!(data, 100);
         file_header.compression_method = data[104];
 
@@ -143,6 +127,8 @@ mod tests {
         assert_eq!(test_struct.level1_table_offset, 196608);
         assert_eq!(test_struct.number_of_snapshots, 0);
         assert_eq!(test_struct.snapshots_offset, 0);
+        assert_eq!(test_struct.incompatible_feature_flags, 0);
+        assert_eq!(test_struct.compatible_feature_flags, 0);
         assert_eq!(test_struct.header_size, 112);
         assert_eq!(test_struct.compression_method, 0);
 
@@ -182,26 +168,6 @@ mod tests {
     fn test_read_data_with_unsupported_number_of_cluster_block_bits() {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[20] = 0xff;
-
-        let mut test_struct = QcowFileHeader::new();
-        let result = QcowFileHeaderV3::read_data(&mut test_struct, &test_data);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_read_data_with_unsupported_incompatible_feature_flags() {
-        let mut test_data: Vec<u8> = get_test_data();
-        test_data[72] = 0xff;
-
-        let mut test_struct = QcowFileHeader::new();
-        let result = QcowFileHeaderV3::read_data(&mut test_struct, &test_data);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_read_data_with_unsupported_compatible_feature_flags() {
-        let mut test_data: Vec<u8> = get_test_data();
-        test_data[80] = 0xff;
 
         let mut test_struct = QcowFileHeader::new();
         let result = QcowFileHeaderV3::read_data(&mut test_struct, &test_data);

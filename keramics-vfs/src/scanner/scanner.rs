@@ -955,14 +955,7 @@ impl VfsScanner {
             VfsType::Os => match self.scan_for_format(&file_system, vfs_location)? {
                 Some(FormatIdentifier::CdsaEncr) => {
                     // TODO: Set VfsType::SparseImage based on extension?
-                    let sub_node_vfs_type: VfsType = VfsType::Udif;
-                    let sub_node_path: Path = Path::from("/");
-                    let sub_node_vfs_location: VfsLocation =
-                        vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_path);
-                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
-                    sub_scan_node.is_locked = true;
-
-                    scan_node.sub_nodes.push(sub_scan_node);
+                    scan_node.add_locked_sub_node(&VfsType::Udif);
                 }
                 Some(format_identifier) => {
                     let sub_node_vfs_type: VfsType = match Self::get_vfs_type(&format_identifier) {
@@ -1031,19 +1024,26 @@ impl VfsScanner {
                         return Err(error);
                     }
                 }
-                let number_of_layers: usize = qcow_image.get_number_of_layers();
+                if qcow_image.is_locked() {
+                    scan_node.is_locked = true;
+                } else {
+                    let number_of_layers: usize = qcow_image.get_number_of_layers();
 
-                match self.scan_for_storage_media_image_sub_nodes(
-                    scan_options,
-                    vfs_location,
-                    scan_node,
-                    QcowImage::PATH_PREFIX,
-                    number_of_layers,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to scan QCOW image");
-                        return Err(error);
+                    match self.scan_for_storage_media_image_sub_nodes(
+                        scan_options,
+                        vfs_location,
+                        scan_node,
+                        QcowImage::PATH_PREFIX,
+                        number_of_layers,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to scan QCOW image"
+                            );
+                            return Err(error);
+                        }
                     }
                 }
             }

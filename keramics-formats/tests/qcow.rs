@@ -14,7 +14,7 @@
 use std::path::PathBuf;
 
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
-use keramics_formats::qcow::QcowFile;
+use keramics_formats::qcow::{QcowCredential, QcowFile};
 
 mod util;
 
@@ -46,8 +46,53 @@ fn open_file(path: &PathBuf) -> Result<QcowFile, ErrorTrace> {
 }
 
 #[test]
-fn read_media() -> Result<(), ErrorTrace> {
+fn read_media_qcow() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow");
+    let file: QcowFile = open_file(&path_buf)?;
+    let data_stream: DataStreamReference = file.get_data_stream().unwrap();
+
+    let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+
+    assert_eq!(media_offset, file.get_media_size());
+    assert_eq!(md5_hash.as_str(), "b1760d0b35a512ef56970df4e6f8c5d6");
+
+    Ok(())
+}
+
+#[test]
+fn read_media_qcow2() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
+    let file: QcowFile = open_file(&path_buf)?;
+    let data_stream: DataStreamReference = file.get_data_stream().unwrap();
+
+    let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+
+    assert_eq!(media_offset, file.get_media_size());
+    assert_eq!(md5_hash.as_str(), "b1760d0b35a512ef56970df4e6f8c5d6");
+
+    Ok(())
+}
+
+#[test]
+fn read_media_qcow2_aes128_encrypted() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
+    let mut file: QcowFile = open_file(&path_buf)?;
+    let credentials: Vec<QcowCredential> = vec![QcowCredential::Passphrase(b"KeRaMiCs".to_vec())];
+    file.unlock(&credentials)?;
+
+    let data_stream: DataStreamReference = file.get_data_stream().unwrap();
+
+    let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+
+    assert_eq!(media_offset, file.get_media_size());
+    assert_eq!(md5_hash.as_str(), "b1760d0b35a512ef56970df4e6f8c5d6");
+
+    Ok(())
+}
+
+#[test]
+fn read_media_qcow2_zlib_compressed() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2_zlib.qcow2");
     let file: QcowFile = open_file(&path_buf)?;
     let data_stream: DataStreamReference = file.get_data_stream().unwrap();
 

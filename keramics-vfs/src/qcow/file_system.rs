@@ -14,9 +14,11 @@
 use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
-use keramics_formats::qcow::{QcowFile, QcowImage};
+use keramics_formats::qcow::{QcowCredential, QcowFile, QcowImage};
 use keramics_formats::{FileResolverReference, Path, PathComponent};
 
+use crate::credential::VfsCredential;
+use crate::credential_store::VfsCredentialStore;
 use crate::file_resolver::new_vfs_file_resolver;
 use crate::image::VfsImageFileSystem;
 use crate::traits::VfsImage;
@@ -59,6 +61,7 @@ impl VfsImage for QcowImage {
         path: &Path,
     ) -> Result<(), ErrorTrace> {
         let parent_path: Path = path.new_with_parent_directory();
+
         let file_name: &PathComponent = match path.file_name() {
             Some(file_name) => file_name,
             None => {
@@ -84,6 +87,26 @@ impl VfsImage for QcowImage {
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
                 return Err(error);
+            }
+        }
+        if self.is_locked() {
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut credentials: Vec<QcowCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        credentials.push(QcowCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match self.unlock(&credentials) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Failed to unlock QCOW image");
+                    return Err(error);
+                }
             }
         }
         Ok(())

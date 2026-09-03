@@ -30,7 +30,7 @@ use super::file_header::QcowFileHeader;
         field(name = "media_size", data_type = "u64"),
         field(name = "encryption_method", data_type = "u32"),
         field(name = "level1_table_number_of_references", data_type = "u32"),
-        field(name = "level1_table_offset", data_type = "u64"),
+        field(name = "level1_table_offset", data_type = "u64", format = "hex"),
         field(name = "reference_count_table_offset", data_type = "u64"),
         field(name = "reference_count_table_clusters", data_type = "u32"),
         field(name = "number_of_snapshots", data_type = "u32"),
@@ -108,6 +108,10 @@ mod tests {
         assert_eq!(test_struct.level1_table_offset, 196608);
         assert_eq!(test_struct.number_of_snapshots, 0);
         assert_eq!(test_struct.snapshots_offset, 0);
+        assert_eq!(test_struct.incompatible_feature_flags, 0);
+        assert_eq!(test_struct.compatible_feature_flags, 0);
+        assert_eq!(test_struct.header_size, 0);
+        assert_eq!(test_struct.compression_method, 0);
 
         Ok(())
     }
