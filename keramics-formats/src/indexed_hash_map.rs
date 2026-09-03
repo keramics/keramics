@@ -69,6 +69,11 @@ where
         self.hashmap.get(key)
     }
 
+    /// Retrieves a specific value by key.
+    pub fn get_value_by_key_mut(&mut self, key: &K) -> Option<&mut V> {
+        self.hashmap.get_mut(key)
+    }
+
     /// Inserts a key value pair.
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         if !self.hashmap.contains_key(&key) {

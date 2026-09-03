@@ -20,8 +20,7 @@ use keramics_types::bytes_to_u32_be;
     structure(
         byte_order = "big",
         field(name = "record_type", data_type = "u32"),
-        field(name = "unknown1", data_type = "[u8; 4]"),
-        field(name = "unknown2", data_type = "[u8; 4]"),
+        field(name = "unknown1", data_type = "[u8; 8]"),
         field(name = "data_size", data_type = "u32"),
     ),
     methods("debug_read_data")

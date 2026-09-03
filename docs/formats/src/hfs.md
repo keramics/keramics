@@ -587,8 +587,7 @@ The "native" and "hpux" device identifier is 4 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 1 | | Major device number |
-| 1 | 2 | 0 | Unknown |
-| 3 | 1 | | Minor device number |
+| 1 | 3 | | Minor device number |
 
 The "386bsd", "4bsd", "freebsd", "isc", "linux", "netbsd", "sco", "sunos", "svr3" and "ultrix"
 device identifier is 4 bytes in size and consists of:
@@ -1291,17 +1290,12 @@ significant bit holds information about the block with the highest number. Listi
 would test whether an block is in use, assuming that you've read the entire allocation file into
 memory.
 
-```text
-Determining whether a block is in use.
+Method to determine whether a block is used:
 
-static Boolean IsAllocationBlockUsed(UInt32 thisAllocationBlock,
-                                     UInt8 *allocationFileContents)
-{
-    UInt8 thisByte;
+```python
+byte_value = allocation_file_data[block_number // 8]
 
-    thisByte = allocationFileContents[thisAllocationBlock / 8];
-    return (thisByte & (1 << (7 - (thisAllocationBlock % 8)))) != 0;
-}
+is_used = (byte_value & (1 << (7 - (block_number % 8)))) != 0
 ```
 
 ## Attributes file {#hfs_plus_attributes_file}
@@ -1312,7 +1306,7 @@ The location of the attributes file can be found in the HFS+ and HFSX volume hea
 
 ### Attributes file keys
 
-An attributes file key is of variable size and consists of:
+An attributes file key (HFSPlusAttrKey) is of variable size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -1320,9 +1314,9 @@ An attributes file key is of variable size and consists of:
 | --- | --- | --- | --- |
 | 0 | 2 | | Key data size, in bytes |
 | <td colspan="4">*If key data size >= 12*</td> |
-| 2 | 2 | | Unknown |
+| 2 | 2 | 0 | Unknown (padding) |
 | 4 | 4 | | Identifier (CNID) |
-| 8 | 4 | | Unknown |
+| 8 | 4 | | Logical block number |
 | 12 | 2 | | Number of characters in the name string |
 | 14 | ... | | Name string, which contains an UTF-16 big-endian string without end-of-string character |
 
@@ -1357,41 +1351,43 @@ The attributes file data record header is 4 bytes in size and consists of:
 | --- | --- | --- |
 | 0x00000010 | kHFSPlusAttrInlineData | Attribute record with inline data |
 | 0x00000020 | kHFSPlusAttrForkData | Attribute record with fork descriptor |
-| 0x00000030 | kHFSPlusAttrExtents | Attribute record with extents overflow |
+| 0x00000030 | kHFSPlusAttrExtents | Extents overflow record for a kHFSPlusAttrForkData record |
 
 > Note that at the moment it is unclear when an attribute record of type kHFSPlusAttrExtents is
 > created and how it should be handled.
 
 #### The inline data attribute record
 
-The inline data attribute record is of variable size and consists of:
+The inline data attribute record (HFSPlusAttrData) is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | 0x00000010 | [Record type](#attributes_file_data_record_types) |
-| 4 | 4 | 0 | Unknown (Reserved) |
-| 8 | 4 | | Unknown |
+| 4 | 2 x 4 = 8 | 0 | Unknown (reserved) |
 | 12 | 4 | | Attribute data size |
 | 16 | ... | | Attribute data |
 
+> Note that is also a HFSPlusAttrInlineData record, which is obsolete and has not been observed
+> to be used.
+
 #### The fork descriptor attribute record
 
-The fork descriptor attribute record is 88 bytes in size and consists of:
+The fork descriptor attribute record (HFSPlusAttrForkData) is 88 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | 0x00000020 | [Record type](#attributes_file_data_record_types) |
-| 4 | 4 | 0 | Unknown (Reserved) |
+| 4 | 4 | 0 | Unknown (reserved) |
 | 8 | 80 | | Attribute [fork descriptor](#hfs_plus_fork_descriptor_structure) |
 
 #### The extents attribute record
 
-The extents attribute record is 72 bytes in size and consists of:
+The extents attribute record (HFSPlusAttrExtents) is 72 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | 0x00000030 | [Record type](#attributes_file_data_record_types) |
-| 4 | 4 | 0 | Unknown (Reserved) |
+| 4 | 4 | 0 | Unknown (reserved) |
 | 8 | 64 | | Attribute [extents record](#hfs_plus_extents_record) |
 
 ## Startup file
