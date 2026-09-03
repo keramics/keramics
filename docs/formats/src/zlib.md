@@ -1,4 +1,4 @@
-# Zlib compressed data
+# Zlib compressed data format
 
 Zlib compression is commonly used in file formats. The zlib compressed data format, as defined in
 RFC1950, allows for multiple techniques but only the Deflate compression method, a variation of

@@ -23,7 +23,7 @@ Certain paritions have a predefined meaning, such as:
 
 The SGI disklabel (or volume header) is stored at offset 0.
 
-The SGI disklabel is 512 bytes of size and consists of:
+The SGI disklabel is 512 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -39,7 +39,7 @@ The SGI disklabel is 512 bytes of size and consists of:
 
 ### Device parameters
 
-The device parameters are 48 bytes of size and consist of:
+The device parameters are 48 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -71,7 +71,7 @@ The device parameters are 48 bytes of size and consist of:
 The volume descriptors contain a flat file system, where each individual descriptor describes a
 execute boot file. These execute boot files are stored within the volume header partition.
 
-The volume descriptor is 16 bytes of size and consists of:
+The volume descriptor is 16 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -81,7 +81,7 @@ The volume descriptor is 16 bytes of size and consists of:
 
 ### Partition entry {#partition_entry}
 
-The partition entry is 12 bytes of size and consists of:
+The partition entry is 12 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |

@@ -10,13 +10,13 @@ Supported features:
 | Format versions | 1, 2, 3 |
 | Image types | Differential (backing file), Dynamic-size |
 | Compression | zlib |
+| Encryption | AES-128-CBC |
 
 Unsupported features:
 
 | Category | Feature(s) |
 | --- | --- |
+| Incompatible feature flags | QCOW2_INCOMPAT_CORRUPT, QCOW2_INCOMPAT_DATA_FILE, QCOW2_INCOMPAT_COMPRESSION, QCOW2_INCOMPAT_EXTL2 |
 | Compression | zstd |
-| Encryption | AES-128-CBC, LUKS |
+| Encryption | Linux Unified Key Setup (LUKS) |
 | | Snapshots |
-| | Data file |
-| | Extended L2 (table) entries |

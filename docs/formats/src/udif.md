@@ -432,10 +432,10 @@ The block table entry (BLKXChunkEntry) is 40 bytes in size and consists of:
 | | | |
 | 0x7ffffffe | | Comment |
 | | | |
-| 0x80000004 | | ADC compressed data |
-| 0x80000005 | | zlib compressed data |
+| 0x80000004 | | [ADC compressed data](adc.md) |
+| 0x80000005 | | [zlib compressed data](zlib.md) |
 | 0x80000006 | | bzip2 compressed data |
-| 0x80000007 | | LZFSE compressed data |
+| 0x80000007 | | [LZFSE compressed data](lzfse.md) |
 | 0x80000008 | | LZMA compressed data |
 | | | |
 | 0xffffffff | | Block table entries terminator |
