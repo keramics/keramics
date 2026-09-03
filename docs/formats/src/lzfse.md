@@ -132,7 +132,7 @@ is of variable size and consits of:
 | 31.6 | 2 bits | | Unknown (unused) |
 | <td colspan="4">*If block header size > 32*</td> |
 | 32 | ... | | Bit stream containing Huffman encoded [frequency table](#lzfse_frequency_table) |
-| <td colspan="4">&nbsp;</td> |
+| <td colspan="4">*Common*</td> |
 | ... | ... | | encoded literals |
 | ... | ... | | encoded L, M, D values |
 
