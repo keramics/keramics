@@ -16,6 +16,7 @@ This documentation uses the term volume systems in a broad sense to describe:
 ## Formats
 
 * [Apple Partition Map (APM)](apm.md)
+* [BitLocker Drive Encryption (BDE)](bde.md)
 * [BSD disklabel](bsdlabel.md)
 * [Core Storage (CS)](corestorage.md)
 * [GUID Partition Table (GPT)](gpt.md)
