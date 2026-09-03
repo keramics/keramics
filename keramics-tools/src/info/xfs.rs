@@ -137,9 +137,10 @@ impl<'a> fmt::Display for XfsFileEntryInfo<'a> {
         if let Some(device_identifier) = self.file_entry.get_device_identifier() {
             writeln!(
                 formatter,
-                "    Device number\t\t\t\t: {},{}",
+                "    Device number\t\t\t\t: {},{} (0x{:08x})",
                 *device_identifier >> 18,
-                *device_identifier & 0x0003ffff
+                *device_identifier & 0x0003ffff,
+                *device_identifier
             )?;
         }
         if let Some(symbolic_link_target) = &self.symbolic_link_target {

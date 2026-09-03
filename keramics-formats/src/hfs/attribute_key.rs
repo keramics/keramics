@@ -26,7 +26,7 @@ use super::string::HfsString;
             size_condition = ">= 14",
             field(name = "unknown1", data_type = "[u8; 2]"),
             field(name = "identifier", data_type = "u32"),
-            field(name = "unknown2", data_type = "[u8; 4]"),
+            field(name = "logical_block_number", data_type = "u32"),
             field(name = "name_size", data_type = "u16"),
         ),
     ),
@@ -40,6 +40,9 @@ pub struct HfsAttributeKey {
     /// Identifier (CNID).
     pub identifier: u32,
 
+    /// Logical block number.
+    pub logical_block_number: u32,
+
     /// Name size.
     pub name_size: u16,
 }
@@ -50,6 +53,7 @@ impl HfsAttributeKey {
         Self {
             size: 0,
             identifier: 0,
+            logical_block_number: 0,
             name_size: 0,
         }
     }
@@ -74,6 +78,9 @@ impl HfsAttributeKey {
             self.identifier = bytes_to_u32_be!(data, 4);
         }
         if key_data_size >= 10 {
+            self.logical_block_number = bytes_to_u32_be!(data, 8);
+        }
+        if key_data_size >= 12 {
             self.name_size = bytes_to_u16_be!(data, 12);
         }
         Ok(())
@@ -122,6 +129,7 @@ mod tests {
 
         assert_eq!(test_struct.size, 14);
         assert_eq!(test_struct.identifier, 1);
+        assert_eq!(test_struct.logical_block_number, 0);
         assert_eq!(test_struct.name_size, 0);
 
         Ok(())

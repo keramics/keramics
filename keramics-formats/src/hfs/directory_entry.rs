@@ -91,6 +91,16 @@ impl HfsDirectoryEntry {
         }
     }
 
+    /// Retrieves the device identifier.
+    pub fn get_device_identifier(&self) -> Option<&u32> {
+        match &self.record {
+            HfsCatalogFileEntryRecord::File(catalog_file_record) => {
+                catalog_file_record.special_permissions.as_ref()
+            }
+            HfsCatalogFileEntryRecord::Folder(_) => None,
+        }
+    }
+
     /// Retrieves the file mode.
     pub fn get_file_mode(&self) -> Option<&u16> {
         match &self.record {

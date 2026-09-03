@@ -187,6 +187,22 @@ impl HfsFileEntry {
         }
     }
 
+    /// Retrieves the device identifier.
+    pub fn get_device_identifier(&self) -> Option<&u32> {
+        match self.get_file_mode() {
+            Some(file_mode) => {
+                if *file_mode & 0xf000 == HFS_FILE_MODE_TYPE_CHARACTER_DEVICE
+                    || *file_mode & 0xf000 == HFS_FILE_MODE_TYPE_BLOCK_DEVICE
+                {
+                    self.directory_entry.get_device_identifier()
+                } else {
+                    None
+                }
+            }
+            None => None,
+        }
+    }
+
     /// Retrieves the file mode.
     pub fn get_file_mode(&self) -> Option<&u16> {
         match &self.indirect_node {
@@ -485,21 +501,66 @@ impl HfsFileEntry {
         attribute_record: &HfsAttributeRecord,
     ) -> Result<DataStreamReference, ErrorTrace> {
         match attribute_record {
-            HfsAttributeRecord::Extents(_) => {
-                // TODO: implement
-                todo!();
-            }
             HfsAttributeRecord::ForkData(fork_data_attribute_record) => {
-                match self.get_block_stream(&fork_data_attribute_record.fork_descriptor) {
-                    Ok(block_stream) => Ok(Arc::new(RwLock::new(block_stream))),
+                let mut block_ranges: HfsBlockRanges = HfsBlockRanges::new();
+                let mut logical_block_number: u32 = 0;
+
+                match block_ranges.read_extents(
+                    self.data_area_block_number,
+                    &mut logical_block_number,
+                    &fork_data_attribute_record.fork_descriptor.extents,
+                ) {
+                    Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to retrieve fork data block stream"
+                            "Unable to determine block ranges from attribute fork data record"
                         );
-                        Err(error)
+                        return Err(error);
                     }
                 }
+                for (index, extents_attribute_record) in fork_data_attribute_record
+                    .extents_records
+                    .iter()
+                    .enumerate()
+                {
+                    if extents_attribute_record.logical_block_number != logical_block_number {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Logical block number mismatch for attribute extents record: {}",
+                            index
+                        )));
+                    }
+                    match block_ranges.read_extents(
+                        self.data_area_block_number,
+                        &mut logical_block_number,
+                        &extents_attribute_record.extents,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to determine block ranges from attribute extents record: {}",
+                                    index
+                                ),
+                            );
+                            return Err(error);
+                        }
+                    }
+                }
+                let mut block_reader: HfsBlockReader = HfsBlockReader::new(
+                    &self.data_stream,
+                    self.block_size,
+                    fork_data_attribute_record.fork_descriptor.size,
+                );
+                match block_reader.open(block_ranges.ranges) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
+                        return Err(error);
+                    }
+                }
+                Ok(Arc::new(RwLock::new(HfsBlockStream::new(block_reader))))
             }
             HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
                 let data_stream: FakeDataStream = FakeDataStream::new(
@@ -507,6 +568,11 @@ impl HfsFileEntry {
                     attribute_inline_data_record.data_size as u64,
                 );
                 Ok(Arc::new(RwLock::new(data_stream)))
+            }
+            _ => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported attribute record type"
+                ));
             }
         }
     }
@@ -952,6 +1018,18 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_device_identifier(), None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_mode_with_hfs() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
 
@@ -975,8 +1053,29 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_identifier
-    // TODO: add tests for get_link_reference
+    #[test]
+    fn test_get_identifier_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_identifier(), 18);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_link_reference_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_link_reference(), None);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_modification_time_with_hfs() -> Result<(), ErrorTrace> {
@@ -1426,6 +1525,18 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_hfsplus() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_device_identifier(), None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_mode_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
@@ -1449,8 +1560,29 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_identifier
-    // TODO: add tests for get_link_reference
+    #[test]
+    fn test_get_identifier_with_hfsplus() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_identifier(), 20);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_link_reference_with_hfsplus() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_link_reference(), Some(&20));
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_modification_time_with_hfsplus() -> Result<(), ErrorTrace> {

@@ -15,6 +15,7 @@ use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_be;
 
+use super::attribute_extents_record::HfsAttributeExtentsRecord;
 use super::fork_descriptor::HfsForkDescriptor;
 
 #[derive(LayoutMap)]
@@ -34,6 +35,9 @@ pub struct HfsAttributeForkDataRecord {
 
     /// Fork descriptor.
     pub fork_descriptor: HfsForkDescriptor,
+
+    /// Extents records.
+    pub extents_records: Vec<HfsAttributeExtentsRecord>,
 }
 
 impl HfsAttributeForkDataRecord {
@@ -42,6 +46,7 @@ impl HfsAttributeForkDataRecord {
         Self {
             record_type: 0,
             fork_descriptor: HfsForkDescriptor::new(),
+            extents_records: Vec::new(),
         }
     }
 
@@ -103,9 +108,10 @@ mod tests {
                 extents: vec![HfsExtentDescriptor {
                     block_number: 242,
                     number_of_blocks: 20
-                },],
+                }],
             }
         );
+        assert_eq!(test_struct.extents_records.len(), 0);
 
         Ok(())
     }

@@ -211,7 +211,6 @@ impl VfsFileEntry {
     /// Retrieves the device identifier.
     pub fn get_device_identifier(&self) -> Option<u64> {
         // TODO: implement support for APFS
-        // TODO: implement support for HFS
         match self {
             VfsFileEntry::Apfs(_)
             | VfsFileEntry::ApfsContainer(_)
@@ -221,7 +220,6 @@ impl VfsFileEntry {
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
-            | VfsFileEntry::Hfs(_)
             | VfsFileEntry::LinuxLvm(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Ntfs(_)
@@ -236,6 +234,10 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_device_identifier() {
+                Some(device_identifier) => Some(*device_identifier as u64),
+                None => None,
+            },
+            VfsFileEntry::Hfs(hfs_file_entry) => match hfs_file_entry.get_device_identifier() {
                 Some(device_identifier) => Some(*device_identifier as u64),
                 None => None,
             },

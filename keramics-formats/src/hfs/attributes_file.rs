@@ -159,16 +159,59 @@ impl HfsAttributesFile {
                                 return Err(error);
                             }
                         };
-                        match self.read_attribute_record(&key, record_data) {
-                            Ok(attribute_record) => {
-                                attributes.insert(name, attribute_record);
-                            }
+                        let mut attribute_record: HfsAttributeRecord = match self
+                            .read_attribute_record(&key, record_data)
+                        {
+                            Ok(attribute_record) => attribute_record,
                             Err(mut error) => {
                                 keramics_core::error_trace_add_frame!(
                                     error,
                                     format!("Unable to read attribute record: {}", record_index)
                                 );
                                 return Err(error);
+                            }
+                        };
+                        match attribute_record {
+                            HfsAttributeRecord::Extents(mut extents_attribute_record) => {
+                                match attributes.get_value_by_key_mut(&name) {
+                                    Some(HfsAttributeRecord::ForkData(fork_attribute_record)) => {
+                                        if key.logical_block_number == 0 {
+                                            return Err(keramics_core::error_trace_new!(format!(
+                                                "Unsupported key: {} with zero logical block number",
+                                                record_index
+                                            )));
+                                        }
+                                        extents_attribute_record.logical_block_number =
+                                            key.logical_block_number;
+
+                                        fork_attribute_record
+                                            .extents_records
+                                            .push(extents_attribute_record)
+                                    }
+                                    _ => {
+                                        return Err(keramics_core::error_trace_new!(format!(
+                                            "Missing attribute: {} fork data record",
+                                            name
+                                        )));
+                                    }
+                                }
+                            }
+                            _ => {
+                                if key.logical_block_number != 0 {
+                                    return Err(keramics_core::error_trace_new!(format!(
+                                        "Unsupported key: {} with non-zero logical block number",
+                                        record_index
+                                    )));
+                                }
+                                match attributes.insert(name.clone(), attribute_record) {
+                                    Some(_) => {
+                                        return Err(keramics_core::error_trace_new!(format!(
+                                            "Unsupported multiple attributes with the name: {}",
+                                            name
+                                        )));
+                                    }
+                                    None => {}
+                                }
                             }
                         }
                     } else if record_index > 0 {

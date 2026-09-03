@@ -36,6 +36,9 @@ pub struct HfsAttributeExtentsRecord {
     /// Record type.
     pub record_type: u32,
 
+    /// Logical block number.
+    pub logical_block_number: u32,
+
     /// Extents.
     pub extents: Vec<HfsExtentDescriptor>,
 }
@@ -45,6 +48,7 @@ impl HfsAttributeExtentsRecord {
     pub fn new() -> Self {
         Self {
             record_type: 0,
+            logical_block_number: 0,
             extents: Vec::new(),
         }
     }
@@ -115,6 +119,7 @@ mod tests {
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.record_type, 0x00000030);
+        assert_eq!(test_struct.logical_block_number, 0);
         assert_eq!(
             test_struct.extents,
             vec![HfsExtentDescriptor {

@@ -225,9 +225,10 @@ impl<'a> fmt::Display for ExtFileEntryInfo<'a> {
         if let Some(device_identifier) = self.file_entry.get_device_identifier() {
             writeln!(
                 formatter,
-                "    Device number\t\t\t\t: {},{}",
+                "    Device number\t\t\t\t: {},{} (0x{:04x})",
                 *device_identifier >> 8,
-                *device_identifier & 0x00ff
+                *device_identifier & 0x00ff,
+                *device_identifier
             )?;
         }
         if let Some(symbolic_link_target) = &self.symbolic_link_target {

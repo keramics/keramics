@@ -154,6 +154,23 @@ impl<'a> fmt::Display for HfsFileEntryInfo<'a> {
 
             writeln!(formatter, "    File mode\t\t\t\t\t: {}", file_mode_info)?;
         }
+        if let Some(device_identifier) = self.file_entry.get_device_identifier() {
+            let (major_number, minor_number): (u32, u32) = if *device_identifier & 0xffff0000 == 0 {
+                // i386 mode
+                (
+                    (*device_identifier >> 8) & 0x000000ff,
+                    *device_identifier & 0x000000ff,
+                )
+            } else {
+                // Native mode
+                (*device_identifier >> 24, *device_identifier & 0x00ffffff)
+            };
+            writeln!(
+                formatter,
+                "    Device number\t\t\t\t: {},{} (0x{:08x})",
+                major_number, minor_number, *device_identifier
+            )?;
+        }
         writeln!(formatter)
     }
 }
