@@ -525,7 +525,7 @@ The FVE metadata header (version 1) is 48 bytes in size and consists of:
 | 40 | 8 | | Creation time, which contains a FILETIME |
 
 > Note that it is currently unknown what the upper 16-bit of the encryption method value is used
-> for. The MSB has been observed to be used or is this value actually 2x 16-bit values.
+> for. The MSB has been observed to be used or is this value actually 2 16-bit values.
 
 #### Encryption methods {#encryption_methods}
 
