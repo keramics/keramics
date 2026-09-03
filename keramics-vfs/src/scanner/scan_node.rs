@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use keramics_formats::Path;
+
 use crate::enums::VfsType;
 use crate::location::VfsLocation;
 
@@ -35,6 +37,17 @@ impl VfsScanNode {
             sub_nodes: Vec::new(),
             is_locked: false,
         }
+    }
+
+    /// Adds a locked sub node.
+    pub(super) fn add_locked_sub_node(&mut self, vfs_type: &VfsType) {
+        let sub_node_location: VfsLocation =
+            self.location.new_with_layer(vfs_type, Path::from("/"));
+
+        let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_location);
+        sub_scan_node.is_locked = true;
+
+        self.sub_nodes.push(sub_scan_node);
     }
 
     /// Retrieves the location.

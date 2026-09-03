@@ -26,10 +26,32 @@ BASE_IMAGE_FILE="test_data/ext/ext2.raw"
 
 if [ -f "${BASE_IMAGE_FILE}" ]
 then
-    # Create a QCOW image with an ext2 file system.
+    # Create a version 1 QCOW image with an ext2 file system.
+    IMAGE_FILE="test_data/qcow/ext2.qcow"
+
+    qemu-img convert -f raw -O qcow "${BASE_IMAGE_FILE}" "${IMAGE_FILE}"
+
+    # Create a version 3 QCOW image with an ext2 file system.
     IMAGE_FILE="test_data/qcow/ext2.qcow2"
 
-    qemu-img convert -f raw -O qcow2 "${BASE_IMAGE_FILE}" "${IMAGE_FILE}"
+    qemu-img convert -f raw -O qcow2 -o compat=v3 "${BASE_IMAGE_FILE}" "${IMAGE_FILE}"
+
+    # Create an AES-128 encrypted version 3 QCOW image with an ext2 file system.
+    IMAGE_FILE="test_data/qcow/ext2_aes128.qcow2"
+
+    qemu-img convert -f raw -O qcow2 -o compat=v3,encrypt.format=aes,encrypt.key-secret=sec0 --object secret,id=sec0,data=KeRaMiCs "${BASE_IMAGE_FILE}" "${IMAGE_FILE}"
+
+    # TODO: add luks encrypted QCOW image.
+
+    # Create a zlib compressed version 2 QCOW image with an ext2 file system.
+    IMAGE_FILE="test_data/qcow/ext2_zlib.qcow2"
+
+    qemu-img convert -f raw -O qcow2 -o compat=v2,compression_type=zlib "${BASE_IMAGE_FILE}" "${IMAGE_FILE}"
+
+    # Create a zstd compressed version 3 QCOW image with an ext2 file system.
+    IMAGE_FILE="test_data/qcow/ext2_zstd.qcow2"
+
+    qemu-img convert -f raw -O qcow2 -o compat=v3,compression_type=zstd "${BASE_IMAGE_FILE}" "${IMAGE_FILE}"
 fi
 
 exit ${EXIT_SUCCESS}

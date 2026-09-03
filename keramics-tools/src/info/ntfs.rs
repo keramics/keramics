@@ -397,15 +397,16 @@ impl<'a> fmt::Display for NtfsFileSystemInfo<'a> {
         writeln!(
             formatter,
             "    Bytes per sector\t\t\t\t: {}",
-            self.file_system.bytes_per_sector
+            self.file_system.get_bytes_per_sector()
         )?;
-        let byte_size: ByteSize = ByteSize::new(self.file_system.cluster_block_size as u64, 1024);
-        writeln!(formatter, "    Cluster block size\t\t\t\t: {}", byte_size)?;
+        let byte_size: ByteSize = ByteSize::new(self.file_system.get_block_size() as u64, 1024);
+        writeln!(formatter, "    Block size\t\t\t\t\t: {}", byte_size)?;
 
-        let byte_size: ByteSize = ByteSize::new(self.file_system.mft_entry_size as u64, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.file_system.get_mft_entry_size() as u64, 1024);
         writeln!(formatter, "    MFT entry size\t\t\t\t: {}", byte_size)?;
 
-        let byte_size: ByteSize = ByteSize::new(self.file_system.index_entry_size as u64, 1024);
+        let byte_size: ByteSize =
+            ByteSize::new(self.file_system.get_index_entry_size() as u64, 1024);
         writeln!(formatter, "    Index entry size\t\t\t\t: {}", byte_size)?;
 
         writeln!(formatter)
@@ -1194,7 +1195,7 @@ mod tests {
             "    Volume flags\t\t\t\t: 0x0000\n",
             "\n",
             "    Bytes per sector\t\t\t\t: 512\n",
-            "    Cluster block size\t\t\t\t: 4.0 KiB (4096 bytes)\n",
+            "    Block size\t\t\t\t\t: 4.0 KiB (4096 bytes)\n",
             "    MFT entry size\t\t\t\t: 1.0 KiB (1024 bytes)\n",
             "    Index entry size\t\t\t\t: 4.0 KiB (4096 bytes)\n",
             "\n"

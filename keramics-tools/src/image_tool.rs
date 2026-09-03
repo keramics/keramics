@@ -60,8 +60,8 @@ struct CommandLineArguments {
     debug: bool,
 
     #[arg(long)]
-    /// Password to unlock storage media image
-    password: Vec<String>,
+    /// Passphrase to unlock storage media image
+    passphrase: Vec<String>,
 
     /// Path of the source file
     source: PathBuf,
@@ -847,15 +847,20 @@ impl ImageTool {
         levels: &mut Vec<bool>,
     ) -> Result<(), ErrorTrace> {
         let scan_node_location: &VfsLocation = vfs_scan_node.get_location();
+        let is_locked: bool = vfs_scan_node.is_locked();
 
-        let result: Option<VfsFileEntry> = match self
-            .vfs_resolver
-            .get_file_entry_by_location(scan_node_location)
-        {
-            Ok(file_entry) => file_entry,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
-                return Err(error);
+        let result: Option<VfsFileEntry> = if is_locked {
+            None
+        } else {
+            match self
+                .vfs_resolver
+                .get_file_entry_by_location(scan_node_location)
+            {
+                Ok(file_entry) => file_entry,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                    return Err(error);
+                }
             }
         };
         let prefix: String = self.get_hierarchy_prefix(levels);
@@ -956,8 +961,6 @@ impl ImageTool {
             },
             None => path.to_string(),
         };
-        let is_locked: bool = vfs_scan_node.is_locked();
-
         let suffix: &str = if is_locked { " [LOCKED]" } else { "" };
         println!("{}{}: path: {}{}", prefix, vfs_type, path_string, suffix);
 
@@ -1046,8 +1049,8 @@ fn main() -> ExitCode {
     }
     let vfs_credential_store: &VfsCredentialStore = VfsCredentialStore::current();
 
-    for password in arguments.password.iter() {
-        match vfs_credential_store.add_passphrase(password.as_bytes()) {
+    for passphrase in arguments.passphrase.iter() {
+        match vfs_credential_store.add_passphrase(passphrase.as_bytes()) {
             Ok(_) => {}
             Err(error) => {
                 println!(

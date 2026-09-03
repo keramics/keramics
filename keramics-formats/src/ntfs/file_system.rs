@@ -36,16 +36,16 @@ pub struct NtfsFileSystem {
     data_stream: Option<DataStreamReference>,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u16,
+    bytes_per_sector: u16,
 
     /// Cluster block size.
-    pub cluster_block_size: u32,
+    cluster_block_size: u32,
 
     /// MFT entry size.
-    pub mft_entry_size: u32,
+    mft_entry_size: u32,
 
     /// Index entry size.
-    pub index_entry_size: u32,
+    index_entry_size: u32,
 
     /// Master File Table (MFT).
     mft: Arc<NtfsMasterFileTable>,
@@ -80,6 +80,16 @@ impl NtfsFileSystem {
         }
     }
 
+    /// Retrieves the block size.
+    pub fn get_block_size(&self) -> u32 {
+        self.cluster_block_size
+    }
+
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u16 {
+        self.bytes_per_sector
+    }
+
     /// Retrieves the format version.
     pub fn get_format_version(&self) -> Option<(u8, u8)> {
         match &self.volume_information {
@@ -89,6 +99,16 @@ impl NtfsFileSystem {
             )),
             None => None,
         }
+    }
+
+    /// Retrieves the index entry size.
+    pub fn get_index_entry_size(&self) -> u32 {
+        self.index_entry_size
+    }
+
+    /// Retrieves the MFT entry size.
+    pub fn get_mft_entry_size(&self) -> u32 {
+        self.mft_entry_size
     }
 
     /// Retrieves the volume flags.
@@ -513,11 +533,51 @@ mod tests {
     }
 
     #[test]
+    fn test_get_block_size() -> Result<(), ErrorTrace> {
+        let file_system: NtfsFileSystem = get_file_system()?;
+
+        let block_size: u32 = file_system.get_block_size();
+        assert_eq!(block_size, 4096);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let file_system: NtfsFileSystem = get_file_system()?;
+
+        let bytes_per_sector: u16 = file_system.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_format_version() -> Result<(), ErrorTrace> {
         let file_system: NtfsFileSystem = get_file_system()?;
 
         let format_version: Option<(u8, u8)> = file_system.get_format_version();
         assert_eq!(format_version, Some((3, 1)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_index_entry_size() -> Result<(), ErrorTrace> {
+        let file_system: NtfsFileSystem = get_file_system()?;
+
+        let index_entry_size: u32 = file_system.get_index_entry_size();
+        assert_eq!(index_entry_size, 4096);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_mft_entry_size() -> Result<(), ErrorTrace> {
+        let file_system: NtfsFileSystem = get_file_system()?;
+
+        let mft_entry_size: u32 = file_system.get_mft_entry_size();
+        assert_eq!(mft_entry_size, 1024);
 
         Ok(())
     }

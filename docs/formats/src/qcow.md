@@ -9,17 +9,17 @@ A QCOW image file consists of:
 
 * the file header
   * optional file header extensions
-* the level 1 table (cluster aligned)
-* the reference count table (cluster aligned)
+* the level 1 table (cluster block aligned)
+* the reference count table (cluster block aligned)
 * reference count blocks
-* snapshot headers (8-byte aligned on cluster boundary)
-* clusters containing:
+* snapshot headers (8-byte aligned on cluster block boundary)
+* cluster blocks containing:
   * level 2 tables
   * storage media data
 
-The storage media data is stored in clusters. Each cluster is a multitude of 512 bytes. The level 1
-(L1) table contains level 1 reference of level 2 (L2) tables. The level 2 tables contain level 2
-references of the storage media clusters.
+The storage media data is stored in cluster blocks. Each cluster block is a multitude of 512 bytes.
+The level 1 (L1) table contains level 1 reference of level 2 (L2) tables. The level 2 tables contain
+level 2 references of the storage media.
 
 There are multiple versions of the QCOW image file format. QCOW (version 1) and QCOW2 (version 2
 and later) are sometimes considered even as separate image formats. Version 3 is considered as an
@@ -33,7 +33,7 @@ extended version of QCOW2.
 | Date and time values | Number of seconds since Jan 1, 1970 00:00:00 UTC (POSIX epoch) |
 | Character strings | UTF-8 |
 
-> Note that this docuement assumes that character strings are stored in UTF-8
+> Note that this document assumes that character strings are stored in UTF-8.
 
 The number of bytes per sector is 512.
 
@@ -233,30 +233,31 @@ The backing file name is set in snapshot image files and is normally stored afte
 
 | Value | Identifier | Description |
 | --- | --- | --- |
-| 0x00000001 | QCOW2_INCOMPAT_DIRTY | |
-| 0x00000002 | QCOW2_INCOMPAT_CORRUPT | |
-| 0x00000004 | QCOW2_INCOMPAT_DATA_FILE | |
-| 0x00000008 | QCOW2_INCOMPAT_COMPRESSION | |
-| 0x00000010 | QCOW2_INCOMPAT_EXTL2 | |
+| 0x0000000000000001 | QCOW2_INCOMPAT_DIRTY | Is dirty (or in use) |
+| 0x0000000000000002 | QCOW2_INCOMPAT_CORRUPT | Is corrupt |
+| 0x0000000000000004 | QCOW2_INCOMPAT_DATA_FILE | Uses data file |
+| 0x0000000000000008 | QCOW2_INCOMPAT_COMPRESSION | Uses non-standard compression, where "standard compression" refers to zlib |
+| 0x0000000000000010 | QCOW2_INCOMPAT_EXTL2 | Has extended L2 (table) entries |
 
 ### Compatible feature flags
 
 | Value | Identifier | Description |
 | --- | --- | --- |
-| 0x00000001 | QCOW2_COMPAT_LAZY_REFCOUNTS | |
+| 0x0000000000000001 | QCOW2_COMPAT_LAZY_REFCOUNTS | Uses lazy reference counting |
 
 ### Auto-clear feature flags
 
 | Value | Identifier | Description |
 | --- | --- | --- |
-| 0x00000001 | QCOW2_AUTOCLEAR_BITMAPS | |
-| 0x00000002 | QCOW2_AUTOCLEAR_DATA_FILE_RAW | |
+| 0x0000000000000001 | QCOW2_AUTOCLEAR_BITMAPS | |
+| 0x0000000000000002 | QCOW2_AUTOCLEAR_DATA_FILE_RAW | |
 
 ### Compression methods
 
 | Value | Identifier | Description |
 | --- | --- | --- |
-| 0 | | ZLIB compression |
+| 0 | | [zlib compression](zlib.md) |
+| 1 | | zstd compression (RFC 8878) |
 
 ### File header extensions
 

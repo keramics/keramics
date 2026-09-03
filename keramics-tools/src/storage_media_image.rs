@@ -19,7 +19,7 @@ use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::luksde::{LuksCredential, LuksEncryptedVolume};
 use keramics_formats::pdi::{PdiImage, PdiImageLayer};
-use keramics_formats::qcow::{QcowImage, QcowImageLayer};
+use keramics_formats::qcow::{QcowCredential, QcowImage, QcowImageLayer};
 use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::splitraw::SplitRawImage;
@@ -435,6 +435,26 @@ impl StorageMediaImage {
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
                 return Err(error);
+            }
+        }
+        if qcow_image.is_locked() {
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut credentials: Vec<QcowCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        credentials.push(QcowCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match qcow_image.unlock(&credentials) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to unlock QCOW image");
+                    return Err(error);
+                }
             }
         }
         let number_of_layers: usize = qcow_image.get_number_of_layers();

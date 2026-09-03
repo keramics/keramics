@@ -17,16 +17,21 @@ use std::io::SeekFrom;
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use crate::block_tree::BlockTree;
+use crate::lru_cache::LruCache;
 use crate::traits::BlockReader;
 
 use super::block_range::{QcowBlockRange, QcowBlockRangeType};
 use super::cluster_table::{QcowClusterTable, QcowClusterTableEntry};
-use super::enums::QcowEncryptionMethod;
+use super::encryption::QcowEncryptionContext;
+use super::enums::QcowCompressionMethod;
 
 /// QEMU Copy-On-Write (QCOW) block reader.
 pub struct QcowBlockReader {
     /// Data stream.
     data_stream: DataStreamReference,
+
+    /// Bytes per sector.
+    bytes_per_sector: u16,
 
     /// Offset bit mask.
     offset_bit_mask: u64,
@@ -50,16 +55,22 @@ pub struct QcowBlockReader {
     number_of_cluster_block_bits: u32,
 
     /// Cluster block size.
-    cluster_block_size: u64,
+    cluster_block_size: u32,
 
     /// Compression flag bit mask.
     compression_flag_bit_mask: u64,
 
-    /// Encryption method.
-    encryption_method: QcowEncryptionMethod,
+    /// Compression method.
+    compression_method: QcowCompressionMethod,
+
+    /// Encryption context.
+    encryption_context: Option<QcowEncryptionContext>,
 
     /// Block tree.
     block_tree: BlockTree<QcowBlockRange>,
+
+    /// Decrypted and/or decompressed block cache.
+    block_cache: LruCache<u64, Vec<u8>>,
 
     /// Backing file data stream.
     backing_file_data_stream: Option<DataStreamReference>,
@@ -72,6 +83,7 @@ impl QcowBlockReader {
     /// Creates a new file.
     pub fn new(
         data_stream: &DataStreamReference,
+        bytes_per_sector: u16,
         offset_bit_mask: u64,
         level1_index_bit_shift: u32,
         level1_table_offset: u64,
@@ -79,13 +91,16 @@ impl QcowBlockReader {
         level2_index_bit_mask: u64,
         level2_table_number_of_references: u64,
         number_of_cluster_block_bits: u32,
-        cluster_block_size: u64,
+        cluster_block_size: u32,
         compression_flag_bit_mask: u64,
+        compression_method: &QcowCompressionMethod,
+        encryption_context: Option<&QcowEncryptionContext>,
         backing_file_data_stream: Option<DataStreamReference>,
         size: u64,
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
+            bytes_per_sector,
             offset_bit_mask,
             level1_index_bit_shift,
             level1_cluster_table: QcowClusterTable::new(
@@ -98,14 +113,80 @@ impl QcowBlockReader {
             number_of_cluster_block_bits,
             cluster_block_size,
             compression_flag_bit_mask,
-            encryption_method: QcowEncryptionMethod::None,
+            compression_method: compression_method.clone(),
+            encryption_context: encryption_context.cloned(),
             block_tree: BlockTree::<QcowBlockRange>::new(
                 size,
                 level2_table_number_of_references,
-                cluster_block_size,
+                cluster_block_size as u64,
             ),
+            block_cache: LruCache::new(64),
             backing_file_data_stream,
             size,
+        }
+    }
+
+    /// Decompressed a block.
+    fn decompress_block(&self, compressed_data: &[u8], data: &mut [u8]) -> Result<(), ErrorTrace> {
+        match self.compression_method {
+            QcowCompressionMethod::Zlib => {
+                _ = crate::zlib_decompress!(
+                    &compressed_data,
+                    data,
+                    "Unable to decompress zlib data"
+                );
+            }
+            QcowCompressionMethod::Zstd => {
+                todo!();
+            }
+            _ => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported compression method"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Reads and decrypts a cluster block.
+    fn read_cluster_block(&self, block_data_offset: u64) -> Result<Vec<u8>, ErrorTrace> {
+        let mut block_data: Vec<u8> = vec![0; self.cluster_block_size as usize];
+
+        keramics_core::data_stream_read_exact_at_position!(
+            &self.data_stream,
+            &mut block_data,
+            SeekFrom::Start(block_data_offset)
+        );
+        match &self.encryption_context {
+            Some(encryption_context) => {
+                let mut sector_number: u64 = block_data_offset / (self.bytes_per_sector as u64);
+
+                let mut data: Vec<u8> = vec![0; self.cluster_block_size as usize];
+                let mut data_offset: usize = 0;
+
+                while data_offset < self.cluster_block_size as usize {
+                    let data_end_offset: usize = data_offset + (self.bytes_per_sector as usize);
+
+                    match encryption_context.decrypt_sector(
+                        sector_number,
+                        &block_data[data_offset..data_end_offset],
+                        &mut data[data_offset..data_end_offset],
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to decrypt sector: {}", sector_number)
+                            );
+                            return Err(error);
+                        }
+                    }
+                    data_offset = data_end_offset;
+                    sector_number += 1;
+                }
+                Ok(data)
+            }
+            None => Ok(block_data),
         }
     }
 
@@ -173,7 +254,7 @@ impl QcowBlockReader {
                 }
             };
             let level2_media_offset: u64 =
-                level1_media_offset + (level2_table_index * self.cluster_block_size);
+                level1_media_offset + (level2_table_index * (self.cluster_block_size as u64));
             let block_data_offset: u64 = level2_entry.reference & self.offset_bit_mask;
             let range_type: QcowBlockRangeType = if block_data_offset == 0 {
                 if self.backing_file_data_stream.is_some() {
@@ -182,26 +263,23 @@ impl QcowBlockReader {
                     QcowBlockRangeType::Sparse
                 }
             } else {
-                if (level2_entry.reference & self.compression_flag_bit_mask) == 0 {
-                    QcowBlockRangeType::InFile
-                } else {
-                    if self.encryption_method != QcowEncryptionMethod::None {
-                        return Err(keramics_core::error_trace_new!(
-                            "Unsupported combined encryption and compression"
-                        ));
-                    }
+                if (level2_entry.reference & self.compression_flag_bit_mask) != 0 {
                     QcowBlockRangeType::Compressed
+                } else if self.encryption_context.is_some() {
+                    QcowBlockRangeType::Encrypted
+                } else {
+                    QcowBlockRangeType::InFile
                 }
             };
             let block_range: QcowBlockRange = QcowBlockRange::new(
                 level2_media_offset,
                 block_data_offset,
-                self.cluster_block_size,
+                self.cluster_block_size as u64,
                 range_type,
             );
             match self.block_tree.insert_value(
                 level2_media_offset,
-                self.cluster_block_size,
+                self.cluster_block_size as u64,
                 block_range,
             ) {
                 Ok(_) => {}
@@ -278,8 +356,97 @@ impl BlockReader for QcowBlockReader {
 
             let range_read_count: usize = match block_range.range_type {
                 QcowBlockRangeType::Compressed => {
-                    // TODO: add compression support.
-                    todo!();
+                    let range_data_offset: usize = range_relative_offset as usize;
+                    let range_data_end_offset: usize = range_data_offset + range_read_size;
+
+                    if !self.block_cache.contains(&block_range.data_offset) {
+                        let compressed_data: Vec<u8> =
+                            match self.read_cluster_block(block_range.data_offset) {
+                                Ok(block_data) => block_data,
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        format!(
+                                            "Unable to read block at offset: {} (0x{:08x})",
+                                            block_range.data_offset, block_range.data_offset
+                                        )
+                                    );
+                                    return Err(error);
+                                }
+                            };
+                        let mut block_data: Vec<u8> = vec![0; self.cluster_block_size as usize];
+
+                        match self.decompress_block(&compressed_data, &mut block_data) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable to decompress block at offset: {} (0x{:08x})",
+                                        block_range.data_offset, block_range.data_offset
+                                    )
+                                );
+                                return Err(error);
+                            }
+                        }
+                        self.block_cache.insert(block_range.data_offset, block_data);
+                    }
+                    let range_data: &[u8] = match self.block_cache.get(&block_range.data_offset) {
+                        Some(data) => data,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unable to retrieve data from cache"
+                            )));
+                        }
+                    };
+                    if range_data.len() != (block_range.size as usize) {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unable to retrieve block range data",
+                        ));
+                    }
+                    data[data_offset..data_end_offset]
+                        .copy_from_slice(&range_data[range_data_offset..range_data_end_offset]);
+
+                    range_read_size
+                }
+                QcowBlockRangeType::Encrypted => {
+                    let range_data_offset: usize = range_relative_offset as usize;
+                    let range_data_end_offset: usize = range_data_offset + range_read_size;
+
+                    if !self.block_cache.contains(&block_range.data_offset) {
+                        let block_data: Vec<u8> =
+                            match self.read_cluster_block(block_range.data_offset) {
+                                Ok(block_data) => block_data,
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        format!(
+                                            "Unable to read block at offset: {} (0x{:08x})",
+                                            block_range.data_offset, block_range.data_offset
+                                        )
+                                    );
+                                    return Err(error);
+                                }
+                            };
+                        self.block_cache.insert(block_range.data_offset, block_data);
+                    }
+                    let range_data: &[u8] = match self.block_cache.get(&block_range.data_offset) {
+                        Some(data) => data,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unable to retrieve data from cache"
+                            )));
+                        }
+                    };
+                    if range_data.len() != (block_range.size as usize) {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unable to retrieve block range data",
+                        ));
+                    }
+                    data[data_offset..data_end_offset]
+                        .copy_from_slice(&range_data[range_data_offset..range_data_end_offset]);
+
+                    range_read_size
                 }
                 QcowBlockRangeType::InBackingFile => match &self.backing_file_data_stream {
                     Some(data_stream) => {

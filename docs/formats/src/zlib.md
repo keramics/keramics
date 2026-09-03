@@ -339,7 +339,7 @@ TODO: complete this section
 The decompression in pseudo code:
 
 ```text
-if block_header.type == HUFFMANN_FIXED:
+if( block_header.type == HUFFMANN_FIXED )
 {
     initialize the fixed Huffman trees
 }
@@ -363,6 +363,7 @@ do
         loop (until end of block code recognized)
         {
             decode literal/length value from input stream
+
             if( value < 256 )
             {
                 copy value (literal byte) to output stream
@@ -370,9 +371,9 @@ do
             else if value = end of block (256)
             {
                  break from loop
-             }
-             else (value = 257..285)
-             {
+            }
+            else (value = 257..285)
+            {
                  decode distance from input stream
 
                  move backwards distance bytes in the output

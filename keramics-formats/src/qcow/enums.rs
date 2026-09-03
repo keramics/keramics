@@ -15,6 +15,7 @@
 pub enum QcowCompressionMethod {
     Unknown,
     Zlib,
+    Zstd,
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

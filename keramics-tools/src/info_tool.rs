@@ -72,8 +72,8 @@ struct CommandLineArguments {
     offset: u64,
 
     #[arg(long)]
-    /// Password to unlock format
-    password: Vec<String>,
+    /// Passphrase to unlock format
+    passphrase: Vec<String>,
 
     /// Path of the source file
     source: PathBuf,
@@ -468,8 +468,8 @@ fn main() -> ExitCode {
     };
     let vfs_credential_store: &VfsCredentialStore = VfsCredentialStore::current();
 
-    for password in arguments.password.iter() {
-        match vfs_credential_store.add_passphrase(password.as_bytes()) {
+    for passphrase in arguments.passphrase.iter() {
+        match vfs_credential_store.add_passphrase(passphrase.as_bytes()) {
             Ok(_) => {}
             Err(error) => {
                 println!(

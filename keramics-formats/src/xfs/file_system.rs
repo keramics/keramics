@@ -112,17 +112,17 @@ impl XfsFileSystem {
         &self,
         inode_number: u64,
     ) -> Result<Option<XfsFileEntry>, ErrorTrace> {
+        if self.features.is_unsupported() {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported file systems features"
+            ));
+        }
         let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
             Some(data_stream) => data_stream,
             None => {
                 return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
-        if self.features.is_unsupported() {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported file systems features"
-            ));
-        }
         match self
             .inode_tree
             .get_inode_by_identifier(data_stream, inode_number)
@@ -150,6 +150,11 @@ impl XfsFileSystem {
 
     /// Retrieves the file entry for a specific path.
     pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<XfsFileEntry>, ErrorTrace> {
+        if self.features.is_unsupported() {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported file systems features"
+            ));
+        }
         if path.is_empty() || path.is_relative() {
             return Ok(None);
         }

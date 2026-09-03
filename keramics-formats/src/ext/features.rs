@@ -191,12 +191,16 @@ mod tests {
         superblock.read_only_compatible_feature_flags = 0x00000403;
         superblock.file_system_identifier = [0; 16];
 
+        let mut test_struct: ExtFeatures = ExtFeatures::new();
+        test_struct.initialize(&superblock);
+
+        assert_eq!(test_struct.compatible_feature_flags, 0x00000038);
+        assert_eq!(test_struct.incompatible_feature_flags, 0x00000002);
+        assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000403);
+
         let mut expected_context: ReversedCrc32Context = ReversedCrc32Context::new(0x82f63b78, 0);
         expected_context.update(&superblock.file_system_identifier);
         let expected_checksum: u32 = expected_context.finalize();
-
-        let mut test_struct: ExtFeatures = ExtFeatures::new();
-        test_struct.initialize(&superblock);
 
         assert_eq!(
             test_struct.get_metadata_checksum_seed(),

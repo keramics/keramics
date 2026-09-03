@@ -27,6 +27,7 @@ mod tests {
 
     use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
 
+    use crate::qcow::enums::QcowCompressionMethod;
     use crate::tests::get_test_data_path;
 
     fn get_block_stream() -> Result<QcowBlockStream, ErrorTrace> {
@@ -36,6 +37,7 @@ mod tests {
 
         Ok(QcowBlockStream::new(QcowBlockReader::new(
             &data_stream,
+            512,
             0x3fffffffffffffff,
             29,
             0x00030000,
@@ -45,6 +47,8 @@ mod tests {
             16,
             65536,
             0x4000000000000000,
+            &QcowCompressionMethod::Zlib,
+            None,
             None,
             4194304,
         )))

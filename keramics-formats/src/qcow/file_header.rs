@@ -26,9 +26,6 @@ pub struct QcowFileHeader {
     /// Format version.
     pub format_version: u32,
 
-    /// Header size.
-    pub header_size: u32,
-
     /// Level 1 table number of references.
     pub level1_table_number_of_references: u32,
 
@@ -44,9 +41,6 @@ pub struct QcowFileHeader {
     /// Media size.
     pub media_size: u64,
 
-    /// Compression method.
-    pub compression_method: u8,
-
     /// Encryption method.
     pub encryption_method: u32,
 
@@ -61,6 +55,18 @@ pub struct QcowFileHeader {
 
     /// Snapshots offset.
     pub snapshots_offset: u64,
+
+    /// Incompatible feature flags.
+    pub incompatible_feature_flags: u64,
+
+    /// Compatible feature flags.
+    pub compatible_feature_flags: u64,
+
+    /// Header size.
+    pub header_size: u32,
+
+    /// Compression method.
+    pub compression_method: u8,
 }
 
 impl QcowFileHeader {
@@ -68,18 +74,20 @@ impl QcowFileHeader {
     pub fn new() -> Self {
         Self {
             format_version: 0,
-            header_size: 0,
             level1_table_number_of_references: 0,
             level1_table_offset: 0,
             number_of_level2_table_bits: 0,
             number_of_cluster_block_bits: 0,
             media_size: 0,
-            compression_method: 0,
             encryption_method: 0,
             backing_file_name_offset: 0,
             backing_file_name_size: 0,
             number_of_snapshots: 0,
             snapshots_offset: 0,
+            incompatible_feature_flags: 0,
+            compatible_feature_flags: 0,
+            header_size: 0,
+            compression_method: 0,
         }
     }
 
@@ -205,6 +213,8 @@ mod tests {
         assert_eq!(test_struct.level1_table_offset, 196608);
         assert_eq!(test_struct.number_of_snapshots, 0);
         assert_eq!(test_struct.snapshots_offset, 0);
+        assert_eq!(test_struct.incompatible_feature_flags, 0);
+        assert_eq!(test_struct.compatible_feature_flags, 0);
         assert_eq!(test_struct.header_size, 112);
         assert_eq!(test_struct.compression_method, 0);
 

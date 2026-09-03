@@ -32,7 +32,7 @@ use super::file_header::QcowFileHeader;
         field(name = "number_of_level2_table_bits", data_type = "u8"),
         field(name = "unknown1", data_type = "[u8; 2]"),
         field(name = "encryption_method", data_type = "u32"),
-        field(name = "level1_table_offset", data_type = "u64"),
+        field(name = "level1_table_offset", data_type = "u64", format = "hex"),
     ),
     methods("debug_read_data")
 )]
@@ -104,6 +104,12 @@ mod tests {
         assert_eq!(test_struct.number_of_level2_table_bits, 9);
         assert_eq!(test_struct.encryption_method, 0);
         assert_eq!(test_struct.level1_table_offset, 48);
+        assert_eq!(test_struct.number_of_snapshots, 0);
+        assert_eq!(test_struct.snapshots_offset, 0);
+        assert_eq!(test_struct.incompatible_feature_flags, 0);
+        assert_eq!(test_struct.compatible_feature_flags, 0);
+        assert_eq!(test_struct.header_size, 0);
+        assert_eq!(test_struct.compression_method, 0);
 
         Ok(())
     }
