@@ -71,7 +71,7 @@ function CreateAndMountVhd {
         [string]$ImageFullPath,
 
         [Parameter(Mandatory=$true)]
-        [int]$ImageSize
+        [int]$ImageSize,
 
         [Parameter(Mandatory=$true)]
         [string]$ImageType
