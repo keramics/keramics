@@ -11,14 +11,15 @@
  * under the License.
  */
 
+use std::ascii::escape_default;
 use std::cmp::PartialEq;
+use std::fmt;
 
 use keramics_core::mediator::{Mediator, MediatorReference};
 
 use super::enums::PatternType;
 
 /// Signature.
-#[derive(Debug)]
 pub struct Signature {
     /// Identifier.
     pub identifier: String,
@@ -29,11 +30,11 @@ pub struct Signature {
     /// Pattern offset.
     pub pattern_offset: usize,
 
-    /// Pattern.
-    pub pattern: Vec<u8>,
-
     /// Pattern size.
     pub pattern_size: usize,
+
+    /// Pattern.
+    pub pattern: Vec<u8>,
 }
 
 impl Signature {
@@ -49,8 +50,8 @@ impl Signature {
             identifier: identifier.to_string(),
             pattern_type,
             pattern_offset,
-            pattern: pattern.to_vec(),
             pattern_size,
+            pattern: pattern.to_vec(),
         }
     }
 
@@ -106,6 +107,27 @@ impl PartialEq for Signature {
             && self.pattern_size == other.pattern_size
             && self.pattern_type == other.pattern_type
             && self.pattern == other.pattern
+    }
+}
+
+impl fmt::Debug for Signature {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let pattern_string: String = self
+            .pattern
+            .iter()
+            .flat_map(|byte_value| {
+                std::ascii::escape_default(*byte_value).map(|byte_value| byte_value as char)
+            })
+            .collect();
+
+        formatter
+            .debug_struct("Signature")
+            .field("identifier", &self.identifier)
+            .field("pattern_type", &self.pattern_type)
+            .field("pattern_offset", &self.pattern_offset)
+            .field("pattern", &pattern_string)
+            .field("pattern_size", &self.pattern_offset)
+            .finish()
     }
 }
 

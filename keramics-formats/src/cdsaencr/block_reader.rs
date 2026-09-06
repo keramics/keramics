@@ -19,7 +19,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use crate::lru_cache::LruCache;
 use crate::traits::BlockReader;
 
-use super::encryption::CdsaEncrEncryptionContext;
+use super::encryption_context::CdsaEncrEncryptionContext;
 
 /// Mac OS Encrypted Encoding (cdsaencr) block reader.
 pub struct CdsaEncrBlockReader {

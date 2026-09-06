@@ -29,7 +29,7 @@ use super::short_name_directory_entry::FatShortNameDirectoryEntry;
         field(name = "flags", data_type = "u8", format = "hex"),
         field(name = "creation_time", data_type = "FatTimeDate10Ms"),
         field(name = "access_date", data_type = "FatDate"),
-        field(name = "data_start_cluster_upport", data_type = "u16"),
+        field(name = "data_start_cluster_upper", data_type = "u16"),
         field(name = "modification_time", data_type = "FatTimeDate"),
         field(name = "data_start_cluster_lower", data_type = "u16"),
         field(name = "data_size", data_type = "u32"),

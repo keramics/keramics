@@ -21,6 +21,7 @@ use keramics_hashes::{
 };
 
 use super::diffuser::LuksDiffuser;
+use super::encryption_context::LuksEncryptionContext;
 use super::encryption_type::LuksEncryptionType;
 
 /// Linux Unified Key Setup (LUKS) Disk Encryption cipher context.
@@ -89,59 +90,6 @@ impl LuksDiffuserContext {
                 diffuser.merge(number_of_stripes, split_data, data)
             }
         }
-    }
-}
-
-/// Linux Unified Key Setup (LUKS) Disk Encryption encryption context.
-#[derive(Clone)]
-pub struct LuksEncryptionContext {
-    /// Cipher context.
-    cipher_context: LuksCipherContext,
-
-    /// Initialization vector context.
-    intialization_vector_context: LuksInitializationVectorContext,
-}
-
-impl LuksEncryptionContext {
-    /// Decrypts a sector.
-    pub fn decrypt_sector(
-        &self,
-        sector_number: u64,
-        encrypted_data: &[u8],
-        data: &mut [u8],
-    ) -> Result<(), ErrorTrace> {
-        let mut initialization_vector: [u8; 16] = [0; 16];
-
-        match self
-            .intialization_vector_context
-            .derive_initialization_vector(sector_number, &mut initialization_vector)
-        {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to derive initialization vector for sector: {}",
-                        sector_number
-                    )
-                );
-                return Err(error);
-            }
-        }
-        match self
-            .cipher_context
-            .decrypt(&initialization_vector, encrypted_data, data)
-        {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Unable to decrypt sector: {}", sector_number)
-                );
-                return Err(error);
-            }
-        }
-        Ok(())
     }
 }
 

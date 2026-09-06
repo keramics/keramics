@@ -42,9 +42,7 @@ impl CdsaEncrCipherContext {
             CdsaEncrCipherContext::Des3(context) => {
                 context.decrypt_cbc(initialization_vector, encrypted_data, data)
             }
-            CdsaEncrCipherContext::None => {
-                return Err(keramics_core::error_trace_new!("Unable to decrypt data"));
-            }
+            CdsaEncrCipherContext::None => Err(keramics_core::error_trace_new!("Not implemented")),
         }
     }
 
@@ -53,61 +51,8 @@ impl CdsaEncrCipherContext {
         match self {
             CdsaEncrCipherContext::Aes(context) => context.set_key(key),
             CdsaEncrCipherContext::Des3(context) => context.set_key(key),
-            CdsaEncrCipherContext::None => {
-                return Err(keramics_core::error_trace_new!("Unable to set key"));
-            }
+            CdsaEncrCipherContext::None => Err(keramics_core::error_trace_new!("Not implemented")),
         }
-    }
-}
-
-/// Mac OS Encrypted Encoding (cdsaencr) encryption context.
-#[derive(Clone)]
-pub struct CdsaEncrEncryptionContext {
-    /// Cipher context.
-    pub cipher_context: CdsaEncrCipherContext,
-
-    /// HMAC context.
-    pub hmac_context: CdsaEncrHmacContext,
-}
-
-impl CdsaEncrEncryptionContext {
-    /// Decrypts a block.
-    pub(crate) fn decrypt_block(
-        &mut self,
-        block_number: u32,
-        encrypted_data: &[u8],
-        data: &mut [u8],
-    ) -> Result<(), ErrorTrace> {
-        let block_number_data: [u8; 4] = block_number.to_be_bytes();
-
-        let mut initialization_vector: Vec<u8> =
-            match self.hmac_context.calculate_hmac(&block_number_data) {
-                Ok(data) => data,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to HMAC initialization vector for decrypting block: {}",
-                            block_number
-                        )
-                    );
-                    return Err(error);
-                }
-            };
-        match self
-            .cipher_context
-            .decrypt(&mut initialization_vector, encrypted_data, data)
-        {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Unable to decrypt block: {}", block_number)
-                );
-                return Err(error);
-            }
-        }
-        Ok(())
     }
 }
 
@@ -130,9 +75,7 @@ impl CdsaEncrHmacContext {
                 context.calculate_hmac(key, data, &mut hmac)?;
                 Ok(hmac)
             }
-            CdsaEncrHmacContext::None => {
-                return Err(keramics_core::error_trace_new!("Unable to calculate HMAC"));
-            }
+            CdsaEncrHmacContext::None => Err(keramics_core::error_trace_new!("Not implemented")),
         }
     }
 }

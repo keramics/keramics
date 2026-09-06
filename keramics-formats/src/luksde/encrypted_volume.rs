@@ -21,9 +21,8 @@ use super::block_reader::LuksBlockReader;
 use super::block_stream::LuksBlockStream;
 use super::constants::*;
 use super::credential::LuksCredential;
-use super::encryption::{
-    LuksDiffuserContext, LuksEncryption, LuksEncryptionContext, LuksKeyDerivationContext,
-};
+use super::encryption::{LuksDiffuserContext, LuksEncryption, LuksKeyDerivationContext};
+use super::encryption_context::LuksEncryptionContext;
 use super::encryption_type::LuksEncryptionType;
 use super::key_slot::LuksKeySlot;
 use super::metadata::LuksMetadata;
@@ -71,8 +70,8 @@ pub struct LuksEncryptedVolume {
     /// Encryption context.
     encryption_context: Option<LuksEncryptionContext>,
 
-    /// The size.
-    size: u64,
+    /// The volume size.
+    volume_size: u64,
 
     /// Value to indicate the container is locked.
     is_locked: bool,
@@ -95,7 +94,7 @@ impl LuksEncryptedVolume {
             key_slots: Vec::new(),
             encrypted_data_offset: 0,
             encryption_context: None,
-            size: 0,
+            volume_size: 0,
             is_locked: true,
         }
     }
@@ -115,7 +114,7 @@ impl LuksEncryptedVolume {
                         self.bytes_per_sector,
                         self.encrypted_data_offset,
                         encryption_context,
-                        self.size,
+                        self.volume_size,
                     ),
                 )))),
                 None => None,
@@ -141,7 +140,7 @@ impl LuksEncryptedVolume {
 
     /// Retrieves the volume size.
     pub fn get_volume_size(&self) -> u64 {
-        self.size
+        self.volume_size
     }
 
     /// Determines if the container is locked.
@@ -282,7 +281,7 @@ impl LuksEncryptedVolume {
             }
         };
         self.data_stream = Some(data_stream.clone());
-        self.size = data_stream_size - self.encrypted_data_offset;
+        self.volume_size = data_stream_size - self.encrypted_data_offset;
         self.is_locked = true;
 
         Ok(())
@@ -559,7 +558,16 @@ mod tests {
         Ok(encrypted_volume)
     }
 
-    // TODO: add tests for get_bytes_per_sector
+    #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let encrypted_volume: LuksEncryptedVolume = get_encrypted_volume()?;
+
+        let bytes_per_sector: u16 = encrypted_volume.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
     // TODO: add tests for get_data_stream
     // TODO: add tests for get_encryption_type
 

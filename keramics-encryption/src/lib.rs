@@ -14,6 +14,7 @@
 mod aes;
 mod blowfish;
 mod cbc;
+mod ccm;
 mod des3;
 mod hmac;
 mod pbkdf2;
@@ -22,7 +23,7 @@ mod rc4;
 mod traits;
 mod xts;
 
-pub use aes::{AesCbcContext, AesContext, AesXtsContext};
+pub use aes::{AesCbcContext, AesCcmContext, AesContext, AesXtsContext};
 pub use blowfish::{BlowfishCbcContext, BlowfishContext};
 pub use des3::{Des3CbcContext, Des3Context};
 pub use hmac::{
@@ -34,4 +35,4 @@ pub use pbkdf2::{
 };
 pub use pkcs7::Pkcs7Context;
 pub use rc4::Rc4Context;
-pub use traits::{CryptCbc, CryptContext, CryptEcb};
+pub use traits::{CryptCbc, CryptCcm, CryptContext, CryptEcb};

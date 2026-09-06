@@ -19,7 +19,8 @@ use keramics_core::ErrorTrace;
 use keramics_types::bytes_to_u32_le;
 
 use super::cbc::CbcContext;
-use super::traits::{CryptCbc, CryptContext, CryptEcb};
+use super::ccm::CcmContext;
+use super::traits::{CryptCbc, CryptCcm, CryptContext, CryptEcb};
 use super::xts::XtsContext;
 
 /// Calculate the next GF(2^8) value using the generator polynomial 0x1b.
@@ -756,6 +757,83 @@ impl AesContext {
         }
         self.number_of_encryption_round_keys = 14;
     }
+
+    /// Calculates the initial CBC-MAC for CCM mode.
+    fn crypt_ccm_calculate_initial_cbc_mac(
+        &self,
+        nonce: &[u8],
+        associated_data: &[u8],
+        tag_size: usize,
+        data_size: usize,
+        tag_values: &mut [u32],
+    ) {
+        let nonce_size: usize = nonce.len();
+        let associated_data_size: usize = associated_data.len();
+
+        let l_value: usize = 15 - nonce_size;
+
+        let l_prime: u8 = (l_value - 1) as u8;
+        let m_prime: u8 = ((tag_size - 2) / 2) as u8;
+        let flags: u8 = ((m_prime & 0x07) << 3)
+            | (l_prime & 0x07)
+            | if associated_data_size == 0 {
+                0x00
+            } else {
+                0x40
+            };
+
+        let mut flags_block_data: [u8; AES_BLOCK_SIZE] = [0; AES_BLOCK_SIZE];
+        flags_block_data[0] = flags;
+        flags_block_data[1..1 + nonce_size].copy_from_slice(nonce);
+
+        let mut remaining_data_size: usize = data_size;
+        for index in 0..l_value {
+            flags_block_data[15 - index] = (remaining_data_size & 0xff) as u8;
+            remaining_data_size >>= 8;
+        }
+        tag_values[0] = bytes_to_u32_le!(flags_block_data, 0);
+        tag_values[1] = bytes_to_u32_le!(flags_block_data, 4);
+        tag_values[2] = bytes_to_u32_le!(flags_block_data, 8);
+        tag_values[3] = bytes_to_u32_le!(flags_block_data, 12);
+
+        let mut cipher_values: [u32; 4] = [0; 4];
+        self.encrypt_block(tag_values, &mut cipher_values);
+
+        if associated_data_size > 0 {
+            let mut associated_block_data: [u8; AES_BLOCK_SIZE] = [0; AES_BLOCK_SIZE];
+            associated_block_data[0] = (associated_data_size >> 8) as u8;
+            associated_block_data[1] = (associated_data_size & 0xff) as u8;
+
+            let mut block_offset: usize = 2;
+
+            for byte_value in associated_data.iter() {
+                associated_block_data[block_offset] = *byte_value;
+                block_offset += 1;
+
+                if block_offset == AES_BLOCK_SIZE {
+                    tag_values[0] ^= bytes_to_u32_le!(associated_block_data, 0);
+                    tag_values[1] ^= bytes_to_u32_le!(associated_block_data, 4);
+                    tag_values[2] ^= bytes_to_u32_le!(associated_block_data, 8);
+                    tag_values[3] ^= bytes_to_u32_le!(associated_block_data, 12);
+
+                    cipher_values.fill(0);
+                    self.encrypt_block(tag_values, &mut cipher_values);
+
+                    associated_block_data.fill(0);
+                    block_offset = 0;
+                }
+            }
+            if block_offset > 0 {
+                tag_values[0] ^= bytes_to_u32_le!(associated_block_data, 0);
+                tag_values[1] ^= bytes_to_u32_le!(associated_block_data, 4);
+                tag_values[2] ^= bytes_to_u32_le!(associated_block_data, 8);
+                tag_values[3] ^= bytes_to_u32_le!(associated_block_data, 12);
+
+                cipher_values.fill(0);
+                self.encrypt_block(tag_values, &mut cipher_values);
+            }
+        }
+    }
 }
 
 impl CryptContext for AesContext {
@@ -987,6 +1065,271 @@ impl CryptCbc for AesContext {
     }
 }
 
+impl CryptCcm for AesContext {
+    /// Decrypts data using CCM (Counter with CBC-MAC) mode.
+    fn decrypt_ccm(
+        &self,
+        nonce: &[u8],
+        associated_data: &[u8],
+        encrypted_data: &[u8],
+        data: &mut [u8],
+        tag: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        if self.decryption_round_keys.is_empty() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - key was not set"
+            ));
+        }
+        let nonce_size: usize = nonce.len();
+
+        if nonce_size < 7 || nonce_size > 13 {
+            return Err(keramics_core::error_trace_new!("Unsupported nonce size"));
+        }
+        let associated_data_size: usize = associated_data.len();
+
+        if associated_data_size >= 65280 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported associated data size"
+            ));
+        }
+        let encrypted_data_size: usize = encrypted_data.len();
+
+        if encrypted_data_size > data.len() {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid data value too small",
+            )));
+        }
+        let tag_size: usize = tag.len();
+
+        if !(4..=16).contains(&tag_size) || (tag_size % 2) != 0 {
+            return Err(keramics_core::error_trace_new!("Unsupported tag size"));
+        }
+        let l_value: usize = 15 - nonce_size;
+        let l_prime: u8 = (l_value - 1) as u8;
+
+        let mut cipher_values: [u32; 4] = [0; 4];
+
+        let mut counter_block_data: [u8; AES_BLOCK_SIZE] = [0; AES_BLOCK_SIZE];
+        counter_block_data[0] = l_prime;
+        counter_block_data[1..1 + nonce_size].copy_from_slice(nonce);
+
+        let mut counter: usize = 0;
+        let mut data_offset: usize = 0;
+
+        for block_data in encrypted_data.chunks(AES_BLOCK_SIZE) {
+            counter += 1;
+
+            let mut remaining_counter: usize = counter;
+            for index in 0..l_value {
+                counter_block_data[15 - index] = (remaining_counter & 0xff) as u8;
+                remaining_counter >>= 8;
+            }
+            let mut counter_values: [u32; 4] = [
+                bytes_to_u32_le!(counter_block_data, 0),
+                bytes_to_u32_le!(counter_block_data, 4),
+                bytes_to_u32_le!(counter_block_data, 8),
+                bytes_to_u32_le!(counter_block_data, 12),
+            ];
+            cipher_values.fill(0);
+            self.encrypt_block(&mut counter_values, &mut cipher_values);
+
+            let mut ctr_keystream: [u8; AES_BLOCK_SIZE] = [0; AES_BLOCK_SIZE];
+            ctr_keystream[0..4].copy_from_slice(&counter_values[0].to_le_bytes());
+            ctr_keystream[4..8].copy_from_slice(&counter_values[1].to_le_bytes());
+            ctr_keystream[8..12].copy_from_slice(&counter_values[2].to_le_bytes());
+            ctr_keystream[12..16].copy_from_slice(&counter_values[3].to_le_bytes());
+
+            let block_data_size: usize = block_data.len();
+
+            for index in 0..block_data_size {
+                data[data_offset + index] = block_data[index] ^ ctr_keystream[index];
+            }
+            data_offset += block_data_size;
+        }
+        let mut tag_values: [u32; 4] = [0; 4];
+
+        self.crypt_ccm_calculate_initial_cbc_mac(
+            nonce,
+            associated_data,
+            tag_size,
+            encrypted_data_size,
+            &mut tag_values,
+        );
+        for block_data in data[0..encrypted_data_size].chunks(AES_BLOCK_SIZE) {
+            let block_data_size: usize = block_data.len();
+            let mut padded_plaintext: [u8; AES_BLOCK_SIZE] = [0; AES_BLOCK_SIZE];
+            padded_plaintext[0..block_data_size].copy_from_slice(block_data);
+
+            tag_values[0] ^= bytes_to_u32_le!(padded_plaintext, 0);
+            tag_values[1] ^= bytes_to_u32_le!(padded_plaintext, 4);
+            tag_values[2] ^= bytes_to_u32_le!(padded_plaintext, 8);
+            tag_values[3] ^= bytes_to_u32_le!(padded_plaintext, 12);
+
+            cipher_values.fill(0);
+            self.encrypt_block(&mut tag_values, &mut cipher_values);
+        }
+        let mut counter_block_data_zero: [u8; AES_BLOCK_SIZE] = [0; AES_BLOCK_SIZE];
+        counter_block_data_zero[0] = l_prime;
+        counter_block_data_zero[1..1 + nonce_size].copy_from_slice(nonce);
+
+        let mut masked_tag_values: [u32; 4] = [
+            bytes_to_u32_le!(counter_block_data_zero, 0),
+            bytes_to_u32_le!(counter_block_data_zero, 4),
+            bytes_to_u32_le!(counter_block_data_zero, 8),
+            bytes_to_u32_le!(counter_block_data_zero, 12),
+        ];
+        cipher_values.fill(0);
+        self.encrypt_block(&mut masked_tag_values, &mut cipher_values);
+
+        tag_values[0] ^= masked_tag_values[0];
+        tag_values[1] ^= masked_tag_values[1];
+        tag_values[2] ^= masked_tag_values[2];
+        tag_values[3] ^= masked_tag_values[3];
+
+        let mut tag_data: [u8; AES_BLOCK_SIZE] = [0; AES_BLOCK_SIZE];
+        tag_data[0..4].copy_from_slice(&tag_values[0].to_le_bytes());
+        tag_data[4..8].copy_from_slice(&tag_values[1].to_le_bytes());
+        tag_data[8..12].copy_from_slice(&tag_values[2].to_le_bytes());
+        tag_data[12..16].copy_from_slice(&tag_values[3].to_le_bytes());
+
+        tag.copy_from_slice(&tag_data[0..tag_size]);
+
+        Ok(())
+    }
+
+    /// Encrypts data using CCM (Counter with CBC-MAC) mode.
+    fn encrypt_ccm(
+        &self,
+        nonce: &[u8],
+        associated_data: &[u8],
+        data: &[u8],
+        encrypted_data: &mut [u8],
+        tag: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        if self.encryption_round_keys.is_empty() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - key was not set"
+            ));
+        }
+        let nonce_size: usize = nonce.len();
+        let data_size: usize = data.len();
+
+        if nonce_size < 7 || nonce_size > 13 {
+            return Err(keramics_core::error_trace_new!("Unsupported nonce size"));
+        }
+        let associated_data_size: usize = associated_data.len();
+
+        if associated_data_size >= 65280 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported associated data size"
+            ));
+        }
+        let tag_size: usize = tag.len();
+
+        if !(4..=16).contains(&tag_size) || (tag_size % 2) != 0 {
+            return Err(keramics_core::error_trace_new!("Unsupported tag size"));
+        }
+        if data_size > encrypted_data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid encrypted data value too small"
+            ));
+        }
+        let l_value: usize = 15 - nonce_size;
+        let l_prime: u8 = (l_value - 1) as u8;
+
+        let maximum_data_size: u64 = if l_value >= 8 {
+            u64::MAX
+        } else {
+            (1 << (l_value * 8)) - 1
+        };
+        if (data_size as u64) > maximum_data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Nonce size not supported for data size"
+            ));
+        }
+        let mut tag_values: [u32; 4] = [0; 4];
+
+        self.crypt_ccm_calculate_initial_cbc_mac(
+            nonce,
+            associated_data,
+            tag_size,
+            data_size,
+            &mut tag_values,
+        );
+        let mut counter_block_data: [u8; AES_BLOCK_SIZE] = [0; AES_BLOCK_SIZE];
+        counter_block_data[0] = l_prime;
+        counter_block_data[1..1 + nonce_size].copy_from_slice(nonce);
+
+        let mut masked_tag_values: [u32; 4] = [
+            bytes_to_u32_le!(counter_block_data, 0),
+            bytes_to_u32_le!(counter_block_data, 4),
+            bytes_to_u32_le!(counter_block_data, 8),
+            bytes_to_u32_le!(counter_block_data, 12),
+        ];
+        let mut cipher_values: [u32; 4] = [0; 4];
+        self.encrypt_block(&mut masked_tag_values, &mut cipher_values);
+
+        let mut counter: usize = 0;
+        let mut data_offset: usize = 0;
+
+        for block_data in data.chunks(AES_BLOCK_SIZE) {
+            counter += 1;
+
+            let mut remaining_counter: usize = counter;
+            for index in 0..l_value {
+                counter_block_data[15 - index] = (remaining_counter & 0xff) as u8;
+                remaining_counter >>= 8;
+            }
+            let mut counter_values: [u32; 4] = [
+                bytes_to_u32_le!(counter_block_data, 0),
+                bytes_to_u32_le!(counter_block_data, 4),
+                bytes_to_u32_le!(counter_block_data, 8),
+                bytes_to_u32_le!(counter_block_data, 12),
+            ];
+            cipher_values.fill(0);
+            self.encrypt_block(&mut counter_values, &mut cipher_values);
+
+            let block_data_size: usize = block_data.len();
+
+            let mut padded_plaintext: [u8; AES_BLOCK_SIZE] = [0; AES_BLOCK_SIZE];
+            padded_plaintext[0..block_data_size].copy_from_slice(block_data);
+
+            tag_values[0] ^= bytes_to_u32_le!(padded_plaintext, 0);
+            tag_values[1] ^= bytes_to_u32_le!(padded_plaintext, 4);
+            tag_values[2] ^= bytes_to_u32_le!(padded_plaintext, 8);
+            tag_values[3] ^= bytes_to_u32_le!(padded_plaintext, 12);
+
+            cipher_values.fill(0);
+            self.encrypt_block(&mut tag_values, &mut cipher_values);
+
+            let mut ctr_keystream: [u8; AES_BLOCK_SIZE] = [0; AES_BLOCK_SIZE];
+            ctr_keystream[0..4].copy_from_slice(&counter_values[0].to_le_bytes());
+            ctr_keystream[4..8].copy_from_slice(&counter_values[1].to_le_bytes());
+            ctr_keystream[8..12].copy_from_slice(&counter_values[2].to_le_bytes());
+            ctr_keystream[12..16].copy_from_slice(&counter_values[3].to_le_bytes());
+
+            for index in 0..block_data_size {
+                encrypted_data[data_offset + index] = block_data[index] ^ ctr_keystream[index];
+            }
+            data_offset += block_data_size;
+        }
+        tag_values[0] ^= masked_tag_values[0];
+        tag_values[1] ^= masked_tag_values[1];
+        tag_values[2] ^= masked_tag_values[2];
+        tag_values[3] ^= masked_tag_values[3];
+
+        let mut tag_data: [u8; AES_BLOCK_SIZE] = [0; AES_BLOCK_SIZE];
+        tag_data[0..4].copy_from_slice(&tag_values[0].to_le_bytes());
+        tag_data[4..8].copy_from_slice(&tag_values[1].to_le_bytes());
+        tag_data[8..12].copy_from_slice(&tag_values[2].to_le_bytes());
+        tag_data[12..16].copy_from_slice(&tag_values[3].to_le_bytes());
+
+        tag.copy_from_slice(&tag_data[0..tag_size]);
+
+        Ok(())
+    }
+}
+
 impl CryptEcb for AesContext {
     /// Decrypts data using ECB (Electronic CodeBook) mode.
     fn decrypt_ecb(&self, encrypted_data: &[u8], data: &mut [u8]) -> Result<(), ErrorTrace> {
@@ -1086,6 +1429,9 @@ impl CryptEcb for AesContext {
 
 /// Context for AES-CBC
 pub type AesCbcContext = CbcContext<AesContext, 16>;
+
+/// Context for AES-CCM
+pub type AesCcmContext = CcmContext<AesContext>;
 
 /// Context for AES-XTS
 pub type AesXtsContext = XtsContext<AesContext, 16>;
