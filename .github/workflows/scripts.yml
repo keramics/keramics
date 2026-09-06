@@ -104,3 +104,14 @@ jobs:
           test_data/sparsebundle/**
           test_data/sparseimage/*.dmg
           test_data/udif/*.dmg
+  generate_test_data_windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v6
+    - name: Generate test data
+      run: |
+        .\scripts\generate_bde_test_data_windows.ps1
+    - uses: actions/upload-artifact@v7
+      with:
+        name: test-data-windows
+        path: specimens/*/*.vhd

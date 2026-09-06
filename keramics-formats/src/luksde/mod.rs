@@ -18,6 +18,7 @@ mod credential;
 mod diffuser;
 mod encrypted_volume;
 mod encryption;
+mod encryption_context;
 mod encryption_type;
 mod key_slot;
 mod metadata;

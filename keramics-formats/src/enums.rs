@@ -18,6 +18,7 @@ use std::fmt;
 pub enum FormatIdentifier {
     Apfs,
     Apm,
+    Bde,
     BsdDiskLabel,
     CdsaEncr,
     Ewf,
@@ -71,6 +72,7 @@ impl fmt::Display for FormatIdentifier {
         let string: &str = match self {
             FormatIdentifier::Apfs => "apfs",
             FormatIdentifier::Apm => "apm",
+            FormatIdentifier::Bde => "bde",
             FormatIdentifier::BsdDiskLabel => "bsdlabel",
             FormatIdentifier::CdsaEncr => "cdsaencr",
             FormatIdentifier::Ewf => "ewf",
@@ -113,6 +115,10 @@ mod tests {
         let format_identifier: FormatIdentifier = FormatIdentifier::Apm;
         let string: String = format_identifier.to_string();
         assert_eq!(string, "apm");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Bde;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "bde");
 
         let format_identifier: FormatIdentifier = FormatIdentifier::BsdDiskLabel;
         let string: String = format_identifier.to_string();

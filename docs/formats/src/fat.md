@@ -69,6 +69,7 @@ The FAT-12 and FAT-16 boot record is at least 512 bytes in size and consists of:
 | --- | --- | --- | --- |
 | 0 | 3 | "\xeb\x3c\x90" | Boot entry point (JMP +62, NOP) |
 | 3 | 8 | | File system signature (or OEM name) |
+| <td colspan="4">*DOS version 2.0 BIOS parameter block (BPB)*</td> |
 | 11 | 2 | | Bytes per sector, which must be 512, 1024, 2048 or 4096 |
 | 13 | 1 | | Sectors per cluster block, which must be 1, 2, 4, 8, 16, 32, 64 or 128 |
 | 14 | 2 | | Number of reserved sectors (reserved region), which starts at the first sector of the volume (sector 0) and must be 1 or more (typically 1 or 32) |
@@ -77,10 +78,12 @@ The FAT-12 and FAT-16 boot record is at least 512 bytes in size and consists of:
 | 19 | 2 | | Total number of sectors (16-bit) |
 | 21 | 1 | | [Media descriptor](#media_descriptors) |
 | 22 | 2 | | Cluster block allocation table size (16-bit), in number of sectors |
+| <td colspan="4">*DOS version 3.4 BIOS parameter block (BPB)*</td> |
 | 24 | 2 | | Number of sectors per track |
 | 26 | 2 | | Number of heads |
 | 28 | 4 | | Number of hidden sectors |
 | 32 | 4 | | Total number of sectors (32-bit) |
+| <td colspan="4">&nbsp;</td> |
 | 36 | 1 | | Drive number |
 | 37 | 1 | 0 | Unknown (reserved for Windows NT) |
 | 38 | 1 | | Extended boot signature |
@@ -99,7 +102,7 @@ The FAT-12 and FAT-16 boot record is at least 512 bytes in size and consists of:
 > Note that the sector signature must be set at offset 512 but in addition can be set in the last 2
 > bytes of the sector.
 
-### FAT-32 boot record
+### FAT-32 boot record {#fat32_boot_record}
 
 The FAT-32 boot record is at least 512 bytes in size and consists of:
 
@@ -109,6 +112,7 @@ The FAT-32 boot record is at least 512 bytes in size and consists of:
 | --- | --- | --- | --- |
 | 0 | 3 | "\xeb\x58\x90" | Boot entry point (JMP +90, NOP) |
 | 3 | 8 | | File system signature (or OEM name) |
+| <td colspan="4">*DOS version 2.0 BIOS parameter block (BPB)*</td> |
 | 11 | 2 | | Bytes per sector, which must be 512, 1024, 2048 or 4096 |
 | 13 | 1 | | Sectors per cluster block, which must be 1, 2, 4, 8, 16, 32, 64 or 128 |
 | 14 | 2 | | Number of reserved sectors (reserved region), which starts at the first sector of the volume (sector 0) and must be 1 or more (typically 1 or 32) |
@@ -117,10 +121,12 @@ The FAT-32 boot record is at least 512 bytes in size and consists of:
 | 19 | 2 | 0 | Total number of sectors (16-bit), which must be 0 for FAT-32 |
 | 21 | 1 | | [Media descriptor](#media_descriptors) |
 | 22 | 2 | 0 | Cluster block allocation table size (16-bit), in number of sectors, which must be 0 for FAT-32 |
+| <td colspan="4">*DOS version 3.4 BIOS parameter block (BPB)*</td> |
 | 24 | 2 | | Number of sectors per track |
 | 26 | 2 | | Number of heads |
 | 28 | 4 | | Number of hidden sectors |
 | 32 | 4 | | Total number of sectors (32-bit) |
+| <td colspan="4">&nbsp;</td> |
 | 36 | 4 | | Cluster block allocation table size (32-bit), in number of sectors, which must be non 0 for FAT-32 |
 | 40 | 2 | | [Extended flags](#fat32_extended_flags) |
 | 42 | 1 | 0 | Format revision minor number |

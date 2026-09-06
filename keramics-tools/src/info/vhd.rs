@@ -92,7 +92,7 @@ pub struct VhdInfo {}
 
 impl VhdInfo {
     /// Opens a file.
-    fn open_file(data_stream: &DataStreamReference) -> Result<VhdFile, ErrorTrace> {
+    pub(super) fn open_file(data_stream: &DataStreamReference) -> Result<VhdFile, ErrorTrace> {
         let mut vhd_file: VhdFile = VhdFile::new();
 
         match vhd_file.read_data_stream(data_stream) {

@@ -145,7 +145,6 @@ impl BlockReader for LinuxLvmBlockReader {
                             return Err(error);
                         }
                     };
-
                     keramics_core::data_stream_read_exact_at_position!(
                         &data_stream,
                         &mut data[data_offset..data_end_offset],

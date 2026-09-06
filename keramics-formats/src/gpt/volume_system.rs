@@ -141,23 +141,25 @@ impl GptVolumeSystem {
                 Err(_) => {
                     #[cfg(feature = "debug-trace")]
                     DebugTrace::static_scope(|debug_trace| {
-                        debug_trace.print("Invalid backup partition table block number falling back to last block");
+                        debug_trace.print("Invalid backup partition table block number falling back to last sector\n");
                     });
                     match backup_partition_table_header.read_at_position(
                         data_stream,
                         SeekFrom::End(-(self.bytes_per_sector as i64)),
                     ) {
                         Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to read backup partition table"
-                            );
-                            return Err(error);
+                        Err(error) => {
+                            #[cfg(feature = "debug-trace")]
+                            DebugTrace::static_scope(|debug_trace| {
+                                debug_trace.print(format!(
+                                    "Unable to read backup partition table with error:\n{}",
+                                    error
+                                ));
+                            });
                         }
                     }
                 }
-            };
+            }
         }
         // TODO: compare primary with backup partition table header.
 
@@ -466,19 +468,6 @@ mod tests {
         assert_eq!(volume_system.get_bytes_per_sector(), 512);
 
         Ok(())
-    }
-
-    #[test]
-    fn test_read_partition_table_with_invalid_backup_fallback() {
-        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
-
-        let mut test_data: Vec<u8> = get_test_data();
-        test_data[3584..3676].fill(0);
-
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data.as_slice());
-
-        let result = volume_system.read_partition_table(&data_stream);
-        assert!(result.is_err());
     }
 
     #[test]

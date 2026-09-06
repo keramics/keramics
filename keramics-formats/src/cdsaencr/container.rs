@@ -23,9 +23,8 @@ use super::constants::*;
 use super::container_footer::CdsaEncrContainerFooter;
 use super::container_header::CdsaEncrContainerHeader;
 use super::credential::CdsaEncrCredential;
-use super::encryption::{
-    CdsaEncrCipherContext, CdsaEncrEncryption, CdsaEncrEncryptionContext, CdsaEncrHmacContext,
-};
+use super::encryption::{CdsaEncrCipherContext, CdsaEncrEncryption, CdsaEncrHmacContext};
+use super::encryption_context::CdsaEncrEncryptionContext;
 use super::encryption_type::CdsaEncrEncryptionType;
 use super::enums::CdsaEncrKeyProtectorType;
 use super::key_protector::CdsaEncrKeyProtector;
@@ -271,6 +270,8 @@ impl CdsaEncrContainer {
         let mut keys_unlocked: bool = false;
 
         for (key_protector_index, key_protector) in self.key_protectors.iter().enumerate() {
+            // TODO: refactor read and unlock of key protector data into key protector?
+
             // Note that 65536 is an arbitrary chosen limit.
             if key_protector.size > 65536 {
                 return Err(keramics_core::error_trace_new!(format!(

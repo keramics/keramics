@@ -31,6 +31,7 @@ impl fmt::Display for QcowEncryptionType {
     /// Formats encryption type for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self.method {
+            0 => write!(formatter, "N/A (not set)"),
             1 => write!(formatter, "AES-128-CBC"),
             2 => write!(formatter, "Linux Unified Key Setup (LUKS)"),
             _ => write!(formatter, "N/A (unsupported)"),
@@ -41,6 +42,12 @@ impl fmt::Display for QcowEncryptionType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_display_with_not_set() {
+        let encryption_type: QcowEncryptionType = QcowEncryptionType::new(0);
+        assert_eq!(encryption_type.to_string(), "N/A (not set)");
+    }
 
     #[test]
     fn test_display_with_aes_cbc() {
@@ -58,8 +65,8 @@ mod tests {
     }
 
     #[test]
-    fn test_display_with_unsupported() {
-        let encryption_type: QcowEncryptionType = QcowEncryptionType::new(0);
+    fn test_display_with_unsupported_method() {
+        let encryption_type: QcowEncryptionType = QcowEncryptionType::new(0xffffffff);
         assert_eq!(encryption_type.to_string(), "N/A (unsupported)");
     }
 }

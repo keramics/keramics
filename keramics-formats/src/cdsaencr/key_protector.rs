@@ -27,7 +27,7 @@ pub struct CdsaEncrKeyProtector {
 
 impl CdsaEncrKeyProtector {
     /// Creates a new key protector.
-    pub fn new(protector_type: CdsaEncrKeyProtectorType, offset: u64, size: u64) -> Self {
+    pub(crate) fn new(protector_type: CdsaEncrKeyProtectorType, offset: u64, size: u64) -> Self {
         Self {
             protector_type,
             offset,

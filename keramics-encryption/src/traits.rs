@@ -13,17 +13,6 @@
 
 use keramics_core::ErrorTrace;
 
-/// Encryption and decryption context trait.
-pub trait CryptContext {
-    /// Creates a new context.
-    fn new() -> Self
-    where
-        Self: Sized;
-
-    /// Sets the key.
-    fn set_key(&mut self, key: &[u8]) -> Result<(), ErrorTrace>;
-}
-
 /// CBC (Cipher Block Chaining) encryption and decryption context trait.
 pub trait CryptCbc: CryptContext {
     /// Decrypts data using CBC (Cipher Block Chaining) mode.
@@ -41,6 +30,40 @@ pub trait CryptCbc: CryptContext {
         data: &[u8],
         encrypted_data: &mut [u8],
     ) -> Result<(), ErrorTrace>;
+}
+
+/// CCM (Counter with Cipher Block Chaining message authentication code (CBC-MAC)) encryption and decryption context trait.
+pub trait CryptCcm: CryptContext {
+    /// Decrypts data using CCM (Counter with CBC-MAC) mode.
+    fn decrypt_ccm(
+        &self,
+        nonce: &[u8],
+        associated_data: &[u8],
+        encrypted_data: &[u8],
+        data: &mut [u8],
+        tag: &mut [u8],
+    ) -> Result<(), ErrorTrace>;
+
+    /// Encrypts data using CCM (Counter with CBC-MAC) mode.
+    fn encrypt_ccm(
+        &self,
+        nonce: &[u8],
+        associated_data: &[u8],
+        data: &[u8],
+        encrypted_data: &mut [u8],
+        tag: &mut [u8],
+    ) -> Result<(), ErrorTrace>;
+}
+
+/// Encryption and decryption context trait.
+pub trait CryptContext {
+    /// Creates a new context.
+    fn new() -> Self
+    where
+        Self: Sized;
+
+    /// Sets the key.
+    fn set_key(&mut self, key: &[u8]) -> Result<(), ErrorTrace>;
 }
 
 /// ECB (Electronic CodeBook) encryption and decryption context trait.

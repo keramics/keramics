@@ -109,7 +109,7 @@ impl LuksInfo {
             match luks_volume.unlock(&credentials) {
                 Ok(_) => {}
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to unlock image");
+                    keramics_core::error_trace_add_frame!(error, "Unable to unlock volume");
                     return Err(error);
                 }
             }
@@ -122,7 +122,7 @@ impl LuksInfo {
         let luks_volume: LuksEncryptedVolume = match Self::open_encrypted_volume(data_stream) {
             Ok(luks_volume) => luks_volume,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open encrypted_volume");
+                keramics_core::error_trace_add_frame!(error, "Unable to open volume");
                 return Err(error);
             }
         };

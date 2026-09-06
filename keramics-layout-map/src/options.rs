@@ -79,7 +79,15 @@ impl Parse for FieldDataTypeOption {
             let string_size: usize = data_type_str.len();
 
             (data_type_str, number_of_elements_str) =
-                data_type_str[1..string_size - 1].rsplit_once(";").unwrap();
+                match data_type_str[1..string_size - 1].rsplit_once(";") {
+                    Some(result) => result,
+                    None => {
+                        return Err(syn::Error::new(
+                            input.span(),
+                            format!("Unsupported data type definition: {}", data_type_str),
+                        ));
+                    }
+                };
             data_type_str = data_type_str.trim();
             number_of_elements_str = number_of_elements_str.trim();
         }
@@ -127,9 +135,21 @@ impl Parse for FieldDataTypeOption {
                     };
                 extended_type_str = "";
 
+                let size: usize = match struct_size.parse::<usize>() {
+                    Ok(size) => size,
+                    Err(error) => {
+                        return Err(syn::Error::new(
+                            input.span(),
+                            format!(
+                                "Unable to parse size in Struct definition: {} with error: {}",
+                                extended_type_str, error
+                            ),
+                        ));
+                    }
+                };
                 DataType::Struct {
                     name: struct_name.to_string(),
-                    size: struct_size.parse::<usize>().unwrap(),
+                    size: size,
                 }
             }
             "u8" | "uint8" | "UnsignedInteger8Bit" => DataType::UnsignedInteger8Bit,

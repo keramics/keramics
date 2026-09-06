@@ -19,7 +19,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use crate::lru_cache::LruCache;
 use crate::traits::BlockReader;
 
-use super::encryption::LuksEncryptionContext;
+use super::encryption_context::LuksEncryptionContext;
 
 /// Linux Unified Key Setup (LUKS) Disk Encryption block reader.
 pub struct LuksBlockReader {
@@ -96,7 +96,6 @@ impl LuksBlockReader {
             &sector_data,
             self.bytes_per_sector
         );
-
         Ok(sector_data)
     }
 }

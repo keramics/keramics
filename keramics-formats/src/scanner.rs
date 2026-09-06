@@ -19,6 +19,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_sigscan::{PatternType, ScanContext, Scanner, Signature};
 
 use super::apfs::constants::*;
+use super::bde::constants::*;
 use super::bsdlabel::constants::*;
 use super::cdsaencr::constants::*;
 use super::enums::FormatIdentifier;
@@ -88,6 +89,38 @@ impl FormatScanner {
                 0x6e, 0x5f, 0x6d, 0x61, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x00,
             ],
+        ));
+    }
+
+    /// BitLocker disk encryption (BDE) signatures.
+    pub fn add_bde_signatures(&mut self) {
+        // BitLocker file system signature.
+        self.signature_scanner.add_signature(Signature::new(
+            "bde1",
+            PatternType::BoundToStart,
+            3,
+            BDE_FILE_SYSTEM_SIGNATURE,
+        ));
+        // BitLocker identifier.
+        self.signature_scanner.add_signature(Signature::new(
+            "bde2",
+            PatternType::BoundToStart,
+            160,
+            BDE_IDENTIFIER,
+        ));
+        // BitLocker Used Disk Space Only encryption identifier.
+        self.signature_scanner.add_signature(Signature::new(
+            "bde3",
+            PatternType::BoundToStart,
+            160,
+            BDE_USED_DISK_SPACE_ONLY_IDENTIFIER,
+        ));
+        // BitLocker identifier used by Bitlocker To Go.
+        self.signature_scanner.add_signature(Signature::new(
+            "bde4",
+            PatternType::BoundToStart,
+            424,
+            BDE_IDENTIFIER,
         ));
     }
 
@@ -461,6 +494,7 @@ impl FormatScanner {
             let format_identifier: FormatIdentifier = match signature.identifier.as_str() {
                 "apfs1" => FormatIdentifier::Apfs,
                 "apm1" | "apm2" => FormatIdentifier::Apm,
+                "bde1" | "bde2" | "bde3" | "bde4" => FormatIdentifier::Bde,
                 "bsdlabel1" => FormatIdentifier::BsdDiskLabel,
                 "cdsaencr1" | "cdsaencr2" => FormatIdentifier::CdsaEncr,
                 "ewf1" | "ewf2" => FormatIdentifier::Ewf,
@@ -505,6 +539,7 @@ mod tests {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apfs_signatures();
         format_scanner.add_apm_signatures();
+        format_scanner.add_bde_signatures();
         format_scanner.add_bsdlabel_signatures();
         format_scanner.add_cdsaencr_signatures();
         format_scanner.add_ewf_signatures();
@@ -533,6 +568,7 @@ mod tests {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apfs_signatures();
         format_scanner.add_apm_signatures();
+        format_scanner.add_bde_signatures();
         format_scanner.add_bsdlabel_signatures();
         format_scanner.add_cdsaencr_signatures();
         format_scanner.add_ewf_signatures();

@@ -19,6 +19,7 @@ mod container_footer;
 mod container_header;
 mod credential;
 mod encryption;
+mod encryption_context;
 mod encryption_type;
 mod enums;
 mod key_protector;
@@ -30,10 +31,8 @@ pub use container::CdsaEncrContainer;
 pub use container_footer::CdsaEncrContainerFooter;
 pub use container_header::CdsaEncrContainerHeader;
 pub use credential::CdsaEncrCredential;
-pub use encryption::{
-    CdsaEncrEncryption, CdsaEncrEncryptionContext, CdsaEncrHmacContext,
-    CdsaEncrKeyDerivationContext,
-};
+pub use encryption::{CdsaEncrEncryption, CdsaEncrHmacContext, CdsaEncrKeyDerivationContext};
+pub use encryption_context::CdsaEncrEncryptionContext;
 pub use encryption_type::CdsaEncrEncryptionType;
 pub use enums::CdsaEncrKeyProtectorType;
 pub use key_protector::CdsaEncrKeyProtector;

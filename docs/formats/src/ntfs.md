@@ -115,7 +115,7 @@ fixed.
 | --- | --- | --- |
 | | "$Extend\$UsnJrnl" | [USN change journal](#usn_change_journal) |
 
-## The boot record
+## The boot record {#boot_record}
 
 The boot record is stored at the start of the volume (in the $Boot metadata file) and contains:
 
@@ -160,6 +160,8 @@ The boot record is stored at the start of the volume (in the $Boot metadata file
 | 510 | 2 | "\x55\xaa" | The (boot) signature |
 
 <!-- rumdl-enable MD033 MD056 -->
+
+> Note that the number of sectors can be 1 less then the value indicated in the partition table.
 
 ### Boot entry point
 
@@ -232,12 +234,6 @@ number. This can be determined by comparing the output of:
 fsutil fsinfo volumeinfo C:
 fsutil fsinfo ntfsinfo C:
 ```
-
-Often the total number of sectors in the boot record will be smaller than the underlying partition.
-A (nearly identical) backup of the boot record is stored in last sector of cluster block, that
-follows the last cluster block of the volume. Often this is the 512 bytes after the last sector of
-the volume, but not necessarily. The backup boot record is not included in the total number of
-sectors.
 
 ### Master File Table (MFT) and index entry size
 

@@ -211,6 +211,9 @@ pub enum FormatType {
     /// Apple Partition Map (APM)
     Apm,
 
+    /// BitLocker disk encryption (BDE)
+    Bde,
+
     /// BSD disklabel (bsdlabel)
     #[value(name = "bsdlabel")]
     BsdDiskLabel,

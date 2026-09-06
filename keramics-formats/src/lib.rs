@@ -49,6 +49,7 @@ pub mod vmdk;
 
 // Volume system formats
 pub mod apm;
+pub mod bde;
 pub mod bsdlabel;
 pub mod gpt;
 pub mod linuxlvm;

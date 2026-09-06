@@ -129,13 +129,13 @@ impl BlockReader for SparseBundleBlockReader {
                     let mut block_number: u64 = current_offset / (self.encrypted_block_size as u64);
                     let block_logical_offset: u64 =
                         block_number * (self.encrypted_block_size as u64);
-                    let mut block_physical_offset: usize =
+                    let mut block_data_offset: usize =
                         (current_offset - block_logical_offset) as usize;
 
-                    let mut block_offset: u64 =
-                        range_relative_offset - (block_physical_offset as u64);
+                    let mut block_physical_offset: u64 =
+                        range_relative_offset - (block_data_offset as u64);
                     let mut block_remainder_size: usize =
-                        self.encrypted_block_size - block_physical_offset;
+                        self.encrypted_block_size - block_data_offset;
 
                     while data_offset < range_data_end_offset {
                         // TODO: cache decrypted block.
@@ -144,7 +144,7 @@ impl BlockReader for SparseBundleBlockReader {
                         keramics_core::data_stream_read_exact_at_position!(
                             data_stream,
                             &mut encrypted_data,
-                            SeekFrom::Start(block_offset)
+                            SeekFrom::Start(block_physical_offset)
                         );
                         let mut block_data: Vec<u8> = vec![0; self.encrypted_block_size];
 
@@ -166,17 +166,15 @@ impl BlockReader for SparseBundleBlockReader {
                             min(read_size - data_offset, block_remainder_size);
 
                         let data_end_offset: usize = data_offset + block_read_size;
-                        let block_data_end_offset: usize = block_physical_offset + block_read_size;
+                        let block_data_end_offset: usize = block_data_offset + block_read_size;
 
-                        data[data_offset..data_end_offset].copy_from_slice(
-                            &block_data[block_physical_offset..block_data_end_offset],
-                        );
-
+                        data[data_offset..data_end_offset]
+                            .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
                         data_offset = data_end_offset;
                         current_offset += block_read_size as u64;
                         block_number += 1;
-                        block_offset += self.encrypted_block_size as u64;
-                        block_physical_offset = 0;
+                        block_physical_offset += self.encrypted_block_size as u64;
+                        block_data_offset = 0;
                         block_remainder_size = self.encrypted_block_size;
                     }
                 }
