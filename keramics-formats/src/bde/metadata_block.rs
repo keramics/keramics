@@ -25,7 +25,7 @@ use super::metadata_entry_header::BdeMetadataEntryHeader;
 use super::metadata_header::BdeMetadataHeader;
 use super::volume_master_key::BdeVolumeMasterKey;
 
-/// BitLocker disk encryption (BDE) metadata block.
+/// BitLocker Drive Encryption (BDE) metadata block.
 pub struct BdeMetadataBlock {
     /// Volume identifier.
     pub volume_identifier: Uuid,

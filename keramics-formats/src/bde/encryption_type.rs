@@ -13,7 +13,7 @@
 
 use std::fmt;
 
-/// BitLocker disk encryption (BDE) encryption type.
+/// BitLocker Drive Encryption (BDE) encryption type.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BdeEncryptionType {
     /// Encryption method.
@@ -26,14 +26,21 @@ impl BdeEncryptionType {
         Self { method }
     }
 
-    /// Retrieves the expected VMK data size.
-    pub(super) fn get_key_data_size(&self) -> usize {
+    /// Retrieves the FVEK size.
+    pub(super) fn get_fvek_size(&self) -> usize {
         match self.method {
-            0x8000 => 16,
-            0x8001 => 32,
-            0x8002 => 16,
-            0x8003 => 32,
-            0x8004 => 32,
+            0x8000..=0x8001 | 0x8005 => 12 + 64,
+            0x8002 => 12 + 16,
+            0x8003..=0x8004 => 12 + 32,
+            _ => 0,
+        }
+    }
+
+    /// Retrieves the key size.
+    pub(super) fn get_key_size(&self) -> usize {
+        match self.method {
+            0x8000 | 0x8002 => 16,
+            0x8001 | 0x8003..=0x8004 => 32,
             0x8005 => 64,
             _ => 0,
         }

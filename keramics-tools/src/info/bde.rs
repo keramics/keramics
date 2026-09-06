@@ -21,7 +21,7 @@ use keramics_vfs::{VfsCredential, VfsCredentialStore};
 
 use crate::formatters::ByteSize;
 
-/// Information about BitLocker disk encryption (BDE) encrypted volume.
+/// Information about BitLocker Drive Encryption (BDE) encrypted volume.
 struct BdeEncryptedVolumeInfo<'a> {
     /// Encrypte volume.
     encrypted_volume: &'a BdeEncryptedVolume,
@@ -37,7 +37,7 @@ impl<'a> BdeEncryptedVolumeInfo<'a> {
 impl<'a> fmt::Display for BdeEncryptedVolumeInfo<'a> {
     /// Formats encrypted_volume information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(formatter, "BitLocker disk encryption (BDE) information:")?;
+        writeln!(formatter, "BitLocker Drive Encryption (BDE) information:")?;
 
         writeln!(
             formatter,
@@ -72,7 +72,7 @@ impl<'a> fmt::Display for BdeEncryptedVolumeInfo<'a> {
     }
 }
 
-/// Information about BitLocker disk encryption (BDE).
+/// Information about BitLocker Drive Encryption (BDE).
 pub struct BdeInfo {}
 
 impl BdeInfo {
@@ -185,7 +185,7 @@ mod tests {
         let test_struct: BdeEncryptedVolumeInfo = BdeEncryptedVolumeInfo::new(&bde_volume);
 
         let expected_string: &str = concat!(
-            "BitLocker disk encryption (BDE) information:\n",
+            "BitLocker Drive Encryption (BDE) information:\n",
             "    Identifier\t\t\t\t\t: fbdde069-e6b1-4cf9-8064-6b68d5955171\n",
             "    Description\t\t\t\t\t: TEST TestVolume 2026-09-04\n",
             "    Bytes per sector\t\t\t\t: 512\n",

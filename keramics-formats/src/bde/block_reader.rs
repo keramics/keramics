@@ -22,7 +22,7 @@ use crate::traits::BlockReader;
 use super::block_range::{BdeBlockRange, BdeBlockRangeType};
 use super::encryption_context::BdeEncryptionContext;
 
-/// BitLocker disk encryption (BDE) block reader.
+/// BitLocker Drive Encryption (BDE) block reader.
 pub struct BdeBlockReader {
     /// The data stream.
     data_stream: DataStreamReference,
@@ -147,7 +147,7 @@ impl BlockReader for BdeBlockReader {
                     )));
                 }
             };
-            let mut range_relative_offset: u64 = current_offset - block_range.logical_offset;
+            let range_relative_offset: u64 = current_offset - block_range.logical_offset;
             let range_remainder_size: u64 = block_range.size - range_relative_offset;
 
             let range_read_size: usize =
@@ -219,13 +219,16 @@ impl BlockReader for BdeBlockReader {
                         &mut data[data_offset..data_end_offset],
                         SeekFrom::Start(range_physical_offset)
                     );
+                    data_offset = data_end_offset;
+                    current_offset += range_read_size as u64;
                 }
                 BdeBlockRangeType::Sparse => {
                     data[data_offset..data_end_offset].fill(0);
+
+                    data_offset = data_end_offset;
+                    current_offset += range_read_size as u64;
                 }
             }
-            data_offset = data_end_offset;
-            current_offset += range_read_size as u64;
             range_index += 1;
         }
         Ok(data_offset)

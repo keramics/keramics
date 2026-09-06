@@ -115,9 +115,7 @@ impl fmt::Debug for Signature {
         let pattern_string: String = self
             .pattern
             .iter()
-            .flat_map(|byte_value| {
-                std::ascii::escape_default(*byte_value).map(|byte_value| byte_value as char)
-            })
+            .flat_map(|byte_value| escape_default(*byte_value).map(|byte_value| byte_value as char))
             .collect();
 
         formatter

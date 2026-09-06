@@ -12,30 +12,35 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_encryption::{CryptCbc, CryptEcb};
+use keramics_encryption::{AesContext, CryptCbc, CryptEcb};
 
+use super::diffuser::BdeDiffuser;
 use super::encryption::BdeCipherContext;
 
-/// BitLocker disk encryption (BDE) block stream.
+/// BitLocker Drive Encryption (BDE) block stream.
 #[derive(Clone)]
 pub struct BdeEncryptionContext {
     /// Bytes per sector.
     bytes_per_sector: u16,
 
     /// Cipher context.
-    pub cipher_context: BdeCipherContext,
+    cipher_context: BdeCipherContext,
 
     /// Diffuser context.
-    pub diffuser_context: Option<u32>,
+    diffuser_context: Option<AesContext>,
 }
 
 impl BdeEncryptionContext {
     /// Creates a new encryption context.
-    pub fn new(bytes_per_sector: u16, cipher_context: BdeCipherContext) -> Self {
+    pub fn new(
+        bytes_per_sector: u16,
+        cipher_context: BdeCipherContext,
+        diffuser_context: Option<AesContext>,
+    ) -> Self {
         Self {
             bytes_per_sector,
             cipher_context,
-            diffuser_context: None,
+            diffuser_context,
         }
     }
 
@@ -67,8 +72,38 @@ impl BdeEncryptionContext {
                         return Err(error);
                     }
                 }
-                if let Some(diffuser_context) = self.diffuser_context {
-                    todo!();
+                let mut sector_key_data: [u8; 32] = [0; 32];
+
+                if let Some(diffuser_context) = &self.diffuser_context {
+                    match diffuser_context.encrypt_ecb(&block_key_data, &mut sector_key_data) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to encrypt initialization vector for sector: {}",
+                                    sector_number
+                                )
+                            );
+                            return Err(error);
+                        }
+                    }
+                    block_key_data[15] = 0x80;
+
+                    match diffuser_context.encrypt_ecb(&block_key_data, &mut sector_key_data[16..])
+                    {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to encrypt initialization vector for sector: {}",
+                                    sector_number
+                                )
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
                 match aes_context.decrypt_cbc(&initialization_vector, encrypted_data, data) {
                     Ok(_) => {}
@@ -80,8 +115,23 @@ impl BdeEncryptionContext {
                         return Err(error);
                     }
                 }
-                if let Some(diffuser_context) = self.diffuser_context {
-                    todo!();
+                if let Some(_) = &self.diffuser_context {
+                    match BdeDiffuser::decrypt(data) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to diffuser decrypt sector: {}", sector_number)
+                            );
+                            return Err(error);
+                        }
+                    }
+                    let mut sector_key_index: usize = 0;
+
+                    for byte_value in data.iter_mut() {
+                        *byte_value ^= sector_key_data[sector_key_index & 0x1f];
+                        sector_key_index += 1;
+                    }
                 }
             }
             BdeCipherContext::AesXts(xts_context) => {

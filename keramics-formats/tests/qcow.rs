@@ -46,7 +46,7 @@ fn open_file(path: &PathBuf) -> Result<QcowFile, ErrorTrace> {
 }
 
 #[test]
-fn read_media_qcow() -> Result<(), ErrorTrace> {
+fn read_file_qcow() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow");
     let file: QcowFile = open_file(&path_buf)?;
     let data_stream: DataStreamReference = file.get_data_stream().unwrap();
@@ -60,7 +60,7 @@ fn read_media_qcow() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_qcow2() -> Result<(), ErrorTrace> {
+fn read_file_qcow2() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
     let file: QcowFile = open_file(&path_buf)?;
     let data_stream: DataStreamReference = file.get_data_stream().unwrap();
@@ -74,7 +74,7 @@ fn read_media_qcow2() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_qcow2_aes128_encrypted() -> Result<(), ErrorTrace> {
+fn read_file_qcow2_aes128_encrypted() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
     let mut file: QcowFile = open_file(&path_buf)?;
     let credentials: Vec<QcowCredential> = vec![QcowCredential::Passphrase(b"KeRaMiCs".to_vec())];
@@ -91,7 +91,7 @@ fn read_media_qcow2_aes128_encrypted() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_qcow2_zlib_compressed() -> Result<(), ErrorTrace> {
+fn read_file_qcow2_zlib_compressed() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2_zlib.qcow2");
     let file: QcowFile = open_file(&path_buf)?;
     let data_stream: DataStreamReference = file.get_data_stream().unwrap();

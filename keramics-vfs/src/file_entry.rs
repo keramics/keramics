@@ -31,6 +31,7 @@ use keramics_types::Ucs2String;
 
 use super::apfs::ApfsContainerFileEntry;
 use super::apm::ApmFileEntry;
+use super::bde::BdeFileEntry;
 use super::data_fork::VfsDataFork;
 use super::data_forks::VfsDataForksIterator;
 use super::enums::{VfsFileType, VfsType};
@@ -59,6 +60,7 @@ pub enum VfsFileEntry {
     Apfs(ApfsFileEntry),
     ApfsContainer(ApfsContainerFileEntry),
     Apm(ApmFileEntry),
+    Bde(BdeFileEntry),
     ExFat(ExFatFileEntry),
     Ext(ExtFileEntry),
     Ewf(EwfFileEntry),
@@ -90,6 +92,7 @@ impl VfsFileEntry {
             VfsFileEntry::Apfs(_) => VfsType::Apfs,
             VfsFileEntry::ApfsContainer(_) => VfsType::ApfsContainer,
             VfsFileEntry::Apm(_) => VfsType::Apm,
+            VfsFileEntry::Bde(_) => VfsType::Bde,
             VfsFileEntry::Ewf(_) => VfsType::Ewf,
             VfsFileEntry::ExFat(_) => VfsType::ExFat,
             VfsFileEntry::Ext(_) => VfsType::Ext,
@@ -120,6 +123,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Gpt(_)
             | VfsFileEntry::LinuxLvm(_)
@@ -151,6 +155,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fat(_)
@@ -182,6 +187,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Gpt(_)
             | VfsFileEntry::LinuxLvm(_)
@@ -215,6 +221,7 @@ impl VfsFileEntry {
             VfsFileEntry::Apfs(_)
             | VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
@@ -254,6 +261,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
@@ -304,6 +312,7 @@ impl VfsFileEntry {
                 apfs_container_file_entry.get_file_type()
             }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_file_type(),
+            VfsFileEntry::Bde(bde_file_entry) => bde_file_entry.get_file_type(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_file_type(),
             VfsFileEntry::ExFat(exfat_file_entry) => {
                 if exfat_file_entry.is_directory() {
@@ -401,6 +410,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Gpt(_)
             | VfsFileEntry::LinuxLvm(_)
@@ -432,6 +442,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
@@ -464,6 +475,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
@@ -501,6 +513,7 @@ impl VfsFileEntry {
                 Some(apfs_container_file_entry.get_name())
             }
             VfsFileEntry::Apm(apm_file_entry) => Some(apm_file_entry.get_name()),
+            VfsFileEntry::Bde(bde_file_entry) => Some(bde_file_entry.get_name()),
             VfsFileEntry::Ewf(ewf_file_entry) => Some(ewf_file_entry.get_name()),
             VfsFileEntry::ExFat(exfat_file_entry) => match exfat_file_entry.get_name() {
                 Some(name) => Some(PathComponent::from(name)),
@@ -564,6 +577,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
@@ -597,6 +611,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
@@ -631,6 +646,7 @@ impl VfsFileEntry {
                 apfs_container_file_entry.get_size()
             }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_size(),
+            VfsFileEntry::Bde(bde_file_entry) => bde_file_entry.get_size(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_size(),
             VfsFileEntry::ExFat(exfat_file_entry) => exfat_file_entry.get_size(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_size(),
@@ -663,6 +679,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
@@ -780,6 +797,10 @@ impl VfsFileEntry {
             VfsFileEntry::Apm(apm_file_entry) => match apm_file_entry {
                 ApmFileEntry::Partition { .. } => 1,
                 ApmFileEntry::Root { .. } => 0,
+            },
+            VfsFileEntry::Bde(bde_file_entry) => match bde_file_entry {
+                BdeFileEntry::Root { .. } => 0,
+                BdeFileEntry::UnlockedVolume { .. } => 1,
             },
             VfsFileEntry::Ewf(ewf_file_entry) => match ewf_file_entry {
                 EwfFileEntry::Layer { .. } => 1,
@@ -919,6 +940,7 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Apfs(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Ext(_)
@@ -1008,6 +1030,7 @@ impl VfsFileEntry {
                 apfs_container_file_entry.get_data_stream()
             }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_data_stream(),
+            VfsFileEntry::Bde(bde_file_entry) => bde_file_entry.get_data_stream(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_data_stream(),
             VfsFileEntry::ExFat(exfat_file_entry) => exfat_file_entry.get_data_stream(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_data_stream(),
@@ -1055,6 +1078,7 @@ impl VfsFileEntry {
             VfsFileEntry::Apfs(_)
             | VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Ext(_)
@@ -1098,6 +1122,7 @@ impl VfsFileEntry {
         let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> = match self {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
@@ -1182,6 +1207,7 @@ impl VfsFileEntry {
                 apfs_container_file_entry.is_root_file_entry()
             }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.is_root_file_entry(),
+            VfsFileEntry::Bde(bde_file_entry) => bde_file_entry.is_root_file_entry(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.is_root_file_entry(),
             VfsFileEntry::ExFat(exfat_file_entry) => exfat_file_entry.is_root_directory(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.is_root_directory(),
@@ -1222,6 +1248,7 @@ impl ExtendedAttributeIterator for VfsFileEntry {
         let result: Result<usize, ErrorTrace> = match self {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
@@ -1268,6 +1295,7 @@ impl ExtendedAttributeIterator for VfsFileEntry {
         let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> = match self {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
+            | VfsFileEntry::Bde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
             | VfsFileEntry::Fake(_)
@@ -1337,6 +1365,9 @@ impl FileEntryIterator for VfsFileEntry {
             }
             VfsFileEntry::Apm(apm_file_entry) => Ok(VfsFileEntry::Apm(
                 apm_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Bde(bde_file_entry) => Ok(VfsFileEntry::Bde(
+                bde_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
             VfsFileEntry::Ewf(ewf_file_entry) => Ok(VfsFileEntry::Ewf(
                 ewf_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
@@ -1429,6 +1460,9 @@ impl FileEntryIterator for VfsFileEntry {
             }
             VfsFileEntry::Apm(apm_file_entry) => {
                 Ok(apm_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Bde(bde_file_entry) => {
+                Ok(bde_file_entry.get_number_of_sub_file_entries())
             }
             VfsFileEntry::Ewf(ewf_file_entry) => {
                 Ok(ewf_file_entry.get_number_of_sub_file_entries())
@@ -2587,6 +2621,10 @@ mod tests {
 
         Ok(())
     }
+
+    // Tests with BDE.
+
+    // TODO: add
 
     // Tests with EWF.
 

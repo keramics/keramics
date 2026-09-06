@@ -92,7 +92,7 @@ impl FormatScanner {
         ));
     }
 
-    /// BitLocker disk encryption (BDE) signatures.
+    /// BitLocker Drive Encryption (BDE) signatures.
     pub fn add_bde_signatures(&mut self) {
         // BitLocker file system signature.
         self.signature_scanner.add_signature(Signature::new(

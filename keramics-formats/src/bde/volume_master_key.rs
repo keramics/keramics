@@ -35,7 +35,7 @@ use super::stretch_key::BdeStretchKey;
     ),
     methods("debug_read_data")
 )]
-/// BitLocker disk encryption (BDE) volume master key.
+/// BitLocker Drive Encryption (BDE) volume master key.
 pub struct BdeVolumeMasterKey {
     /// Identifier.
     pub identifier: Uuid,
@@ -272,16 +272,14 @@ impl BdeVolumeMasterKey {
         if self.protector_type != 0x2000 {
             return Ok(false);
         }
-        let data_size: usize = self.data.len();
-
-        let mut stretch_key: BdeStretchKey = match self.read_stretch_key_property() {
+        let stretch_key: BdeStretchKey = match self.read_stretch_key_property() {
             Ok(key) => key,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read stretch key property");
                 return Err(error);
             }
         };
-        let mut aes_ccm_encrypted_key: BdeAesCcmEncryptedKey =
+        let aes_ccm_encrypted_key: BdeAesCcmEncryptedKey =
             match self.read_aes_ccm_encrypted_key_property() {
                 Ok(key) => key,
                 Err(mut error) => {

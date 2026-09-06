@@ -36,7 +36,7 @@ use super::constants::*;
     ),
     methods("debug_read_data")
 )]
-/// BitLocker disk encryption (BDE) metadata block header.
+/// BitLocker Drive Encryption (BDE) metadata block header.
 pub struct BdeMetadataBlockHeader {
     /// Format version.
     pub format_version: u16,

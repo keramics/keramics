@@ -11,9 +11,8 @@
  * under the License.
  */
 
-/// BitLocker Drive Encryption (BDE) credential.
-#[derive(Clone, Debug, PartialEq)]
-pub enum BdeCredential {
-    None,
-    Passphrase(Vec<u8>),
-}
+mod file_entry;
+mod file_system;
+
+pub use file_entry::BdeFileEntry;
+pub use file_system::BdeFileSystem;

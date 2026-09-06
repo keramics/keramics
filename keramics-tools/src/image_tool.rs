@@ -59,7 +59,7 @@ struct CommandLineArguments {
     /// Enable debug output
     debug: bool,
 
-    #[arg(long)]
+    #[arg(long, alias = "password")]
     /// Passphrase to unlock storage media image
     passphrase: Vec<String>,
 

@@ -33,6 +33,7 @@ mod types;
 // Format specific back-ends.
 mod apfs;
 mod apm;
+mod bde;
 mod ewf;
 mod fake;
 mod gpt;

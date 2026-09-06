@@ -28,7 +28,7 @@ use super::metadata_property::BdeMetadataProperty;
     ),
     methods("debug_read_data")
 )]
-/// BitLocker disk encryption (BDE) stretch key.
+/// BitLocker Drive Encryption (BDE) stretch key.
 pub struct BdeStretchKey {
     /// Encryption method.
     pub encryption_method: u16,

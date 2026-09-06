@@ -21,6 +21,7 @@ mod boot_record_togo;
 mod boot_record_vista;
 pub mod constants;
 mod credential;
+mod diffuser;
 mod encrypted_volume;
 mod encryption;
 mod encryption_context;

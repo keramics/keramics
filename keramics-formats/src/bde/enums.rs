@@ -13,7 +13,7 @@
 
 use std::fmt;
 
-/// BitLocker disk encryption (BDE) key protector types.
+/// BitLocker Drive Encryption (BDE) key protector types.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum BdeKeyProtectorType {
     ClearKey,

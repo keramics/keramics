@@ -45,7 +45,7 @@ use keramics_types::bytes_to_u64_le;
     ),
     methods("debug_read_data")
 )]
-/// BitLocker disk encryption (BDE) metadata header.
+/// BitLocker Drive Encryption (BDE) metadata header.
 pub struct BdeBootRecordDescriptor {
     /// Boot record offset.
     pub boot_record_offset: u64,

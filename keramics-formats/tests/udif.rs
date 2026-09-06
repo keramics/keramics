@@ -46,7 +46,7 @@ fn open_image(base_path: &PathBuf, file_name: &str) -> Result<UdifImage, ErrorTr
 }
 
 #[test]
-fn read_media_adc_compressed() -> Result<(), ErrorTrace> {
+fn read_image_adc_compressed() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/udif");
     let image: UdifImage = open_image(&path_buf, "hfsplus_adc.dmg")?;
     let data_stream: DataStreamReference = image.get_data_stream().unwrap();
@@ -60,7 +60,7 @@ fn read_media_adc_compressed() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_aes128_encrypted_and_zlib_compressed() -> Result<(), ErrorTrace> {
+fn read_image_aes128_encrypted_and_zlib_compressed() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/udif");
     let mut image: UdifImage = open_image(&path_buf, "hfsplus_zlib_aes128.dmg")?;
     let credentials: Vec<CdsaEncrCredential> =
@@ -78,7 +78,7 @@ fn read_media_aes128_encrypted_and_zlib_compressed() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_aes256_encrypted() -> Result<(), ErrorTrace> {
+fn read_image_aes256_encrypted() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/udif");
     let mut image: UdifImage = open_image(&path_buf, "hfsplus_aes256.dmg")?;
     let credentials: Vec<CdsaEncrCredential> =
@@ -96,7 +96,7 @@ fn read_media_aes256_encrypted() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_bzip2_compressed() -> Result<(), ErrorTrace> {
+fn read_image_bzip2_compressed() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/udif");
     let image: UdifImage = open_image(&path_buf, "hfsplus_bzip2.dmg")?;
     let data_stream: DataStreamReference = image.get_data_stream().unwrap();
@@ -110,7 +110,7 @@ fn read_media_bzip2_compressed() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_lzfse_compressed() -> Result<(), ErrorTrace> {
+fn read_image_lzfse_compressed() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/udif");
     let image: UdifImage = open_image(&path_buf, "hfsplus_lzfse.dmg")?;
     let data_stream: DataStreamReference = image.get_data_stream().unwrap();
@@ -124,7 +124,7 @@ fn read_media_lzfse_compressed() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_with_resource_fork() -> Result<(), ErrorTrace> {
+fn read_image_with_resource_fork() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/udif");
     let image: UdifImage = open_image(&path_buf, "hfsplus_rsrc.dmg")?;
     let data_stream: DataStreamReference = image.get_data_stream().unwrap();
@@ -138,7 +138,7 @@ fn read_media_with_resource_fork() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_with_segments() -> Result<(), ErrorTrace> {
+fn read_image_with_segments() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/udif");
     let image: UdifImage = open_image(&path_buf, "hfsplus_segments.dmg")?;
     let data_stream: DataStreamReference = image.get_data_stream().unwrap();
@@ -152,7 +152,7 @@ fn read_media_with_segments() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_zlib_compressed() -> Result<(), ErrorTrace> {
+fn read_image_zlib_compressed() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/udif");
     let image: UdifImage = open_image(&path_buf, "hfsplus_zlib.dmg")?;
     let data_stream: DataStreamReference = image.get_data_stream().unwrap();
@@ -166,7 +166,7 @@ fn read_media_zlib_compressed() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_zlib_compressed_with_segments() -> Result<(), ErrorTrace> {
+fn read_image_zlib_compressed_with_segments() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/udif");
     let image: UdifImage = open_image(&path_buf, "hfsplus_zlib_segments.dmg")?;
     let data_stream: DataStreamReference = image.get_data_stream().unwrap();

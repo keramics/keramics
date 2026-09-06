@@ -26,7 +26,7 @@ use keramics_types::bytes_to_u16_le;
     ),
     methods("debug_read_data")
 )]
-/// BitLocker disk encryption (BDE) metadata entry header.
+/// BitLocker Drive Encryption (BDE) metadata entry header.
 pub struct BdeMetadataEntryHeader {
     /// Entry size.
     pub entry_size: u16,

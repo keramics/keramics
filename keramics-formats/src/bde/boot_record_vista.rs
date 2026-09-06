@@ -48,7 +48,7 @@ use super::constants::*;
     ),
     methods("debug_read_data")
 )]
-/// BitLocker disk encryption (BDE) boot record used by Windows Vista.
+/// BitLocker Drive Encryption (BDE) boot record used by Windows Vista.
 pub struct BdeBootRecordVista {
     /// Bytes per sector.
     pub bytes_per_sector: u16,

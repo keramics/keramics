@@ -15,7 +15,7 @@ use keramics_types::Uuid;
 
 use super::enums::BdeKeyProtectorType;
 
-/// BitLocker disk encryption (BDE) key protector.
+/// BitLocker Drive Encryption (BDE) key protector.
 pub struct BdeKeyProtector {
     /// Protector type.
     pub(super) protector_type: BdeKeyProtectorType,

@@ -15,7 +15,7 @@ use keramics_core::ErrorTrace;
 use keramics_hashes::{DigestHashContext, Sha256Context};
 use keramics_types::{ByteString, Ucs2String};
 
-/// BitLocker disk encryption (BDE) password.
+/// BitLocker Drive Encryption (BDE) password.
 pub struct BdePassword {}
 
 impl BdePassword {

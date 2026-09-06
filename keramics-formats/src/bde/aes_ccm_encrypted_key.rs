@@ -25,7 +25,7 @@ use keramics_layout_map::LayoutMap;
     ),
     methods("debug_read_data")
 )]
-/// BitLocker disk encryption (BDE) AES-CCM encrypted key.
+/// BitLocker Drive Encryption (BDE) AES-CCM encrypted key.
 pub struct BdeAesCcmEncryptedKey {
     /// Nonce.
     pub nonce: Vec<u8>,

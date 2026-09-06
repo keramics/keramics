@@ -11,7 +11,7 @@
  * under the License.
  */
 
-/// BitLocker disk encryption (BDE) block range type.
+/// BitLocker Drive Encryption (BDE) block range type.
 #[derive(Clone, Debug, PartialEq)]
 pub enum BdeBlockRangeType {
     Encrypted,
@@ -19,7 +19,7 @@ pub enum BdeBlockRangeType {
     Sparse,
 }
 
-/// BitLocker disk encryption (BDE) block range.
+/// BitLocker Drive Encryption (BDE) block range.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BdeBlockRange {
     /// Logical offset.
