@@ -15,6 +15,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
+use keramics_formats::bde::{BdeCredential, BdeEncryptedVolume};
 use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::luksde::{LuksCredential, LuksEncryptedVolume};
@@ -34,6 +35,9 @@ use keramics_vfs::{VfsCredential, VfsCredentialStore, VfsScanner};
 
 /// Storage media image.
 pub enum StorageMediaImage {
+    Bde {
+        bde_volume: BdeEncryptedVolume,
+    },
     Ewf {
         ewf_image: Arc<EwfImage>,
     },
@@ -101,6 +105,7 @@ impl StorageMediaImage {
     /// Retrieves a data stream.
     pub fn get_data_stream(&self) -> Option<DataStreamReference> {
         match self {
+            Self::Bde { bde_volume } => bde_volume.get_data_stream(),
             Self::Ewf { ewf_image } => Some(ewf_image.get_data_stream()),
             Self::Luks { luks_volume } => luks_volume.get_data_stream(),
             Self::Pdi {
@@ -210,6 +215,7 @@ impl StorageMediaImage {
         // Scan for volume and file system formats to detect encrypted volumes and raw storage
         // media images.
         match vfs_scanner.scan_for_volume_system_format(&data_stream) {
+            Ok(Some(FormatIdentifier::Bde)) => return Self::open_bde_volume(path),
             Ok(Some(FormatIdentifier::Luks)) => return Self::open_luks_volume(path),
             Ok(Some(_)) => return Self::open_raw_image(path),
             Ok(None) => {}
@@ -234,6 +240,57 @@ impl StorageMediaImage {
                 Err(error)
             }
         }
+    }
+
+    /// Opens a BDE encrypted volume.
+    fn open_bde_volume(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let data_stream: DataStreamReference = match open_os_data_stream(path) {
+            Ok(data_stream) => data_stream,
+            Err(mut error) => {
+                // TODO: get printable version of path instead of using display().
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to open data stream: {}", path.display())
+                );
+                return Err(error);
+            }
+        };
+        let mut bde_volume: BdeEncryptedVolume = BdeEncryptedVolume::new();
+
+        match bde_volume.read_data_stream(&data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read BDE encrypted volume from data stream"
+                );
+                return Err(error);
+            }
+        }
+        if bde_volume.is_locked() {
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut credentials: Vec<BdeCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        credentials.push(BdeCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match bde_volume.unlock(&credentials) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to unlock BDE encrypted volume"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        Ok(Self::Bde { bde_volume })
     }
 
     /// Opens an EWF image.

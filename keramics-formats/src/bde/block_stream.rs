@@ -15,7 +15,7 @@ use crate::block_stream::BlockStream;
 
 use super::block_reader::BdeBlockReader;
 
-/// BitLocker disk encryption (BDE) block stream.
+/// BitLocker Drive Encryption (BDE) block stream.
 pub type BdeBlockStream = BlockStream<BdeBlockReader>;
 
 #[cfg(test)]
@@ -30,7 +30,7 @@ mod tests {
 
     use crate::RangeStream;
     use crate::bde::block_range::{BdeBlockRange, BdeBlockRangeType};
-    use crate::bde::encryption::{BdeCipherContext, BdeEncryption};
+    use crate::bde::encryption::BdeEncryption;
     use crate::bde::encryption_context::BdeEncryptionContext;
     use crate::bde::encryption_type::BdeEncryptionType;
     use crate::tests::get_test_data_path;
@@ -49,7 +49,7 @@ mod tests {
             65536,
             65994752,
         )));
-        let block_ranges: [BdeBlockRange; 8] = [
+        let block_ranges: [BdeBlockRange; 9] = [
             BdeBlockRange {
                 logical_offset: 0,
                 physical_offset: 35651584,
@@ -70,8 +70,14 @@ mod tests {
             },
             BdeBlockRange {
                 logical_offset: 35651584,
-                physical_offset: 35651584,
-                size: 7626752,
+                physical_offset: 0,
+                size: 8192,
+                range_type: BdeBlockRangeType::Sparse,
+            },
+            BdeBlockRange {
+                logical_offset: 35659776,
+                physical_offset: 35659776,
+                size: 7618560,
                 range_type: BdeBlockRangeType::Encrypted,
             },
             BdeBlockRange {
@@ -104,10 +110,8 @@ mod tests {
             0x15, 0xbc, 0x71, 0x55, 0xa3, 0x8f, 0xa1, 0x61, 0xc7, 0x2a, 0x9e, 0xeb, 0xe1, 0x20,
             0x25, 0xe6,
         ];
-        let cipher_context: BdeCipherContext =
-            BdeEncryption::get_cipher_context(&encryption_type, &fvek_key)?.unwrap();
         let encryption_context: BdeEncryptionContext =
-            BdeEncryptionContext::new(512, cipher_context);
+            BdeEncryption::get_encryption_context(521, &encryption_type, &fvek_key)?.unwrap();
 
         Ok(BdeBlockStream::new(BdeBlockReader::new(
             &data_stream,

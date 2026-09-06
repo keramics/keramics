@@ -211,7 +211,7 @@ pub enum FormatType {
     /// Apple Partition Map (APM)
     Apm,
 
-    /// BitLocker disk encryption (BDE)
+    /// BitLocker Drive Encryption (BDE)
     Bde,
 
     /// BSD disklabel (bsdlabel)

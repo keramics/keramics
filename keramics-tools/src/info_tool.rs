@@ -71,7 +71,7 @@ struct CommandLineArguments {
     /// Offset within the source file or storage media
     offset: u64,
 
-    #[arg(long)]
+    #[arg(long, alias = "password")]
     /// Passphrase to unlock format
     passphrase: Vec<String>,
 

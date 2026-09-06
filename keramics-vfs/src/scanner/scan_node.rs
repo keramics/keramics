@@ -79,6 +79,7 @@ impl VfsScanNode {
             | VfsType::Xfs => true,
             VfsType::ApfsContainer
             | VfsType::Apm
+            | VfsType::Bde
             | VfsType::Ewf
             | VfsType::Fake
             | VfsType::Gpt

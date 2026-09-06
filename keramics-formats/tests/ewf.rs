@@ -45,7 +45,7 @@ fn open_image(base_path: &PathBuf, file_name: &str) -> Result<EwfImage, ErrorTra
 }
 
 #[test]
-fn read_media() -> Result<(), ErrorTrace> {
+fn read_image() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/ewf");
     let image: EwfImage = open_image(&path_buf, "ext2.E01")?;
     let data_stream: DataStreamReference = image.get_data_stream();

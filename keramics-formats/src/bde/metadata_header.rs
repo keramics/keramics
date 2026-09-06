@@ -32,7 +32,7 @@ use keramics_types::{Uuid, bytes_to_u16_le, bytes_to_u32_le};
     ),
     methods("debug_read_data")
 )]
-/// BitLocker disk encryption (BDE) metadata header.
+/// BitLocker Drive Encryption (BDE) metadata header.
 pub struct BdeMetadataHeader {
     /// Metadata size.
     pub metadata_size: u32,

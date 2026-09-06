@@ -59,7 +59,7 @@ use super::constants::*;
     ),
     methods("debug_read_data")
 )]
-/// BitLocker disk encryption (BDE) boot record.
+/// BitLocker Drive Encryption (BDE) boot record.
 pub struct BdeBootRecord {
     /// Bytes per sector.
     pub bytes_per_sector: u16,

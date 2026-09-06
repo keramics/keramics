@@ -1,0 +1,369 @@
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may
+ * obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+
+use std::sync::Arc;
+
+use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::Path;
+use keramics_formats::bde::{BdeCredential, BdeEncryptedVolume};
+
+use crate::credential::VfsCredential;
+use crate::credential_store::VfsCredentialStore;
+use crate::location::VfsLocation;
+use crate::types::VfsFileSystemReference;
+
+use super::file_entry::BdeFileEntry;
+
+/// BitLocker Drive Encryption (BDE) encrypted volume file system.
+pub struct BdeFileSystem {
+    /// Encrypted volume.
+    encrypted_volume: Arc<BdeEncryptedVolume>,
+}
+
+impl BdeFileSystem {
+    pub const PATH_PREFIX: &'static str = "/bde";
+
+    /// Creates a new file system.
+    pub fn new() -> Self {
+        Self {
+            encrypted_volume: Arc::new(BdeEncryptedVolume::new()),
+        }
+    }
+
+    /// Determines if the file entry with the specified path exists.
+    pub fn file_entry_exists(&self, path: &Path) -> bool {
+        if path.is_relative() {
+            return false;
+        }
+        match path.get_component_by_index(1) {
+            Some(path_component) => {
+                if path.get_number_of_components() > 2 {
+                    return false;
+                }
+                if path_component != "bde1" {
+                    false
+                } else {
+                    true
+                }
+            }
+            None => {
+                if path.is_empty() {
+                    false
+                } else {
+                    true
+                }
+            }
+        }
+    }
+
+    /// Retrieves the bytes per sector.
+    pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
+        Ok(self.encrypted_volume.get_bytes_per_sector() as u32)
+    }
+
+    /// Retrieves the file entry with the specific location.
+    pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<BdeFileEntry>, ErrorTrace> {
+        if path.is_relative() {
+            return Ok(None);
+        }
+        match path.get_component_by_index(1) {
+            Some(path_component) => {
+                if path.get_number_of_components() > 2 {
+                    return Ok(None);
+                }
+                if path_component != "bde1" {
+                    return Ok(None);
+                }
+                Ok(Some(BdeFileEntry::UnlockedVolume {
+                    encrypted_volume: self.encrypted_volume.clone(),
+                }))
+            }
+            None => {
+                if path.is_empty() {
+                    return Ok(None);
+                }
+                Ok(Some(self.get_root_file_entry()))
+            }
+        }
+    }
+
+    /// Retrieves the root file entry.
+    pub fn get_root_file_entry(&self) -> BdeFileEntry {
+        BdeFileEntry::Root {
+            encrypted_volume: self.encrypted_volume.clone(),
+        }
+    }
+
+    /// Opens the file system.
+    pub fn open(
+        &mut self,
+        parent_file_system: Option<&VfsFileSystemReference>,
+        vfs_location: &VfsLocation,
+    ) -> Result<(), ErrorTrace> {
+        let file_system: &VfsFileSystemReference = match parent_file_system {
+            Some(file_system) => file_system,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Missing parent file system"
+                ));
+            }
+        };
+        let path: &Path = vfs_location.get_path();
+
+        match Arc::get_mut(&mut self.encrypted_volume) {
+            Some(encrypted_volume) => {
+                match Self::open_encrypted_volume(encrypted_volume, file_system, path) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open BDE encrypted volume"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to BDE encrypted volume"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Opens a BDE encrypted volume.
+    pub(crate) fn open_encrypted_volume(
+        encrypted_volume: &mut BdeEncryptedVolume,
+        file_system: &VfsFileSystemReference,
+        path: &Path,
+    ) -> Result<(), ErrorTrace> {
+        let data_stream: DataStreamReference = match file_system.get_data_stream_by_path(path) {
+            Ok(Some(data_stream)) => data_stream,
+            Ok(None) => {
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                return Err(error);
+            }
+        };
+        match encrypted_volume.read_data_stream(&data_stream) {
+            Ok(()) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read BDE encrypted volume from data stream"
+                );
+                return Err(error);
+            }
+        }
+        if encrypted_volume.is_locked() {
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut credentials: Vec<BdeCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        credentials.push(BdeCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match encrypted_volume.unlock(&credentials) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Failed to unlock BDE encrypted volume"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_formats::PathComponent;
+
+    use crate::enums::{VfsFileType, VfsType};
+    use crate::file_system::VfsFileSystem;
+    use crate::mbr::MbrFileSystem;
+    use crate::vhd::VhdFileSystem;
+
+    use crate::tests::get_test_data_path;
+
+    fn get_file_system() -> Result<BdeFileSystem, ErrorTrace> {
+        let mut bde_file_system: BdeFileSystem = BdeFileSystem::new();
+
+        let os_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("bde/bde_aes128.vhd");
+        let os_vfs_location: VfsLocation = VfsLocation::from(&path_string);
+
+        let mut vhd_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Vhd));
+        match Arc::get_mut(&mut vhd_file_system) {
+            Some(file_system) => file_system.open(Some(&os_file_system), &os_vfs_location)?,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to VHD file system"
+                ));
+            }
+        };
+        let vhd_vfs_location: VfsLocation =
+            os_vfs_location.new_with_layer(&VfsType::Vhd, Path::from("/vhd1"));
+
+        let mut mbr_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Mbr));
+        match Arc::get_mut(&mut mbr_file_system) {
+            Some(file_system) => file_system.open(Some(&vhd_file_system), &vhd_vfs_location)?,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to MBR file system"
+                ));
+            }
+        };
+        let mbr_vfs_location: VfsLocation =
+            vhd_vfs_location.new_with_layer(&VfsType::Mbr, Path::from("/mbr1"));
+
+        bde_file_system.open(Some(&mbr_file_system), &mbr_vfs_location)?;
+
+        Ok(bde_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists() -> Result<(), ErrorTrace> {
+        let bde_file_system: BdeFileSystem = get_file_system()?;
+
+        let path: Path = Path::from("/");
+        let result: bool = bde_file_system.file_entry_exists(&path);
+        assert_eq!(result, true);
+
+        let path: Path = Path::from("/bde1");
+        let result: bool = bde_file_system.file_entry_exists(&path);
+        assert_eq!(result, true);
+
+        let path: Path = Path::from("/bde99");
+        let result: bool = bde_file_system.file_entry_exists(&path);
+        assert_eq!(result, false);
+
+        let path: Path = Path::from("bde1");
+        let result: bool = bde_file_system.file_entry_exists(&path);
+        assert_eq!(result, false);
+
+        let path: Path = Path::from("/bogus1");
+        let result: bool = bde_file_system.file_entry_exists(&path);
+        assert_eq!(result, false);
+
+        let path: Path = Path::from("/bde1/bogus1");
+        let result: bool = bde_file_system.file_entry_exists(&path);
+        assert_eq!(result, false);
+
+        Ok(())
+    }
+
+    // TODO: add tests for get_bytes_per_sector
+
+    #[test]
+    fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
+        let bde_file_system: BdeFileSystem = get_file_system()?;
+
+        let path: Path = Path::from("/");
+        let result: Option<BdeFileEntry> = bde_file_system.get_file_entry_by_path(&path)?;
+        assert!(result.is_some());
+
+        let bde_file_entry: BdeFileEntry = result.unwrap();
+
+        let name: PathComponent = bde_file_entry.get_name();
+        assert_eq!(name, PathComponent::Root);
+
+        let file_type: VfsFileType = bde_file_entry.get_file_type();
+        assert_eq!(file_type, VfsFileType::Directory);
+
+        let path: Path = Path::from("/bde1");
+        let result: Option<BdeFileEntry> = bde_file_system.get_file_entry_by_path(&path)?;
+        assert!(result.is_some());
+
+        let bde_file_entry: BdeFileEntry = result.unwrap();
+
+        let name: PathComponent = bde_file_entry.get_name();
+        assert_eq!(name, PathComponent::from("bde1"));
+
+        let file_type: VfsFileType = bde_file_entry.get_file_type();
+        assert_eq!(file_type, VfsFileType::File);
+
+        let path: Path = Path::from("/bogus1");
+        let result: Option<BdeFileEntry> = bde_file_system.get_file_entry_by_path(&path)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_root_file_entry() -> Result<(), ErrorTrace> {
+        let bde_file_system: BdeFileSystem = get_file_system()?;
+
+        let bde_file_entry: BdeFileEntry = bde_file_system.get_root_file_entry();
+        assert!(matches!(bde_file_entry, BdeFileEntry::Root { .. }));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open() -> Result<(), ErrorTrace> {
+        let mut bde_file_system: BdeFileSystem = BdeFileSystem::new();
+
+        let os_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("bde/bde_aes128.vhd");
+        let os_vfs_location: VfsLocation = VfsLocation::from(&path_string);
+
+        let mut vhd_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Vhd));
+        match Arc::get_mut(&mut vhd_file_system) {
+            Some(file_system) => file_system.open(Some(&os_file_system), &os_vfs_location)?,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to VHD file system"
+                ));
+            }
+        };
+        let vhd_vfs_location: VfsLocation =
+            os_vfs_location.new_with_layer(&VfsType::Vhd, Path::from("/vhd1"));
+
+        let mut mbr_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Mbr));
+        match Arc::get_mut(&mut mbr_file_system) {
+            Some(file_system) => file_system.open(Some(&vhd_file_system), &vhd_vfs_location)?,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to MBR file system"
+                ));
+            }
+        };
+        let mbr_vfs_location: VfsLocation =
+            vhd_vfs_location.new_with_layer(&VfsType::Mbr, Path::from("/mbr1"));
+
+        bde_file_system.open(Some(&mbr_file_system), &mbr_vfs_location)?;
+
+        Ok(())
+    }
+
+    // TODO: add tests for open_file
+}

@@ -14,9 +14,10 @@
 use keramics_core::ErrorTrace;
 use keramics_encryption::{AesContext, AesXtsContext, CryptContext};
 
+use super::encryption_context::BdeEncryptionContext;
 use super::encryption_type::BdeEncryptionType;
 
-/// BitLocker disk encryption (BDE) cipher context.
+/// BitLocker Drive Encryption (BDE) cipher context.
 #[derive(Clone)]
 pub enum BdeCipherContext {
     AesCbc(AesContext),
@@ -37,28 +38,61 @@ impl BdeCipherContext {
     }
 }
 
-/// BitLocker disk encryption (BDE) encryption.
+/// BitLocker Drive Encryption (BDE) encryption.
 pub struct BdeEncryption {}
 
 impl BdeEncryption {
-    /// Retrieves a cipher context.
-    pub fn get_cipher_context(
+    /// Retrieves a encryption context.
+    pub fn get_encryption_context(
+        bytes_per_sector: u16,
         encryption_type: &BdeEncryptionType,
-        key: &[u8],
-    ) -> Result<Option<BdeCipherContext>, ErrorTrace> {
+        key_data: &[u8],
+    ) -> Result<Option<BdeEncryptionContext>, ErrorTrace> {
         let mut cipher_context: BdeCipherContext = match encryption_type.method {
-            0x8000 | 0x8001 => todo!(),
-            0x8002 | 0x8003 => BdeCipherContext::AesCbc(AesContext::new()),
-            0x8004 | 0x8005 => BdeCipherContext::AesXts(AesXtsContext::new()),
+            0x8000..=0x8003 => BdeCipherContext::AesCbc(AesContext::new()),
+            0x8004..=0x8005 => BdeCipherContext::AesXts(AesXtsContext::new()),
             _ => return Ok(None),
         };
-        match cipher_context.set_key(key) {
+        let key_size: usize = encryption_type.get_key_size();
+        let key_data_size: usize = key_data.len();
+
+        if key_data_size < key_size {
+            return Err(keramics_core::error_trace_new!("Unsupported key size"));
+        }
+        match cipher_context.set_key(&key_data[0..key_size]) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to set key in context");
                 return Err(error);
             }
         }
-        Ok(Some(cipher_context))
+        let diffuser_context: Option<AesContext> = match encryption_type.method {
+            0x8000 | 0x8001 => {
+                if key_data_size < 32 + key_size {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported diffuser key size"
+                    ));
+                }
+                let mut aes_context: AesContext = AesContext::new();
+
+                match aes_context.set_key(&key_data[32..32 + key_size]) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to set key in diffuser context"
+                        );
+                        return Err(error);
+                    }
+                }
+                Some(aes_context)
+            }
+            _ => None,
+        };
+        Ok(Some(BdeEncryptionContext::new(
+            bytes_per_sector,
+            cipher_context,
+            diffuser_context,
+        )))
     }
 }

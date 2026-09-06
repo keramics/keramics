@@ -27,7 +27,7 @@ use super::boot_record_togo::BdeBootRecordToGo;
 use super::boot_record_vista::BdeBootRecordVista;
 use super::constants::*;
 use super::credential::BdeCredential;
-use super::encryption::{BdeCipherContext, BdeEncryption};
+use super::encryption::BdeEncryption;
 use super::encryption_context::BdeEncryptionContext;
 use super::encryption_type::BdeEncryptionType;
 use super::enums::BdeKeyProtectorType;
@@ -36,7 +36,7 @@ use super::metadata_block::BdeMetadataBlock;
 use super::password::BdePassword;
 use super::volume_master_key::BdeVolumeMasterKey;
 
-/// BitLocker disk encryption (BDE) encrypted volume.
+/// BitLocker Drive Encryption (BDE) encrypted volume.
 pub struct BdeEncryptedVolume {
     /// Data stream.
     data_stream: Option<DataStreamReference>,
@@ -320,24 +320,35 @@ impl BdeEncryptedVolume {
                 "Unable to determine boot record size",
             ));
         }
+        // Block range to map the encrypted boot record to the start of the unlocked volume.
         self.metadata_ranges.push(BdeBlockRange::new(
             0,
             boot_record_offset,
             metadata_block.boot_record_size,
             BdeBlockRangeType::Encrypted,
         ));
+        // Block range to hide the encrypted boot record.
+        self.metadata_ranges.push(BdeBlockRange::new(
+            boot_record_offset,
+            0,
+            metadata_block.boot_record_size,
+            BdeBlockRangeType::Sparse,
+        ));
+        // Block range to hide the metadata block 1.
         self.metadata_ranges.push(BdeBlockRange::new(
             metadata_block.metadata_block_offset1,
             metadata_block.metadata_block_offset1,
             metadata_block_size as u64,
             BdeBlockRangeType::Sparse,
         ));
+        // Block range to hide the metadata block 2.
         self.metadata_ranges.push(BdeBlockRange::new(
             metadata_block.metadata_block_offset2,
             metadata_block.metadata_block_offset2,
             metadata_block_size as u64,
             BdeBlockRangeType::Sparse,
         ));
+        // Block range to hide the metadata block 3.
         self.metadata_ranges.push(BdeBlockRange::new(
             metadata_block.metadata_block_offset3,
             metadata_block.metadata_block_offset3,
@@ -510,10 +521,9 @@ impl BdeEncryptedVolume {
                         }
                         let key_data_size: u32 = bytes_to_u32_le!(&fvek_key, 0);
 
-                        if (key_data_size as usize) != 12 + self.encryption_type.get_key_data_size()
-                        {
+                        if (key_data_size as usize) != self.encryption_type.get_fvek_size() {
                             return Err(keramics_core::error_trace_new!(
-                                "Invalid FVEK - unsupported data size"
+                                "Invalid FVEK - unsupported data size",
                             ));
                         }
                         let mut metadata_ranges: Vec<BdeBlockRange> = self.metadata_ranges.clone();
@@ -554,8 +564,9 @@ impl BdeEncryptedVolume {
                                 BdeBlockRangeType::Encrypted,
                             ));
                         }
-                        let cipher_context: BdeCipherContext =
-                            match BdeEncryption::get_cipher_context(
+                        let encryption_context: BdeEncryptionContext =
+                            match BdeEncryption::get_encryption_context(
+                                self.bytes_per_sector,
                                 &self.encryption_type,
                                 &fvek_key[12..],
                             ) {
@@ -577,10 +588,7 @@ impl BdeEncryptedVolume {
                                     return Err(error);
                                 }
                             };
-                        self.encryption_context = Some(BdeEncryptionContext::new(
-                            self.bytes_per_sector,
-                            cipher_context,
-                        ));
+                        self.encryption_context = Some(encryption_context);
 
                         // TODO: determine or check unencrypted volume size
 

@@ -15,6 +15,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 
 use keramics_formats::apfs::{ApfsContainer, ApfsVolume};
 use keramics_formats::apm::ApmVolumeSystem;
+use keramics_formats::bde::BdeEncryptedVolume;
 use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::fat::FatFileSystem;
@@ -34,6 +35,7 @@ use keramics_formats::vmdk::VmdkImage;
 use keramics_formats::{FormatIdentifier, FormatScanner, PartitionIterator, Path};
 
 use crate::apfs::ApfsContainerFileSystem;
+use crate::bde::BdeFileSystem;
 use crate::credential::VfsCredential;
 use crate::credential_store::VfsCredentialStore;
 use crate::enums::{VfsFileType, VfsType};
@@ -115,13 +117,6 @@ impl VfsScanner {
                 return Err(error);
             }
         }
-        // The Master Boot Record (MBR) signatures are used in other volume
-        // system or file formats, such as:
-        // * BitLocker drive encryption (BDE)
-        // * Extensible File Allocation Table (exFAT)
-        // * File Allocation Table (FAT)
-        // * New Technologies File System (NTFS)
-
         // The scanner:
         // * first looks for non-overlapping volume system signatures (phase 1)
         // * next excludes overlapping signatures (phase 2)
@@ -129,6 +124,7 @@ impl VfsScanner {
 
         self.phase1_volume_system_scanner.add_apfs_signatures();
         self.phase1_volume_system_scanner.add_apm_signatures();
+        self.phase1_volume_system_scanner.add_bde_signatures();
         self.phase1_volume_system_scanner.add_gpt_signatures();
         self.phase1_volume_system_scanner.add_linuxlvm_signatures();
         self.phase1_volume_system_scanner.add_luksde_signatures();
@@ -144,6 +140,14 @@ impl VfsScanner {
                 return Err(error);
             }
         }
+        // The Master Boot Record (MBR) signatures are used in other volume system or file formats,
+        // such as:
+        // * BitLocker Drive Encryption (BDE)
+        // * Extensible File Allocation Table (exFAT)
+        // * File Allocation Table (FAT)
+        // * New Technologies File System (NTFS)
+
+        self.phase2_volume_system_scanner.add_bde_signatures();
         self.phase2_volume_system_scanner.add_exfat_signatures();
         self.phase2_volume_system_scanner.add_fat_signatures();
         self.phase2_volume_system_scanner.add_ntfs_signatures();
@@ -171,6 +175,7 @@ impl VfsScanner {
             }
         }
         self.sub_volume_system_scanner.add_apfs_signatures();
+        self.sub_volume_system_scanner.add_bde_signatures();
         self.sub_volume_system_scanner.add_linuxlvm_signatures();
 
         match self.sub_volume_system_scanner.build() {
@@ -205,6 +210,7 @@ impl VfsScanner {
         match format_identifier {
             FormatIdentifier::Apfs => Some(VfsType::ApfsContainer),
             FormatIdentifier::Apm => Some(VfsType::Apm),
+            FormatIdentifier::Bde => Some(VfsType::Bde),
             FormatIdentifier::Ewf => Some(VfsType::Ewf),
             FormatIdentifier::ExFat => Some(VfsType::ExFat),
             FormatIdentifier::Ext => Some(VfsType::Ext),
@@ -411,6 +417,16 @@ impl VfsScanner {
                 }
                 Ok(result)
             }
+            VfsType::Bde => match self.scan_for_file_system_format(&data_stream) {
+                Ok(scan_results) => Ok(scan_results),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to scan data stream for file system formats"
+                    );
+                    return Err(error);
+                }
+            },
             VfsType::Ewf
             | VfsType::SparseBundle
             | VfsType::SparseImage
@@ -818,6 +834,48 @@ impl VfsScanner {
                             "Unable to scan APM volume system"
                         );
                         return Err(error);
+                    }
+                }
+            }
+            VfsType::Bde => {
+                let mut bde_encrypted_volume: BdeEncryptedVolume = BdeEncryptedVolume::new();
+
+                match BdeFileSystem::open_encrypted_volume(
+                    &mut bde_encrypted_volume,
+                    file_system,
+                    path,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open BDE encrypted volume"
+                        );
+                        return Err(error);
+                    }
+                }
+                // TODO: add support for ToGo placeholder FAT file system.
+
+                if bde_encrypted_volume.is_locked() {
+                    scan_node.is_locked = true;
+                } else {
+                    let number_of_partitions: usize = 1;
+
+                    match self.scan_for_volume_system_sub_nodes(
+                        scan_options,
+                        vfs_location,
+                        scan_node,
+                        BdeFileSystem::PATH_PREFIX,
+                        number_of_partitions,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to scan BDE unlocked volume"
+                            );
+                            return Err(error);
+                        }
                     }
                 }
             }
@@ -1327,6 +1385,7 @@ impl VfsScanner {
         match &format_identifier {
             Some(FormatIdentifier::Apfs) => return Ok(Some(FormatIdentifier::Apfs)),
             Some(FormatIdentifier::Apm) => return Ok(Some(FormatIdentifier::Apm)),
+            Some(FormatIdentifier::Bde) => return Ok(Some(FormatIdentifier::Bde)),
             Some(FormatIdentifier::Gpt) => return Ok(Some(FormatIdentifier::Gpt)),
             Some(FormatIdentifier::LinuxLvm) => return Ok(Some(FormatIdentifier::LinuxLvm)),
             Some(FormatIdentifier::Luks) => return Ok(Some(FormatIdentifier::Luks)),
@@ -2030,6 +2089,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test for BDE
 
     #[test]
     fn test_scan_for_volume_system_format_with_gpt() -> Result<(), ErrorTrace> {

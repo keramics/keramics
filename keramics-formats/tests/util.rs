@@ -47,10 +47,10 @@ pub fn read_data_stream(data_stream: &DataStreamReference) -> Result<(u64, Strin
 }
 
 #[allow(dead_code)]
-fn read_data_stream_with_output_file(
+pub fn read_data_stream_with_output_file(
     data_stream: &DataStreamReference,
 ) -> Result<(u64, String), ErrorTrace> {
-    let mut data: Vec<u8> = vec![0; 512];
+    let mut data: Vec<u8> = vec![0; 35891];
     let mut md5_context: Md5Context = Md5Context::new();
     let mut media_offset: u64 = 0;
 
@@ -71,7 +71,7 @@ fn read_data_stream_with_output_file(
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to read from sparseimage file at offset {} (0x{:08x})",
+                            "Unable to read from data stream at offset {} (0x{:08x})",
                             media_offset, media_offset
                         )
                     );

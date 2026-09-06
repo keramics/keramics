@@ -47,7 +47,7 @@ fn open_file(path: &PathBuf) -> Result<VhdxFile, ErrorTrace> {
 }
 
 #[test]
-fn read_media_fixed() -> Result<(), ErrorTrace> {
+fn read_file_fixed() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ntfs-parent.vhdx");
     let file: VhdxFile = open_file(&path_buf)?;
     let data_stream: DataStreamReference = file.get_data_stream().unwrap();
@@ -61,7 +61,7 @@ fn read_media_fixed() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_dynamic() -> Result<(), ErrorTrace> {
+fn read_file_dynamic() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ntfs-dynamic.vhdx");
     let file: VhdxFile = open_file(&path_buf)?;
     let data_stream: DataStreamReference = file.get_data_stream().unwrap();
@@ -75,7 +75,7 @@ fn read_media_dynamic() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_sparse_dynamic() -> Result<(), ErrorTrace> {
+fn read_file_sparse_dynamic() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ext2.vhdx");
     let file: VhdxFile = open_file(&path_buf)?;
     let data_stream: DataStreamReference = file.get_data_stream().unwrap();
@@ -89,7 +89,7 @@ fn read_media_sparse_dynamic() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_differential() -> Result<(), ErrorTrace> {
+fn read_file_differential() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ntfs-parent.vhdx");
     let parent_file: VhdxFile = open_file(&path_buf)?;
 

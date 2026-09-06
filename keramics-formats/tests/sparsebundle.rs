@@ -46,7 +46,7 @@ fn open_image(base_path: &PathBuf) -> Result<SparseBundleImage, ErrorTrace> {
 }
 
 #[test]
-fn read_media() -> Result<(), ErrorTrace> {
+fn read_image() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
     let image: SparseBundleImage = open_image(&path_buf)?;
     let data_stream: DataStreamReference = image.get_data_stream();
@@ -60,7 +60,7 @@ fn read_media() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_media_encrypted() -> Result<(), ErrorTrace> {
+fn read_image_encrypted() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus_aes128.sparsebundle");
     let mut image: SparseBundleImage = open_image(&path_buf)?;
     let credentials: Vec<CdsaEncrCredential> =

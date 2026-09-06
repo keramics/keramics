@@ -46,7 +46,7 @@ fn open_image(base_path: &PathBuf, file_name: &str) -> Result<VmdkImage, ErrorTr
 }
 
 #[test]
-fn read_media() -> Result<(), ErrorTrace> {
+fn read_image() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/vmdk");
     let image: VmdkImage = open_image(&path_buf, "ext2.vmdk")?;
 

@@ -45,7 +45,7 @@ fn open_image(base_path: &PathBuf) -> Result<PdiImage, ErrorTrace> {
 }
 
 #[test]
-fn read_media() -> Result<(), ErrorTrace> {
+fn read_image() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/pdi/hfsplus.hdd");
     let image: PdiImage = open_image(&path_buf)?;
     let number_of_layers: usize = image.get_number_of_layers();

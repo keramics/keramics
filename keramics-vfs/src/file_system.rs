@@ -23,6 +23,7 @@ use keramics_formats::{Path, PathComponent};
 
 use super::apfs::{ApfsContainerFileEntry, ApfsContainerFileSystem};
 use super::apm::{ApmFileEntry, ApmFileSystem};
+use super::bde::{BdeFileEntry, BdeFileSystem};
 use super::enums::VfsType;
 use super::ewf::{EwfFileEntry, EwfFileSystem};
 use super::fake::FakeFileSystem;
@@ -49,6 +50,7 @@ pub enum VfsFileSystem {
     Apfs(Option<ApfsFileSystem>),
     ApfsContainer(ApfsContainerFileSystem),
     Apm(ApmFileSystem),
+    Bde(BdeFileSystem),
     Ewf(EwfFileSystem),
     ExFat(ExFatFileSystem),
     Ext(ExtFileSystem),
@@ -80,6 +82,7 @@ impl VfsFileSystem {
             VfsType::Apfs => VfsFileSystem::Apfs(None),
             VfsType::ApfsContainer => VfsFileSystem::ApfsContainer(ApfsContainerFileSystem::new()),
             VfsType::Apm => VfsFileSystem::Apm(ApmFileSystem::new()),
+            VfsType::Bde => VfsFileSystem::Bde(BdeFileSystem::new()),
             VfsType::Ewf => VfsFileSystem::Ewf(EwfFileSystem::new()),
             VfsType::ExFat => VfsFileSystem::ExFat(ExFatFileSystem::new()),
             VfsType::Ext => VfsFileSystem::Ext(ExtFileSystem::new()),
@@ -112,6 +115,7 @@ impl VfsFileSystem {
             VfsFileSystem::Apfs(_) => VfsType::Apfs,
             VfsFileSystem::ApfsContainer(_) => VfsType::ApfsContainer,
             VfsFileSystem::Apm(_) => VfsType::Apm,
+            VfsFileSystem::Bde(_) => VfsType::Bde,
             VfsFileSystem::Ewf(_) => VfsType::Ewf,
             VfsFileSystem::ExFat(_) => VfsType::ExFat,
             VfsFileSystem::Ext(_) => VfsType::Ext,
@@ -160,6 +164,7 @@ impl VfsFileSystem {
                 Ok(apfs_container_file_system.file_entry_exists(path))
             }
             VfsFileSystem::Apm(apm_file_system) => Ok(apm_file_system.file_entry_exists(path)),
+            VfsFileSystem::Bde(bde_file_system) => Ok(bde_file_system.file_entry_exists(path)),
             VfsFileSystem::Ewf(ewf_file_system) => Ok(ewf_file_system.file_entry_exists(path)),
             VfsFileSystem::ExFat(exfat_file_system) => {
                 match exfat_file_system.get_file_entry_by_path(path) {
@@ -356,6 +361,12 @@ impl VfsFileSystem {
                     None => Ok(None),
                 }
             }
+            VfsFileSystem::Bde(bde_file_system) => {
+                match bde_file_system.get_file_entry_by_path(path)? {
+                    Some(bde_file_entry) => Ok(Some(VfsFileEntry::Bde(bde_file_entry))),
+                    None => Ok(None),
+                }
+            }
             VfsFileSystem::Ewf(ewf_file_system) => {
                 match ewf_file_system.get_file_entry_by_path(path)? {
                     Some(ewf_file_entry) => Ok(Some(VfsFileEntry::Ewf(ewf_file_entry))),
@@ -533,6 +544,11 @@ impl VfsFileSystem {
                 let apm_file_entry: ApmFileEntry = apm_file_system.get_root_file_entry();
 
                 Ok(Some(VfsFileEntry::Apm(apm_file_entry)))
+            }
+            VfsFileSystem::Bde(bde_file_system) => {
+                let bde_file_entry: BdeFileEntry = bde_file_system.get_root_file_entry();
+
+                Ok(Some(VfsFileEntry::Bde(bde_file_entry)))
             }
             VfsFileSystem::Ewf(ewf_file_system) => {
                 let ewf_file_entry: EwfFileEntry = ewf_file_system.get_root_file_entry();
@@ -716,6 +732,9 @@ impl VfsFileSystem {
             }
             VfsFileSystem::Apm(apm_file_system) => {
                 apm_file_system.open(parent_file_system, vfs_location)
+            }
+            VfsFileSystem::Bde(bde_file_system) => {
+                bde_file_system.open(parent_file_system, vfs_location)
             }
             VfsFileSystem::Ewf(ewf_file_system) => {
                 ewf_file_system.open(parent_file_system, vfs_location)
@@ -1373,6 +1392,10 @@ mod tests {
 
         Ok(())
     }
+
+    // Tests with BDE.
+
+    // TODO: add
 
     // Tests with exFAT.
 

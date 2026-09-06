@@ -22,7 +22,7 @@ pub struct LuksDiffuser<T: DigestHashContext, const HASH_SIZE: usize> {
 }
 
 impl<T: DigestHashContext, const HASH_SIZE: usize> LuksDiffuser<T, HASH_SIZE> {
-    /// Creates a new diffuer context.
+    /// Creates a new diffuser context.
     pub fn new() -> Self {
         Self {
             digest_context: T::new(),

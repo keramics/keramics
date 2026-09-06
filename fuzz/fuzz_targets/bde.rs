@@ -16,15 +16,15 @@
 use libfuzzer_sys::fuzz_target;
 
 use keramics_core::{DataStreamReference, open_fake_data_stream};
-use keramics_formats::luksde::{LuksCredential, LuksEncryptedVolume};
+use keramics_formats::bde::{BdeCredential, BdeEncryptedVolume};
 
-// Linux Unified Key Setup (LUKS) Disk Encryption encrypted volume fuzz target.
+// BitLocker Drive Encryption (BDE) encrypted volume fuzz target.
 fuzz_target!(|data: &[u8]| {
-    let mut luks_encrypted_volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+    let mut bde_encrypted_volume: BdeEncryptedVolume = BdeEncryptedVolume::new();
 
     let data_stream: DataStreamReference = open_fake_data_stream(&data);
-    _ = luks_encrypted_volume.read_data_stream(&data_stream);
+    _ = bde_encrypted_volume.read_data_stream(&data_stream);
 
-    let credentials: Vec<LuksCredential> = vec![LuksCredential::Passphrase(b"KeRaMiCs".to_vec())];
-    _ = luks_encrypted_volume.unlock(&credentials);
+    let credentials: Vec<BdeCredential> = vec![BdeCredential::Passphrase(b"KeRaMiCs".to_vec())];
+    _ = bde_encrypted_volume.unlock(&credentials);
 });

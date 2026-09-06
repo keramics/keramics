@@ -11,7 +11,7 @@
  * under the License.
  */
 
-/// BitLocker disk encryption (BDE) metadata property.
+/// BitLocker Drive Encryption (BDE) metadata property.
 pub struct BdeMetadataProperty {
     /// Value type.
     pub value_type: u16,
