@@ -7,14 +7,13 @@ Supported features:
 
 | Category | Feature(s) |
 | --- | --- |
-| Format versions | 1 (Windows Vista), 2 (Windows 7 and later), To Go |
-| Encryption methods | AES-CBC, AES-XTS |
-| Unlock credentials | Passphrase (password) |
+| Format versions | 1 (Windows Vista), 2 (Windows 7 and later), To Go, Used Disk Space Only encryption |
+| Encryption methods | AES-CBC, AES-CBC with Elephant Diffuser, AES-XTS |
+| Unlock credentials | Passphrase (password), Recovery password |
 
 Unsupported features:
 
 | Category | Feature(s) |
 | --- | --- |
-| Encryption methods | AES-CBC with Elephant Diffuser |
-| Unlock credentials | clear key, recovery password, external key (start-up or recovery key), FKEV and/or TWEAK key data, SID-based, TPM |
-| | Used Disk Space Only encryption |
+| Unlock credentials | clear key, external key (start-up or recovery key), FKEV and/or TWEAK key data, SID-based, TPM |
+| | Partial encrypted volumes |

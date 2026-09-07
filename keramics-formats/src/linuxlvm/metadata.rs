@@ -815,7 +815,7 @@ impl LinuxLvmMetadata {
                 )));
             }
         }
-        let string: String = match String::from_utf8(data) {
+        let string: &str = match str::from_utf8(&data) {
             Ok(string) => string,
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(

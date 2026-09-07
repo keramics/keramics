@@ -24,9 +24,13 @@ use super::block_reader::BdeBlockReader;
 use super::block_stream::BdeBlockStream;
 use super::boot_record::BdeBootRecord;
 use super::boot_record_togo::BdeBootRecordToGo;
+use super::boot_record_used_disk_space::BdeBootRecordUsedDiskSpace;
 use super::boot_record_vista::BdeBootRecordVista;
 use super::constants::*;
 use super::credential::BdeCredential;
+use super::encrypt_on_write_block_map::BdeEncryptOnWriteBlockMap;
+use super::encrypt_on_write_block_record::BdeEncryptOnWriteBlockRecord;
+use super::encrypt_on_write_data::BdeEncryptOnWriteData;
 use super::encryption::BdeEncryption;
 use super::encryption_context::BdeEncryptionContext;
 use super::encryption_type::BdeEncryptionType;
@@ -34,6 +38,7 @@ use super::enums::BdeKeyProtectorType;
 use super::key_protector::BdeKeyProtector;
 use super::metadata_block::BdeMetadataBlock;
 use super::password::BdePassword;
+use super::recovery_password::BdeRecoveryPassword;
 use super::volume_master_key::BdeVolumeMasterKey;
 
 /// BitLocker Drive Encryption (BDE) encrypted volume.
@@ -52,9 +57,6 @@ pub struct BdeEncryptedVolume {
 
     /// Description.
     description: Option<Ucs2String>,
-
-    /// Metadata ranges (boot record and metadata blocks).
-    metadata_ranges: Vec<BdeBlockRange>,
 
     /// Full volume encryption key (FVEK).
     full_volume_encryption_key: Option<BdeAesCcmEncryptedKey>,
@@ -84,7 +86,6 @@ impl BdeEncryptedVolume {
             bytes_per_sector: 0,
             encryption_type: BdeEncryptionType::new(0),
             description: None,
-            metadata_ranges: Vec::new(),
             full_volume_encryption_key: None,
             key_protectors: Vec::new(),
             block_ranges: Vec::new(),
@@ -173,15 +174,15 @@ impl BdeEncryptedVolume {
         keramics_core::debug_trace_data!("BdeBootSector", offset, &data, 512);
 
         let mut volume_size: u64 = 0;
-        let mut boot_record_offset: u64 = 0;
+        let mut encrypt_on_write_data_offset1: u64 = 0;
+        let mut encrypt_on_write_data_offset2: u64 = 0;
+
         let metadata_block_offset1: u64;
         let metadata_block_offset2: u64;
         let metadata_block_offset3: u64;
         let metadata_block_size: usize;
 
-        if &data[160..176] == BDE_IDENTIFIER
-            || &data[160..176] == BDE_USED_DISK_SPACE_ONLY_IDENTIFIER
-        {
+        if &data[160..176] == BDE_IDENTIFIER {
             keramics_core::debug_trace_structure!(BdeBootRecord::debug_read_data(&data));
 
             let mut boot_record: BdeBootRecord = BdeBootRecord::new();
@@ -203,6 +204,34 @@ impl BdeEncryptedVolume {
             metadata_block_offset2 = boot_record.metadata_block_offset2;
             metadata_block_offset3 = boot_record.metadata_block_offset3;
             metadata_block_size = 65536;
+
+            self.bytes_per_sector = boot_record.bytes_per_sector;
+        } else if &data[160..176] == BDE_USED_DISK_SPACE_ONLY_IDENTIFIER {
+            keramics_core::debug_trace_structure!(BdeBootRecordUsedDiskSpace::debug_read_data(
+                &data
+            ));
+
+            let mut boot_record: BdeBootRecordUsedDiskSpace = BdeBootRecordUsedDiskSpace::new();
+
+            match boot_record.read_data(&data) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read boot record at offset: {} (0x{:08x})",
+                            offset, offset
+                        ),
+                    );
+                    return Err(error);
+                }
+            }
+            metadata_block_offset1 = boot_record.metadata_block_offset1;
+            metadata_block_offset2 = boot_record.metadata_block_offset2;
+            metadata_block_offset3 = boot_record.metadata_block_offset3;
+            metadata_block_size = 65536;
+            encrypt_on_write_data_offset1 = boot_record.encrypt_on_write_data_offset1;
+            encrypt_on_write_data_offset2 = boot_record.encrypt_on_write_data_offset2;
 
             self.bytes_per_sector = boot_record.bytes_per_sector;
         } else if &data[424..440] == BDE_IDENTIFIER {
@@ -229,7 +258,7 @@ impl BdeEncryptedVolume {
             metadata_block_size = 65536;
 
             self.bytes_per_sector = boot_record.bytes_per_sector;
-        } else if &data[0..3] == BDE_BOOT_ENTRY_POINT_VISTA {
+        } else if &data[3..11] == BDE_FILE_SYSTEM_SIGNATURE {
             keramics_core::debug_trace_structure!(BdeBootRecordVista::debug_read_data(&data));
 
             let mut boot_record: BdeBootRecordVista = BdeBootRecordVista::new();
@@ -298,8 +327,8 @@ impl BdeEncryptedVolume {
                 "Invalid metadata block - metadata block offset 3 value does not value in boot record"
             ));
         }
-        self.encryption_type = BdeEncryptionType::new(metadata_block.encryption_method);
         self.volume_identifier = metadata_block.volume_identifier;
+        self.encryption_type = BdeEncryptionType::new(metadata_block.encryption_method);
 
         if !metadata_block.description.is_empty() {
             self.description = Some(metadata_block.description);
@@ -307,54 +336,85 @@ impl BdeEncryptedVolume {
         self.full_volume_encryption_key = metadata_block.full_volume_encryption_key;
         self.key_protectors = metadata_block.key_protectors;
 
-        if boot_record_offset == 0 && metadata_block.boot_record_offset != 0 {
-            boot_record_offset = metadata_block.boot_record_offset;
-        }
-        if boot_record_offset == 0 {
-            return Err(keramics_core::error_trace_new!(
-                "Unable to determine boot record offset",
+        /// Metadata ranges (boot record and metadata blocks).
+        let mut metadata_ranges: Vec<BdeBlockRange> = Vec::new();
+
+        if metadata_block.mft_mirror_cluster_block_number != 0 {
+            // Block range to map the BDE boot record to an NTFS boot record.
+            metadata_ranges.push(BdeBlockRange::new(
+                0,
+                metadata_block.mft_mirror_cluster_block_number,
+                self.bytes_per_sector as u64,
+                BdeBlockRangeType::VistaBootSector,
             ));
-        }
-        if metadata_block.boot_record_size == 0 {
-            return Err(keramics_core::error_trace_new!(
-                "Unable to determine boot record size",
+        } else if let Some(metadata_area_descriptors) = &metadata_block.metadata_area_descriptors {
+            if metadata_area_descriptors.boot_record_offset == 0 {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid metadata areas descriptor - missing boot record offset",
+                ));
+            }
+            if metadata_area_descriptors.boot_record_size == 0 {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid metadata areas descriptor - missing boot record size",
+                ));
+            }
+            // Block range to map the encrypted boot record to the start of the unlocked volume.
+            metadata_ranges.push(BdeBlockRange::new(
+                0,
+                metadata_area_descriptors.boot_record_offset,
+                metadata_area_descriptors.boot_record_size,
+                BdeBlockRangeType::Encrypted,
             ));
+            // Block range to hide the encrypted boot record.
+            metadata_ranges.push(BdeBlockRange::new(
+                metadata_area_descriptors.boot_record_offset,
+                0,
+                metadata_area_descriptors.boot_record_size,
+                BdeBlockRangeType::Sparse,
+            ));
+        } else {
+            if metadata_block.boot_record_offset == 0 {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to determine boot record offset",
+                ));
+            }
+            // TODO: fallback if there are no metadata area descriptors.
+            todo!();
         }
-        // Block range to map the encrypted boot record to the start of the unlocked volume.
-        self.metadata_ranges.push(BdeBlockRange::new(
-            0,
-            boot_record_offset,
-            metadata_block.boot_record_size,
-            BdeBlockRangeType::Encrypted,
-        ));
-        // Block range to hide the encrypted boot record.
-        self.metadata_ranges.push(BdeBlockRange::new(
-            boot_record_offset,
-            0,
-            metadata_block.boot_record_size,
-            BdeBlockRangeType::Sparse,
-        ));
         // Block range to hide the metadata block 1.
-        self.metadata_ranges.push(BdeBlockRange::new(
+        metadata_ranges.push(BdeBlockRange::new(
             metadata_block.metadata_block_offset1,
-            metadata_block.metadata_block_offset1,
+            0,
             metadata_block_size as u64,
             BdeBlockRangeType::Sparse,
         ));
         // Block range to hide the metadata block 2.
-        self.metadata_ranges.push(BdeBlockRange::new(
+        metadata_ranges.push(BdeBlockRange::new(
             metadata_block.metadata_block_offset2,
-            metadata_block.metadata_block_offset2,
+            0,
             metadata_block_size as u64,
             BdeBlockRangeType::Sparse,
         ));
         // Block range to hide the metadata block 3.
-        self.metadata_ranges.push(BdeBlockRange::new(
+        metadata_ranges.push(BdeBlockRange::new(
             metadata_block.metadata_block_offset3,
-            metadata_block.metadata_block_offset3,
+            0,
             metadata_block_size as u64,
             BdeBlockRangeType::Sparse,
         ));
+        if let Some(metadata_area_descriptors) = &metadata_block.metadata_area_descriptors {
+            if metadata_area_descriptors.unknown_area_offset > 0
+                && metadata_area_descriptors.unknown_area_size > 0
+            {
+                // Block range to hide the unknown metadata area.
+                metadata_ranges.push(BdeBlockRange::new(
+                    metadata_area_descriptors.unknown_area_offset,
+                    0,
+                    metadata_area_descriptors.unknown_area_size,
+                    BdeBlockRangeType::Sparse,
+                ));
+            }
+        }
         if volume_size == 0 {
             volume_size = metadata_block.volume_size;
         }
@@ -362,6 +422,160 @@ impl BdeEncryptedVolume {
             volume_size = data_stream_size;
         }
         self.volume_size = volume_size;
+
+        if encrypt_on_write_data_offset1 > 0 {
+            let mut encrypt_on_write_data: BdeEncryptOnWriteData = BdeEncryptOnWriteData::new();
+
+            match encrypt_on_write_data
+                .read_at_position(data_stream, SeekFrom::Start(encrypt_on_write_data_offset1))
+            {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read encrypt on write (EOW) data at offset: {} (0x{:08x})",
+                            encrypt_on_write_data_offset1, encrypt_on_write_data_offset1
+                        ),
+                    );
+                    return Err(error);
+                }
+            }
+            // Block range to hide the encrypt-on-write data 1.
+            metadata_ranges.push(BdeBlockRange::new(
+                encrypt_on_write_data_offset1,
+                0,
+                4096,
+                BdeBlockRangeType::Sparse,
+            ));
+            for block_map_offset in encrypt_on_write_data.block_map_offsets.iter() {
+                let mut encrypt_on_write_block_map: BdeEncryptOnWriteBlockMap =
+                    BdeEncryptOnWriteBlockMap::new();
+
+                match encrypt_on_write_block_map
+                    .read_at_position(data_stream, SeekFrom::Start(*block_map_offset))
+                {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to read encrypt on write (EOW) block map at offset: {} (0x{:08x})",
+                                *block_map_offset, *block_map_offset
+                            ),
+                        );
+                        return Err(error);
+                    }
+                }
+                // Block range to hide the encrypt-on-write block map.
+                metadata_ranges.push(BdeBlockRange::new(
+                    *block_map_offset,
+                    0,
+                    4096,
+                    BdeBlockRangeType::Sparse,
+                ));
+                // Block range to hide the encrypt-on-write OLRDHEVF2 area.
+                metadata_ranges.push(BdeBlockRange::new(
+                    encrypt_on_write_block_map.olrdhevf2_area_offset,
+                    0,
+                    encrypt_on_write_data.olrdhevf2_area_size as u64,
+                    BdeBlockRangeType::Sparse,
+                ));
+                let block_record_offset: u64 =
+                    *block_map_offset + (encrypt_on_write_block_map.block_record_offset1 as u64);
+
+                let mut encrypt_on_write_block_record: BdeEncryptOnWriteBlockRecord =
+                    BdeEncryptOnWriteBlockRecord::new();
+
+                match encrypt_on_write_block_record
+                    .read_at_position(data_stream, SeekFrom::Start(block_record_offset))
+                {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to read encrypt on write (EOW) block record at offset: {} (0x{:08x})",
+                                block_record_offset, block_record_offset
+                            ),
+                        );
+                        return Err(error);
+                    }
+                }
+                let block_record_offset: u64 =
+                    *block_map_offset + (encrypt_on_write_block_map.block_record_offset2 as u64);
+
+                let mut encrypt_on_write_block_record: BdeEncryptOnWriteBlockRecord =
+                    BdeEncryptOnWriteBlockRecord::new();
+
+                match encrypt_on_write_block_record
+                    .read_at_position(data_stream, SeekFrom::Start(block_record_offset))
+                {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to read encrypt on write (EOW) block record at offset: {} (0x{:08x})",
+                                block_record_offset, block_record_offset
+                            ),
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            // Note that Encrypt-on-Write (EOW) data 2 contains a copy of data 1.
+            if encrypt_on_write_data_offset2 > 0 {
+                // Block range to hide the encrypt-on-write data 2.
+                metadata_ranges.push(BdeBlockRange::new(
+                    encrypt_on_write_data_offset2,
+                    0,
+                    4096,
+                    BdeBlockRangeType::Sparse,
+                ));
+            }
+        }
+        metadata_ranges.sort_by_key(|block_range| block_range.logical_offset);
+
+        // TODO: handle unencrypted ranges.
+        // TODO: merge successive sparse ranges.
+        let mut volume_offset: u64 = 0;
+
+        for metadata_block_range in metadata_ranges.drain(..) {
+            if metadata_block_range.logical_offset < volume_offset
+                || metadata_block_range.logical_offset > self.volume_size
+            {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid metadata block offset value out of bounds"
+                ));
+            }
+            if volume_offset < metadata_block_range.logical_offset {
+                let range_size: u64 = metadata_block_range.logical_offset - volume_offset;
+
+                self.block_ranges.push(BdeBlockRange::new(
+                    volume_offset,
+                    volume_offset,
+                    range_size,
+                    BdeBlockRangeType::Encrypted,
+                ));
+                volume_offset += range_size;
+            }
+            volume_offset += metadata_block_range.size;
+
+            self.block_ranges.push(metadata_block_range);
+        }
+        let range_size: u64 = self.volume_size - volume_offset;
+
+        if range_size > 0 {
+            self.block_ranges.push(BdeBlockRange::new(
+                volume_offset,
+                volume_offset,
+                range_size,
+                BdeBlockRangeType::Encrypted,
+            ));
+        }
+        println!("X: {:#?}", self.block_ranges);
+
         self.data_stream = Some(data_stream.clone());
 
         // TODO: check for clear key and unlock volume
@@ -386,22 +600,21 @@ impl BdeEncryptedVolume {
         for credential in credentials.iter() {
             match credential {
                 BdeCredential::Passphrase(passphrase) => {
+                    let password_hash: Vec<u8> = match BdePassword::calculate_hash(passphrase) {
+                        Ok(password_hash) => password_hash,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to calculate password hash"
+                            );
+                            return Err(error);
+                        }
+                    };
                     for (key_protector_index, key_protector) in
                         self.key_protectors.iter().enumerate()
                     {
                         match key_protector.protector_type {
                             BdeKeyProtectorType::Passphrase => {
-                                let password_hash: Vec<u8> =
-                                    match BdePassword::calculate_hash(passphrase) {
-                                        Ok(password_hash) => password_hash,
-                                        Err(mut error) => {
-                                            keramics_core::error_trace_add_frame!(
-                                                error,
-                                                "Unable to calculate password hash"
-                                            );
-                                            return Err(error);
-                                        }
-                                    };
                                 let mut volume_master_key: BdeVolumeMasterKey =
                                     BdeVolumeMasterKey::new();
 
@@ -422,7 +635,7 @@ impl BdeEncryptedVolume {
                                         return Err(error);
                                     }
                                 }
-                                match volume_master_key.unlock_with_password(&password_hash) {
+                                match volume_master_key.unlock_with_password_hash(&password_hash) {
                                     Ok(true) => {
                                         vmk_key = volume_master_key.key;
                                         vmk_key_unlocked = true;
@@ -432,7 +645,69 @@ impl BdeEncryptedVolume {
                                         keramics_core::error_trace_add_frame!(
                                             error,
                                             format!(
-                                                "Unable to unlock volume master key: {}",
+                                                "Unable to unlock volume master key: {} with password",
+                                                key_protector_index
+                                            ),
+                                        );
+                                        return Err(error);
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    if vmk_key_unlocked {
+                        break;
+                    }
+                }
+                BdeCredential::RecoveryPassword(recovery_password) => {
+                    let password_hash: Vec<u8> =
+                        match BdeRecoveryPassword::calculate_hash(recovery_password) {
+                            Ok(password_hash) => password_hash,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to calculate recovery password hash"
+                                );
+                                return Err(error);
+                            }
+                        };
+                    for (key_protector_index, key_protector) in
+                        self.key_protectors.iter().enumerate()
+                    {
+                        match key_protector.protector_type {
+                            BdeKeyProtectorType::RecoveryPassword => {
+                                let mut volume_master_key: BdeVolumeMasterKey =
+                                    BdeVolumeMasterKey::new();
+
+                                match volume_master_key.read_at_position(
+                                    data_stream,
+                                    key_protector.size,
+                                    SeekFrom::Start(key_protector.offset),
+                                ) {
+                                    Ok(_) => {}
+                                    Err(mut error) => {
+                                        keramics_core::error_trace_add_frame!(
+                                            error,
+                                            format!(
+                                                "Unable to read volume master key: {}",
+                                                key_protector_index
+                                            ),
+                                        );
+                                        return Err(error);
+                                    }
+                                }
+                                match volume_master_key.unlock_with_password_hash(&password_hash) {
+                                    Ok(true) => {
+                                        vmk_key = volume_master_key.key;
+                                        vmk_key_unlocked = true;
+                                    }
+                                    Ok(false) => {}
+                                    Err(mut error) => {
+                                        keramics_core::error_trace_add_frame!(
+                                            error,
+                                            format!(
+                                                "Unable to unlock volume master key: {} with recovery password",
                                                 key_protector_index
                                             ),
                                         );
@@ -524,44 +799,6 @@ impl BdeEncryptedVolume {
                         if (key_data_size as usize) != self.encryption_type.get_fvek_size() {
                             return Err(keramics_core::error_trace_new!(
                                 "Invalid FVEK - unsupported data size",
-                            ));
-                        }
-                        let mut metadata_ranges: Vec<BdeBlockRange> = self.metadata_ranges.clone();
-                        metadata_ranges.sort_by_key(|block_range| block_range.logical_offset);
-
-                        // TODO: handle unencrypted ranges.
-                        let mut volume_offset: u64 = 0;
-
-                        for metadata_block_range in metadata_ranges.drain(..) {
-                            if metadata_block_range.logical_offset > self.volume_size {
-                                return Err(keramics_core::error_trace_new!(
-                                    "Invalid metadata block offset value out of bounds"
-                                ));
-                            }
-                            if volume_offset < metadata_block_range.logical_offset {
-                                let range_size: u64 =
-                                    metadata_block_range.logical_offset - volume_offset;
-
-                                self.block_ranges.push(BdeBlockRange::new(
-                                    volume_offset,
-                                    volume_offset,
-                                    range_size,
-                                    BdeBlockRangeType::Encrypted,
-                                ));
-                                volume_offset += range_size;
-                            }
-                            volume_offset += metadata_block_range.size;
-
-                            self.block_ranges.push(metadata_block_range);
-                        }
-                        let range_size: u64 = self.volume_size - volume_offset;
-
-                        if range_size > 0 {
-                            self.block_ranges.push(BdeBlockRange::new(
-                                volume_offset,
-                                volume_offset,
-                                range_size,
-                                BdeBlockRangeType::Encrypted,
                             ));
                         }
                         let encryption_context: BdeEncryptionContext =

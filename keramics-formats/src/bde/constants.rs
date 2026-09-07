@@ -14,9 +14,6 @@
 /// BDE file system signature.
 pub(crate) const BDE_FILE_SYSTEM_SIGNATURE: &[u8] = b"-FVE-FS-";
 
-/// BDE boot entry point Windows Vista boot record.
-pub(super) const BDE_BOOT_ENTRY_POINT_VISTA: &[u8] = &[0xeb, 0x52, 0x90];
-
 /// BDE identifier.
 pub(crate) const BDE_IDENTIFIER: &[u8] = &[
     0x3b, 0xd6, 0x67, 0x49, 0x29, 0x2e, 0xd8, 0x4a, 0x83, 0x99, 0xf6, 0xa3, 0x39, 0xe3, 0xd0, 0x01,

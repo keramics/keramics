@@ -517,11 +517,12 @@ impl VhdxFile {
                         let parent_identifier: Uuid = match Uuid::from_string(uuid_string.as_str())
                         {
                             Ok(uuid) => uuid,
-                            Err(error) => {
-                                return Err(keramics_core::error_trace_new_with_error!(
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
                                     "Unable to parse parent identifier",
-                                    error
-                                ));
+                                );
+                                return Err(error);
                             }
                         };
                         self.parent_identifier = Some(parent_identifier);

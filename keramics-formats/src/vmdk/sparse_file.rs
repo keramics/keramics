@@ -270,11 +270,12 @@ impl VmdkSparseFile {
                 .insert_value(grain_extent_offset, grain_extent_size, block_range)
             {
                 Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
                         "Unable to insert block range into block tree",
-                        error
-                    ));
+                    );
+                    return Err(error);
                 }
             }
         } else {
@@ -354,11 +355,12 @@ impl VmdkSparseFile {
             .insert_value(grain_extent_offset, self.grain_size, block_range)
         {
             Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
                     "Unable to insert block range into block tree",
-                    error
-                ));
+                );
+                return Err(error);
             }
         }
         Ok(())

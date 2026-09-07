@@ -22,7 +22,7 @@ use super::constants::*;
     structure(
         byte_order = "little",
         field(name = "signature", data_type = "ByteString<8>"),
-        field(name = "size", data_type = "u16"),
+        field(name = "header_size", data_type = "u16"),
         field(name = "format_version", data_type = "u16"),
         field(name = "unknown1", data_type = "u16"),
         field(name = "unknown2", data_type = "u16"),
@@ -59,6 +59,9 @@ pub struct BdeMetadataBlockHeader {
     /// Metadata block offset 3.
     pub metadata_block_offset3: u64,
 
+    /// MFT mirror cluster block number.
+    pub mft_mirror_cluster_block_number: u64,
+
     /// Boot record offset.
     pub boot_record_offset: u64,
 }
@@ -74,6 +77,7 @@ impl BdeMetadataBlockHeader {
             metadata_block_offset1: 0,
             metadata_block_offset2: 0,
             metadata_block_offset3: 0,
+            mft_mirror_cluster_block_number: 0,
             boot_record_offset: 0,
         }
     }
@@ -103,7 +107,9 @@ impl BdeMetadataBlockHeader {
         self.metadata_block_offset2 = bytes_to_u64_le!(data, 40);
         self.metadata_block_offset3 = bytes_to_u64_le!(data, 48);
 
-        if self.format_version > 1 {
+        if self.format_version == 1 {
+            self.mft_mirror_cluster_block_number = bytes_to_u64_le!(data, 56);
+        } else {
             self.boot_record_offset = bytes_to_u64_le!(data, 56);
         }
         Ok(())
@@ -138,6 +144,7 @@ mod tests {
         assert_eq!(test_struct.metadata_block_offset1, 0x021f0000);
         assert_eq!(test_struct.metadata_block_offset2, 0x02946000);
         assert_eq!(test_struct.metadata_block_offset3, 0x0309b000);
+        assert_eq!(test_struct.mft_mirror_cluster_block_number, 0);
         assert_eq!(test_struct.boot_record_offset, 0x02200000);
 
         Ok(())

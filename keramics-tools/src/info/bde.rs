@@ -98,6 +98,9 @@ impl BdeInfo {
                     VfsCredential::Passphrase(passphrase) => {
                         credentials.push(BdeCredential::Passphrase(passphrase.clone()))
                     }
+                    VfsCredential::RecoveryPassword(recovery_password) => {
+                        credentials.push(BdeCredential::RecoveryPassword(recovery_password.clone()))
+                    }
                     _ => {}
                 }
             }

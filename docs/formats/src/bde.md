@@ -10,7 +10,9 @@ There are multiple versions of BitLocker Drive Encryption (BDE):
   harddisks, which typically contain NTFS file systems.
 * BitLocker To Go; introduced in Windows 7; used to encrypt removable drives, which typically
   contain FAT file systems.
-* BitLocker Used Disk Space Only encryption; used to encrypt only the used space of volumes.
+* BitLocker Used Disk Space Only encryption; used to encrypt only the used space of volumes, which
+  presumably was introduced in Windows 8.
+* BitLocker Encrypt-on-Write (EOW), which presumably was introduced in Windows 10 (1511).
 
 > Note that Windows treats NTFS volumes on removable drives are treated as NTFS volumes on fixed
 > storage media.
@@ -45,16 +47,29 @@ assumed that these files are used to prevent the BitLocker metadata to be overwr
 In BitLocker Windows Vista the "\System Volume Information" directory contains the following
 BitLocker related files:
 
-* "FVE.{%GUID%}.[123]" maps the blocks that contain the metadata; typically 16384 bytes in size.
+* "FVE.{e40ad34d-dae9-4bc7-95bd-b16218c10f72}.[123]" maps [a metadata block](#metadata_block);
+  typically 16384 bytes in size.
 
 ### BitLocker Windows Windows 7 and later
 
 In BitLocker Windows 7 and later the "\System Volume Information" directory contains the following
 BitLocker related files:
 
-* "FVE2.{%GUID%}" maps the block that contains the encrypted boot record; typically 8192 bytes in
-  size.
-* "FVE2.{%GUID%}.[123]" maps the blocks that contain the metadata; typically 65536 bytes in size.
+* "FVE2.{09cf57b8-9e6c-43d4-ae1f-0408882a397d}.[1-6]", maps
+  [an Encrypt-on-Write (EOW) block map](#encrypt_on_write_block_map), used by "Used Disk Space Only
+  encryption".
+* "FVE2.{24e6f0ae-6a00-4f73-984b-75ce9942852d}" maps the block that contains the encrypted boot
+  record; typically 8192 bytes in size.
+* "FVE2.{93de4bce-e958-48b6-9fac-602d0294e5ef}.[12]", maps
+  [Encrypt-on-Write (EOW) data](#encrypt_on_write_data), used by "Used Disk Space Only encryption".
+* "FVE2.{aff97bac-a69b-45da-aba1-2cfbce434750}.[12]", introduced in Windows 8, typically 512 bytes
+  in size (possibly 1 sector in size?).
+* "FVE2.{c9ca54a3-6983-46b7-8684-a7e5e23499e3}.[1-6]", maps an Encrypt-on-Write (EOW) "OLRDHEVF2
+  area", used by "Used Disk Space Only encryption".
+* "FVE2.{da392a22-cae0-4f0f-9a30-b8830385d046}", introduced in Windows 10, typically 65536 bytes
+  in size.
+* "FVE2.{e40ad34d-dae9-4bc7-95bd-b16218c10f72}.[1-3]" maps [a metadata block](#metadata_block);
+  typically 65536 bytes in size.
 
 ### BitLocker To Go
 
@@ -297,20 +312,24 @@ The sectors that contain the BDE metadata are shown as empty sectors; containing
 
 #### BitLocker Windows 7 and To Go
 
-Both BitLocker Windows 7 and To Go store an encrypted version of the unencrypted first sectors in a
+Both BitLocker Windows 7 and To Go store an encrypted version of the unencrypted boot record in a
 specific location. This location is defined in the
-[boot record descriptor](#boot_record_descriptor). It is commonly 8192 bytes an size, entailing the
-first 16 sectors.
+[metadata area descriptors](#metadata_area_descriptors).
+
+The encrypted boot record is commonly 8192 bytes an size, entailing the first 16 sectors.
 
 The sectors that contain the encrypted boot recored and the BDE metadata are shown as empty sectors;
 containing 0-byte values.
 
 #### BitLocker Windows 10
 
-In later versions of Bitlocker Windows 10 the [boot record descriptor](#boot_record_descriptor) is
-not always present. The number of boot record sectors in the
-[metadata block header](#metadata_block_header_v2) can be used to determine the boot record size.
-It is commonly 8192 bytes an size, entailing the first 16 sectors.
+In later versions of Bitlocker Windows 10 the
+[metadata area descriptors](#metadata_area_descriptors) is not always present.
+
+The number of boot record sectors in the [metadata block header](#metadata_block_header_v2) can be
+used to determine the boot record size.
+
+The encrypted boot record is commonly 8192 bytes an size, entailing the first 16 sectors.
 
 ## Boot record
 
@@ -359,7 +378,7 @@ The differences have been emphasized in bold. The boot record is 512 bytes of si
 
 > Note that the number of sectors can be 1 less then the value indicated in the partition table.
 
-### BitLocker Windows 7 and later
+### BitLocker Windows 7 and later {#boot_record}
 
 The BitLocker Windows 7 boot record for a NTFS volume is similar to
 [a FAT32 boot record](fat.md#fat32_boot_record). The differences have been emphasized in bold. The
@@ -405,17 +424,14 @@ boot record is 512 bytes of size and consists of:
 | 67 | 23 | | Unknown |
 | <td colspan="4">*Common*</td> |
 | 90 | 70 | | Bootcode |
-| **160** | **16** | | **[BitLocker or BitLocker Used Disk Space Only identifier](#identifiers)**, which contains a GUID |
+| **160** | **16** | | **[BitLocker identifier](#identifiers)**, which contains a GUID |
 | **176** | **8** | | **Metadata block 1 offset**, which is relative to the start of the volume |
 | **184** | **8** | | **Metadata block 2 offset**, which is relative to the start of the volume |
 | **192** | **8** | | **Metadata block 3 offset**, which is relative to the start of the volume |
-| **200** | **307** | | **Unknown (part of bootcode)** |
-| **507** | **3** | | **Unknown** |
+| **200** | **310** | | **Unknown (part of bootcode)** |
 | 510 | 2 | 0x55 0xaa | Sector signature |
 
 <!-- rumdl-enable MD033 MD056 -->
-
-> Note that the number of sectors can be 1 less then the value indicated in the partition table.
 
 ### BitLocker To Go
 
@@ -472,7 +488,67 @@ differences have been emphasized in bold. The boot record is 512 bytes in size a
 
 <!-- rumdl-enable MD033 MD056 -->
 
-## Metadata block
+### BitLocker BitLocker Used Disk Space Only encryption
+
+The BitLocker Used Disk Space Only encryption boot record for a NTFS volume is similar to a
+[BitLocker Windows 7 and later boot record](#boot_record). The differences have been emphasized
+in bold. The boot record is 512 bytes of size and consists of:
+
+<!-- rumdl-disable MD033 MD056 -->
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 3 | "\xeb\x58\x90" | Boot entry point Boot entry point (JMP +90, NOP) |
+| 3 | 8 | "-FVE-FS-" | File system signature (or OEM name) |
+| <td colspan="4">*DOS version 2.0 BIOS parameter block (BPB)*</td> |
+| 11 | 2 | | Bytes per sector, which must be 512, 1024, 2048 or 4096 |
+| 13 | 1 | | Sectors per cluster block, which must be 1, 2, 4, 8, 16, 32, 64 or 128 |
+| 14 | 2 | | Number of reserved sectors (reserved region), which starts at the first sector of the volume (sector 0) and must be 1 or more (typically 1 or 32) |
+| 16 | 1 | | Number of cluster block allocation tables, which must be 1 or more (typically 2) |
+| 17 | 2 | | Number of root directory entries |
+| 19 | 2 | | Total number of sectors (16-bit) |
+| 21 | 1 | | [Media descriptor](fat.md#media_descriptors) |
+| 22 | 2 | | Cluster block allocation table size (16-bit) |
+| <td colspan="4">*DOS version 3.4 BIOS parameter block (BPB)*</td> |
+| 24 | 2 | | Number of sectors per track |
+| 26 | 2 | | Number of heads |
+| 28 | 4 | | Number of hidden sectors, which contains the volume start sector number |
+| 32 | 4 | | Total number of sectors (32-bit) |
+| <td colspan="4">&nbsp;</td> |
+| 36 | 4 | | Cluster block allocation table size (32-bit), in number of sectors |
+| 40 | 2 | | [Extended flags](fat.md#fat32_extended_flags) |
+| 42 | 1 | | Format revision minor number |
+| 43 | 1 | | Format revision major number |
+| 44 | 4 | | Root directory start cluster |
+| 48 | 2 | | File system information (FSINFO) sector number |
+| 50 | 2 | | Boot record sector number |
+| 52 | 12 | | Unknown (reserved) |
+| 64 | 1 | | Drive number |
+| 65 | 1 | | Unknown (reserved for Windows NT) |
+| 66 | 1 | | Extended boot signature |
+| <td colspan="4">*If extended boot signature == 0x29*</td> |
+| 67 | 4 | | Volume serial number, which can be derived from the system current date and time |
+| 71 | 11 | | Volume label, which contains a narrow character string or "NO\x20NAME\x20\x20\x20\x20" if not set |
+| 82 | 8 | "FAT32\x20\x20\x20" | File system hint, which is informational and not required |
+| <td colspan="4">*If extended boot signature != 0x29*</td> |
+| 67 | 23 | | Unknown |
+| <td colspan="4">*Common*</td> |
+| 90 | 70 | | Bootcode |
+| **160** | **16** | | **[BitLocker Used Disk Space Only identifier](#identifiers)**, which contains a GUID |
+| 176 | 8 | | Metadata block 1 offset, which is relative to the start of the volume |
+| 184 | 8 | | Metadata block 2 offset, which is relative to the start of the volume |
+| 192 | 8 | | Metadata block 3 offset, which is relative to the start of the volume |
+| **200** | **8** | | **Encrypt-on-Write data 1 offset**, which is relative to the start of the volume |
+| **208** | **8** | | **Encrypt-on-Write data 2 offset**, which is relative to the start of the volume |
+| **216** | **294** | | **Unknown (part of bootcode)** |
+| 510 | 2 | 0x55 0xaa | Sector signature |
+
+<!-- rumdl-enable MD033 MD056 -->
+
+> Note that Windows 10 version for Bitlocker without "Used Disk Space Only encryption" can also
+> contain Encrypt-on-Write data blocks stored within the metadata blocks.
+
+## Metadata block {#metadata_block}
 
 A BitLocker encrypted volume contains 3 metadata blocks. Which is typically:
 
@@ -495,7 +571,7 @@ The metadata block header version 1 is 64 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 8 | "-FVE-FS-" | Signature |
-| 8 | 2 | | Unknown (Size?) |
+| 8 | 2 | | Unknown (Header size?) |
 | 10 | 2 | 1 | Format version |
 | 12 | 2 | | Unknown, which is commonly 0x04 |
 | 14 | 2 | | Unknown, which is commonly 0x04 |
@@ -512,7 +588,7 @@ The metadata block header version 2 is 64 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 8 | "-FVE-FS-" | Signature |
-| 8 | 2 | | Unknown (Size?) |
+| 8 | 2 | | Unknown (Header size?) |
 | 10 | 2 | 2 | Format version |
 | 12 | 2 | | Unknown, which is commonly 0x04, but 0x05 has been observed in a partial decrypted volume (protection status?) |
 | 14 | 2 | | Unknown, which is commonly 0x04, but 0x01 has been observed in a partial decrypted volume |
@@ -534,7 +610,7 @@ The metadata header is 48 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 4 | | Metadata size, which includes the size value |
+| 0 | 4 | | Metadata size, which includes the size value but not the size of the metadata block header |
 | 4 | 4 | 1 | Format version |
 | 8 | 4 | 48 | Metadata header size |
 | 12 | 4 | | Metadata size copy |
@@ -578,7 +654,7 @@ The metadata entry is of variable size and consists of:
 | 0 | 2 | | Entry size, which includes the size value |
 | 2 | 2 | | [Entry type](#entry_types) |
 | 4 | 2 | | [Value type](#value_types) |
-| 6 | 2 | | Unknown (Values of 0x0001, 0x0003, 0x0005 and 0x0105 have been observed) |
+| 6 | 2 | | Unknown (Flags? Values of 0x0001, 0x0003, 0x0005 and 0x0105 have been observed) |
 | 8 | ... | | Entry data |
 
 #### Metadata entry types {#entry_types}
@@ -596,7 +672,7 @@ The metadata entry is of variable size and consists of:
 | | | |
 | 0x000b | | Unknown (FVEAutoUnlock key?) |
 | | | |
-| 0x000f | | Boot record descriptor |
+| 0x000f | | Metadata area descriptors |
 
 > Note that older versions of BitLocker use a locale dependent date format in the description,
 > such as "MM/DD/YYYY". Recent versions of BitLocker use "YYYY-MM-DD".
@@ -618,7 +694,7 @@ The metadata entry is of variable size and consists of:
 | 0x000a | | Update |
 | 0x000b | | Error |
 | | | |
-| 0x000f | | [Boot record descriptor](#boot_record_descriptor) |
+| 0x000f | | [Metadata area descriptors](#metadata_area_descriptors) |
 
 ### Key encrypted key (KEK) {#key_encrypted_key}
 
@@ -740,7 +816,7 @@ The TPM protected VMK consists of:
 | | | |
 | 0x0500 | | VMK protected with TPM and PIN |
 | | | |
-| 0x0800 | | VMK protected with recovery password (or passphrase) |
+| 0x0800 | | VMK protected with recovery password |
 | | | |
 | 0x2000 | | VMK protected with password (or passphrase) |
 
@@ -761,9 +837,9 @@ The available properties:
 * optional description string containing "ExternalKey\x00"
 * key
 
-### Boot record descriptor {#boot_record_descriptor}
+### Metadata area descriptors {#metadata_area_descriptors}
 
-The boot record descriptor has value type 0x000f and is 16 or more bytes in size and consists of:
+The metadata area descriptors has value type 0x000f and is 16 or more bytes in size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -771,30 +847,30 @@ The boot record descriptor has value type 0x000f and is 16 or more bytes in size
 | --- | --- | --- | --- |
 | 0 | 8 | | Boot record offset |
 | 8 | 8 | | Boot record size |
-| <td colspan="4">*If size > 16*</td> |
-| 16 | 2 | 4 or 5 | Unknown |
-| 18 | 2 | 60 or 76 | Unknown (size of additional data?) |
+| <td colspan="4">*If size > 16, related to "FVE2.{aff97bac-a69b-45da-aba1-2cfbce434750}.[12]"?*</td> |
+| 16 | 2 | 3, 4 or 5 | Unknown (format version or number of descriptors?) |
+| 18 | 2 | 36, 60 or 76 | Unknown (size of additional data?) |
 | 20 | 4 | | Unknown |
-| 24 | 8 | 0x09, 0x0a, 0xca | Unknown (flags?) |
-| 32 | 8 | | Unknown (convert log offset?) |
-| 40 | 4 | | Unknown (convert log size?) |
-| 44 | 4 | 512 | Unknown (related to logical sector size as in vhdx?) |
-| 48 | 4 | 512 or 4096 | Unknown (related to physical sector size as in vhdx?) |
+| 24 | 8 | 0x09, 0x0a, 0x0b, 0xca, 0xcb | Unknown (flags?), 0xc0 used by "Used Disk Space Only encryption"? |
+| 32 | 8 | | Unknown (offset?) |
+| 40 | 4 | | Unknown (size?) |
+| 44 | 4 | 512 | Logical sector size |
+| 48 | 4 | 512 or 4096 | Physical sector size |
+| <td colspan="4">*If additional data size > 36*</td> |
 | 52 | 8 | 10 | Unknown |
 | 60 | 4 | 0x0000295a, 0x00004a61, 0x00004a62 or 0x00004a65 | Unknown |
 | 64 | 8 | 2 | Unknown |
 | 72 | 4 | 0x02010110 | Unknown |
 | <td colspan="4">*If additional data size > 60*</td> |
-| 76 | 8 | | Unknown offset |
-| 84 | 4 | 65536 | Unknown size |
-| 88 | 4 | 0 | Unknown |
+| 76 | 8 | | Unknown area offset, related to "FVE2.{da392a22-cae0-4f0f-9a30-b8830385d046}" |
+| 84 | 8 | | Unknown area size, related to "FVE2.{da392a22-cae0-4f0f-9a30-b8830385d046}" |
 
 <!-- rumdl-enable MD033 MD056 -->
 
-The boot record descriptor seems to have been introduced in Windows 7. It specifies the location in
-the encrypted volume where the unencrypted boot record is stored.
+The metadata area descriptors seems to have been introduced in Windows 7. They specify the location,
+within the encrypted volume, where certain metadata is stored, such as the unencrypted boot record.
 
-The boot record descriptor is commonly 8192 bytes in size for BitLocker Windows 7 (and later)
+The unencrypted boot record is commonly 8192 bytes in size for BitLocker Windows 7 (and later)
 and 5365760 bytes for BitLocker To Go.
 
 ## BitLocker External Key (BEK) file
@@ -831,44 +907,105 @@ data.
 
 The identifier of the VMK should match the identifier in the BEK file header.
 
-## Notes
+## Encrypt-on-Write (EOW)
 
-### FVE-EOW block
+Checksums use a CRC-32 with the polynominal 0xedb88320 and initial value 0.
 
-The FVE-EOW block has ...
+### Encrypt-on-Write data (FVE-EOW) {#encrypt_on_write_data}
+
+The Encrypt-on-Write data (FVE-EOW) is variable of size and consists of:
+
+<!-- rumdl-disable MD033 MD056 -->
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
+| <td colspan="4">*Header*</td> |
 | 0 | 8 | "FVE-EOW\x00" | Signature |
+| 8 | 2 | 56 | Header size |
+| 10 | 2 | | Data size |
+| 12 | 4 | | Logical sector size (or EOW data sector size?) |
+| 16 | 4 | | Physical sector size (or block record size?) |
+| 20 | 4 | | Unknown (Block size?) |
+| 24 | 4 | | OLRDHEVF2 area size |
+| 28 | 4 | | Unknown (Flags?) |
+| 32 | 4 | | Number of block map offsets |
+| 36 | 4 | | Checksum of the data from the start of the Encrypt-on-Write data (FVE-EOW) upto data size with the checksum value set to 0 |
+| 40 | 8 | | Encrypt-on-Write data 1 offset |
+| 48 | 8 | | Encrypt-on-Write data 2 offset |
+| <td colspan="4">&nbsp;</td> |
+| 56 | number x 8 | | Array of 64-bit [block map](#encrypt_on_write_block_map) offsets |
+| ... | ... | | Unknown (empty values) |
 
-### FVE-EOWBM block
+<!-- rumdl-enable MD033 MD056 -->
 
-The FVE-EOWBM block has ...
+### Encrypt-on-Write block map (FVE-EOWBM) {#encrypt_on_write_block_map}
+
+The Encrypt-on-Write block map (FVE-EOWBM) is variable of size and consists of:
+
+* Encrypt-on-Write block map (FVE-EOWBM) header
+* One or more Encrypt-on-Write block (map) records
+
+#### Encrypt-on-Write block map header
+
+The Encrypt-on-Write block map header is variable of size, and stored as a sector, and consists of:
+
+<!-- rumdl-disable MD033 MD056 -->
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
+| <td colspan="4">*Header*</td> |
 | 0 | 10 | "FVE-EOWBM\x00" | Signature |
-| 10 | 2 | | Block size, which includes the signature and size value |
-| 12 | 4 | | Unknown |
+| 10 | 2 | 60 | Header size |
+| 12 | 4 | | Block map size, including the size of the block records |
+| 16 | 4 | | Block map index, corresponds to the index in the offset array of the EOW data |
+| 20 | 8 | | Volume logical offset, region (or area) of the volume this block map represents |
+| 28 | 8 | | Volume logical size |
+| 36 | 8 | | OLRDHEVF2 area offset |
+| 44 | 4 | | Block record offset 1, relative to start of the block map |
+| 48 | 4 | | Block record offset 2, relative to start of the block map |
+| 52 | 4 | | Block record size (or physical sector size?) |
+| 56 | 4 | | Checksum, of the sector data with the checksum value set to 0 |
+| 60 | ... | | Unknown (empty values) |
 
-### FVE-EOWBR block
+<!-- rumdl-enable MD033 MD056 -->
 
-The FVE-EOWBR block has ...
+#### Encrypt-on-Write block (map) record (FVE-EOWBR)
+
+The Encrypt-on-Write block (map) record (FVE-EOWBR) is variable of size, and stored as a sector, and
+consists of:
+
+<!-- rumdl-disable MD033 MD056 -->
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
+| <td colspan="4">*Header*</td> |
 | 0 | 10 | "FVE-EOWBR\x00" | Signature |
-| 10 | 2 | | Block size, which includes the signature and size value |
-| 12 | 4 | | Unknown |
+| 10 | 2 | 36 | Header size |
+| 12 | 4 | | Block record size (or physical sector size?) |
+| 16 | 4 | | Unknown |
+| 20 | 8 | | Unknown |
+| 28 | 4 | | Unknown |
+| 32 | 4 | | Checksum |
+| <td colspan="4">&nbsp;</td> |
+| 36 | ... | | Bitmap |
+| ... | ... | | Unknown (empty values) |
 
-### OLRDHEVF2 block
+<!-- rumdl-enable MD033 MD056 -->
 
-The OLRDHEVF2 block has ...
+### OLRDHEVF2 area
+
+The OLRDHEVF2 area is variable of size, and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 10 | "OLRDHEVF2\x00" | Signature |
 | 10 | 2 | | Unknown |
+| 12 | 2 | | Unknown |
+| 14 | 4 | | Unknown (Size?) |
+| 18 | 8 | | Encrypted volume size |
+| 26 | 8 | | Unknown |
+| 34 | 8 | | Unknown |
+| 42 | 8 | | Volume logical offset |
 
 ## References
 

@@ -20,8 +20,8 @@ A Linux LVM consist of:
 
 According to "RHEL 5 - Logical Volume Manager Administration" the number of bytes per sector is 512.
 
-Checksums use a "weak" CRC-32 checksum, which is a CRC-32 without the initial and final XOR
-with 0xffffffff, using the polynominal 0xedb88320 and initial value 0xf597a6cf.
+Checksums use a "weak" CRC-32, which is a CRC-32 without the initial and final XOR with 0xffffffff,
+using the polynominal 0xedb88320 and initial value 0xf597a6cf.
 
 ### Terminology
 

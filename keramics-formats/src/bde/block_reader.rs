@@ -132,8 +132,6 @@ impl BlockReader for BdeBlockReader {
                 )));
             }
         };
-        // TODO: virtualize vista sector 0
-
         while data_offset < read_size {
             if current_offset >= self.size {
                 break;
@@ -152,7 +150,6 @@ impl BlockReader for BdeBlockReader {
 
             let range_read_size: usize =
                 min(read_size - data_offset, range_remainder_size as usize);
-            let data_end_offset: usize = data_offset + range_read_size;
 
             match block_range.range_type {
                 BdeBlockRangeType::Encrypted => {
@@ -211,6 +208,8 @@ impl BlockReader for BdeBlockReader {
                     }
                 }
                 BdeBlockRangeType::InFile => {
+                    let data_end_offset: usize = data_offset + range_read_size;
+
                     let range_physical_offset: u64 =
                         block_range.physical_offset + range_relative_offset;
 
@@ -223,8 +222,30 @@ impl BlockReader for BdeBlockReader {
                     current_offset += range_read_size as u64;
                 }
                 BdeBlockRangeType::Sparse => {
+                    let data_end_offset: usize = data_offset + range_read_size;
+
                     data[data_offset..data_end_offset].fill(0);
 
+                    data_offset = data_end_offset;
+                    current_offset += range_read_size as u64;
+                }
+                BdeBlockRangeType::VistaBootSector => {
+                    let data_end_offset: usize = data_offset + range_read_size;
+                    let mft_mirror_cluster_block_number: u64 = block_range.physical_offset;
+
+                    let mut sector_data: Vec<u8> = vec![0; self.bytes_per_sector as usize];
+
+                    keramics_core::data_stream_read_exact_at_position!(
+                        &self.data_stream,
+                        &mut sector_data,
+                        SeekFrom::Start(0)
+                    );
+                    sector_data[3..11].copy_from_slice(b"NTFS    ");
+                    sector_data[56..64]
+                        .copy_from_slice(&mft_mirror_cluster_block_number.to_le_bytes());
+
+                    data[data_offset..data_end_offset]
+                        .copy_from_slice(&sector_data[data_offset..data_end_offset]);
                     data_offset = data_end_offset;
                     current_offset += range_read_size as u64;
                 }
