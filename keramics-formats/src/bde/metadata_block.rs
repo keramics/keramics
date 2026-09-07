@@ -17,9 +17,9 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{Ucs2String, Uuid};
 
 use super::aes_ccm_encrypted_key::BdeAesCcmEncryptedKey;
-use super::boot_record_descriptor::BdeBootRecordDescriptor;
 use super::enums::BdeKeyProtectorType;
 use super::key_protector::BdeKeyProtector;
+use super::metadata_area_descriptors::BdeMetadataAreaDescriptors;
 use super::metadata_block_header::BdeMetadataBlockHeader;
 use super::metadata_entry_header::BdeMetadataEntryHeader;
 use super::metadata_header::BdeMetadataHeader;
@@ -51,11 +51,14 @@ pub struct BdeMetadataBlock {
     /// Metadata block offset 3.
     pub metadata_block_offset3: u64,
 
+    /// MFT mirror cluster block number.
+    pub mft_mirror_cluster_block_number: u64,
+
     /// Boot record offset.
     pub boot_record_offset: u64,
 
-    /// Boot record size.
-    pub boot_record_size: u64,
+    /// Metadata area descriptors.
+    pub metadata_area_descriptors: Option<BdeMetadataAreaDescriptors>,
 
     /// Full volume encryption key (FVEK).
     pub full_volume_encryption_key: Option<BdeAesCcmEncryptedKey>,
@@ -76,8 +79,9 @@ impl BdeMetadataBlock {
             metadata_block_offset1: 0,
             metadata_block_offset2: 0,
             metadata_block_offset3: 0,
+            mft_mirror_cluster_block_number: 0,
             boot_record_offset: 0,
-            boot_record_size: 0,
+            metadata_area_descriptors: None,
             full_volume_encryption_key: None,
             key_protectors: Vec::new(),
         }
@@ -109,6 +113,7 @@ impl BdeMetadataBlock {
         self.metadata_block_offset1 = block_header.metadata_block_offset1;
         self.metadata_block_offset2 = block_header.metadata_block_offset2;
         self.metadata_block_offset3 = block_header.metadata_block_offset3;
+        self.mft_mirror_cluster_block_number = block_header.mft_mirror_cluster_block_number;
         self.boot_record_offset = block_header.boot_record_offset;
 
         keramics_core::debug_trace_structure!(BdeMetadataHeader::debug_read_data(&data[64..]));
@@ -131,9 +136,10 @@ impl BdeMetadataBlock {
         self.encryption_method = header.encryption_method;
 
         let mut data_offset: usize = 112;
+        let entries_end_offset: usize = 64 + (header.metadata_size as usize);
         let mut entry_index: usize = 0;
 
-        while data_offset < (header.metadata_size as usize) {
+        while data_offset < entries_end_offset {
             keramics_core::debug_trace_structure!(BdeMetadataEntryHeader::debug_read_data(
                 &data[data_offset..]
             ));
@@ -201,7 +207,7 @@ impl BdeMetadataBlock {
                             0x0100 => BdeKeyProtectorType::Tpm,
                             0x0200 => BdeKeyProtectorType::ExternalKey,
                             0x0500 => BdeKeyProtectorType::TpmAndPin,
-                            0x0800 => BdeKeyProtectorType::RecoveryPassphrase,
+                            0x0800 => BdeKeyProtectorType::RecoveryPassword,
                             0x2000 => BdeKeyProtectorType::Passphrase,
                             _ => BdeKeyProtectorType::Unknown(volume_master_key.protector_type),
                         };
@@ -259,34 +265,32 @@ impl BdeMetadataBlock {
                         )));
                     }
                     keramics_core::debug_trace_structure!(
-                        BdeBootRecordDescriptor::debug_read_data(
+                        BdeMetadataAreaDescriptors::debug_read_data(
                             &data[data_offset..data_end_offset]
                         )
                     );
-                    let mut boot_record_descriptor: BdeBootRecordDescriptor =
-                        BdeBootRecordDescriptor::new();
+                    let mut metadata_area_descriptors: BdeMetadataAreaDescriptors =
+                        BdeMetadataAreaDescriptors::new();
 
-                    match boot_record_descriptor.read_data(&data[data_offset..data_end_offset]) {
+                    match metadata_area_descriptors.read_data(&data[data_offset..data_end_offset]) {
                         Ok(_) => {}
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
                                 format!(
-                                    "Unable to read boot record descriptor metadata entry: {}",
+                                    "Unable to read metadata area descriptors metadata entry: {}",
                                     entry_index
                                 )
                             );
                             return Err(error);
                         }
                     }
-                    if self.boot_record_offset == 0 {
-                        self.boot_record_offset = boot_record_descriptor.boot_record_offset;
-                    } else if boot_record_descriptor.boot_record_offset != self.boot_record_offset {
+                    if self.metadata_area_descriptors.is_some() {
                         return Err(keramics_core::error_trace_new!(
-                            "Boot record offset in block header does not match value in boot record descriptor"
+                            "Metadata area descriptors already set",
                         ));
                     }
-                    self.boot_record_size = boot_record_descriptor.boot_record_size;
+                    self.metadata_area_descriptors = Some(metadata_area_descriptors);
                 }
                 _ => {}
             }

@@ -299,24 +299,22 @@ impl UdifFile {
             &data,
             self.plist_size
         );
-        let string: String = match String::from_utf8(data) {
+        let string: &str = match str::from_utf8(&data) {
             Ok(string) => string,
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to convert plist data into UTF-8 string",
+                    "Unable to convert XML plist data into UTF-8 string",
                     error
                 ));
             }
         };
         let mut xml_plist: XmlPlist = XmlPlist::new();
 
-        match xml_plist.parse(string.as_str()) {
+        match xml_plist.parse(string) {
             Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to parse plist",
-                    error
-                ));
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to XML parse plist");
+                return Err(error);
             }
         }
         let resource_fork_object: &PlistObject =

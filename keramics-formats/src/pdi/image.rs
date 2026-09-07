@@ -170,7 +170,7 @@ impl PdiImage {
         );
         keramics_core::debug_trace_data!("PdiImageXml", 0, &data, data_stream_size);
 
-        let string: String = match String::from_utf8(data) {
+        let string: &str = match str::from_utf8(&data) {
             Ok(string) => string,
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
@@ -181,13 +181,11 @@ impl PdiImage {
         };
         let mut xml_document: XmlDocument = XmlDocument::new();
 
-        match xml_document.parse(string.as_str()) {
+        match xml_document.parse(string) {
             Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to parse XML document",
-                    error
-                ));
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to XML document");
+                return Err(error);
             }
         }
         match xml_document.root_element {

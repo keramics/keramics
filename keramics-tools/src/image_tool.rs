@@ -30,9 +30,9 @@ use keramics_formats::ntfs::constants::NTFS_NAME_SPACE_DOS;
 use keramics_hashes::{DigestHashContext, Md5Context, Sha1Context};
 use keramics_types::Ucs2String;
 use keramics_vfs::{
-    VfsCredentialStore, VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsFinder,
-    VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanOptions,
-    VfsScanner, VfsType,
+    VfsCredential, VfsCredentialStore, VfsDataFork, VfsFileEntry, VfsFileSystemReference,
+    VfsFileType, VfsFinder, VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext,
+    VfsScanNode, VfsScanOptions, VfsScanner, VfsType,
 };
 
 #[cfg(feature = "debug-trace")]
@@ -54,14 +54,14 @@ pub const FILE_ATTRIBUTE_FLAG_SYSTEM: u32 = 0x00000004;
 #[derive(Parser)]
 #[command(version, about = "Analyzes the contents of a storage media image", long_about = None)]
 struct CommandLineArguments {
+    #[arg(long)]
+    /// Credential to unlock format
+    credential: Vec<String>,
+
     #[cfg(feature = "debug-trace")]
     #[arg(long, default_value_t = false)]
     /// Enable debug output
     debug: bool,
-
-    #[arg(long, alias = "password")]
-    /// Passphrase to unlock storage media image
-    passphrase: Vec<String>,
 
     /// Path of the source file
     source: PathBuf,
@@ -1049,14 +1049,36 @@ fn main() -> ExitCode {
     }
     let vfs_credential_store: &VfsCredentialStore = VfsCredentialStore::current();
 
-    for passphrase in arguments.passphrase.iter() {
-        match vfs_credential_store.add_passphrase(passphrase.as_bytes()) {
-            Ok(_) => {}
-            Err(error) => {
-                println!(
-                    "Unable to add passphrase to credential store with error:\n{}",
-                    error
-                );
+    for credential in arguments.credential.iter() {
+        match credential.split_once(':') {
+            Some((credential_type, credential_data)) => {
+                let vfs_credential: VfsCredential = match credential_type {
+                    "passphrase" | "password" => {
+                        let passphrase: Vec<u8> = credential_data.as_bytes().to_vec();
+                        VfsCredential::Passphrase(passphrase)
+                    }
+                    "recovery_password" => {
+                        let recovery_password: Vec<u8> = credential_data.as_bytes().to_vec();
+                        VfsCredential::RecoveryPassword(recovery_password)
+                    }
+                    _ => {
+                        println!("Unsuported type prefix: {} in credential", credential_type);
+                        return ExitCode::FAILURE;
+                    }
+                };
+                match vfs_credential_store.add_credential(vfs_credential) {
+                    Ok(_) => {}
+                    Err(error) => {
+                        println!(
+                            "Unable to add {} to credential store with error:\n{}",
+                            credential_type, error
+                        );
+                        return ExitCode::FAILURE;
+                    }
+                }
+            }
+            None => {
+                println!("Unsuported credential - missing type prefix",);
                 return ExitCode::FAILURE;
             }
         }

@@ -201,8 +201,6 @@ mod tests {
 
     #[test]
     fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        keramics_core::mediator::Mediator { debug_output: true }.make_current();
-
         let mut block_stream: BdeBlockStream = get_block_stream()?;
         block_stream.seek(SeekFrom::Start(0))?;
 

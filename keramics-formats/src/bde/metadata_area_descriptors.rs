@@ -22,55 +22,71 @@ use keramics_types::bytes_to_u64_le;
         field(name = "boot_record_offset", data_type = "u64", format = "hex"),
         field(name = "boot_record_size", data_type = "u64"),
         group(
-            size_condition = ">= 76",
+            size_condition = ">= 52",
             field(name = "unknown1", data_type = "u16"),
             field(name = "additional_data_size", data_type = "u16"),
             field(name = "unknown2", data_type = "u32"),
             field(name = "unknown3", data_type = "u64", format = "hex"),
-            field(name = "convert_log_offset", data_type = "u64", format = "hex"),
-            field(name = "convert_log_size", data_type = "u32"),
-            field(name = "unknown4", data_type = "u32"),
+            field(name = "unknown4", data_type = "u64", format = "hex"),
             field(name = "unknown5", data_type = "u32"),
-            field(name = "unknown6", data_type = "u64"),
-            field(name = "unknown7", data_type = "u32", format = "hex"),
+            field(name = "logical_sector_size", data_type = "u32"),
+            field(name = "physical_sector_size", data_type = "u32"),
+        ),
+        group(
+            size_condition = ">= 76",
             field(name = "unknown8", data_type = "u64"),
             field(name = "unknown9", data_type = "u32", format = "hex"),
+            field(name = "unknown10", data_type = "u64"),
+            field(name = "unknown11", data_type = "u32", format = "hex"),
         ),
         group(
             size_condition = ">= 92",
-            field(name = "unknown_offset", data_type = "u64", format = "hex"),
-            field(name = "unknown_size", data_type = "u32"),
-            field(name = "unknown10", data_type = "u32"),
+            field(name = "unknown_area_offset", data_type = "u64", format = "hex"),
+            field(name = "unknown_area_size", data_type = "u64"),
         )
     ),
     methods("debug_read_data")
 )]
-/// BitLocker Drive Encryption (BDE) metadata header.
-pub struct BdeBootRecordDescriptor {
+/// BitLocker Drive Encryption (BDE) metadata area descriptors.
+pub struct BdeMetadataAreaDescriptors {
     /// Boot record offset.
     pub boot_record_offset: u64,
 
     /// Boot record size.
     pub boot_record_size: u64,
+
+    /// Unknown area offset.
+    pub unknown_area_offset: u64,
+
+    /// Unknown area size.
+    pub unknown_area_size: u64,
 }
 
-impl BdeBootRecordDescriptor {
-    /// Creates a new metadata header.
+impl BdeMetadataAreaDescriptors {
+    /// Creates new metadata area descriptors.
     pub fn new() -> Self {
         Self {
             boot_record_offset: 0,
             boot_record_size: 0,
+            unknown_area_offset: 0,
+            unknown_area_size: 0,
         }
     }
 
-    /// Reads the metadata header from a buffer.
+    /// Reads the metadata area descriptors from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 16 {
+        let data_size: usize = data.len();
+
+        if data_size < 16 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.boot_record_offset = bytes_to_u64_le!(data, 0);
         self.boot_record_size = bytes_to_u64_le!(data, 8);
 
+        if data_size >= 92 {
+            self.unknown_area_offset = bytes_to_u64_le!(data, 76);
+            self.unknown_area_size = bytes_to_u64_le!(data, 84);
+        }
         Ok(())
     }
 }
@@ -95,11 +111,13 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = BdeBootRecordDescriptor::new();
+        let mut test_struct = BdeMetadataAreaDescriptors::new();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.boot_record_offset, 0x02200000);
         assert_eq!(test_struct.boot_record_size, 8192);
+        assert_eq!(test_struct.unknown_area_offset, 0x2202000);
+        assert_eq!(test_struct.unknown_area_size, 65536);
 
         Ok(())
     }
@@ -108,7 +126,7 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = BdeBootRecordDescriptor::new();
+        let mut test_struct = BdeMetadataAreaDescriptors::new();
         let result = test_struct.read_data(&test_data[0..15]);
         assert!(result.is_err());
     }

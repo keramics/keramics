@@ -267,9 +267,9 @@ impl BdeVolumeMasterKey {
         Ok(stretch_key)
     }
 
-    /// Unlocks the key using a password.
-    pub fn unlock_with_password(&mut self, password_hash: &[u8]) -> Result<bool, ErrorTrace> {
-        if self.protector_type != 0x2000 {
+    /// Unlocks the key using a password hash.
+    pub fn unlock_with_password_hash(&mut self, password_hash: &[u8]) -> Result<bool, ErrorTrace> {
+        if self.protector_type != 0x0800 && self.protector_type != 0x2000 {
             return Ok(false);
         }
         let stretch_key: BdeStretchKey = match self.read_stretch_key_property() {
@@ -331,6 +331,8 @@ impl BdeVolumeMasterKey {
                 return Err(error);
             }
         };
+        keramics_core::debug_trace_data!("BdeUnlockedKey", 0, &self.key, key_size,);
+        keramics_core::debug_trace_data!("BdeUnlockedKeyTag", 0, &tag, 16,);
         Ok(&aes_ccm_encrypted_key.tag == &tag)
     }
 }

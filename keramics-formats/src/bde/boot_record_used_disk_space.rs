@@ -54,13 +54,23 @@ use super::constants::*;
         field(name = "metadata_block_offset1", data_type = "u64", format = "hex"),
         field(name = "metadata_block_offset2", data_type = "u64", format = "hex"),
         field(name = "metadata_block_offset3", data_type = "u64", format = "hex"),
-        field(name = "unknown3", data_type = "[u8; 310]", format = "hex"),
+        field(
+            name = "encrypt_on_write_data_offset1",
+            data_type = "u64",
+            format = "hex"
+        ),
+        field(
+            name = "encrypt_on_write_data_offset2",
+            data_type = "u64",
+            format = "hex"
+        ),
+        field(name = "unknown3", data_type = "[u8; 294]", format = "hex"),
         field(name = "boot_signature", data_type = "[u8; 2]", format = "hex"),
     ),
     methods("debug_read_data")
 )]
-/// BitLocker Drive Encryption (BDE) boot record.
-pub struct BdeBootRecord {
+/// BitLocker Drive Encryption (BDE) Used Disk Space Only encryption boot record
+pub struct BdeBootRecordUsedDiskSpace {
     /// Bytes per sector.
     pub bytes_per_sector: u16,
 
@@ -75,9 +85,15 @@ pub struct BdeBootRecord {
 
     /// Metadata block offset 3.
     pub metadata_block_offset3: u64,
+
+    /// Encrypt on write (EOW) data offset 1.
+    pub encrypt_on_write_data_offset1: u64,
+
+    /// Encrypt on write (EOW) data offset 2.
+    pub encrypt_on_write_data_offset2: u64,
 }
 
-impl BdeBootRecord {
+impl BdeBootRecordUsedDiskSpace {
     /// Creates a new boot record.
     pub fn new() -> Self {
         Self {
@@ -86,6 +102,8 @@ impl BdeBootRecord {
             metadata_block_offset1: 0,
             metadata_block_offset2: 0,
             metadata_block_offset3: 0,
+            encrypt_on_write_data_offset1: 0,
+            encrypt_on_write_data_offset2: 0,
         }
     }
 
@@ -97,7 +115,7 @@ impl BdeBootRecord {
         if &data[3..11] != BDE_FILE_SYSTEM_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
-        if &data[160..176] != BDE_IDENTIFIER {
+        if &data[160..176] != BDE_USED_DISK_SPACE_ONLY_IDENTIFIER {
             return Err(keramics_core::error_trace_new!("Unsupported identifier"));
         }
         self.bytes_per_sector = bytes_to_u16_le!(data, 11);
@@ -115,6 +133,8 @@ impl BdeBootRecord {
         self.metadata_block_offset1 = bytes_to_u64_le!(data, 176);
         self.metadata_block_offset2 = bytes_to_u64_le!(data, 184);
         self.metadata_block_offset3 = bytes_to_u64_le!(data, 192);
+        self.encrypt_on_write_data_offset1 = bytes_to_u64_le!(data, 200);
+        self.encrypt_on_write_data_offset2 = bytes_to_u64_le!(data, 208);
 
         Ok(())
     }
@@ -128,7 +148,7 @@ mod tests {
         vec![
             0xeb, 0x58, 0x90, 0x2d, 0x46, 0x56, 0x45, 0x2d, 0x46, 0x53, 0x2d, 0x00, 0x02, 0x08,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x00, 0x00, 0x3f, 0x00, 0xff, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x1f, 0x00, 0x00, 0x00, 0x00,
+            0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x1f, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x29, 0x00, 0x00, 0x00,
             0x00, 0x4e, 0x4f, 0x20, 0x4e, 0x41, 0x4d, 0x45, 0x20, 0x20, 0x20, 0x20, 0x46, 0x41,
@@ -137,11 +157,11 @@ mod tests {
             0x98, 0x40, 0x74, 0x0c, 0x48, 0x74, 0x0e, 0xb4, 0x0e, 0xbb, 0x07, 0x00, 0xcd, 0x10,
             0xeb, 0xef, 0xa0, 0xfd, 0x7d, 0xeb, 0xe6, 0xcd, 0x16, 0xcd, 0x19, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3b, 0xd6, 0x67, 0x49, 0x29, 0x2e, 0xd8, 0x4a,
-            0x83, 0x99, 0xf6, 0xa3, 0x39, 0xe3, 0xd0, 0x01, 0x00, 0x00, 0x10, 0x02, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x50, 0x95, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0xa0, 0x1a, 0x0b,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3b, 0x4d, 0xa8, 0x92, 0x80, 0xdd, 0x0e, 0x4d,
+            0x9e, 0x4e, 0xb1, 0xe3, 0x28, 0x4e, 0xae, 0xd8, 0x00, 0x00, 0x1f, 0x02, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x60, 0x94, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb0, 0x09, 0x03,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x21, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xcf, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x0d, 0x0a, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x20, 0x64,
@@ -170,14 +190,16 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = BdeBootRecord::new();
+        let mut test_struct = BdeBootRecordUsedDiskSpace::new();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.bytes_per_sector, 512);
         assert_eq!(test_struct.number_of_sectors, 0);
-        assert_eq!(test_struct.metadata_block_offset1, 0x02100000);
-        assert_eq!(test_struct.metadata_block_offset2, 0x06955000);
-        assert_eq!(test_struct.metadata_block_offset3, 0x0b1aa000);
+        assert_eq!(test_struct.metadata_block_offset1, 0x021f0000);
+        assert_eq!(test_struct.metadata_block_offset2, 0x02946000);
+        assert_eq!(test_struct.metadata_block_offset3, 0x0309b000);
+        assert_eq!(test_struct.encrypt_on_write_data_offset1, 0x02212000);
+        assert_eq!(test_struct.encrypt_on_write_data_offset2, 0x02cf0000);
 
         Ok(())
     }
@@ -186,7 +208,7 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = BdeBootRecord::new();
+        let mut test_struct = BdeBootRecordUsedDiskSpace::new();
         let result = test_struct.read_data(&test_data[0..511]);
         assert!(result.is_err());
     }
@@ -196,7 +218,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[3] = 0xff;
 
-        let mut test_struct = BdeBootRecord::new();
+        let mut test_struct = BdeBootRecordUsedDiskSpace::new();
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
@@ -206,7 +228,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[160] = 0xff;
 
-        let mut test_struct = BdeBootRecord::new();
+        let mut test_struct = BdeBootRecordUsedDiskSpace::new();
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }

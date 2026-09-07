@@ -16,4 +16,5 @@
 pub enum BdeCredential {
     None,
     Passphrase(Vec<u8>),
+    RecoveryPassword(Vec<u8>),
 }

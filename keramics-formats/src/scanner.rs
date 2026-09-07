@@ -591,11 +591,9 @@ mod tests {
 
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to build format scanner",
-                    error
-                ));
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build format scanner");
+                return Err(error);
             }
         };
         let path_string: String = get_test_data_path("qcow/ext2.qcow2");

@@ -177,6 +177,9 @@ impl BdeFileSystem {
                     VfsCredential::Passphrase(passphrase) => {
                         credentials.push(BdeCredential::Passphrase(passphrase.clone()))
                     }
+                    VfsCredential::RecoveryPassword(recovery_password) => {
+                        credentials.push(BdeCredential::RecoveryPassword(recovery_password.clone()))
+                    }
                     _ => {}
                 }
             }
@@ -203,8 +206,6 @@ mod tests {
 
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
-    use crate::mbr::MbrFileSystem;
-    use crate::vhd::VhdFileSystem;
 
     use crate::tests::get_test_data_path;
 

@@ -34,11 +34,12 @@ impl VfsCredentialStore {
         })
     }
 
-    /// Adds a passphrase.
-    pub fn add_passphrase(&self, password: &[u8]) -> Result<(), ErrorTrace> {
+    /// Adds a credential.
+    pub fn add_credential(&self, credential: VfsCredential) -> Result<(), ErrorTrace> {
         match self.credentials.write() {
             Ok(mut credentials) => {
-                credentials.push(VfsCredential::Passphrase(password.to_vec()));
+                credentials.push(credential);
+
                 Ok(())
             }
             Err(error) => Err(keramics_core::error_trace_new_with_error!(
@@ -63,12 +64,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_add_passphrase() -> Result<(), ErrorTrace> {
+    fn test_add_credential() -> Result<(), ErrorTrace> {
         let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
 
         assert_eq!(credential_store.iter().count(), 0);
 
-        credential_store.add_passphrase("KeRaMiCs".as_bytes())?;
+        let passphrase: Vec<u8> = "KeRaMiCs".as_bytes().to_vec();
+        credential_store.add_credential(VfsCredential::Passphrase(passphrase))?;
 
         assert_eq!(credential_store.iter().count(), 1);
 

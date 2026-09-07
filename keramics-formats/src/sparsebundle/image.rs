@@ -175,7 +175,7 @@ impl SparseBundleImage {
 
         keramics_core::debug_trace_data!("SparseBundleImageXmlPlist", 0, &data, data_stream_size);
 
-        let string: String = match String::from_utf8(data) {
+        let string: &str = match str::from_utf8(&data) {
             Ok(string) => string,
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
@@ -186,13 +186,11 @@ impl SparseBundleImage {
         };
         let mut xml_plist: XmlPlist = XmlPlist::new();
 
-        match xml_plist.parse(string.as_str()) {
+        match xml_plist.parse(string) {
             Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to parse XML plist",
-                    error
-                ));
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to XML parse plist");
+                return Err(error);
             }
         }
         match xml_plist

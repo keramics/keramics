@@ -128,6 +128,7 @@ impl SplitRawImage {
                 return Err(error);
             }
         }
+        if self.number_of_segment_files <= 1 {}
         self.file_resolver = file_resolver.clone();
 
         Ok(())
@@ -305,6 +306,28 @@ mod tests {
         image.open(&file_resolver, &file_name)?;
 
         Ok(image)
+    }
+
+    // TODO: add tests for get_data_stream
+
+    #[test]
+    fn test_get_media_size() -> Result<(), ErrorTrace> {
+        let image: SplitRawImage = get_image()?;
+
+        let media_size: u64 = image.get_media_size();
+        assert_eq!(media_size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_segments() -> Result<(), ErrorTrace> {
+        let image: SplitRawImage = get_image()?;
+
+        let number_of_segments: u16 = image.get_number_of_segments();
+        assert_eq!(number_of_segments, 5);
+
+        Ok(())
     }
 
     #[test]

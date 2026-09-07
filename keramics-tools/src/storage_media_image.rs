@@ -179,53 +179,60 @@ impl StorageMediaImage {
                 ));
             }
         }
-
-        match vfs_scanner.scan_for_storage_media_image_format(&data_stream) {
-            Ok(Some(FormatIdentifier::CdsaEncr)) => {
+        let format_identifier: Option<FormatIdentifier> =
+            match vfs_scanner.scan_for_storage_media_image_format(&data_stream) {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to scan data stream for storage media image format signatures"
+                    );
+                    return Err(error);
+                }
+            };
+        match format_identifier {
+            Some(FormatIdentifier::CdsaEncr) => {
                 return Err(keramics_core::error_trace_new!(
                     "Store media image is encrypted and requires a credential to be unlocked",
                 ));
             }
-            Ok(Some(FormatIdentifier::Ewf)) => return Self::open_ewf_image(path),
-            Ok(Some(FormatIdentifier::Pdi)) => return Self::open_pdi_image(path, image_layer),
-            Ok(Some(FormatIdentifier::Qcow)) => return Self::open_qcow_image(path, image_layer),
-            Ok(Some(FormatIdentifier::SparseImage)) => return Self::open_sparseimage_file(path),
-            Ok(Some(FormatIdentifier::Udif)) => return Self::open_udif_image(path),
-            Ok(Some(FormatIdentifier::Vhd)) => return Self::open_vhd_image(path, image_layer),
-            Ok(Some(FormatIdentifier::Vhdx)) => return Self::open_vhdx_image(path, image_layer),
-            Ok(Some(FormatIdentifier::Vmdk)) => return Self::open_vmdk_image(path, image_layer),
-            Ok(Some(format_identifier)) => {
+            Some(FormatIdentifier::Ewf) => return Self::open_ewf_image(path),
+            Some(FormatIdentifier::Pdi) => return Self::open_pdi_image(path, image_layer),
+            Some(FormatIdentifier::Qcow) => return Self::open_qcow_image(path, image_layer),
+            Some(FormatIdentifier::SparseImage) => return Self::open_sparseimage_file(path),
+            Some(FormatIdentifier::Udif) => return Self::open_udif_image(path),
+            Some(FormatIdentifier::Vhd) => return Self::open_vhd_image(path, image_layer),
+            Some(FormatIdentifier::Vhdx) => return Self::open_vhdx_image(path, image_layer),
+            Some(FormatIdentifier::Vmdk) => return Self::open_vmdk_image(path, image_layer),
+            Some(format_identifier) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unsupported format: {}",
                     format_identifier
                 )));
             }
-            Ok(None) => match Self::open_splitraw_image(path) {
+            None => match Self::open_splitraw_image(path) {
                 Ok(storage_media_image) => return Ok(storage_media_image),
                 Err(_) => {}
             },
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to scan data stream for storage media image format signatures"
-                );
-                return Err(error);
-            }
-        }
+        };
         // Scan for volume and file system formats to detect encrypted volumes and raw storage
         // media images.
-        match vfs_scanner.scan_for_volume_system_format(&data_stream) {
-            Ok(Some(FormatIdentifier::Bde)) => return Self::open_bde_volume(path),
-            Ok(Some(FormatIdentifier::Luks)) => return Self::open_luks_volume(path),
-            Ok(Some(_)) => return Self::open_raw_image(path),
-            Ok(None) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to scan data stream for volume system format signatures"
-                );
-                return Err(error);
-            }
+        let format_identifier: Option<FormatIdentifier> =
+            match vfs_scanner.scan_for_volume_system_format(&data_stream) {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to scan data stream for volume system format signatures"
+                    );
+                    return Err(error);
+                }
+            };
+        match format_identifier {
+            Some(FormatIdentifier::Bde) => return Self::open_bde_volume(path),
+            Some(FormatIdentifier::Luks) => return Self::open_luks_volume(path),
+            Some(_) => return Self::open_raw_image(path),
+            None => {}
         }
         match vfs_scanner.scan_for_file_system_format(&data_stream) {
             Ok(Some(_)) => Self::open_raw_image(path),
@@ -275,6 +282,9 @@ impl StorageMediaImage {
                 match vfs_credential {
                     VfsCredential::Passphrase(passphrase) => {
                         credentials.push(BdeCredential::Passphrase(passphrase.clone()))
+                    }
+                    VfsCredential::RecoveryPassword(recovery_password) => {
+                        credentials.push(BdeCredential::RecoveryPassword(recovery_password.clone()))
                     }
                     _ => {}
                 }
@@ -701,6 +711,13 @@ impl StorageMediaImage {
                 keramics_core::error_trace_add_frame!(error, "Unable to open split raw image");
                 return Err(error);
             }
+        }
+        let number_of_segments: u16 = splitraw_image.get_number_of_segments();
+
+        if number_of_segments <= 1 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported split raw image - one or less segment files found"
+            ));
         }
         Ok(Self::SplitRaw {
             splitraw_image: Arc::new(splitraw_image),
