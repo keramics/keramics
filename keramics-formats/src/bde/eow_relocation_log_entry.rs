@@ -13,39 +13,51 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
+use keramics_types::bytes_to_u32_le;
 
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "little",
-        field(name = "signature", data_type = "[u8; 10]", format = "hex"),
-        field(name = "header_size", data_type = "u16"),
-        field(name = "block_record_size", data_type = "u32"),
-        field(name = "unknown2", data_type = "u32"),
-        field(name = "unknown3", data_type = "u64"),
-        field(name = "unknown4", data_type = "u32"),
-        field(name = "checksum", data_type = "u32", format = "hex"),
-        field(name = "unknown3", data_type = "[u8; 476]"),
+        field(name = "unknown1", data_type = "u16"),
+        field(name = "unknown2", data_type = "u16"),
+        field(name = "unknown3", data_type = "u16"),
+        field(name = "unknown4", data_type = "u16"),
+        field(name = "unknown5", data_type = "u32"),
+        field(name = "volume_region_offset", data_type = "u64", format = "hex"),
+        field(name = "encrypted_sectors_data_size", data_type = "u32"),
+        field(
+            name = "encrypted_sectors_data_checksum",
+            data_type = "u32",
+            format = "hex"
+        ),
+        field(name = "unknown_checksum", data_type = "u32", format = "hex"),
     ),
-    methods("debug_read_data", "read_at_position")
+    methods("debug_read_data")
 )]
-/// BitLocker Drive Encryption (BDE) encrypt on write (EOW) block record.
-pub struct BdeEncryptOnWriteBlockRecord {}
+/// BitLocker Drive Encryption (BDE) Encrypt-on-Write (EOW) relocation log entry.
+pub struct BdeEowRelocationLogEntry {
+    /// Encrypted sectors data checksum.
+    pub encrypted_sectors_data_checksum: u32,
+}
 
-impl BdeEncryptOnWriteBlockRecord {
-    /// Creates a new encrypt on write (EOW) block record.
+impl BdeEowRelocationLogEntry {
+    /// Creates a new Encrypt-on-Write (EOW) relocation log entry.
     pub fn new() -> Self {
-        Self {}
+        Self {
+            encrypted_sectors_data_checksum: 0,
+        }
     }
 
-    /// Reads the encrypt on write (EOW) block record from a buffer.
+    /// Reads the Encrypt-on-Write (EOW) relocation log entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 60 {
+        let data_size: usize = data.len();
+
+        if data_size < 42 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        if &data[0..10] != b"FVE-EOWBR\x00" {
-            return Err(keramics_core::error_trace_new!("Unsupported signature"));
-        }
+        self.encrypted_sectors_data_checksum = bytes_to_u32_le!(data, 38);
+
         Ok(())
     }
 }
@@ -54,15 +66,11 @@ impl BdeEncryptOnWriteBlockRecord {
 mod tests {
     use super::*;
 
-    use std::io::SeekFrom;
-
-    use keramics_core::{DataStreamReference, open_fake_data_stream};
-
     fn get_test_data() -> Vec<u8> {
         vec![
-            0x46, 0x56, 0x45, 0x2d, 0x45, 0x4f, 0x57, 0x42, 0x52, 0x00, 0x24, 0x00, 0x00, 0x02,
-            0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x01, 0x00, 0x00, 0x00, 0x8b, 0x52, 0x85, 0x70, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00,
+            0x20, 0x00, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0xeb, 0x8e, 0x97, 0xd7,
+            0x1a, 0xf1, 0xcf, 0xbe, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -104,8 +112,10 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = BdeEncryptOnWriteBlockRecord::new();
+        let mut test_struct = BdeEowRelocationLogEntry::new();
         test_struct.read_data(&test_data)?;
+
+        assert_eq!(test_struct.encrypted_sectors_data_checksum, 0);
 
         Ok(())
     }
@@ -114,29 +124,8 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = BdeEncryptOnWriteBlockRecord::new();
-        let result = test_struct.read_data(&test_data[0..59]);
+        let mut test_struct = BdeEowRelocationLogEntry::new();
+        let result = test_struct.read_data(&test_data[0..41]);
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_read_data_with_unsupported_signature() {
-        let mut test_data: Vec<u8> = get_test_data();
-        test_data[0] = 0xff;
-
-        let mut test_struct = BdeEncryptOnWriteBlockRecord::new();
-        let result = test_struct.read_data(&test_data);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_read_at_position() -> Result<(), ErrorTrace> {
-        let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
-
-        let mut test_struct = BdeEncryptOnWriteBlockRecord::new();
-        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
-
-        Ok(())
     }
 }

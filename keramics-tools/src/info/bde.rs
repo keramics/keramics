@@ -39,6 +39,8 @@ impl<'a> fmt::Display for BdeEncryptedVolumeInfo<'a> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "BitLocker Drive Encryption (BDE) information:")?;
 
+        // TODO: print format version 1.0 Vista, 2.0 Win7 and later
+
         writeln!(
             formatter,
             "    Identifier\t\t\t\t\t: {}",

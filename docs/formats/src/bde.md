@@ -56,16 +56,18 @@ In BitLocker Windows 7 and later the "\System Volume Information" directory cont
 BitLocker related files:
 
 * "FVE2.{09cf57b8-9e6c-43d4-ae1f-0408882a397d}.[1-6]", maps
-  [an Encrypt-on-Write (EOW) block map](#encrypt_on_write_block_map), used by "Used Disk Space Only
-  encryption".
+  [an Encrypt-on-Write (EOW) block map area](#encrypt_on_write_block_map_area), used by "Used
+  Disk Space Only encryption".
 * "FVE2.{24e6f0ae-6a00-4f73-984b-75ce9942852d}" maps the block that contains the encrypted boot
   record; typically 8192 bytes in size.
 * "FVE2.{93de4bce-e958-48b6-9fac-602d0294e5ef}.[12]", maps
-  [Encrypt-on-Write (EOW) data](#encrypt_on_write_data), used by "Used Disk Space Only encryption".
+  [Encrypt-on-Write (EOW) descriptor](#encrypt_on_write_descriptor), used by "Used Disk Space Only
+  encryption".
 * "FVE2.{aff97bac-a69b-45da-aba1-2cfbce434750}.[12]", introduced in Windows 8, typically 512 bytes
   in size (possibly 1 sector in size?).
-* "FVE2.{c9ca54a3-6983-46b7-8684-a7e5e23499e3}.[1-6]", maps an Encrypt-on-Write (EOW) "OLRDHEVF2
-  area", used by "Used Disk Space Only encryption".
+* "FVE2.{c9ca54a3-6983-46b7-8684-a7e5e23499e3}.[1-6]", maps
+  [an Encrypt-on-Write (EOW) relocation log area](#encrypt_on_write_relocation_log_area), used by
+  "Used Disk Space Only encryption".
 * "FVE2.{da392a22-cae0-4f0f-9a30-b8830385d046}", introduced in Windows 10, typically 65536 bytes
   in size.
 * "FVE2.{e40ad34d-dae9-4bc7-95bd-b16218c10f72}.[1-3]" maps [a metadata block](#metadata_block);
@@ -488,7 +490,7 @@ differences have been emphasized in bold. The boot record is 512 bytes in size a
 
 <!-- rumdl-enable MD033 MD056 -->
 
-### BitLocker BitLocker Used Disk Space Only encryption
+### BitLocker Used Disk Space Only encryption
 
 The BitLocker Used Disk Space Only encryption boot record for a NTFS volume is similar to a
 [BitLocker Windows 7 and later boot record](#boot_record). The differences have been emphasized
@@ -538,15 +540,16 @@ in bold. The boot record is 512 bytes of size and consists of:
 | 176 | 8 | | Metadata block 1 offset, which is relative to the start of the volume |
 | 184 | 8 | | Metadata block 2 offset, which is relative to the start of the volume |
 | 192 | 8 | | Metadata block 3 offset, which is relative to the start of the volume |
-| **200** | **8** | | **Encrypt-on-Write data 1 offset**, which is relative to the start of the volume |
-| **208** | **8** | | **Encrypt-on-Write data 2 offset**, which is relative to the start of the volume |
+| **200** | **8** | | **Encrypt-on-Write descriptor 1 offset**, which is relative to the start of the volume |
+| **208** | **8** | | **Encrypt-on-Write descriptor 2 offset**, which is relative to the start of the volume |
 | **216** | **294** | | **Unknown (part of bootcode)** |
 | 510 | 2 | 0x55 0xaa | Sector signature |
 
 <!-- rumdl-enable MD033 MD056 -->
 
 > Note that Windows 10 version for Bitlocker without "Used Disk Space Only encryption" can also
-> contain Encrypt-on-Write data blocks stored within the metadata blocks.
+> contain Encrypt-on-Write structures within the metadata blocks, these might be remnants of of
+> encrypting the volume.
 
 ## Metadata block {#metadata_block}
 
@@ -851,7 +854,7 @@ The metadata area descriptors has value type 0x000f and is 16 or more bytes in s
 | 16 | 2 | 3, 4 or 5 | Unknown (format version or number of descriptors?) |
 | 18 | 2 | 36, 60 or 76 | Unknown (size of additional data?) |
 | 20 | 4 | | Unknown |
-| 24 | 8 | 0x09, 0x0a, 0x0b, 0xca, 0xcb | Unknown (flags?), 0xc0 used by "Used Disk Space Only encryption"? |
+| 24 | 8 | | Unknown (flags?) |
 | 32 | 8 | | Unknown (offset?) |
 | 40 | 4 | | Unknown (size?) |
 | 44 | 4 | 512 | Logical sector size |
@@ -872,6 +875,19 @@ within the encrypted volume, where certain metadata is stored, such as the unenc
 
 The unencrypted boot record is commonly 8192 bytes in size for BitLocker Windows 7 (and later)
 and 5365760 bytes for BitLocker To Go.
+
+#### Unknown flags
+
+| Value | Identifier | Description |
+| --- | --- | --- |
+| 0x01 | | |
+| 0x02 | | |
+| 0x04 | | |
+| 0x08 | | |
+| 0x10 | | |
+| 0x20 | | |
+| 0x40 | | Unknown (related to pause? seen: 0x4b while paused of used disk space only) |
+| 0x80 | | Unknown (related to pause? seen: 0xcb after initialization of used disk space only) |
 
 ## BitLocker External Key (BEK) file
 
@@ -911,9 +927,9 @@ The identifier of the VMK should match the identifier in the BEK file header.
 
 Checksums use a CRC-32 with the polynominal 0xedb88320 and initial value 0.
 
-### Encrypt-on-Write data (FVE-EOW) {#encrypt_on_write_data}
+### Encrypt-on-Write (FVE-EOW) descriptor {#encrypt_on_write_descriptor}
 
-The Encrypt-on-Write data (FVE-EOW) is variable of size and consists of:
+The Encrypt-on-Write (FVE-EOW) descriptor is variable of size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -925,29 +941,36 @@ The Encrypt-on-Write data (FVE-EOW) is variable of size and consists of:
 | 10 | 2 | | Data size |
 | 12 | 4 | | Logical sector size (or EOW data sector size?) |
 | 16 | 4 | | Physical sector size (or block record size?) |
-| 20 | 4 | | Unknown (Block size?) |
-| 24 | 4 | | OLRDHEVF2 area size |
-| 28 | 4 | | Unknown (Flags?) |
+| 20 | 4 | | Relocation block size |
+| 24 | 4 | | Encrypt-on-Write relocation log area size |
+| 28 | 4 | | Encrypt-on-Write relocation log entry size |
 | 32 | 4 | | Number of block map offsets |
-| 36 | 4 | | Checksum of the data from the start of the Encrypt-on-Write data (FVE-EOW) upto data size with the checksum value set to 0 |
-| 40 | 8 | | Encrypt-on-Write data 1 offset |
-| 48 | 8 | | Encrypt-on-Write data 2 offset |
+| 36 | 4 | | Checksum of the data from the start of the Encrypt-on-Write descriptor upto data size with the checksum value set to 0 |
+| 40 | 8 | | Encrypt-on-Write descriptor 1 offset |
+| 48 | 8 | | Encrypt-on-Write descriptor 2 offset |
 | <td colspan="4">&nbsp;</td> |
-| 56 | number x 8 | | Array of 64-bit [block map](#encrypt_on_write_block_map) offsets |
+| 56 | number x 8 | | Array of 64-bit [block map area](#encrypt_on_write_block_map_area) offsets |
 | ... | ... | | Unknown (empty values) |
 
 <!-- rumdl-enable MD033 MD056 -->
 
-### Encrypt-on-Write block map (FVE-EOWBM) {#encrypt_on_write_block_map}
+> Note that Encrypt-on-Write descriptor 1 and 2 are copies and should reference the same block map
+> areas.
 
-The Encrypt-on-Write block map (FVE-EOWBM) is variable of size and consists of:
+### Encrypt-on-Write block map area {#encrypt_on_write_block_map_area}
 
-* Encrypt-on-Write block map (FVE-EOWBM) header
+The Encrypt-on-Write block map area is variable of size and consists of:
+
+* Encrypt-on-Write block map (FVE-EOWBM)
 * One or more Encrypt-on-Write block (map) records
 
-#### Encrypt-on-Write block map header
+> Note that "FVE2.{09cf57b8-9e6c-43d4-ae1f-0408882a397d}.[1-6]" masks the Encrypt-on-Write block
+> map area, with a 4096 aligment size.
 
-The Encrypt-on-Write block map header is variable of size, and stored as a sector, and consists of:
+#### Encrypt-on-Write block map (FVE-EOWBM)
+
+The Encrypt-on-Write block map (FVE-EOWBM) is variable of size, stored as a (physical) sector, and
+consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -958,21 +981,22 @@ The Encrypt-on-Write block map header is variable of size, and stored as a secto
 | 10 | 2 | 60 | Header size |
 | 12 | 4 | | Block map size, including the size of the block records |
 | 16 | 4 | | Block map index, corresponds to the index in the offset array of the EOW data |
-| 20 | 8 | | Volume logical offset, region (or area) of the volume this block map represents |
-| 28 | 8 | | Volume logical size |
-| 36 | 8 | | OLRDHEVF2 area offset |
+| 20 | 8 | | Volume region offset, region (or area) of the volume this block map represents |
+| 28 | 8 | | Volume region size |
+| 36 | 8 | | Encrypt-on-Write relocation log area offset |
 | 44 | 4 | | Block record offset 1, relative to start of the block map |
 | 48 | 4 | | Block record offset 2, relative to start of the block map |
-| 52 | 4 | | Block record size (or physical sector size?) |
-| 56 | 4 | | Checksum, of the sector data with the checksum value set to 0 |
+| 52 | 4 | | Block record size |
+| 56 | 4 | | Checksum, of the (physical) sector data with the checksum value set to 0 |
+| <td colspan="4">&nbsp;</td> |
 | 60 | ... | | Unknown (empty values) |
 
 <!-- rumdl-enable MD033 MD056 -->
 
 #### Encrypt-on-Write block (map) record (FVE-EOWBR)
 
-The Encrypt-on-Write block (map) record (FVE-EOWBR) is variable of size, and stored as a sector, and
-consists of:
+The Encrypt-on-Write block (map) record (FVE-EOWBR) is variable of size, stored as one or more
+(physical) sectors, and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -981,31 +1005,77 @@ consists of:
 | <td colspan="4">*Header*</td> |
 | 0 | 10 | "FVE-EOWBR\x00" | Signature |
 | 10 | 2 | 36 | Header size |
-| 12 | 4 | | Block record size (or physical sector size?) |
-| 16 | 4 | | Unknown |
-| 20 | 8 | | Unknown |
-| 28 | 4 | | Unknown |
-| 32 | 4 | | Checksum |
+| 12 | 4 | | Physical sector size |
+| 16 | 4 | | Unknown (bitmap size, in number of bits?) |
+| 20 | 4 | | Sequence number |
+| 24 | 4 | 0 | Unknown |
+| 28 | 4 | | Unknown (flags?, seen 0 and 1) |
+| 32 | 4 | | Checksum, of the (physical) sectors data with the checksum value set to 0 |
 | <td colspan="4">&nbsp;</td> |
 | 36 | ... | | Bitmap |
 | ... | ... | | Unknown (empty values) |
 
 <!-- rumdl-enable MD033 MD056 -->
 
-### OLRDHEVF2 area
+### Encrypt-on-Write relocation log area {#encrypt_on_write_relocation_log_area}
 
-The OLRDHEVF2 area is variable of size, and consists of:
+The Encrypt-on-Write Encrypt-on-Write relocation log area is variable of size and consists of:
+
+* Encrypt-on-Write relocation log area (OLRDHEVF2) header
+* Encrypt-on-Write relocation log entries
+  * Encrypt-on-Write relocation log entry descriptor
+  * encrypted sector data or 0-byte values
+  * backup of Encrypt-on-Write relocation log entry descriptor
+* backup of Encrypt-on-Write relocation log area (OLRDHEVF2) header
+* Unknown (empty values)
+
+> Note that "FVE2.{c9ca54a3-6983-46b7-8684-a7e5e23499e3}.[1-6]" masks the Encrypt-on-Write
+> relocation log area, with a 4096 aligment size.
+
+#### Encrypt-on-Write relocation log area (OLRDHEVF2) header
+
+The Encrypt-on-Write relocation log area (OLRDHEVF2) header is variable of size, stored as a
+(logical) sector, and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 10 | "OLRDHEVF2\x00" | Signature |
-| 10 | 2 | | Unknown |
-| 12 | 2 | | Unknown |
-| 14 | 4 | | Unknown (Size?) |
-| 18 | 8 | | Encrypted volume size |
-| 26 | 8 | | Unknown |
-| 34 | 8 | | Unknown |
-| 42 | 8 | | Volume logical offset |
+| 10 | 2 | 1 | Unknown |
+| 12 | 2 | 2 | Unknown (Number of entries?) |
+| 14 | 4 | | Unknown (Logical sector or entry descriptor size?) |
+| 18 | 8 | | (Encrypted) volume size |
+| 26 | 4 | | Relocation block size |
+| 30 | 4 | | Encrypt-on-Write relocation log entry size |
+| 34 | 4 | 32 | Unknown |
+| 38 | 4 | 2 | Unknown |
+| 42 | 8 | | Volume region offset, region (or area) of the volume this relocation log represents |
+
+#### Encrypt-on-Write relocation log entry descriptor
+
+The Encrypt-on-Write relocation log entry descriptor is variable of size, stored as a (logical)
+sector, and consists of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 2 | 32 | Unknown |
+| 2 | 2 | 1 | Unknown |
+| 4 | 2 | | Unknown (0 if unencrypted region?) |
+| 6 | 2 | 0 | Unknown |
+| 8 | 4 | 0 | Unknown |
+| 12 | 8 | | Volume region offset, region (or area) of the volume this relocation log entry represents, or 0 if the region is not used by the relocation log |
+| 20 | 4 | | (Used) encrypted sector data size |
+| 38 | 4 | | Checksum of the encrypted sectors data |
+| 42 | 4 | | Unknown (checksum of the unencrypted sectors data?) |
+
+> Note that an Encrypt-on-Write relocation log entry descriptor can be empty (filled with 0-byte
+> values).
+
+#### Encrypt-on-Write encrypted sector data
+
+* 16 bytes of encrypted sector data per sector? decryption sector key is the corresponding volume
+  region offset
+
+TODO: determine if 32 is a compression factor, given 16 x 32 = 512
 
 ## References
 

@@ -54,16 +54,8 @@ use super::constants::*;
         field(name = "metadata_block_offset1", data_type = "u64", format = "hex"),
         field(name = "metadata_block_offset2", data_type = "u64", format = "hex"),
         field(name = "metadata_block_offset3", data_type = "u64", format = "hex"),
-        field(
-            name = "encrypt_on_write_data_offset1",
-            data_type = "u64",
-            format = "hex"
-        ),
-        field(
-            name = "encrypt_on_write_data_offset2",
-            data_type = "u64",
-            format = "hex"
-        ),
+        field(name = "eow_descriptor_offset1", data_type = "u64", format = "hex"),
+        field(name = "eow_descriptor_offset2", data_type = "u64", format = "hex"),
         field(name = "unknown3", data_type = "[u8; 294]", format = "hex"),
         field(name = "boot_signature", data_type = "[u8; 2]", format = "hex"),
     ),
@@ -86,11 +78,11 @@ pub struct BdeBootRecordUsedDiskSpace {
     /// Metadata block offset 3.
     pub metadata_block_offset3: u64,
 
-    /// Encrypt on write (EOW) data offset 1.
-    pub encrypt_on_write_data_offset1: u64,
+    /// Encrypt-on-Write (EOW) descriptor offset 1.
+    pub eow_descriptor_offset1: u64,
 
-    /// Encrypt on write (EOW) data offset 2.
-    pub encrypt_on_write_data_offset2: u64,
+    /// Encrypt-on-Write (EOW) descriptor offset 2.
+    pub eow_descriptor_offset2: u64,
 }
 
 impl BdeBootRecordUsedDiskSpace {
@@ -102,8 +94,8 @@ impl BdeBootRecordUsedDiskSpace {
             metadata_block_offset1: 0,
             metadata_block_offset2: 0,
             metadata_block_offset3: 0,
-            encrypt_on_write_data_offset1: 0,
-            encrypt_on_write_data_offset2: 0,
+            eow_descriptor_offset1: 0,
+            eow_descriptor_offset2: 0,
         }
     }
 
@@ -133,8 +125,8 @@ impl BdeBootRecordUsedDiskSpace {
         self.metadata_block_offset1 = bytes_to_u64_le!(data, 176);
         self.metadata_block_offset2 = bytes_to_u64_le!(data, 184);
         self.metadata_block_offset3 = bytes_to_u64_le!(data, 192);
-        self.encrypt_on_write_data_offset1 = bytes_to_u64_le!(data, 200);
-        self.encrypt_on_write_data_offset2 = bytes_to_u64_le!(data, 208);
+        self.eow_descriptor_offset1 = bytes_to_u64_le!(data, 200);
+        self.eow_descriptor_offset2 = bytes_to_u64_le!(data, 208);
 
         Ok(())
     }
@@ -198,8 +190,8 @@ mod tests {
         assert_eq!(test_struct.metadata_block_offset1, 0x021f0000);
         assert_eq!(test_struct.metadata_block_offset2, 0x02946000);
         assert_eq!(test_struct.metadata_block_offset3, 0x0309b000);
-        assert_eq!(test_struct.encrypt_on_write_data_offset1, 0x02212000);
-        assert_eq!(test_struct.encrypt_on_write_data_offset2, 0x02cf0000);
+        assert_eq!(test_struct.eow_descriptor_offset1, 0x02212000);
+        assert_eq!(test_struct.eow_descriptor_offset2, 0x02cf0000);
 
         Ok(())
     }
