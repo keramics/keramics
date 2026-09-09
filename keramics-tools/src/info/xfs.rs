@@ -600,14 +600,8 @@ impl XfsInfo {
                 }
             },
         };
-        let mut path_components: Vec<String> = match path {
-            Some(path) => path
-                .split('/')
-                .skip(2)
-                .map(|component| component.to_string())
-                .collect::<Vec<String>>(),
-            None => Vec::new(),
-        };
+        let mut path_components: Vec<String> = Vec::new();
+
         match Self::print_hierarchy_file_entry(&mut file_entry, &mut path_components) {
             Ok(_) => {}
             Err(mut error) => {

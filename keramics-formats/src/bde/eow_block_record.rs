@@ -11,83 +11,56 @@
  * under the License.
  */
 
+use std::io::SeekFrom;
+
 use keramics_checksums::ReversedCrc32Context;
-use keramics_core::ErrorTrace;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_layout_map::LayoutMap;
-use keramics_types::{bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
+use keramics_types::bytes_to_u32_le;
 
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "little",
-        field(name = "signature", data_type = "[u8; 8]", format = "hex"),
+        field(name = "signature", data_type = "[u8; 10]", format = "hex"),
         field(name = "header_size", data_type = "u16"),
-        field(name = "data_size", data_type = "u16"),
-        field(name = "logical_sector_size", data_type = "u32"),
         field(name = "physical_sector_size", data_type = "u32"),
-        field(name = "unknown1", data_type = "u32"),
-        field(name = "olrdhevf2_area_size", data_type = "u32"),
-        field(name = "unknown1", data_type = "u32", format = "hex"),
-        field(name = "number_of_block_map_offsets", data_type = "u32"),
+        field(name = "bitmap_size", data_type = "u32"),
+        field(name = "sequence_number", data_type = "u32"),
+        field(name = "unknown2", data_type = "u32"),
+        field(name = "flags", data_type = "u32", format = "hex"),
         field(name = "checksum", data_type = "u32", format = "hex"),
-        field(
-            name = "encrypt_on_write_data_offset1",
-            data_type = "u64",
-            format = "hex"
-        ),
-        field(
-            name = "encrypt_on_write_data_offset2",
-            data_type = "u64",
-            format = "hex"
-        ),
-        field(name = "block_map_offsets", data_type = "[u64; 8]", format = "hex"),
-        field(name = "unknown2", data_type = "[u8; 392]"),
+        field(name = "bitmap", data_type = "[u8; 16]", format = "hex"),
     ),
-    methods("debug_read_data", "read_at_position")
+    methods("debug_read_data")
 )]
-/// BitLocker Drive Encryption (BDE) encrypt on write (EOW) data.
-pub struct BdeEncryptOnWriteData {
-    /// OLRDHEVF2 area size.
-    pub olrdhevf2_area_size: u32,
+/// BitLocker Drive Encryption (BDE) Encrypt-on-Write (EOW) block record.
+pub struct BdeEowBlockRecord {}
 
-    /// Block map offsets.
-    pub block_map_offsets: Vec<u64>,
-}
-
-impl BdeEncryptOnWriteData {
-    /// Creates a new encrypt on write (EOW) data.
+impl BdeEowBlockRecord {
+    /// Creates a new Encrypt-on-Write (EOW) block record.
     pub fn new() -> Self {
-        Self {
-            olrdhevf2_area_size: 0,
-            block_map_offsets: Vec::new(),
-        }
+        Self {}
     }
 
-    /// Reads the encrypt on write (EOW) data from a buffer.
+    /// Reads the Encrypt-on-Write (EOW) block record from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
-        if data_size < 56 {
+        if data_size < 60 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        if &data[0..8] != b"FVE-EOW\x00" {
+        if &data[0..10] != b"FVE-EOWBR\x00" {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
-        let data_end_offset: usize = bytes_to_u16_le!(data, 10) as usize;
-
-        if data_end_offset < 56 || data_end_offset > data_size {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid data size value out of bounds"
-            ));
-        }
-        let checksum: u32 = bytes_to_u32_le!(data, 36);
+        let checksum: u32 = bytes_to_u32_le!(data, 32);
 
         if checksum != 0 {
             let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
 
-            crc32_context.update(&data[0..36]);
+            crc32_context.update(&data[0..32]);
             crc32_context.update(&[0; 4]);
-            crc32_context.update(&data[40..data_end_offset]);
+            crc32_context.update(&data[36..data_size]);
 
             let calculated_checksum: u32 = crc32_context.finalize();
 
@@ -98,20 +71,47 @@ impl BdeEncryptOnWriteData {
                 )));
             }
         }
-        self.olrdhevf2_area_size = bytes_to_u32_le!(data, 24);
+        Ok(())
+    }
 
-        let number_of_offsets: u32 = bytes_to_u32_le!(data, 32);
-
-        if (number_of_offsets as usize) > (data_size - 56) / 8 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid number of offsets value out of bounds"
-            ));
+    /// Reads the Encrypt-on-Write (EOW) block record from a specific position in a data stream.
+    pub fn read_at_position(
+        &mut self,
+        data_stream: &DataStreamReference,
+        data_size: usize,
+        position: SeekFrom,
+    ) -> Result<(), ErrorTrace> {
+        // Note that 65536 is an arbitrary chosen limit.
+        if data_size < 60 || data_size > 65536 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported Encrypt-on-Write (EOW) block record size: {} value out of bounds",
+                data_size
+            )));
         }
-        let offsets_end_offset: usize = 56 + ((number_of_offsets as usize) * 8);
+        let mut data: Vec<u8> = vec![0; data_size];
 
-        for chunk in data[56..offsets_end_offset].chunks_exact(8) {
-            let offset: u64 = bytes_to_u64_le!(chunk, 0);
-            self.block_map_offsets.push(offset);
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
+
+        keramics_core::debug_trace_data_and_structure!(
+            "BdeEowBlockRecord",
+            offset,
+            &data,
+            data_size,
+            BdeEowBlockRecord::debug_read_data(&data)
+        );
+        match self.read_data(&data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read Encrypt-on-Write (EOW) block record at offset: {} (0x{:08x})",
+                        offset, offset
+                    )
+                );
+                return Err(error);
+            }
         }
         Ok(())
     }
@@ -127,14 +127,14 @@ mod tests {
 
     fn get_test_data() -> Vec<u8> {
         vec![
-            0x46, 0x56, 0x45, 0x2d, 0x45, 0x4f, 0x57, 0x00, 0x38, 0x00, 0x68, 0x00, 0x00, 0x02,
-            0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x0c, 0x02, 0x00,
-            0x00, 0x04, 0x01, 0x00, 0x06, 0x00, 0x00, 0x00, 0x25, 0x95, 0x3a, 0x6e, 0x00, 0x20,
-            0x21, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xcf, 0x02, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x30, 0x21, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb0, 0x59, 0x02, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x60, 0x95, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0xcf, 0x02,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0xb0, 0x0a, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x60,
-            0x44, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x46, 0x56, 0x45, 0x2d, 0x45, 0x4f, 0x57, 0x42, 0x52, 0x00, 0x24, 0x00, 0x00, 0x02,
+            0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x8b, 0x52, 0x85, 0x70, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -171,11 +171,8 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = BdeEncryptOnWriteData::new();
+        let mut test_struct = BdeEowBlockRecord::new();
         test_struct.read_data(&test_data)?;
-
-        assert_eq!(test_struct.olrdhevf2_area_size, 134144);
-        assert_eq!(test_struct.block_map_offsets.len(), 6);
 
         Ok(())
     }
@@ -184,8 +181,8 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = BdeEncryptOnWriteData::new();
-        let result = test_struct.read_data(&test_data[0..55]);
+        let mut test_struct = BdeEowBlockRecord::new();
+        let result = test_struct.read_data(&test_data[0..59]);
         assert!(result.is_err());
     }
 
@@ -194,7 +191,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
-        let mut test_struct = BdeEncryptOnWriteData::new();
+        let mut test_struct = BdeEowBlockRecord::new();
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
@@ -204,8 +201,8 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut test_struct = BdeEncryptOnWriteData::new();
-        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
+        let mut test_struct = BdeEowBlockRecord::new();
+        test_struct.read_at_position(&data_stream, 512, SeekFrom::Start(0))?;
 
         Ok(())
     }
