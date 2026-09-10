@@ -42,6 +42,12 @@ pub struct BdeEowBlockMap {
     /// Block map size.
     pub block_map_size: u32,
 
+    /// Volume region offset.
+    pub volume_region_offset: u64,
+
+    /// Volume region size.
+    pub volume_region_size: u64,
+
     /// Encrypt-on-Write relocation log area offset.
     pub relocation_log_area_offset: u64,
 
@@ -60,6 +66,8 @@ impl BdeEowBlockMap {
     pub fn new() -> Self {
         Self {
             block_map_size: 0,
+            volume_region_offset: 0,
+            volume_region_size: 0,
             relocation_log_area_offset: 0,
             block_record_offset1: 0,
             block_record_offset2: 0,
@@ -96,6 +104,8 @@ impl BdeEowBlockMap {
             }
         }
         self.block_map_size = bytes_to_u32_le!(data, 12);
+        self.volume_region_offset = bytes_to_u64_le!(data, 20);
+        self.volume_region_size = bytes_to_u64_le!(data, 28);
         self.relocation_log_area_offset = bytes_to_u64_le!(data, 36);
         self.block_record_offset1 = bytes_to_u32_le!(data, 44);
         self.block_record_offset2 = bytes_to_u32_le!(data, 48);
@@ -202,6 +212,8 @@ mod tests {
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.block_map_size, 1536);
+        assert_eq!(test_struct.volume_region_offset, 0x00002000);
+        assert_eq!(test_struct.volume_region_size, 18800640);
         assert_eq!(test_struct.relocation_log_area_offset, 0x02214000);
         assert_eq!(test_struct.block_record_offset1, 0x00000200);
         assert_eq!(test_struct.block_record_offset2, 0x00000400);

@@ -25,7 +25,7 @@ pub struct VhdSectorBitmapRange {
 }
 
 impl VhdSectorBitmapRange {
-    /// Creates a new sector bitmap range.
+    /// Creates a new bitmap range.
     pub fn new(start_offset: u64, end_offset: u64, is_set: bool) -> Self {
         Self {
             size: end_offset - start_offset,
@@ -39,7 +39,7 @@ pub struct VhdSectorBitmap {
     /// Size.
     size: usize,
 
-    /// Number bytes a single bit represents.
+    /// Number of bytes a single bit represents.
     bytes_per_bit: u16,
 
     /// The ranges.
@@ -47,7 +47,7 @@ pub struct VhdSectorBitmap {
 }
 
 impl VhdSectorBitmap {
-    /// Creates a new sector bitmap.
+    /// Creates a new bitmap.
     pub fn new(size: usize, bytes_per_bit: u16) -> Self {
         Self {
             size,
@@ -56,7 +56,7 @@ impl VhdSectorBitmap {
         }
     }
 
-    /// Reads the sector bitmap from a buffer.
+    /// Reads the bitmap from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let mut offset: u64 = 0;
         let mut range_offset: u64 = 0;
@@ -87,7 +87,7 @@ impl VhdSectorBitmap {
         Ok(())
     }
 
-    /// Reads the sector bitmap from a specific position in a data stream.
+    /// Reads the bitmap from a specific position in a data stream.
     pub fn read_at_position(
         &mut self,
         data_stream: &DataStreamReference,

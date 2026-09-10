@@ -86,3 +86,22 @@ fn read_encrypted_volume() -> Result<(), ErrorTrace> {
 
     Ok(())
 }
+
+#[test]
+fn read_encrypted_volume_used_space_only() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/bde/bde_aes128_used_space.vhd");
+    let mut encrypted_volume: BdeEncryptedVolume = open_encrypted_volume(&path_buf)?;
+    let credentials: Vec<BdeCredential> = vec![BdeCredential::Passphrase(b"KeRaMiCs".to_vec())];
+    encrypted_volume.unlock(&credentials)?;
+
+    let data_stream: DataStreamReference = encrypted_volume.get_data_stream().unwrap();
+
+    // let (volume_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+    let (volume_offset, md5_hash): (u64, String) =
+        util::read_data_stream_with_output_file(&data_stream)?;
+
+    assert_eq!(volume_offset, encrypted_volume.get_volume_size());
+    assert_eq!(md5_hash.as_str(), "4ad8e69047c8742938afffb0a5dda0d1");
+
+    Ok(())
+}

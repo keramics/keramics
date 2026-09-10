@@ -42,6 +42,9 @@ pub struct BdeEowDescriptor {
     /// Physical sector size.
     pub physical_sector_size: u32,
 
+    /// Encrypt-on-Write relocation block size.
+    pub relocation_block_size: u32,
+
     /// Encrypt-on-Write relocation log area size.
     pub relocation_log_area_size: u32,
 
@@ -54,6 +57,7 @@ impl BdeEowDescriptor {
     pub fn new() -> Self {
         Self {
             physical_sector_size: 0,
+            relocation_block_size: 0,
             relocation_log_area_size: 0,
             block_map_offsets: Vec::new(),
         }
@@ -95,6 +99,7 @@ impl BdeEowDescriptor {
             }
         }
         self.physical_sector_size = bytes_to_u32_le!(data, 16);
+        self.relocation_block_size = bytes_to_u32_le!(data, 20);
         self.relocation_log_area_size = bytes_to_u32_le!(data, 24);
 
         let number_of_offsets: u32 = bytes_to_u32_le!(data, 32);
@@ -172,6 +177,7 @@ mod tests {
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.physical_sector_size, 512);
+        assert_eq!(test_struct.relocation_block_size, 2097152);
         assert_eq!(test_struct.relocation_log_area_size, 134144);
         assert_eq!(test_struct.block_map_offsets.len(), 6);
 

@@ -13,7 +13,7 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
+use keramics_types::{bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -37,8 +37,14 @@ pub struct BdeEowRelocationLogHeader {
     /// Number of entries.
     pub number_of_entries: u16,
 
+    /// Relocation block size.
+    pub relocation_block_size: u32,
+
     /// Relocation log entry size.
     pub entry_size: u32,
+
+    /// Volume region offset.
+    pub volume_region_offset: u64,
 }
 
 impl BdeEowRelocationLogHeader {
@@ -46,7 +52,9 @@ impl BdeEowRelocationLogHeader {
     pub fn new() -> Self {
         Self {
             number_of_entries: 0,
+            relocation_block_size: 0,
             entry_size: 0,
+            volume_region_offset: 0,
         }
     }
 
@@ -61,7 +69,9 @@ impl BdeEowRelocationLogHeader {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.number_of_entries = bytes_to_u16_le!(data, 12);
+        self.relocation_block_size = bytes_to_u32_le!(data, 26);
         self.entry_size = bytes_to_u32_le!(data, 30);
+        self.volume_region_offset = bytes_to_u64_le!(data, 42);
 
         Ok(())
     }
@@ -121,7 +131,9 @@ mod tests {
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.number_of_entries, 2);
+        assert_eq!(test_struct.relocation_block_size, 2097152);
         assert_eq!(test_struct.entry_size, 66560);
+        assert_eq!(test_struct.volume_region_offset, 0x00002000);
 
         Ok(())
     }
