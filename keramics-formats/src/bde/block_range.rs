@@ -26,7 +26,7 @@ pub struct BdeBlockRange {
     /// Logical offset.
     pub logical_offset: u64,
 
-    /// Data offset.
+    /// Physical offset.
     pub physical_offset: u64,
 
     /// Size.

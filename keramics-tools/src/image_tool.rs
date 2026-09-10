@@ -1078,7 +1078,7 @@ fn main() -> ExitCode {
                 }
             }
             None => {
-                println!("Unsuported credential - missing type prefix",);
+                println!("Unsuported credential - missing type prefix");
                 return ExitCode::FAILURE;
             }
         }

@@ -18,6 +18,29 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_le;
 
+/// BitLocker Drive Encryption (BDE) Encrypt-on-Write (EOW) block bitmap range.
+pub struct BdeEowBlockBitmapRange {
+    /// Start offset.
+    pub start_offset: u64,
+
+    /// End offset.
+    pub end_offset: u64,
+
+    /// Value to indicate the bit was set.
+    pub is_set: bool,
+}
+
+impl BdeEowBlockBitmapRange {
+    /// Creates a new bitmap range.
+    pub fn new(start_offset: u64, end_offset: u64, is_set: bool) -> Self {
+        Self {
+            start_offset,
+            end_offset,
+            is_set,
+        }
+    }
+}
+
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
@@ -25,7 +48,7 @@ use keramics_types::bytes_to_u32_le;
         field(name = "signature", data_type = "[u8; 10]", format = "hex"),
         field(name = "header_size", data_type = "u16"),
         field(name = "physical_sector_size", data_type = "u32"),
-        field(name = "bitmap_size", data_type = "u32"),
+        field(name = "number_of_bits", data_type = "u32"),
         field(name = "sequence_number", data_type = "u32"),
         field(name = "unknown2", data_type = "u32"),
         field(name = "flags", data_type = "u32", format = "hex"),
@@ -35,19 +58,64 @@ use keramics_types::bytes_to_u32_le;
     methods("debug_read_data")
 )]
 /// BitLocker Drive Encryption (BDE) Encrypt-on-Write (EOW) block record.
-pub struct BdeEowBlockRecord {}
+pub struct BdeEowBlockRecord {
+    /// Number of bytes a single bit represents.
+    bytes_per_bit: u32,
+
+    /// Sequence number.
+    pub sequence_number: u32,
+
+    /// Bitmap ranges.
+    pub ranges: Vec<BdeEowBlockBitmapRange>,
+}
 
 impl BdeEowBlockRecord {
     /// Creates a new Encrypt-on-Write (EOW) block record.
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(bytes_per_bit: u32) -> Self {
+        Self {
+            bytes_per_bit,
+            sequence_number: 0,
+            ranges: Vec::new(),
+        }
+    }
+
+    /// Reads the bitmap from a buffer.
+    fn read_bitmap(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        let mut offset: u64 = 0;
+        let mut range_offset: u64 = 0;
+        let mut range_bit_value: u8 = data[0] & 0x01;
+
+        for byte_value in data.iter() {
+            let mut bit_values: u8 = *byte_value;
+            for _ in 0..8 {
+                let bit_value: u8 = bit_values & 0x01;
+                bit_values >>= 1;
+
+                if bit_value != range_bit_value {
+                    self.ranges.push(BdeEowBlockBitmapRange::new(
+                        range_offset,
+                        offset,
+                        range_bit_value != 0,
+                    ));
+                    range_offset = offset;
+                    range_bit_value = bit_value;
+                }
+                offset += self.bytes_per_bit as u64;
+            }
+        }
+        self.ranges.push(BdeEowBlockBitmapRange::new(
+            range_offset,
+            offset,
+            range_bit_value != 0,
+        ));
+        Ok(())
     }
 
     /// Reads the Encrypt-on-Write (EOW) block record from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
-        if data_size < 60 {
+        if data_size < 36 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..10] != b"FVE-EOWBR\x00" {
@@ -71,7 +139,24 @@ impl BdeEowBlockRecord {
                 )));
             }
         }
-        Ok(())
+        let number_of_bits: u32 = bytes_to_u32_le!(data, 16);
+
+        self.sequence_number = bytes_to_u32_le!(data, 20);
+
+        let bitmap_end_offset: usize = 36 + (number_of_bits.next_multiple_of(8) as usize);
+
+        if bitmap_end_offset > data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid bitmap size value out of bounds"
+            ));
+        }
+        match self.read_bitmap(&data[36..bitmap_end_offset]) {
+            Ok(_) => Ok(()),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read bitmap");
+                Err(error)
+            }
+        }
     }
 
     /// Reads the Encrypt-on-Write (EOW) block record from a specific position in a data stream.
@@ -171,8 +256,11 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = BdeEowBlockRecord::new();
+        let mut test_struct = BdeEowBlockRecord::new(2097152);
         test_struct.read_data(&test_data)?;
+
+        assert_eq!(test_struct.sequence_number, 5);
+        assert_eq!(test_struct.ranges.len(), 2);
 
         Ok(())
     }
@@ -181,8 +269,8 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = BdeEowBlockRecord::new();
-        let result = test_struct.read_data(&test_data[0..59]);
+        let mut test_struct = BdeEowBlockRecord::new(2097152);
+        let result = test_struct.read_data(&test_data[0..35]);
         assert!(result.is_err());
     }
 
@@ -191,7 +279,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
-        let mut test_struct = BdeEowBlockRecord::new();
+        let mut test_struct = BdeEowBlockRecord::new(2097152);
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
@@ -201,7 +289,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut test_struct = BdeEowBlockRecord::new();
+        let mut test_struct = BdeEowBlockRecord::new(2097152);
         test_struct.read_at_position(&data_stream, 512, SeekFrom::Start(0))?;
 
         Ok(())

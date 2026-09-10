@@ -331,8 +331,9 @@ impl BdeVolumeMasterKey {
                 return Err(error);
             }
         };
-        keramics_core::debug_trace_data!("BdeUnlockedKey", 0, &self.key, key_size,);
-        keramics_core::debug_trace_data!("BdeUnlockedKeyTag", 0, &tag, 16,);
+        keramics_core::debug_trace_data!("BdeUnlockedKey", 0, &self.key, key_size);
+        keramics_core::debug_trace_data!("BdeUnlockedKeyTag", 0, &tag, 16);
+
         Ok(&aes_ccm_encrypted_key.tag == &tag)
     }
 }

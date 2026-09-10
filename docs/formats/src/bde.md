@@ -1006,9 +1006,9 @@ The Encrypt-on-Write block (map) record (FVE-EOWBR) is variable of size, stored 
 | 0 | 10 | "FVE-EOWBR\x00" | Signature |
 | 10 | 2 | 36 | Header size |
 | 12 | 4 | | Physical sector size |
-| 16 | 4 | | Unknown (bitmap size, in number of bits?) |
+| 16 | 4 | | Number of bits |
 | 20 | 4 | | Sequence number |
-| 24 | 4 | 0 | Unknown |
+| 24 | 4 | 0 | Unknown (part of sequence number?) |
 | 28 | 4 | | Unknown (flags?, seen 0 and 1) |
 | 32 | 4 | | Checksum, of the (physical) sectors data with the checksum value set to 0 |
 | <td colspan="4">&nbsp;</td> |
@@ -1017,9 +1017,18 @@ The Encrypt-on-Write block (map) record (FVE-EOWBR) is variable of size, stored 
 
 <!-- rumdl-enable MD033 MD056 -->
 
+The bitmap is stored on a per-byte basis with the LSB represents the first bit in the bitmap. Each
+bit represents a "reallocation block", where a set bit (1) indicates the block has been encrypted.
+
+> Note that the volume region size in the block map can be smaller than
+> `number_of_bits * relocation_block_size`.
+
+Since a block map contains multiple records, the block (map) record with the largest sequence
+number is autorative.
+
 ### Encrypt-on-Write relocation log area {#encrypt_on_write_relocation_log_area}
 
-The Encrypt-on-Write Encrypt-on-Write relocation log area is variable of size and consists of:
+The Encrypt-on-Write relocation log area is variable of size and consists of:
 
 * Encrypt-on-Write relocation log area (OLRDHEVF2) header
 * Encrypt-on-Write relocation log entries
@@ -1059,21 +1068,20 @@ sector, and consists of:
 | --- | --- | --- | --- |
 | 0 | 2 | 32 | Unknown |
 | 2 | 2 | 1 | Unknown |
-| 4 | 2 | | Unknown (0 if unencrypted region?) |
-| 6 | 2 | 0 | Unknown |
-| 8 | 4 | 0 | Unknown |
-| 12 | 8 | | Volume region offset, region (or area) of the volume this relocation log entry represents, or 0 if the region is not used by the relocation log |
+| 4 | 4 | | Sequence number |
+| 8 | 4 | 0 | Unknown (part of sequence number?) |
+| 12 | 8 | | Encrypted sector data sector offset, used for the encryption as the block key |
 | 20 | 4 | | (Used) encrypted sector data size |
-| 38 | 4 | | Checksum of the encrypted sectors data |
-| 42 | 4 | | Unknown (checksum of the unencrypted sectors data?) |
+| 24 | 4 | | Checksum of the (used) encrypted sectors data |
+| 28 | 4 | | Unknown (checksum of the unencrypted sectors data?), does 0xbecff11a have a special meaning? |
 
 > Note that an Encrypt-on-Write relocation log entry descriptor can be empty (filled with 0-byte
 > values).
 
 #### Encrypt-on-Write encrypted sector data
 
-* 16 bytes of encrypted sector data per sector? decryption sector key is the corresponding volume
-  region offset
+* 16 bytes of encrypted sector data per sector using the encrypted sector data sector offset as
+  block key
 
 TODO: determine if 32 is a compression factor, given 16 x 32 = 512
 

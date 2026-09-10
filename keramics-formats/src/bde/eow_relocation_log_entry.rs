@@ -13,7 +13,7 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::bytes_to_u32_le;
+use keramics_types::{bytes_to_u32_le, bytes_to_u64_le};
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -21,10 +21,13 @@ use keramics_types::bytes_to_u32_le;
         byte_order = "little",
         field(name = "unknown1", data_type = "u16"),
         field(name = "unknown2", data_type = "u16"),
-        field(name = "unknown3", data_type = "u16"),
-        field(name = "unknown4", data_type = "u16"),
-        field(name = "unknown5", data_type = "u32"),
-        field(name = "volume_region_offset", data_type = "u64", format = "hex"),
+        field(name = "sequence_number", data_type = "u32"),
+        field(name = "unknown3", data_type = "u32"),
+        field(
+            name = "encrypted_sectors_block_key",
+            data_type = "u64",
+            format = "hex"
+        ),
         field(name = "encrypted_sectors_data_size", data_type = "u32"),
         field(
             name = "encrypted_sectors_data_checksum",
@@ -37,6 +40,12 @@ use keramics_types::bytes_to_u32_le;
 )]
 /// BitLocker Drive Encryption (BDE) Encrypt-on-Write (EOW) relocation log entry.
 pub struct BdeEowRelocationLogEntry {
+    /// Encrypted sectors block key.
+    pub encrypted_sectors_block_key: u64,
+
+    /// Encrypted sectors data size.
+    pub encrypted_sectors_data_size: u32,
+
     /// Encrypted sectors data checksum.
     pub encrypted_sectors_data_checksum: u32,
 }
@@ -45,6 +54,8 @@ impl BdeEowRelocationLogEntry {
     /// Creates a new Encrypt-on-Write (EOW) relocation log entry.
     pub fn new() -> Self {
         Self {
+            encrypted_sectors_block_key: 0,
+            encrypted_sectors_data_size: 0,
             encrypted_sectors_data_checksum: 0,
         }
     }
@@ -56,7 +67,9 @@ impl BdeEowRelocationLogEntry {
         if data_size < 42 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        self.encrypted_sectors_data_checksum = bytes_to_u32_le!(data, 38);
+        self.encrypted_sectors_block_key = bytes_to_u64_le!(data, 12);
+        self.encrypted_sectors_data_size = bytes_to_u32_le!(data, 20);
+        self.encrypted_sectors_data_checksum = bytes_to_u32_le!(data, 24);
 
         Ok(())
     }
@@ -115,7 +128,9 @@ mod tests {
         let mut test_struct = BdeEowRelocationLogEntry::new();
         test_struct.read_data(&test_data)?;
 
-        assert_eq!(test_struct.encrypted_sectors_data_checksum, 0);
+        assert_eq!(test_struct.encrypted_sectors_block_key, 0);
+        assert_eq!(test_struct.encrypted_sectors_data_size, 65536);
+        assert_eq!(test_struct.encrypted_sectors_data_checksum, 0xd7978eeb);
 
         Ok(())
     }

@@ -110,7 +110,15 @@ impl BdeEowRelocationLog {
             }
             data_offset = data_end_offset;
 
-            let data_end_offset: usize = data_offset + sectors_data_size;
+            let entry_sectors_data_size: usize = entry.encrypted_sectors_data_size as usize;
+
+            if entry_sectors_data_size > data_size - data_offset {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid relocation log entry: {} - used entry sectors data size value out of bounds",
+                    entry_index
+                )));
+            }
+            let data_end_offset: usize = data_offset + entry_sectors_data_size;
 
             keramics_core::debug_trace_data!(
                 "BdeEowRelocationLogSectorData",
@@ -133,7 +141,7 @@ impl BdeEowRelocationLog {
                     )));
                 }
             }
-            data_offset = data_end_offset;
+            data_offset += sectors_data_size;
 
             let data_end_offset: usize = data_offset + 512;
 

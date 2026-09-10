@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
@@ -424,151 +425,74 @@ impl BdeEncryptedVolume {
         }
         self.volume_size = volume_size;
 
-        if eow_descriptor_offset1 > 0 {
-            let mut eow_descriptor: BdeEowDescriptor = BdeEowDescriptor::new();
+        let mut unencrypted_ranges: Vec<BdeBlockRange> = Vec::new();
 
-            match eow_descriptor
-                .read_at_position(data_stream, SeekFrom::Start(eow_descriptor_offset1))
-            {
+        if eow_descriptor_offset1 > 0 {
+            match self.read_encrypt_on_write_data(
+                data_stream,
+                eow_descriptor_offset1,
+                eow_descriptor_offset2,
+                &mut metadata_ranges,
+                &mut unencrypted_ranges,
+            ) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        format!(
-                            "Unable to read Encrypt-on-Write (EOW) descriptor at offset: {} (0x{:08x})",
-                            eow_descriptor_offset1, eow_descriptor_offset1
-                        ),
+                        "Unable to read Encrypt-on-Write (EOW) data"
                     );
                     return Err(error);
                 }
             }
-            // Block range to hide the Encrypt-on-Write descriptor 1.
-            metadata_ranges.push(BdeBlockRange::new(
-                eow_descriptor_offset1,
-                0,
-                4096,
-                BdeBlockRangeType::Sparse,
-            ));
-            for eow_block_map_offset in eow_descriptor.block_map_offsets.iter() {
-                let mut eow_block_map: BdeEowBlockMap = BdeEowBlockMap::new();
-
-                match eow_block_map.read_at_position(
-                    data_stream,
-                    eow_descriptor.physical_sector_size as usize,
-                    SeekFrom::Start(*eow_block_map_offset),
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to read Encrypt-on-Write (EOW) block map at offset: {} (0x{:08x})",
-                                *eow_block_map_offset, *eow_block_map_offset
-                            ),
-                        );
-                        return Err(error);
-                    }
-                }
-                let mut eow_relocation_log: BdeEowRelocationLog = BdeEowRelocationLog::new();
-
-                match eow_relocation_log.read_at_position(
-                    data_stream,
-                    eow_descriptor.relocation_log_area_size as usize,
-                    SeekFrom::Start(eow_block_map.relocation_log_area_offset),
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to read Encrypt-on-Write (EOW) relocation log area at offset: {} (0x{:08x})",
-                                eow_block_map.relocation_log_area_offset,
-                                eow_block_map.relocation_log_area_offset,
-                            ),
-                        );
-                        return Err(error);
-                    }
-                }
-                // TODO: check this.
-                let eow_block_map_size: u32 = eow_block_map.block_map_size.next_multiple_of(4096);
-                let relocation_log_area_size: u32 = eow_descriptor
-                    .relocation_log_area_size
-                    .next_multiple_of(4096);
-
-                // Block range to hide the Encrypt-on-Write block map.
-                metadata_ranges.push(BdeBlockRange::new(
-                    *eow_block_map_offset,
-                    0,
-                    eow_block_map_size as u64,
-                    BdeBlockRangeType::Sparse,
-                ));
-                // Block range to hide the Encrypt-on-Write relocation log area.
-                metadata_ranges.push(BdeBlockRange::new(
-                    eow_block_map.relocation_log_area_offset,
-                    0,
-                    relocation_log_area_size as u64,
-                    BdeBlockRangeType::Sparse,
-                ));
-                let eow_block_record_offset: u64 =
-                    *eow_block_map_offset + (eow_block_map.block_record_offset1 as u64);
-
-                let mut eow_block_record: BdeEowBlockRecord = BdeEowBlockRecord::new();
-
-                match eow_block_record.read_at_position(
-                    data_stream,
-                    eow_block_map.block_record_size as usize,
-                    SeekFrom::Start(eow_block_record_offset),
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to read Encrypt-on-Write (EOW) block record at offset: {} (0x{:08x})",
-                                eow_block_record_offset, eow_block_record_offset
-                            ),
-                        );
-                        return Err(error);
-                    }
-                }
-                let eow_block_record_offset: u64 =
-                    *eow_block_map_offset + (eow_block_map.block_record_offset2 as u64);
-
-                let mut eow_block_record: BdeEowBlockRecord = BdeEowBlockRecord::new();
-
-                match eow_block_record.read_at_position(
-                    data_stream,
-                    eow_block_map.block_record_size as usize,
-                    SeekFrom::Start(eow_block_record_offset),
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to read Encrypt-on-Write (EOW) block record at offset: {} (0x{:08x})",
-                                eow_block_record_offset, eow_block_record_offset
-                            ),
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            // Note that Encrypt-on-Write (EOW) descriptor 2 contains a copy of descriptor 1.
-            if eow_descriptor_offset2 > 0 {
-                // Block range to hide the Encrypt-on-Write descriptor 2.
-                metadata_ranges.push(BdeBlockRange::new(
-                    eow_descriptor_offset2,
-                    0,
-                    4096,
-                    BdeBlockRangeType::Sparse,
-                ));
-            }
         }
         metadata_ranges.sort_by_key(|block_range| block_range.logical_offset);
+        unencrypted_ranges.sort_by_key(|block_range| block_range.logical_offset);
 
-        // TODO: handle unencrypted ranges.
-        // TODO: merge successive sparse ranges.
+        let mut adjusted_ranges: Vec<BdeBlockRange> = Vec::new();
+
+        for mut unencrypted_range in unencrypted_ranges.drain(..) {
+            let unencrypted_range_end_offset: u64 =
+                unencrypted_range.logical_offset + unencrypted_range.size;
+
+            for metadata_block_range in metadata_ranges.iter() {
+                if metadata_block_range.logical_offset < unencrypted_range.logical_offset {
+                    continue;
+                }
+                if metadata_block_range.logical_offset > unencrypted_range_end_offset {
+                    break;
+                }
+                let metadata_range_end_offset: u64 =
+                    metadata_block_range.logical_offset + metadata_block_range.size;
+
+                if unencrypted_range.logical_offset < metadata_block_range.logical_offset {
+                    let range_size: u64 =
+                        metadata_block_range.logical_offset - unencrypted_range.logical_offset;
+                    let adjusted_range: BdeBlockRange = BdeBlockRange::new(
+                        unencrypted_range.logical_offset,
+                        unencrypted_range.physical_offset,
+                        range_size,
+                        BdeBlockRangeType::InFile,
+                    );
+                    adjusted_ranges.push(adjusted_range);
+                }
+                unencrypted_range.logical_offset = metadata_range_end_offset;
+                unencrypted_range.physical_offset = metadata_range_end_offset;
+                unencrypted_range.size = if unencrypted_range_end_offset < metadata_range_end_offset
+                {
+                    0
+                } else {
+                    unencrypted_range_end_offset - metadata_range_end_offset
+                };
+            }
+            if unencrypted_range.size > 0 {
+                adjusted_ranges.push(unencrypted_range);
+            }
+        }
+        metadata_ranges.append(&mut adjusted_ranges);
+        metadata_ranges.sort_by_key(|block_range| block_range.logical_offset);
+
+        // TODO: handle pre-EOW unencrypted ranges.
+        // TODO: merge successive (sparse) ranges.
         let mut volume_offset: u64 = 0;
 
         for metadata_block_range in metadata_ranges.drain(..) {
@@ -604,12 +528,194 @@ impl BdeEncryptedVolume {
                 BdeBlockRangeType::Encrypted,
             ));
         }
-        println!("RANGES: {:#?}", self.block_ranges);
-
         self.data_stream = Some(data_stream.clone());
 
         // TODO: check for clear key and unlock volume
 
+        Ok(())
+    }
+
+    /// Reads the Encrypt-on-Write data.
+    pub fn read_encrypt_on_write_data(
+        &mut self,
+        data_stream: &DataStreamReference,
+        eow_descriptor_offset1: u64,
+        eow_descriptor_offset2: u64,
+        metadata_ranges: &mut Vec<BdeBlockRange>,
+        unencrypted_ranges: &mut Vec<BdeBlockRange>,
+    ) -> Result<(), ErrorTrace> {
+        let mut eow_descriptor: BdeEowDescriptor = BdeEowDescriptor::new();
+
+        match eow_descriptor.read_at_position(data_stream, SeekFrom::Start(eow_descriptor_offset1))
+        {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read Encrypt-on-Write (EOW) descriptor 1 at offset: {} (0x{:08x})",
+                        eow_descriptor_offset1, eow_descriptor_offset1
+                    )
+                );
+                return Err(error);
+            }
+        }
+        // Block range to hide the Encrypt-on-Write descriptor 1.
+        metadata_ranges.push(BdeBlockRange::new(
+            eow_descriptor_offset1,
+            0,
+            4096,
+            BdeBlockRangeType::Sparse,
+        ));
+        for eow_block_map_offset in eow_descriptor.block_map_offsets.iter() {
+            let mut eow_block_map: BdeEowBlockMap = BdeEowBlockMap::new();
+
+            match eow_block_map.read_at_position(
+                data_stream,
+                eow_descriptor.physical_sector_size as usize,
+                SeekFrom::Start(*eow_block_map_offset),
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read Encrypt-on-Write (EOW) block map at offset: {} (0x{:08x})",
+                            *eow_block_map_offset, *eow_block_map_offset
+                        ),
+                    );
+                    return Err(error);
+                }
+            }
+            let eow_block_record_offset1: u64 =
+                *eow_block_map_offset + (eow_block_map.block_record_offset1 as u64);
+
+            let mut eow_block_record1: BdeEowBlockRecord =
+                BdeEowBlockRecord::new(eow_descriptor.relocation_block_size);
+
+            match eow_block_record1.read_at_position(
+                data_stream,
+                eow_block_map.block_record_size as usize,
+                SeekFrom::Start(eow_block_record_offset1),
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read Encrypt-on-Write (EOW) block record 1 at offset: {} (0x{:08x})",
+                            eow_block_record_offset1, eow_block_record_offset1
+                        )
+                    );
+                    return Err(error);
+                }
+            }
+            let eow_block_record_offset2: u64 =
+                *eow_block_map_offset + (eow_block_map.block_record_offset2 as u64);
+
+            let mut eow_block_record2: BdeEowBlockRecord =
+                BdeEowBlockRecord::new(eow_descriptor.relocation_block_size);
+
+            match eow_block_record2.read_at_position(
+                data_stream,
+                eow_block_map.block_record_size as usize,
+                SeekFrom::Start(eow_block_record_offset2),
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read Encrypt-on-Write (EOW) block record 2 at offset: {} (0x{:08x})",
+                            eow_block_record_offset2, eow_block_record_offset2
+                        )
+                    );
+                    return Err(error);
+                }
+            }
+            let last_block_record: &BdeEowBlockRecord =
+                if eow_block_record1.sequence_number > eow_block_record2.sequence_number {
+                    &eow_block_record1
+                } else if eow_block_record1.sequence_number < eow_block_record2.sequence_number {
+                    &eow_block_record2
+                } else {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unable to determine most recent Encrypt-on-Write (EOW) block record"
+                    ));
+                };
+
+            // Note that the bitmap ranges are relative to eow_block_map.volume_region_offset.
+            for bitmap_range in last_block_record.ranges.iter() {
+                if bitmap_range.start_offset >= eow_block_map.volume_region_size {
+                    break;
+                }
+                if !bitmap_range.is_set {
+                    let range_offset: u64 =
+                        eow_block_map.volume_region_offset + bitmap_range.start_offset;
+                    let range_size: u64 =
+                        min(bitmap_range.end_offset, eow_block_map.volume_region_size)
+                            - bitmap_range.start_offset;
+
+                    // Block range of unencrypted region.
+                    unencrypted_ranges.push(BdeBlockRange::new(
+                        range_offset,
+                        range_offset,
+                        range_size,
+                        BdeBlockRangeType::InFile,
+                    ));
+                }
+            }
+            let mut eow_relocation_log: BdeEowRelocationLog = BdeEowRelocationLog::new();
+
+            match eow_relocation_log.read_at_position(
+                data_stream,
+                eow_descriptor.relocation_log_area_size as usize,
+                SeekFrom::Start(eow_block_map.relocation_log_area_offset),
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read Encrypt-on-Write (EOW) relocation log area at offset: {} (0x{:08x})",
+                            eow_block_map.relocation_log_area_offset,
+                            eow_block_map.relocation_log_area_offset,
+                        )
+                    );
+                    return Err(error);
+                }
+            }
+            // TODO: check this.
+            let eow_block_map_size: u32 = eow_block_map.block_map_size.next_multiple_of(4096);
+            let relocation_log_area_size: u32 = eow_descriptor
+                .relocation_log_area_size
+                .next_multiple_of(4096);
+
+            // Block range to hide the Encrypt-on-Write block map.
+            metadata_ranges.push(BdeBlockRange::new(
+                *eow_block_map_offset,
+                0,
+                eow_block_map_size as u64,
+                BdeBlockRangeType::Sparse,
+            ));
+            // Block range to hide the Encrypt-on-Write relocation log area.
+            metadata_ranges.push(BdeBlockRange::new(
+                eow_block_map.relocation_log_area_offset,
+                0,
+                relocation_log_area_size as u64,
+                BdeBlockRangeType::Sparse,
+            ));
+        }
+        // Note that Encrypt-on-Write (EOW) descriptor 2 contains a copy of descriptor 1.
+        if eow_descriptor_offset2 > 0 {
+            // Block range to hide the Encrypt-on-Write descriptor 2.
+            metadata_ranges.push(BdeBlockRange::new(
+                eow_descriptor_offset2,
+                0,
+                4096,
+                BdeBlockRangeType::Sparse,
+            ));
+        }
         Ok(())
     }
 
