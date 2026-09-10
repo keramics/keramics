@@ -1024,7 +1024,7 @@ bit represents a "reallocation block", where a set bit (1) indicates the block h
 > `number_of_bits * relocation_block_size`.
 
 Since a block map contains multiple records, the block (map) record with the largest sequence
-number is autorative.
+number is authoritative.
 
 ### Encrypt-on-Write relocation log area {#encrypt_on_write_relocation_log_area}
 
