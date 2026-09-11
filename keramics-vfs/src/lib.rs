@@ -53,8 +53,10 @@ mod vmdk;
 
 // Helpers.
 mod finder;
+mod pathfilter;
 mod resolver;
 mod scanner;
+mod windows;
 
 pub use context::VfsContext;
 pub use credential::VfsCredential;
@@ -67,9 +69,11 @@ pub use file_resolver::{VfsFileResolver, new_vfs_file_resolver};
 pub use file_system::VfsFileSystem;
 pub use finder::VfsFinder;
 pub use location::VfsLocation;
+pub use pathfilter::{PathFilter, PathFilterSignature};
 pub use resolver::VfsResolver;
 pub use scanner::{VfsScanContext, VfsScanNode, VfsScanOptions, VfsScanner, VfsScannerMediator};
 pub use types::*;
+pub use windows::WindowsPath;
 
 #[cfg(test)]
 mod tests {
