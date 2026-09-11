@@ -146,7 +146,7 @@ Keep the size of a Pull Request (PR) reasonable. If you are planning substantial
 discuss these with the maintainers first.
 
 1. Make sure your commit contains a legal name and valid email address.
-1. Push your branch to GitHub, e.g. with `git push origin feature`.
+1. Push your branch to GitHub, e.g. with `git push --set-upstream origin feature`.
 1. Make sure the tests pass on GitHub.
 1. Open a PR against the `main` branch. Only create a PR when your changes are ready. In your PR
    description, clearly explain what your code changes.
