@@ -59,8 +59,8 @@ use super::constants::*;
     ),
     methods("debug_read_data")
 )]
-/// BitLocker Drive Encryption (BDE) boot record.
-pub struct BdeBootRecord {
+/// BitLocker Drive Encryption (BDE) boot record version 2.
+pub struct BdeBootRecordV2 {
     /// Bytes per sector.
     pub bytes_per_sector: u16,
 
@@ -77,7 +77,7 @@ pub struct BdeBootRecord {
     pub metadata_block_offset3: u64,
 }
 
-impl BdeBootRecord {
+impl BdeBootRecordV2 {
     /// Creates a new boot record.
     pub fn new() -> Self {
         Self {
@@ -170,7 +170,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = BdeBootRecord::new();
+        let mut test_struct = BdeBootRecordV2::new();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.bytes_per_sector, 512);
@@ -186,7 +186,7 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = BdeBootRecord::new();
+        let mut test_struct = BdeBootRecordV2::new();
         let result = test_struct.read_data(&test_data[0..511]);
         assert!(result.is_err());
     }
@@ -196,7 +196,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[3] = 0xff;
 
-        let mut test_struct = BdeBootRecord::new();
+        let mut test_struct = BdeBootRecordV2::new();
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
@@ -206,7 +206,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[160] = 0xff;
 
-        let mut test_struct = BdeBootRecord::new();
+        let mut test_struct = BdeBootRecordV2::new();
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }

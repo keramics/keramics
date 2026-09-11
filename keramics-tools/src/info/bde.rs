@@ -15,10 +15,11 @@ use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::bde::{
-    BdeCredential, BdeEncryptedVolume, BdeKeyProtector, BdeKeyProtectorType,
+    BdeCredential, BdeEncryptedVolume, BdeFormatVersion, BdeKeyProtector, BdeKeyProtectorType,
 };
 use keramics_vfs::{VfsCredential, VfsCredentialStore};
 
+use super::constants::*;
 use crate::formatters::ByteSize;
 
 /// Information about BitLocker Drive Encryption (BDE) encrypted volume.
@@ -39,8 +40,18 @@ impl<'a> fmt::Display for BdeEncryptedVolumeInfo<'a> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "BitLocker Drive Encryption (BDE) information:")?;
 
-        // TODO: print format version 1.0 Vista, 2.0 Win7 and later
-
+        let format_version_string: &str = match self.encrypted_volume.get_format_version() {
+            &BdeFormatVersion::NotSet => NOT_SET_VALUE,
+            &BdeFormatVersion::ToGo => "2.0 (To Go)",
+            &BdeFormatVersion::UsedDiskSpaceOnly => "2.0 (Used Disk Space Only)",
+            &BdeFormatVersion::Version1 => "1.0 (Vista)",
+            &BdeFormatVersion::Version2 => "2.0",
+        };
+        writeln!(
+            formatter,
+            "    Format version\t\t\t\t: {}",
+            format_version_string,
+        )?;
         writeln!(
             formatter,
             "    Identifier\t\t\t\t\t: {}",
@@ -191,6 +202,7 @@ mod tests {
 
         let expected_string: &str = concat!(
             "BitLocker Drive Encryption (BDE) information:\n",
+            "    Format version\t\t\t\t: 2.0\n",
             "    Identifier\t\t\t\t\t: fbdde069-e6b1-4cf9-8064-6b68d5955171\n",
             "    Description\t\t\t\t\t: TEST TestVolume 2026-09-04\n",
             "    Bytes per sector\t\t\t\t: 512\n",

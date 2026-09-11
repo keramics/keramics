@@ -172,11 +172,9 @@ impl StorageMediaImage {
 
         match vfs_scanner.build() {
             Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to build VFS scanner",
-                    error
-                ));
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build VFS scanner");
+                return Err(error);
             }
         }
         let format_identifier: Option<FormatIdentifier> =

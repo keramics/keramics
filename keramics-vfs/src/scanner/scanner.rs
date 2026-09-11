@@ -1608,10 +1608,10 @@ mod tests {
 
         match format_scanner.build() {
             Ok(_) => Ok(format_scanner),
-            Err(error) => Err(keramics_core::error_trace_new_with_error!(
-                "Unable to build format scanner",
-                error
-            )),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build format scanner");
+                return Err(error);
+            }
         }
     }
 

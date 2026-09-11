@@ -229,7 +229,7 @@ impl BlockReader for BdeBlockReader {
                     data_offset = data_end_offset;
                     current_offset += range_read_size as u64;
                 }
-                BdeBlockRangeType::VistaBootSector => {
+                BdeBlockRangeType::V1BootSector => {
                     let data_end_offset: usize = data_offset + range_read_size;
                     let mft_mirror_cluster_block_number: u64 = block_range.physical_offset;
 

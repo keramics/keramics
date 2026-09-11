@@ -333,11 +333,9 @@ impl InfoTool {
 
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to build format scanner",
-                    error
-                ));
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build format scanner");
+                return Err(error);
             }
         }
         let mut result: Option<FormatIdentifier> = match format_scanner
@@ -426,11 +424,9 @@ impl InfoTool {
 
             match format_scanner.build() {
                 Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to build format scanner",
-                        error
-                    ));
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to build format scanner");
+                    return Err(error);
                 }
             }
             result = match format_scanner.scan_data_stream(data_stream) {
