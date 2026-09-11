@@ -43,33 +43,37 @@ impl PathComponent {
         case_folding_mappings: &PathCharacterMappings,
     ) -> Result<Self, ErrorTrace> {
         match self {
-            PathComponent::ByteString(byte_string) => {
-                match case_folding_mappings {
-                    PathCharacterMappings::Ucs2(mappings) => {
-                        let elements: Vec<u8> = byte_string
-                            .elements
-                            .iter()
-                            .map(|element| mappings.get(&(*element as u16)) as u8)
-                            .collect();
-                        Ok(PathComponent::ByteString(ByteString {
-                            encoding: byte_string.encoding.clone(),
-                            elements,
-                        }))
-                    }
-                    PathCharacterMappings::Utf16(_) => Ok(self.clone()),
+            PathComponent::ByteString(byte_string) => match case_folding_mappings {
+                PathCharacterMappings::Ucs2(mappings) => {
+                    let elements: Vec<u8> = byte_string
+                        .elements
+                        .iter()
+                        .map(|element| mappings.get(&(*element as u16)) as u8)
+                        .collect();
+                    Ok(PathComponent::ByteString(ByteString {
+                        encoding: byte_string.encoding.clone(),
+                        elements,
+                    }))
                 }
+                PathCharacterMappings::Utf16(_) => Ok(self.clone()),
+            },
+            PathComponent::Current | PathComponent::Parent | PathComponent::Root => {
+                Ok(self.clone())
             }
-            PathComponent::Current | PathComponent::Parent | PathComponent::Root => Ok(self.clone()),
             PathComponent::OsString(os_string) => Ok(PathComponent::OsString(os_string.clone())),
             PathComponent::String(string) => Ok(PathComponent::String(string.to_lowercase())),
             PathComponent::Ucs2String(ucs2_string) => match case_folding_mappings {
                 PathCharacterMappings::Ucs2(mappings) => Ok(PathComponent::Ucs2String(
                     ucs2_string.new_with_case_folding(mappings),
                 )),
-                PathCharacterMappings::Utf16(_) => Ok(PathComponent::Ucs2String(ucs2_string.clone())),
+                PathCharacterMappings::Utf16(_) => {
+                    Ok(PathComponent::Ucs2String(ucs2_string.clone()))
+                }
             },
             PathComponent::Utf16String(utf16_string) => match case_folding_mappings {
-                PathCharacterMappings::Ucs2(_) => Ok(PathComponent::Utf16String(utf16_string.clone())),
+                PathCharacterMappings::Ucs2(_) => {
+                    Ok(PathComponent::Utf16String(utf16_string.clone()))
+                }
                 PathCharacterMappings::Utf16(mappings) => Ok(PathComponent::Utf16String(
                     utf16_string.new_with_case_folding(mappings)?,
                 )),
@@ -671,7 +675,8 @@ mod tests {
         // Ucs2 mappings apply to Ucs2String and ByteString components.
         let mut ucs2_mappings: Ucs2CharacterMappings = Ucs2CharacterMappings::new();
         ucs2_mappings.add(0x0041, 0x0061); // 'A' -> 'a'
-        let ucs2_mappings: PathCharacterMappings = PathCharacterMappings::Ucs2(Arc::new(ucs2_mappings));
+        let ucs2_mappings: PathCharacterMappings =
+            PathCharacterMappings::Ucs2(Arc::new(ucs2_mappings));
 
         let component: PathComponent = PathComponent::Ucs2String(Ucs2String::from("AB"));
         let folded: PathComponent = component.new_with_case_folding(&ucs2_mappings)?;
@@ -707,15 +712,18 @@ mod tests {
         let mut utf16_mappings: keramics_types::Utf16CharacterMappings =
             keramics_types::Utf16CharacterMappings::new(&[]);
         utf16_mappings.add(0x0061, 0x0041); // 'a' -> 'A'
-        let utf16_mappings: PathCharacterMappings = PathCharacterMappings::Utf16(Arc::new(utf16_mappings));
+        let utf16_mappings: PathCharacterMappings =
+            PathCharacterMappings::Utf16(Arc::new(utf16_mappings));
 
         let component: PathComponent = PathComponent::Utf16String(Utf16String::from("aB"));
         let folded: PathComponent = component.new_with_case_folding(&utf16_mappings)?;
         assert_eq!(folded, PathComponent::Utf16String(Utf16String::from("AB")));
 
         // The shared UCS2_CASE_MAPPINGS table (lower -> upper) is also usable.
-        let case_mappings: Ucs2CharacterMappings = Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice());
-        let case_mappings: PathCharacterMappings = PathCharacterMappings::Ucs2(Arc::new(case_mappings));
+        let case_mappings: Ucs2CharacterMappings =
+            Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice());
+        let case_mappings: PathCharacterMappings =
+            PathCharacterMappings::Ucs2(Arc::new(case_mappings));
         let component: PathComponent = PathComponent::Ucs2String(Ucs2String::from("aB"));
         let folded: PathComponent = component.new_with_case_folding(&case_mappings)?;
         assert_eq!(folded, PathComponent::Ucs2String(Ucs2String::from("AB")));

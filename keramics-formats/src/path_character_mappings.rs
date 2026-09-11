@@ -37,10 +37,9 @@ mod tests {
 
         assert!(matches!(cloned, PathCharacterMappings::Ucs2(_)));
 
-        let mappings: PathCharacterMappings =
-            PathCharacterMappings::Utf16(Arc::new(Utf16CharacterMappings::new(&[
-                (0x0061, 0x0041),
-            ])));
+        let mappings: PathCharacterMappings = PathCharacterMappings::Utf16(Arc::new(
+            Utf16CharacterMappings::new(&[(0x0061, 0x0041)]),
+        ));
         let cloned: PathCharacterMappings = mappings.clone();
 
         assert!(matches!(cloned, PathCharacterMappings::Utf16(_)));

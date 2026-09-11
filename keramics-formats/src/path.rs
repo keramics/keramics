@@ -772,7 +772,8 @@ mod tests {
     #[test]
     fn test_new_with_case_folding_empty_mappings() -> Result<(), ErrorTrace> {
         let empty_mappings: Ucs2CharacterMappings = Ucs2CharacterMappings::new();
-        let empty_mappings: PathCharacterMappings = PathCharacterMappings::Ucs2(Arc::new(empty_mappings));
+        let empty_mappings: PathCharacterMappings =
+            PathCharacterMappings::Ucs2(Arc::new(empty_mappings));
         let path = Path {
             components: vec![PathComponent::Ucs2String(Ucs2String::from("AB"))],
         };
