@@ -1,8 +1,7 @@
 # Security Policy
 
-This project does not consider minor code weaknesses, vulnerabilities. A finding by a fuzzer or
-other type of security tool is **not necessarily** a security vulnerability. Minor code weaknesses
-can be reported as regular issues.
+This project does not consider minor code weaknesses, vulnerabilities. Minor code weaknesses can be
+reported as regular issues.
 
 Cryptographic functions provided by this project are primarily intended for data format analysis,
 and are **not** intended for other purposes.
@@ -14,6 +13,9 @@ and are **not** intended for other purposes.
 If you discover an actual security vulnerability within this project, please report it privately to
 the maintainers. This allows us to coordinate a fix and protect users before the flaw is made
 public.
+
+A finding by a fuzzer or other type of security tool is **not necessarily** a security
+vulnerability. Make sure to include an analysis of what makes the finding an actual vulnerability.
 
 ### How to Report
 
