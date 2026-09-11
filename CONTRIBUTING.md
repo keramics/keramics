@@ -1,6 +1,6 @@
 # Contributing to Keramics
 
-Thanks for your interest in contributing to the Keramics, analysis of data formats.
+Thanks for your interest in contributing to the Keramics project.
 
 **Note that this project is in an early phase (experimental, pre-release), so the codebase is
 evolving.**
