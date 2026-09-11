@@ -107,6 +107,15 @@ mod tests {
         let ucs2_string: Ucs2String = Ucs2String::from("file:fork");
         let result: Option<Ucs2String> = WindowsPath::data_fork_name(&ucs2_string);
         assert_eq!(result, Some(Ucs2String::from("fork")));
+
+        let ucs2_string: Ucs2String = Ucs2String::from("file:fork1:fork2");
+        let result: Option<Ucs2String> = WindowsPath::data_fork_name(&ucs2_string);
+        // Only the last colon delimiter is used.
+        assert_eq!(result, Some(Ucs2String::from("fork2")));
+
+        let ucs2_string: Ucs2String = Ucs2String::from("file:");
+        let result: Option<Ucs2String> = WindowsPath::data_fork_name(&ucs2_string);
+        assert_eq!(result, Some(Ucs2String::from("")));
     }
 
     #[test]
@@ -218,6 +227,60 @@ mod tests {
             test_struct,
             Path {
                 components: vec![PathComponent::Current]
+            }
+        );
+
+        // Note that the result of from_str may be different when the path is invalid.
+        let test_struct: Path = WindowsPath::from_str("");
+        assert_eq!(test_struct, Path { components: vec![] });
+    }
+
+    #[test]
+    fn test_from_str_with_prefix() {
+        let test_struct: Path = WindowsPath::from_str("\\\\.\\C:\\testdir1\\testfile1");
+        assert_eq!(
+            test_struct,
+            Path {
+                components: vec![
+                    PathComponent::Ucs2String(Ucs2String::from("C:")),
+                    PathComponent::Ucs2String(Ucs2String::from("testdir1")),
+                    PathComponent::Ucs2String(Ucs2String::from("testfile1")),
+                ]
+            }
+        );
+
+        let test_struct: Path = WindowsPath::from_str("\\\\?\\C:\\testdir1\\testfile1");
+        assert_eq!(
+            test_struct,
+            Path {
+                components: vec![
+                    PathComponent::Ucs2String(Ucs2String::from("C:")),
+                    PathComponent::Ucs2String(Ucs2String::from("testdir1")),
+                    PathComponent::Ucs2String(Ucs2String::from("testfile1")),
+                ]
+            }
+        );
+
+        let test_struct: Path = WindowsPath::from_str("\\??\\C:\\testdir1\\testfile1");
+        assert_eq!(
+            test_struct,
+            Path {
+                components: vec![
+                    PathComponent::Ucs2String(Ucs2String::from("C:")),
+                    PathComponent::Ucs2String(Ucs2String::from("testdir1")),
+                    PathComponent::Ucs2String(Ucs2String::from("testfile1")),
+                ]
+            }
+        );
+    }
+
+    #[test]
+    fn test_from_str_with_drive_letter() {
+        let test_struct: Path = WindowsPath::from_str("C:");
+        assert_eq!(
+            test_struct,
+            Path {
+                components: vec![PathComponent::Ucs2String(Ucs2String::from("C:"))]
             }
         );
     }

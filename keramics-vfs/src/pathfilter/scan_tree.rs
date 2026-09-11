@@ -102,6 +102,8 @@ impl ScanTree {
 mod tests {
     use super::*;
 
+    use keramics_formats::PathComponent;
+
     #[test]
     fn test_build() -> Result<(), ErrorTrace> {
         let mut scan_tree: ScanTree = ScanTree::new(ScanTreeType::Prefix);
@@ -138,6 +140,35 @@ mod tests {
     }
 
     #[test]
+    fn test_build_with_multiple_signatures() -> Result<(), ErrorTrace> {
+        let mut scan_tree: ScanTree = ScanTree::new(ScanTreeType::Prefix);
+
+        assert!(matches!(scan_tree.root_scan_object, ScanObject::None));
+
+        let mut signatures: Vec<Arc<PathFilterSignature>> = Vec::new();
+        signatures.push(Arc::new(PathFilterSignature::new(
+            Path::from("/Windows/System32/winevt/Logs/Application.evtx"),
+            None,
+        )));
+        signatures.push(Arc::new(PathFilterSignature::new(
+            Path::from("/Windows/SoftwareDistribution/DataStore/DataStore.edb"),
+            None,
+        )));
+        signatures.push(Arc::new(PathFilterSignature::new(
+            Path::from("/Library/Caches/com.apple.Safari"),
+            Some(PathComponent::from("rsrc")),
+        )));
+        scan_tree.build(&signatures)?;
+
+        assert!(matches!(
+            scan_tree.root_scan_object,
+            ScanObject::ScanTreeNode(_)
+        ));
+
+        Ok(())
+    }
+
+    #[test]
     fn test_signature() -> Result<(), ErrorTrace> {
         let mut scan_tree: ScanTree = ScanTree::new(ScanTreeType::Prefix);
 
@@ -150,7 +181,11 @@ mod tests {
 
         let path: Path = Path::from("/Windows/System32/winevt/Logs/Application.evtx");
         let scan_result: Option<&PathFilterSignature> = scan_tree.scan_path(&path);
-        assert!(scan_result.is_some());
+        assert!(matches!(scan_result, Some(_)));
+        assert_eq!(
+            scan_result.unwrap().path,
+            Path::from("/Windows/System32/winevt/Logs/Application.evtx")
+        );
 
         let path: Path = Path::from("/Windows/SoftwareDistribution/DataStore/DataStore.edb");
         let scan_result: Option<&PathFilterSignature> = scan_tree.scan_path(&path);
@@ -159,5 +194,64 @@ mod tests {
         // TODO: add test with case folding
 
         Ok(())
+    }
+
+    #[test]
+    fn test_signature_with_multiple_signatures() -> Result<(), ErrorTrace> {
+        let mut scan_tree: ScanTree = ScanTree::new(ScanTreeType::Prefix);
+
+        let mut signatures: Vec<Arc<PathFilterSignature>> = Vec::new();
+        signatures.push(Arc::new(PathFilterSignature::new(
+            Path::from("/Windows/System32/winevt/Logs/Application.evtx"),
+            None,
+        )));
+        signatures.push(Arc::new(PathFilterSignature::new(
+            Path::from("/Windows/SoftwareDistribution/DataStore/DataStore.edb"),
+            None,
+        )));
+        signatures.push(Arc::new(PathFilterSignature::new(
+            Path::from("/Windows/SoftwareDistribution/Downloads/scan.download"),
+            None,
+        )));
+        signatures.push(Arc::new(PathFilterSignature::new(
+            Path::from("/Library/Caches/com.apple.Safari"),
+            Some(PathComponent::from("rsrc")),
+        )));
+        scan_tree.build(&signatures)?;
+
+        for expected_path in [
+            "/Windows/System32/winevt/Logs/Application.evtx",
+            "/Windows/SoftwareDistribution/DataStore/DataStore.edb",
+            "/Windows/SoftwareDistribution/Downloads/scan.download",
+            "/Library/Caches/com.apple.Safari",
+        ]
+        .iter()
+        {
+            let path: Path = Path::from(*expected_path);
+            let scan_result: Option<&PathFilterSignature> = scan_tree.scan_path(&path);
+            assert!(
+                matches!(scan_result, Some(_)),
+                "expected match for: {}",
+                expected_path
+            );
+            assert_eq!(scan_result.unwrap().path, path);
+        }
+
+        let path: Path = Path::from("/Windows/System32/winevt/Logs/Security.evtx");
+        let scan_result: Option<&PathFilterSignature> = scan_tree.scan_path(&path);
+        assert!(scan_result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_signature_from_empty_scan_tree() {
+        let scan_tree: ScanTree = ScanTree::new(ScanTreeType::Prefix);
+
+        assert!(matches!(scan_tree.root_scan_object, ScanObject::None));
+
+        let path: Path = Path::from("/Windows/System32/winevt/Logs/Application.evtx");
+        let scan_result: Option<&PathFilterSignature> = scan_tree.scan_path(&path);
+        assert!(scan_result.is_none());
     }
 }

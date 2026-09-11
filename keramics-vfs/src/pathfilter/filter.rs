@@ -89,6 +89,51 @@ mod tests {
             None,
         ));
         assert_eq!(path_filter.signatures.len(), 1);
+        assert_eq!(
+            path_filter.signatures[0].path,
+            Path::from("/Windows/System32/winevt/Logs/Application.evtx")
+        );
+        assert_eq!(path_filter.signatures[0].data_fork_name, None);
+    }
+
+    #[test]
+    fn test_add_signature_with_data_fork_name() {
+        let mut path_filter: PathFilter = PathFilter::new();
+
+        let data_fork_name: PathComponent = PathComponent::from("rsrc");
+        path_filter.add_signature(PathFilterSignature::new(
+            Path::from("/Library/Caches/com.apple.Safari"),
+            Some(data_fork_name.clone()),
+        ));
+        assert_eq!(path_filter.signatures.len(), 1);
+        assert_eq!(
+            path_filter.signatures[0].path,
+            Path::from("/Library/Caches/com.apple.Safari")
+        );
+        assert_eq!(
+            path_filter.signatures[0].data_fork_name,
+            Some(data_fork_name)
+        );
+    }
+
+    #[test]
+    fn test_add_multiple_signatures() {
+        let mut path_filter: PathFilter = PathFilter::new();
+
+        path_filter.add_signature(PathFilterSignature::new(
+            Path::from("/Windows/System32/winevt/Logs/Application.evtx"),
+            None,
+        ));
+        path_filter.add_signature(PathFilterSignature::new(
+            Path::from("/Windows/SoftwareDistribution/DataStore/DataStore.edb"),
+            None,
+        ));
+        path_filter.add_signature(PathFilterSignature::new(
+            Path::from("/Library/Caches/com.apple.Safari"),
+            Some(PathComponent::from("rsrc")),
+        ));
+
+        assert_eq!(path_filter.signatures.len(), 3);
     }
 
     #[test]
@@ -99,7 +144,25 @@ mod tests {
             Path::from("/Windows/System32/winevt/Logs/Application.evtx"),
             None,
         ));
-        path_filter.build()
+        path_filter.build()?;
+
+        let path: Path = Path::from("/Windows/System32/winevt/Logs/Application.evtx");
+        assert!(path_filter.is_match(&path, None));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_without_signatures() -> Result<(), ErrorTrace> {
+        let mut path_filter: PathFilter = PathFilter::new();
+
+        path_filter.build()?;
+
+        // Without signatures no path matches the filter.
+        let path: Path = Path::from("/Windows/System32/winevt/Logs/Application.evtx");
+        assert!(!path_filter.is_match(&path, None));
+
+        Ok(())
     }
 
     #[test]
@@ -110,6 +173,10 @@ mod tests {
             Path::from("/Windows/System32/winevt/Logs/Application.evtx"),
             None,
         ));
+        path_filter.add_signature(PathFilterSignature::new(
+            Path::from("/Windows/SoftwareDistribution/DataStore/DataStore.edb"),
+            None,
+        ));
         path_filter.build()?;
 
         let path: Path = Path::from("/Windows/System32/winevt/Logs/Application.evtx");
@@ -118,9 +185,40 @@ mod tests {
 
         let path: Path = Path::from("/Windows/SoftwareDistribution/DataStore/DataStore.edb");
         let result: bool = path_filter.is_match(&path, None);
+        assert_eq!(result, true);
+
+        let path: Path = Path::from("/Windows/System32/winevt/Logs/Security.evtx");
+        let result: bool = path_filter.is_match(&path, None);
         assert_eq!(result, false);
 
         // TODO: add test with case folding
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_match_with_data_fork_name() -> Result<(), ErrorTrace> {
+        let mut path_filter: PathFilter = PathFilter::new();
+
+        path_filter.add_signature(PathFilterSignature::new(
+            Path::from("/Library/Caches/com.apple.Safari"),
+            Some(PathComponent::from("rsrc")),
+        ));
+        path_filter.build()?;
+
+        let path: Path = Path::from("/Library/Caches/com.apple.Safari");
+
+        // The data fork name must match the signature.
+        let data_fork_name: PathComponent = PathComponent::from("rsrc");
+        let result: bool = path_filter.is_match(&path, Some(&data_fork_name));
+        assert_eq!(result, true);
+
+        let data_fork_name: PathComponent = PathComponent::from("data");
+        let result: bool = path_filter.is_match(&path, Some(&data_fork_name));
+        assert_eq!(result, false);
+
+        let result: bool = path_filter.is_match(&path, None);
+        assert_eq!(result, false);
 
         Ok(())
     }

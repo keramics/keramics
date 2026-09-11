@@ -269,50 +269,512 @@ mod tests {
 
     use keramics_formats::Path;
 
-    #[test]
-    fn test_calculate_weights() {
-        let mut component_table: ComponentTable = ComponentTable::new(&ScanTreeType::Prefix);
+    fn get_test_component_table(
+        scan_tree_type: &ScanTreeType,
+        path_strings: &[&str],
+        component_indexes_to_ignore: &[usize],
+    ) -> ComponentTable {
+        let mut component_table: ComponentTable = ComponentTable::new(scan_tree_type);
 
-        let mut signatures: Vec<Arc<PathFilterSignature>> = Vec::new();
-        signatures.push(Arc::new(PathFilterSignature::new(
-            Path::from("/testdir1/testfile1"),
-            None,
-        )));
+        let signatures: Vec<Arc<PathFilterSignature>> = path_strings
+            .iter()
+            .map(|path_string| Arc::new(PathFilterSignature::new(Path::from(*path_string), None)))
+            .collect();
 
-        let component_indexes_to_ignore: Vec<usize> = Vec::new();
-        component_table.fill(&signatures, &component_indexes_to_ignore);
-        component_table.calculate_weights();
+        component_table.fill(&signatures, component_indexes_to_ignore);
 
-        // TODO: check weights.
+        component_table
     }
 
     #[test]
-    fn test_fill() {
+    fn test_calculate_weights() {
+        let mut component_table: ComponentTable =
+            get_test_component_table(&ScanTreeType::Prefix, &["/testdir1/testfile1"], &[]);
+        component_table.calculate_weights();
+
+        assert_eq!(component_table.occurrence_weights.largest_weight, 0);
+        assert_eq!(component_table.occurrence_weights.get_weight(&0), 0);
+        assert_eq!(component_table.occurrence_weights.get_weight(&1), 0);
+        assert_eq!(component_table.occurrence_weights.get_weight(&2), 0);
+
+        assert_eq!(component_table.similarity_weights.largest_weight, 0);
+        assert_eq!(component_table.similarity_weights.get_weight(&0), 0);
+        assert_eq!(component_table.similarity_weights.get_weight(&1), 0);
+        assert_eq!(component_table.similarity_weights.get_weight(&2), 0);
+
+        assert_eq!(component_table.value_weights.largest_weight, 0);
+        assert_eq!(component_table.value_weights.get_weight(&0), 0);
+        assert_eq!(component_table.value_weights.get_weight(&1), 0);
+        assert_eq!(component_table.value_weights.get_weight(&2), 0);
+    }
+
+    #[test]
+    fn test_calculate_weights_with_identical_path_groups() {
+        let mut component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Prefix,
+            &["/testdir1/testfile1", "/testdir1/testfile2"],
+            &[],
+        );
+        component_table.calculate_weights();
+
+        // Component index 2 (the file name) has two different path groups.
+        assert_eq!(component_table.occurrence_weights.largest_weight, 2);
+        assert_eq!(component_table.occurrence_weights.get_weight(&2), 2);
+        assert_eq!(component_table.occurrence_weights.get_weight(&0), 0);
+        assert_eq!(component_table.occurrence_weights.get_weight(&1), 0);
+
+        // Component indexes 0 (root) and 1 (testdir1) each have two similar signatures.
+        assert_eq!(component_table.similarity_weights.largest_weight, 2);
+        assert_eq!(component_table.similarity_weights.get_weight(&0), 2);
+        assert_eq!(component_table.similarity_weights.get_weight(&1), 2);
+        assert_eq!(component_table.similarity_weights.get_weight(&2), 0);
+    }
+
+    #[test]
+    fn test_calculate_weights_with_different_path_groups() {
+        let mut component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Prefix,
+            &[
+                "/testdir1/testfile1",
+                "/testdir1/testfile2",
+                "/testdir2/testfile3",
+            ],
+            &[],
+        );
+        component_table.calculate_weights();
+
+        assert_eq!(component_table.occurrence_weights.largest_weight, 3);
+        assert_eq!(component_table.occurrence_weights.get_weight(&1), 2);
+        assert_eq!(component_table.occurrence_weights.get_weight(&2), 3);
+
+        assert_eq!(component_table.similarity_weights.largest_weight, 3);
+        assert_eq!(component_table.similarity_weights.get_weight(&0), 3);
+        assert_eq!(component_table.similarity_weights.get_weight(&1), 2);
+        assert_eq!(component_table.similarity_weights.get_weight(&2), 0);
+
+        assert_eq!(component_table.value_weights.largest_weight, 0);
+        assert_eq!(component_table.value_weights.get_weight(&0), 0);
+        assert_eq!(component_table.value_weights.get_weight(&1), 0);
+        assert_eq!(component_table.value_weights.get_weight(&2), 0);
+    }
+
+    #[test]
+    fn test_fill_with_prefix_tree() {
         let mut component_table: ComponentTable = ComponentTable::new(&ScanTreeType::Prefix);
 
         assert_eq!(component_table.component_groups.len(), 0);
         assert_eq!(component_table.signatures.len(), 0);
 
-        let mut signatures: Vec<Arc<PathFilterSignature>> = Vec::new();
-        signatures.push(Arc::new(PathFilterSignature::new(
-            Path::from("/testdir1/testfile1"),
-            None,
-        )));
+        let component_indexes_to_ignore: Vec<usize> = Vec::new();
+        component_table.fill(
+            &[Arc::new(PathFilterSignature::new(
+                Path::from("/testdir1/testfile1"),
+                None,
+            ))],
+            &component_indexes_to_ignore,
+        );
+        assert_eq!(component_table.component_groups.len(), 3);
+        assert_eq!(component_table.signatures.len(), 1);
+        assert_eq!(component_table.smallest_component_index, 0);
+
+        let component_group: &ComponentGroup = &component_table.component_groups[&0];
+        assert_eq!(component_group.component_index, 0);
+        assert_eq!(component_group.path_groups.len(), 1);
+
+        let component_group: &ComponentGroup = &component_table.component_groups[&1];
+        assert_eq!(component_group.component_index, 1);
+        assert_eq!(component_group.path_groups.len(), 1);
+
+        let component_group: &ComponentGroup = &component_table.component_groups[&2];
+        assert_eq!(component_group.component_index, 2);
+        assert_eq!(component_group.path_groups.len(), 1);
+    }
+
+    #[test]
+    fn test_fill_with_suffix_tree() {
+        let mut component_table: ComponentTable = ComponentTable::new(&ScanTreeType::Suffix);
 
         let component_indexes_to_ignore: Vec<usize> = Vec::new();
-        component_table.fill(&signatures, &component_indexes_to_ignore);
+        component_table.fill(
+            &[Arc::new(PathFilterSignature::new(
+                Path::from("testdir1/testfile1"),
+                None,
+            ))],
+            &component_indexes_to_ignore,
+        );
+        assert_eq!(component_table.component_groups.len(), 2);
+        assert_eq!(component_table.signatures.len(), 1);
+        assert_eq!(component_table.smallest_component_index, 0);
 
+        // The path components are indexed in reverse order.
+        let component_group: &ComponentGroup = &component_table.component_groups[&0];
+        assert_eq!(
+            component_group.path_groups.keys().next().unwrap(),
+            &PathComponent::from("testfile1")
+        );
+
+        let component_group: &ComponentGroup = &component_table.component_groups[&1];
+        assert_eq!(
+            component_group.path_groups.keys().next().unwrap(),
+            &PathComponent::from("testdir1")
+        );
+    }
+
+    #[test]
+    fn test_fill_with_mixed_paths() {
+        // Relative paths are ignored for a prefix tree.
+        let component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Prefix,
+            &["testdir1/testfile1", "/testdir1/testfile1"],
+            &[],
+        );
         assert_eq!(component_table.component_groups.len(), 3);
+        assert_eq!(component_table.signatures.len(), 1);
+
+        // Absolute paths are ignored for a suffix tree.
+        let component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Suffix,
+            &["testdir1/testfile1", "/testdir1/testfile1"],
+            &[],
+        );
+        assert_eq!(component_table.component_groups.len(), 2);
         assert_eq!(component_table.signatures.len(), 1);
     }
 
-    // TODO: add tests for fill_prefix
-    // TODO: add tests for fill_suffix
-    // TODO: add tests for get_component_index_by_occurrence_weights
-    // TODO: add tests for get_component_index_by_similarity_weights
-    // TODO: add tests for get_component_index_by_value_weights
-    // TODO: add tests for get_most_significant_component_index
-    // TODO: add tests for get_signatures_by_component_index
-    // TODO: add tests for insert_component
-    // TODO: add tests for is_empty
+    #[test]
+    fn test_fill_without_signatures() {
+        let component_table: ComponentTable =
+            get_test_component_table(&ScanTreeType::Prefix, &[], &[]);
+
+        assert_eq!(component_table.component_groups.len(), 0);
+        assert_eq!(component_table.signatures.len(), 0);
+
+        let component_table: ComponentTable =
+            get_test_component_table(&ScanTreeType::Suffix, &[], &[]);
+
+        assert_eq!(component_table.component_groups.len(), 0);
+        assert_eq!(component_table.signatures.len(), 0);
+    }
+
+    #[test]
+    fn test_fill_prefix_with_ignored_component_indexes() {
+        let component_table: ComponentTable =
+            get_test_component_table(&ScanTreeType::Prefix, &["/testdir1/testfile1"], &[1]);
+
+        assert_eq!(component_table.component_groups.len(), 2);
+        assert_eq!(component_table.signatures.len(), 1);
+        assert_eq!(component_table.smallest_component_index, 0);
+
+        let component_group: &ComponentGroup = &component_table.component_groups[&0];
+        assert_eq!(
+            component_group.path_groups.keys().next().unwrap(),
+            &PathComponent::Root
+        );
+
+        let component_group: &ComponentGroup = &component_table.component_groups[&2];
+        assert_eq!(
+            component_group.path_groups.keys().next().unwrap(),
+            &PathComponent::from("testfile1")
+        );
+    }
+
+    #[test]
+    fn test_fill_suffix_with_ignored_component_indexes() {
+        let component_table: ComponentTable =
+            get_test_component_table(&ScanTreeType::Suffix, &["testdir1/testfile1"], &[0]);
+
+        assert_eq!(component_table.component_groups.len(), 1);
+        assert_eq!(component_table.signatures.len(), 1);
+        assert_eq!(component_table.smallest_component_index, 0);
+
+        let component_group: &ComponentGroup = &component_table.component_groups[&1];
+        assert_eq!(
+            component_group.path_groups.keys().next().unwrap(),
+            &PathComponent::from("testdir1")
+        );
+    }
+
+    #[test]
+    fn test_get_component_index_by_occurrence_weights() {
+        let mut component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Prefix,
+            &["/testdir1/testfile1", "/testdir1/testfile2"],
+            &[],
+        );
+        component_table.calculate_weights();
+
+        assert_eq!(
+            component_table.get_component_index_by_occurrence_weights(),
+            Some(2)
+        );
+
+        // Without occurrence weights the method returns None.
+        let mut component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Prefix,
+            &["/testdir1/testfile1", "/testdir1/testfile1"],
+            &[],
+        );
+        component_table.calculate_weights();
+
+        assert_eq!(
+            component_table.get_component_index_by_occurrence_weights(),
+            None
+        );
+    }
+
+    #[test]
+    fn test_get_component_index_by_similarity_weights() {
+        let mut component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Prefix,
+            &[
+                "/testdir1/testfile1",
+                "/testdir1/testfile2",
+                "/testdir2/testfile1",
+            ],
+            &[],
+        );
+        component_table.calculate_weights();
+
+        assert_eq!(
+            component_table.get_component_index_by_similarity_weights(),
+            Some(0)
+        );
+
+        // With the root component index ignored, component index 1
+        // has the largest similarity weight of 2.
+        let mut component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Prefix,
+            &[
+                "/testdir1/testfile1",
+                "/testdir1/testfile2",
+                "/testdir2/testfile1",
+            ],
+            &[0],
+        );
+        component_table.calculate_weights();
+
+        assert_eq!(
+            component_table.get_component_index_by_similarity_weights(),
+            Some(1)
+        );
+
+        // Without similarity weights the method returns None.
+        let mut component_table: ComponentTable =
+            get_test_component_table(&ScanTreeType::Suffix, &[], &[]);
+        component_table.calculate_weights();
+
+        assert_eq!(
+            component_table.get_component_index_by_similarity_weights(),
+            None
+        );
+    }
+
+    #[test]
+    fn test_get_component_index_by_value_weights() {
+        let mut component_table: ComponentTable =
+            get_test_component_table(&ScanTreeType::Prefix, &["/testdir1/testfile1"], &[]);
+        component_table.calculate_weights();
+
+        // Value weights are never calculated, so the method always returns None.
+        assert_eq!(component_table.get_component_index_by_value_weights(), None);
+
+        let mut component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Prefix,
+            &[
+                "/testdir1/testfile1",
+                "/testdir1/testfile2",
+                "/testdir2/testfile3",
+            ],
+            &[],
+        );
+        component_table.calculate_weights();
+
+        assert_eq!(component_table.get_component_index_by_value_weights(), None);
+    }
+
+    #[test]
+    fn test_get_most_significant_component_index() {
+        // Without signatures the method returns None.
+        let component_table: ComponentTable = ComponentTable::new(&ScanTreeType::Prefix);
+        assert_eq!(component_table.get_most_significant_component_index(), None);
+
+        // With a single signature the value weights are empty and the method
+        // falls back to the smallest component index.
+        let component_table: ComponentTable =
+            get_test_component_table(&ScanTreeType::Prefix, &["/testdir1/testfile1"], &[]);
+
+        assert_eq!(
+            component_table.get_most_significant_component_index(),
+            Some(0)
+        );
+
+        // With two signatures and calculated weights the occurrence weights
+        // select component index 2, which has two different path groups.
+        let mut component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Prefix,
+            &["/testdir1/testfile1", "/testdir1/testfile2"],
+            &[],
+        );
+        component_table.calculate_weights();
+
+        assert_eq!(
+            component_table.get_most_significant_component_index(),
+            Some(2)
+        );
+
+        // With multiple similar signatures the similarity weights select the
+        // root component index (0), which has the largest similarity weight.
+        let mut component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Prefix,
+            &[
+                "/testdir1/testfile1",
+                "/testdir1/testfile2",
+                "/testdir2/testfile3",
+            ],
+            &[],
+        );
+        component_table.calculate_weights();
+
+        assert_eq!(
+            component_table.get_most_significant_component_index(),
+            Some(0)
+        );
+
+        // With the root component index ignored, component index 1 has the
+        // largest similarity weight of 2.
+        let mut component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Prefix,
+            &[
+                "/testdir1/testfile1",
+                "/testdir1/testfile2",
+                "/testdir2/testfile3",
+            ],
+            &[0],
+        );
+        component_table.calculate_weights();
+
+        assert_eq!(
+            component_table.get_most_significant_component_index(),
+            Some(1)
+        );
+
+        // With a suffix tree and two signatures the occurrence weights select
+        // component index 0 (the file names), which has two different path groups.
+        let mut component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Suffix,
+            &["testdir1/testfile1", "testdir1/testfile2"],
+            &[],
+        );
+        component_table.calculate_weights();
+
+        assert_eq!(
+            component_table.get_most_significant_component_index(),
+            Some(0)
+        );
+
+        // With a single signature and all component indexes ignored, no component
+        // groups exist and the method returns None.
+        let component_table: ComponentTable =
+            get_test_component_table(&ScanTreeType::Prefix, &["/testdir1/testfile1"], &[0, 1, 2]);
+
+        assert_eq!(component_table.get_most_significant_component_index(), None);
+    }
+
+    #[test]
+    fn test_get_signatures_by_component_index() {
+        let component_table: ComponentTable = get_test_component_table(
+            &ScanTreeType::Prefix,
+            &["/testdir1/testfile1", "/testdir1/testfile2"],
+            &[],
+        );
+
+        let expected_paths: [Path; 2] = [
+            Path::from("/testdir1/testfile1"),
+            Path::from("/testdir1/testfile2"),
+        ];
+
+        let signatures: Vec<Arc<PathFilterSignature>> =
+            component_table.get_signatures_by_component_index(0);
+        assert_eq!(signatures.len(), 2);
+        for signature in signatures.iter() {
+            assert!(expected_paths.contains(&signature.path));
+        }
+
+        let signatures: Vec<Arc<PathFilterSignature>> =
+            component_table.get_signatures_by_component_index(1);
+        assert_eq!(signatures.len(), 2);
+        let expected_path_component: PathComponent = PathComponent::from("testdir1");
+        for signature in signatures.iter() {
+            assert_eq!(
+                signature.path.get_component_by_index(1),
+                Some(&expected_path_component)
+            );
+        }
+
+        // Component index 2 has two path groups, one for each signature.
+        let signatures: Vec<Arc<PathFilterSignature>> =
+            component_table.get_signatures_by_component_index(2);
+        assert_eq!(signatures.len(), 2);
+        for signature in signatures.iter() {
+            assert!(expected_paths.contains(&signature.path));
+        }
+
+        // Without a component group an empty list is returned.
+        let signatures: Vec<Arc<PathFilterSignature>> =
+            component_table.get_signatures_by_component_index(3);
+        assert_eq!(signatures.len(), 0);
+    }
+
+    #[test]
+    fn test_insert_component() {
+        let mut component_table: ComponentTable = ComponentTable::new(&ScanTreeType::Prefix);
+
+        let signature: Arc<PathFilterSignature> = Arc::new(PathFilterSignature::new(
+            Path::from("/testdir1/testfile1"),
+            None,
+        ));
+
+        component_table.insert_component(3, &PathComponent::from("testfile1"), &signature);
+
+        assert_eq!(component_table.component_groups.len(), 1);
+        assert_eq!(component_table.smallest_component_index, 0);
+
+        let component_group: &ComponentGroup = &component_table.component_groups[&3];
+        assert_eq!(component_group.path_groups.len(), 1);
+        assert_eq!(
+            component_group.path_groups[&PathComponent::from("testfile1")]
+                .signatures
+                .len(),
+            1
+        );
+
+        // Inserting a different path component in the same component group.
+        component_table.insert_component(3, &PathComponent::from("testfile2"), &signature);
+
+        let component_group: &ComponentGroup = &component_table.component_groups[&3];
+        assert_eq!(component_group.path_groups.len(), 2);
+
+        // Inserting into an existing component group.
+        component_table.insert_component(1, &PathComponent::from("testdir1"), &signature);
+
+        assert_eq!(component_table.component_groups.len(), 2);
+        assert_eq!(component_table.smallest_component_index, 0);
+    }
+
+    #[test]
+    fn test_is_empty() {
+        let component_table: ComponentTable = ComponentTable::new(&ScanTreeType::Prefix);
+        assert!(component_table.is_empty());
+
+        let component_table: ComponentTable =
+            get_test_component_table(&ScanTreeType::Prefix, &["/testdir1/testfile1"], &[]);
+
+        assert!(!component_table.is_empty());
+
+        // Relative paths are ignored for a prefix tree.
+        let component_table: ComponentTable =
+            get_test_component_table(&ScanTreeType::Prefix, &["testdir1/testfile1"], &[]);
+
+        assert!(component_table.is_empty());
+    }
 }

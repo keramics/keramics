@@ -148,5 +148,146 @@ impl ScanTreeNode {
 mod tests {
     use super::*;
 
-    // TODO: add tests
+    use super::super::enums::ScanTreeType;
+    use keramics_formats::Path;
+
+    fn build_component_table(
+        path_strings: &[&str],
+        component_indexes_to_ignore: &[usize],
+    ) -> ComponentTable {
+        let mut component_table: ComponentTable = ComponentTable::new(&ScanTreeType::Prefix);
+
+        let signatures: Vec<Arc<PathFilterSignature>> = path_strings
+            .iter()
+            .map(|path_string| Arc::new(PathFilterSignature::new(Path::from(*path_string), None)))
+            .collect();
+
+        component_table.fill(&signatures, component_indexes_to_ignore);
+        component_table.calculate_weights();
+
+        component_table
+    }
+
+    #[test]
+    fn test_build_with_single_signature() -> Result<(), ErrorTrace> {
+        let component_table: ComponentTable = build_component_table(&["/testdir1/testfile1"], &[]);
+
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+        scan_tree_node.build(&component_table, &[])?;
+
+        assert_eq!(scan_tree_node.component_index, 0);
+        assert_eq!(scan_tree_node.scan_objects.len(), 1);
+        assert!(matches!(
+            scan_tree_node.scan_objects[&PathComponent::Root],
+            ScanObject::Signature(_)
+        ));
+        assert!(matches!(
+            *scan_tree_node.default_scan_object,
+            ScanObject::None
+        ));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_with_multiple_signatures_same_branch() -> Result<(), ErrorTrace> {
+        let component_table: ComponentTable = build_component_table(
+            &[
+                "/Windows/SoftwareDistribution/DataStore/DataStore.edb",
+                "/Windows/SoftwareDistribution/Downloads/scan.download",
+            ],
+            &[],
+        );
+
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+        scan_tree_node.build(&component_table, &[])?;
+
+        // The two signatures differ at the component that is resolved by this
+        // node, so both branches hold a single signature.
+        assert_eq!(scan_tree_node.scan_objects.len(), 2);
+        assert!(
+            scan_tree_node
+                .scan_objects
+                .values()
+                .all(|scan_object| matches!(scan_object, ScanObject::Signature(_)))
+        );
+        assert!(matches!(
+            *scan_tree_node.default_scan_object,
+            ScanObject::None
+        ));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_with_sub_scan_tree_node() -> Result<(), ErrorTrace> {
+        let component_table: ComponentTable = build_component_table(
+            &[
+                "/testdir1/subdir1/testfile1",
+                "/testdir1/subdir1/testfile2",
+                "/testdir1/subdir2/testfile3",
+            ],
+            &[],
+        );
+
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+        scan_tree_node.build(&component_table, &[])?;
+
+        // The resolved component has a single path group holding multiple
+        // signatures, so it is represented by a sub scan tree node.
+        assert_eq!(scan_tree_node.scan_objects.len(), 1);
+        assert!(
+            scan_tree_node
+                .scan_objects
+                .values()
+                .all(|scan_object| matches!(scan_object, ScanObject::ScanTreeNode(_)))
+        );
+        assert!(matches!(
+            *scan_tree_node.default_scan_object,
+            ScanObject::None
+        ));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_with_multiple_signatures_different_groups() -> Result<(), ErrorTrace> {
+        let component_table: ComponentTable = build_component_table(
+            &[
+                "/Windows/System32/winevt/Logs/Application.evtx",
+                "/Library/Caches/com.apple.Safari",
+            ],
+            &[],
+        );
+
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+        scan_tree_node.build(&component_table, &[])?;
+
+        // The two signatures differ at the first directory component, and each
+        // branch holds a single signature.
+        assert_eq!(scan_tree_node.scan_objects.len(), 2);
+        assert!(
+            scan_tree_node
+                .scan_objects
+                .values()
+                .all(|scan_object| matches!(scan_object, ScanObject::Signature(_)))
+        );
+        assert!(matches!(
+            *scan_tree_node.default_scan_object,
+            ScanObject::None
+        ));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_with_empty_component_table() {
+        let component_table: ComponentTable = build_component_table(&[], &[]);
+
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+
+        // Without signatures the most significant component index cannot be determined.
+        let result: Result<(), ErrorTrace> = scan_tree_node.build(&component_table, &[]);
+        assert!(result.is_err());
+    }
 }

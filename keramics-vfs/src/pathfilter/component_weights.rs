@@ -77,9 +77,218 @@ mod tests {
         component_weights.append_weight(3, 5);
 
         assert_eq!(component_weights.component_index_groups.len(), 1);
-        // TODO: test if component_index_groups contains a component index for weight 5
+
+        let index_group: &IndexGroup = component_weights.component_index_groups.get(&5).unwrap();
+        assert!(index_group.indexes.contains(&3));
+        assert_eq!(
+            component_weights
+                .component_index_groups
+                .get(&5)
+                .unwrap()
+                .indexes
+                .len(),
+            1
+        );
         assert_eq!(component_weights.weights.len(), 1);
-        // TODO: test if weights contains a weight for component index 3
+        assert_eq!(component_weights.weights.get(&3), Some(&5));
         assert_eq!(component_weights.largest_weight, 5);
+    }
+
+    #[test]
+    fn test_append_weight_with_component_indexes_in_same_weight_group() {
+        let mut component_weights: ComponentWeights = ComponentWeights::new();
+
+        component_weights.append_weight(1, 5);
+        component_weights.append_weight(2, 5);
+        component_weights.append_weight(3, 5);
+
+        assert_eq!(component_weights.component_index_groups.len(), 1);
+
+        let index_group: &IndexGroup = component_weights.component_index_groups.get(&5).unwrap();
+        let indexes: &Vec<usize> = &index_group.indexes;
+        assert!(indexes.contains(&1));
+        assert!(indexes.contains(&2));
+        assert!(indexes.contains(&3));
+        assert_eq!(indexes.len(), 3);
+
+        assert_eq!(component_weights.weights.len(), 3);
+        assert_eq!(component_weights.weights.get(&1), Some(&5));
+        assert_eq!(component_weights.weights.get(&2), Some(&5));
+        assert_eq!(component_weights.weights.get(&3), Some(&5));
+
+        assert_eq!(component_weights.largest_weight, 5);
+    }
+
+    #[test]
+    fn test_append_weight_with_component_indexes_in_multiple_weight_groups() {
+        let mut component_weights: ComponentWeights = ComponentWeights::new();
+
+        component_weights.append_weight(1, 5);
+        component_weights.append_weight(2, 10);
+        component_weights.append_weight(3, 2);
+
+        assert_eq!(component_weights.component_index_groups.len(), 3);
+        assert_eq!(
+            component_weights
+                .component_index_groups
+                .get(&5)
+                .unwrap()
+                .indexes,
+            vec![1]
+        );
+        assert_eq!(
+            component_weights
+                .component_index_groups
+                .get(&10)
+                .unwrap()
+                .indexes,
+            vec![2]
+        );
+        assert_eq!(
+            component_weights
+                .component_index_groups
+                .get(&2)
+                .unwrap()
+                .indexes,
+            vec![3]
+        );
+        assert_eq!(component_weights.weights.len(), 3);
+        assert_eq!(component_weights.largest_weight, 10);
+    }
+
+    #[test]
+    fn test_append_weight_with_negative_weight() {
+        let mut component_weights: ComponentWeights = ComponentWeights::new();
+
+        component_weights.append_weight(1, -5);
+
+        assert_eq!(component_weights.component_index_groups.len(), 1);
+        assert_eq!(
+            component_weights
+                .component_index_groups
+                .get(&-5)
+                .unwrap()
+                .indexes,
+            vec![1]
+        );
+        assert_eq!(component_weights.weights.get(&1), Some(&-5));
+    }
+
+    #[test]
+    fn test_append_weight_with_negative_and_positive_weights() {
+        let mut component_weights: ComponentWeights = ComponentWeights::new();
+
+        component_weights.append_weight(1, 10);
+        component_weights.append_weight(2, -5);
+
+        assert_eq!(component_weights.component_index_groups.len(), 2);
+        assert_eq!(
+            component_weights
+                .component_index_groups
+                .get(&10)
+                .unwrap()
+                .indexes,
+            vec![1]
+        );
+        assert_eq!(
+            component_weights
+                .component_index_groups
+                .get(&-5)
+                .unwrap()
+                .indexes,
+            vec![2]
+        );
+        assert_eq!(component_weights.weights.len(), 2);
+        assert_eq!(component_weights.weights.get(&1), Some(&10));
+        assert_eq!(component_weights.weights.get(&2), Some(&-5));
+        assert_eq!(component_weights.largest_weight, 10);
+    }
+
+    #[test]
+    fn test_append_weight_with_negative_weight_only() {
+        let mut component_weights: ComponentWeights = ComponentWeights::new();
+
+        component_weights.append_weight(1, -10);
+        component_weights.append_weight(2, -5);
+
+        assert_eq!(component_weights.component_index_groups.len(), 2);
+        assert_eq!(
+            component_weights
+                .component_index_groups
+                .get(&-10)
+                .unwrap()
+                .indexes,
+            vec![1]
+        );
+        assert_eq!(
+            component_weights
+                .component_index_groups
+                .get(&-5)
+                .unwrap()
+                .indexes,
+            vec![2]
+        );
+        assert_eq!(component_weights.weights.len(), 2);
+        assert_eq!(component_weights.largest_weight, 0);
+    }
+
+    #[test]
+    fn test_append_weight_with_component_index_replacement() {
+        let mut component_weights: ComponentWeights = ComponentWeights::new();
+
+        component_weights.append_weight(1, 5);
+        component_weights.append_weight(1, 10);
+
+        assert_eq!(component_weights.component_index_groups.len(), 2);
+        assert_eq!(
+            component_weights
+                .component_index_groups
+                .get(&5)
+                .unwrap()
+                .indexes,
+            vec![1]
+        );
+        assert_eq!(
+            component_weights
+                .component_index_groups
+                .get(&10)
+                .unwrap()
+                .indexes,
+            vec![1]
+        );
+        assert_eq!(component_weights.weights.len(), 1);
+        assert_eq!(component_weights.weights.get(&1), Some(&10));
+        assert_eq!(component_weights.largest_weight, 10);
+    }
+
+    #[test]
+    fn test_get_weight() {
+        let mut component_weights: ComponentWeights = ComponentWeights::new();
+
+        let component_index: usize = 3;
+        assert_eq!(component_weights.get_weight(&component_index), 0);
+
+        component_weights.append_weight(3, 5);
+        assert_eq!(component_weights.get_weight(&component_index), 5);
+    }
+
+    #[test]
+    fn test_get_weight_of_unknown_component_index_returns_zero() {
+        let mut component_weights: ComponentWeights = ComponentWeights::new();
+
+        component_weights.append_weight(1, 5);
+
+        assert_eq!(component_weights.get_weight(&1), 5);
+        assert_eq!(component_weights.get_weight(&2), 0);
+    }
+
+    #[test]
+    fn test_get_weight_of_component_index_with_negative_weight() {
+        let mut component_weights: ComponentWeights = ComponentWeights::new();
+
+        let component_index: usize = 2;
+        component_weights.append_weight(2, -5);
+
+        assert_eq!(component_weights.get_weight(&component_index), -5);
     }
 }
