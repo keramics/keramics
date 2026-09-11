@@ -127,8 +127,8 @@ If the test data cannot be created by means of script, make sure:
 * the test data has a project compatible license.
 
 If the test data was not authored by you (as the contributor), make sure you have permission to use
-it and mention its orginal source in "ACKNOWLEDGEMENTS.md". Do not include test data that cannot be
-redistributed.
+it and mention its orginal source in "ACKNOWLEDGEMENTS.md". **Do not include test data that cannot
+be redistributed.**
 
 **Document the data format.** Data formats change over time, hence documentating its structures is
 important. Data format documentation can be found in the "docs/formats" directory and is hosted on:
