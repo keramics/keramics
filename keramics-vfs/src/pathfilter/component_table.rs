@@ -508,7 +508,6 @@ mod tests {
             Some(2)
         );
 
-        // Without occurrence weights the method returns None.
         let mut component_table: ComponentTable = get_test_component_table(
             &ScanTreeType::Prefix,
             &["/testdir1/testfile1", "/testdir1/testfile1"],
@@ -540,8 +539,8 @@ mod tests {
             Some(0)
         );
 
-        // With the root component index ignored, component index 1
-        // has the largest similarity weight of 2.
+        // With the root component index ignored, component index 1 has the largest similarity
+        // weight of 2.
         let mut component_table: ComponentTable = get_test_component_table(
             &ScanTreeType::Prefix,
             &[
@@ -558,7 +557,6 @@ mod tests {
             Some(1)
         );
 
-        // Without similarity weights the method returns None.
         let mut component_table: ComponentTable =
             get_test_component_table(&ScanTreeType::Suffix, &[], &[]);
         component_table.calculate_weights();
@@ -575,7 +573,6 @@ mod tests {
             get_test_component_table(&ScanTreeType::Prefix, &["/testdir1/testfile1"], &[]);
         component_table.calculate_weights();
 
-        // Value weights are never calculated, so the method always returns None.
         assert_eq!(component_table.get_component_index_by_value_weights(), None);
 
         let mut component_table: ComponentTable = get_test_component_table(
@@ -594,12 +591,11 @@ mod tests {
 
     #[test]
     fn test_get_most_significant_component_index() {
-        // Without signatures the method returns None.
         let component_table: ComponentTable = ComponentTable::new(&ScanTreeType::Prefix);
         assert_eq!(component_table.get_most_significant_component_index(), None);
 
-        // With a single signature the value weights are empty and the method
-        // falls back to the smallest component index.
+        // With a single signature the value weights are empty and the method falls back to the
+        // smallest component index.
         let component_table: ComponentTable =
             get_test_component_table(&ScanTreeType::Prefix, &["/testdir1/testfile1"], &[]);
 
@@ -608,8 +604,8 @@ mod tests {
             Some(0)
         );
 
-        // With two signatures and calculated weights the occurrence weights
-        // select component index 2, which has two different path groups.
+        // With two signatures and calculated weights the occurrence weights select component
+        // index 2, which has two different path groups.
         let mut component_table: ComponentTable = get_test_component_table(
             &ScanTreeType::Prefix,
             &["/testdir1/testfile1", "/testdir1/testfile2"],
@@ -622,8 +618,8 @@ mod tests {
             Some(2)
         );
 
-        // With multiple similar signatures the similarity weights select the
-        // root component index (0), which has the largest similarity weight.
+        // With multiple similar signatures the similarity weights select the root component index
+        // (0), which has the largest similarity weight.
         let mut component_table: ComponentTable = get_test_component_table(
             &ScanTreeType::Prefix,
             &[
@@ -640,8 +636,8 @@ mod tests {
             Some(0)
         );
 
-        // With the root component index ignored, component index 1 has the
-        // largest similarity weight of 2.
+        // With the root component index ignored, component index 1 has the largest similarity
+        // weight of 2.
         let mut component_table: ComponentTable = get_test_component_table(
             &ScanTreeType::Prefix,
             &[
@@ -658,8 +654,8 @@ mod tests {
             Some(1)
         );
 
-        // With a suffix tree and two signatures the occurrence weights select
-        // component index 0 (the file names), which has two different path groups.
+        // With a suffix tree and two signatures the occurrence weights select component index 0
+        // (the file names), which has two different path groups.
         let mut component_table: ComponentTable = get_test_component_table(
             &ScanTreeType::Suffix,
             &["testdir1/testfile1", "testdir1/testfile2"],
@@ -672,8 +668,8 @@ mod tests {
             Some(0)
         );
 
-        // With a single signature and all component indexes ignored, no component
-        // groups exist and the method returns None.
+        // With a single signature and all component indexes ignored, no component groups exist
+        // and the method returns None.
         let component_table: ComponentTable =
             get_test_component_table(&ScanTreeType::Prefix, &["/testdir1/testfile1"], &[0, 1, 2]);
 
@@ -687,22 +683,21 @@ mod tests {
             &["/testdir1/testfile1", "/testdir1/testfile2"],
             &[],
         );
-
         let expected_paths: [Path; 2] = [
             Path::from("/testdir1/testfile1"),
             Path::from("/testdir1/testfile2"),
         ];
-
         let signatures: Vec<Arc<PathFilterSignature>> =
             component_table.get_signatures_by_component_index(0);
         assert_eq!(signatures.len(), 2);
+
         for signature in signatures.iter() {
             assert!(expected_paths.contains(&signature.path));
         }
-
         let signatures: Vec<Arc<PathFilterSignature>> =
             component_table.get_signatures_by_component_index(1);
         assert_eq!(signatures.len(), 2);
+
         let expected_path_component: PathComponent = PathComponent::from("testdir1");
         for signature in signatures.iter() {
             assert_eq!(
@@ -710,16 +705,14 @@ mod tests {
                 Some(&expected_path_component)
             );
         }
-
         // Component index 2 has two path groups, one for each signature.
         let signatures: Vec<Arc<PathFilterSignature>> =
             component_table.get_signatures_by_component_index(2);
         assert_eq!(signatures.len(), 2);
+
         for signature in signatures.iter() {
             assert!(expected_paths.contains(&signature.path));
         }
-
-        // Without a component group an empty list is returned.
         let signatures: Vec<Arc<PathFilterSignature>> =
             component_table.get_signatures_by_component_index(3);
         assert_eq!(signatures.len(), 0);
@@ -733,7 +726,6 @@ mod tests {
             Path::from("/testdir1/testfile1"),
             None,
         ));
-
         component_table.insert_component(3, &PathComponent::from("testfile1"), &signature);
 
         assert_eq!(component_table.component_groups.len(), 1);
@@ -747,7 +739,6 @@ mod tests {
                 .len(),
             1
         );
-
         // Inserting a different path component in the same component group.
         component_table.insert_component(3, &PathComponent::from("testfile2"), &signature);
 
