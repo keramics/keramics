@@ -1,6 +1,9 @@
-# keramics-core
+# keramics-encryption
 
 Encryption support for Keramics.
+
+Cryptographic functions provided by this project are primarily intended for data format analysis,
+and are **not** intended for other purposes.
 
 [docs.rs](https://docs.rs/keramics_encryption)
 

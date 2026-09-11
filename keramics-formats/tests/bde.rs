@@ -96,9 +96,8 @@ fn read_encrypted_volume_used_space_only() -> Result<(), ErrorTrace> {
 
     let data_stream: DataStreamReference = encrypted_volume.get_data_stream().unwrap();
 
-    // let (volume_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
-    let (volume_offset, md5_hash): (u64, String) =
-        util::read_data_stream_with_output_file(&data_stream)?;
+    let (volume_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+    // let (volume_offset, md5_hash): (u64, String) = util::read_data_stream_with_output_file(&data_stream)?;
 
     assert_eq!(volume_offset, encrypted_volume.get_volume_size());
     assert_eq!(md5_hash.as_str(), "4ad8e69047c8742938afffb0a5dda0d1");

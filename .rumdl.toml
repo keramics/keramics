@@ -1,9 +1,10 @@
 [global]
 flavor = "commonmark"
 include = [
+    "*.md",
     "docs/*/src/*.md",
     "keramics-*/README.md",
-    "README.md"
+    "keramics-formats/src/*/README.md",
 ]
 respect-gitignore = true
 

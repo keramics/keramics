@@ -567,13 +567,23 @@ impl BdeEncryptedVolume {
             4096,
             BdeBlockRangeType::Sparse,
         ));
-        for eow_block_map_offset in eow_descriptor.block_map_offsets.iter() {
+        // Note that Encrypt-on-Write (EOW) descriptor 2 contains a copy of descriptor 1.
+        if eow_descriptor_offset2 > 0 {
+            // Block range to hide the Encrypt-on-Write descriptor 2.
+            metadata_ranges.push(BdeBlockRange::new(
+                eow_descriptor_offset2,
+                0,
+                4096,
+                BdeBlockRangeType::Sparse,
+            ));
+        }
+        for eow_block_map_area_offset in eow_descriptor.block_map_area_offsets.iter() {
             let mut eow_block_map: BdeEowBlockMap = BdeEowBlockMap::new();
 
             match eow_block_map.read_at_position(
                 data_stream,
                 eow_descriptor.physical_sector_size as usize,
-                SeekFrom::Start(*eow_block_map_offset),
+                SeekFrom::Start(*eow_block_map_area_offset),
             ) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -581,14 +591,37 @@ impl BdeEncryptedVolume {
                         error,
                         format!(
                             "Unable to read Encrypt-on-Write (EOW) block map at offset: {} (0x{:08x})",
-                            *eow_block_map_offset, *eow_block_map_offset
+                            *eow_block_map_area_offset, *eow_block_map_area_offset
                         ),
                     );
                     return Err(error);
                 }
             }
+            // TODO: check this.
+            let eow_block_map_area_size: u32 = eow_block_map.block_map_size.next_multiple_of(4096);
+
+            // Block range to hide the Encrypt-on-Write block map area.
+            metadata_ranges.push(BdeBlockRange::new(
+                *eow_block_map_area_offset,
+                0,
+                eow_block_map_area_size as u64,
+                BdeBlockRangeType::Sparse,
+            ));
+            if eow_block_map.relocation_log_area_offset > 0 {
+                let relocation_log_area_size: u32 = eow_descriptor
+                    .relocation_log_area_size
+                    .next_multiple_of(4096);
+
+                // Block range to hide the Encrypt-on-Write relocation log area.
+                metadata_ranges.push(BdeBlockRange::new(
+                    eow_block_map.relocation_log_area_offset,
+                    0,
+                    relocation_log_area_size as u64,
+                    BdeBlockRangeType::Sparse,
+                ));
+            }
             let eow_block_record_offset1: u64 =
-                *eow_block_map_offset + (eow_block_map.block_record_offset1 as u64);
+                *eow_block_map_area_offset + (eow_block_map.block_record_offset1 as u64);
 
             let mut eow_block_record1: BdeEowBlockRecord =
                 BdeEowBlockRecord::new(eow_descriptor.relocation_block_size);
@@ -611,7 +644,7 @@ impl BdeEncryptedVolume {
                 }
             }
             let eow_block_record_offset2: u64 =
-                *eow_block_map_offset + (eow_block_map.block_record_offset2 as u64);
+                *eow_block_map_area_offset + (eow_block_map.block_record_offset2 as u64);
 
             let mut eow_block_record2: BdeEowBlockRecord =
                 BdeEowBlockRecord::new(eow_descriptor.relocation_block_size);
@@ -665,56 +698,29 @@ impl BdeEncryptedVolume {
                     ));
                 }
             }
-            let mut eow_relocation_log: BdeEowRelocationLog = BdeEowRelocationLog::new();
+            // TODO: remove, currently only used for format analysis
+            if eow_block_map.relocation_log_area_offset > 0 {
+                let mut eow_relocation_log: BdeEowRelocationLog = BdeEowRelocationLog::new();
 
-            match eow_relocation_log.read_at_position(
-                data_stream,
-                eow_descriptor.relocation_log_area_size as usize,
-                SeekFrom::Start(eow_block_map.relocation_log_area_offset),
-            ) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to read Encrypt-on-Write (EOW) relocation log area at offset: {} (0x{:08x})",
-                            eow_block_map.relocation_log_area_offset,
-                            eow_block_map.relocation_log_area_offset,
-                        )
-                    );
-                    return Err(error);
+                match eow_relocation_log.read_at_position(
+                    data_stream,
+                    eow_descriptor.relocation_log_area_size as usize,
+                    SeekFrom::Start(eow_block_map.relocation_log_area_offset),
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to read Encrypt-on-Write (EOW) relocation log area at offset: {} (0x{:08x})",
+                                eow_block_map.relocation_log_area_offset,
+                                eow_block_map.relocation_log_area_offset,
+                            )
+                        );
+                        return Err(error);
+                    }
                 }
             }
-            // TODO: check this.
-            let eow_block_map_size: u32 = eow_block_map.block_map_size.next_multiple_of(4096);
-            let relocation_log_area_size: u32 = eow_descriptor
-                .relocation_log_area_size
-                .next_multiple_of(4096);
-
-            // Block range to hide the Encrypt-on-Write block map.
-            metadata_ranges.push(BdeBlockRange::new(
-                *eow_block_map_offset,
-                0,
-                eow_block_map_size as u64,
-                BdeBlockRangeType::Sparse,
-            ));
-            // Block range to hide the Encrypt-on-Write relocation log area.
-            metadata_ranges.push(BdeBlockRange::new(
-                eow_block_map.relocation_log_area_offset,
-                0,
-                relocation_log_area_size as u64,
-                BdeBlockRangeType::Sparse,
-            ));
-        }
-        // Note that Encrypt-on-Write (EOW) descriptor 2 contains a copy of descriptor 1.
-        if eow_descriptor_offset2 > 0 {
-            // Block range to hide the Encrypt-on-Write descriptor 2.
-            metadata_ranges.push(BdeBlockRange::new(
-                eow_descriptor_offset2,
-                0,
-                4096,
-                BdeBlockRangeType::Sparse,
-            ));
         }
         Ok(())
     }

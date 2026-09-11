@@ -28,12 +28,15 @@ use keramics_types::{bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
         field(name = "relocation_block_size", data_type = "u32"),
         field(name = "relocation_log_area_size", data_type = "u32"),
         field(name = "relocation_log_entry_size", data_type = "u32"),
-        field(name = "number_of_block_map_offsets", data_type = "u32"),
+        field(name = "number_of_offsets", data_type = "u32"),
         field(name = "checksum", data_type = "u32", format = "hex"),
         field(name = "eow_descriptor_offset1", data_type = "u64", format = "hex"),
         field(name = "eow_descriptor_offset2", data_type = "u64", format = "hex"),
-        field(name = "block_map_offsets", data_type = "[u64; 8]", format = "hex"),
-        field(name = "unknown2", data_type = "[u8; 392]"),
+        field(
+            name = "block_map_area_offsets",
+            data_type = "[u64; 8]",
+            format = "hex"
+        ),
     ),
     methods("debug_read_data", "read_at_position")
 )]
@@ -48,8 +51,8 @@ pub struct BdeEowDescriptor {
     /// Encrypt-on-Write relocation log area size.
     pub relocation_log_area_size: u32,
 
-    /// Block map offsets.
-    pub block_map_offsets: Vec<u64>,
+    /// Block map area offsets.
+    pub block_map_area_offsets: Vec<u64>,
 }
 
 impl BdeEowDescriptor {
@@ -59,7 +62,7 @@ impl BdeEowDescriptor {
             physical_sector_size: 0,
             relocation_block_size: 0,
             relocation_log_area_size: 0,
-            block_map_offsets: Vec::new(),
+            block_map_area_offsets: Vec::new(),
         }
     }
 
@@ -72,6 +75,11 @@ impl BdeEowDescriptor {
         }
         if &data[0..8] != b"FVE-EOW\x00" {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
+        }
+        let header_size: u16 = bytes_to_u16_le!(data, 8);
+
+        if header_size != 56 {
+            return Err(keramics_core::error_trace_new!("Unsupported header size"));
         }
         let data_end_offset: usize = bytes_to_u16_le!(data, 10) as usize;
 
@@ -113,7 +121,7 @@ impl BdeEowDescriptor {
 
         for chunk in data[56..offsets_end_offset].chunks_exact(8) {
             let offset: u64 = bytes_to_u64_le!(chunk, 0);
-            self.block_map_offsets.push(offset);
+            self.block_map_area_offsets.push(offset);
         }
         Ok(())
     }
@@ -179,7 +187,7 @@ mod tests {
         assert_eq!(test_struct.physical_sector_size, 512);
         assert_eq!(test_struct.relocation_block_size, 2097152);
         assert_eq!(test_struct.relocation_log_area_size, 134144);
-        assert_eq!(test_struct.block_map_offsets.len(), 6);
+        assert_eq!(test_struct.block_map_area_offsets.len(), 6);
 
         Ok(())
     }
