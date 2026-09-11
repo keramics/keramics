@@ -19,7 +19,7 @@ public.
 
 You can report vulnerabilities through one of the following methods:
 
-1. **Email:** Send a detailed report to **joachim.metz@gmail.com**
+1. **Email:** Send a detailed report to joachim.metz at gmail.com
 
 ### What to Include
 
