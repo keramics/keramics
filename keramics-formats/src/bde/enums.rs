@@ -13,6 +13,16 @@
 
 use std::fmt;
 
+/// BitLocker Drive Encryption (BDE) format versions (or variant).
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum BdeFormatVersion {
+    NotSet,
+    ToGo,
+    UsedDiskSpaceOnly,
+    Version1,
+    Version2,
+}
+
 /// BitLocker Drive Encryption (BDE) key protector types.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum BdeKeyProtectorType {

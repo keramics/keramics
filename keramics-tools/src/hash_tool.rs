@@ -566,11 +566,9 @@ impl HashTool {
 
         match vfs_scanner.build() {
             Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to build format scanner",
-                    error
-                ));
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build format scanner");
+                return Err(error);
             }
         }
         match vfs_scanner.scan(&vfs_scan_options, vfs_scan_context, vfs_location) {

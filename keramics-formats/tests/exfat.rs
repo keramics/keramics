@@ -53,11 +53,9 @@ fn read_path(
 fn open_file_system(path: &PathBuf) -> Result<ExFatFileSystem, ErrorTrace> {
     let data_stream: DataStreamReference = match open_os_data_stream(path) {
         Ok(data_stream) => data_stream,
-        Err(error) => {
-            return Err(keramics_core::error_trace_new_with_error!(
-                "Unable to open data stream",
-                error
-            ));
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
+            return Err(error);
         }
     };
     let mut file_system: ExFatFileSystem = ExFatFileSystem::new();

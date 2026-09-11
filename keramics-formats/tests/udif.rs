@@ -25,11 +25,9 @@ use util::read_data_stream;
 fn open_image(base_path: &PathBuf, file_name: &str) -> Result<UdifImage, ErrorTrace> {
     let file_resolver: FileResolverReference = match open_os_file_resolver(base_path) {
         Ok(data_stream) => data_stream,
-        Err(error) => {
-            return Err(keramics_core::error_trace_new_with_error!(
-                "Unable to open file resolver",
-                error
-            ));
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to open file resolver");
+            return Err(error);
         }
     };
     let mut image: UdifImage = UdifImage::new();

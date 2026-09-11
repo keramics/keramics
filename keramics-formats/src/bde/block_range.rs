@@ -17,7 +17,7 @@ pub enum BdeBlockRangeType {
     Encrypted,
     InFile,
     Sparse,
-    VistaBootSector,
+    V1BootSector,
 }
 
 /// BitLocker Drive Encryption (BDE) block range.

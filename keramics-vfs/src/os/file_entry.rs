@@ -255,11 +255,12 @@ impl OsFileEntry {
                             sub_file_entry_index
                         )));
                     }
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
                             format!("Unable to open sub file entry: {}", sub_file_entry_index),
-                            error
-                        ));
+                        );
+                        return Err(error);
                     }
                 }
                 Ok(os_file_entry)

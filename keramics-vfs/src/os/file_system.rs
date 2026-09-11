@@ -28,11 +28,12 @@ impl OsFileSystem {
     pub fn file_entry_exists(path: &Path) -> Result<bool, ErrorTrace> {
         let path_buf: PathBuf = match path.to_path_buf() {
             Ok(path_buf) => path_buf,
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to determine path buffer from path",
-                    error
-                ));
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to determine path buffer from path"
+                );
+                return Err(error);
             }
         };
         // Note that symlink_metadata() is used to prevent traversing symbolic links.
@@ -50,11 +51,12 @@ impl OsFileSystem {
     pub fn get_file_entry_by_path(path: &Path) -> Result<Option<OsFileEntry>, ErrorTrace> {
         let path_buf: PathBuf = match path.to_path_buf() {
             Ok(path_buf) => path_buf,
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to determine path buffer from path",
-                    error
-                ));
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to determine path buffer from path"
+                );
+                return Err(error);
             }
         };
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
@@ -77,10 +79,10 @@ impl OsFileSystem {
         match os_file_entry.open(&path_buf) {
             Ok(true) => Ok(os_file_entry),
             Ok(false) => Err(keramics_core::error_trace_new!("Missing file entry")),
-            Err(error) => Err(keramics_core::error_trace_new_with_error!(
-                "Unable to open OS root directory",
-                error
-            )),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open OS root directory");
+                return Err(error);
+            }
         }
     }
 }

@@ -26,22 +26,18 @@ use util::read_data_stream;
 fn open_encrypted_volume(path: &PathBuf) -> Result<BdeEncryptedVolume, ErrorTrace> {
     let os_data_stream: DataStreamReference = match open_os_data_stream(path) {
         Ok(data_stream) => data_stream,
-        Err(error) => {
-            return Err(keramics_core::error_trace_new_with_error!(
-                "Unable to open data stream",
-                error
-            ));
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
+            return Err(error);
         }
     };
     let mut vhd_file: VhdFile = VhdFile::new();
 
     match vhd_file.read_data_stream(&os_data_stream) {
         Ok(_) => {}
-        Err(error) => {
-            return Err(keramics_core::error_trace_new_with_error!(
-                "Unable to open VHD file",
-                error
-            ));
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to open VHD file");
+            return Err(error);
         }
     }
     let vhd_data_stream: DataStreamReference = match vhd_file.get_data_stream() {

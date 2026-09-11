@@ -62,10 +62,10 @@ impl FileResolver for OsFileResolver {
         match symlink_metadata(&path_buf) {
             Ok(_) => match open_os_data_stream(&path_buf) {
                 Ok(data_stream) => Ok(Some(data_stream)),
-                Err(error) => Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to open data stream with error",
-                    error
-                )),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
+                    return Err(error);
+                }
             },
             Err(ref error) if error.kind() == ErrorKind::NotFound => Ok(None),
             Err(error) => Err(keramics_core::error_trace_new_with_error!(

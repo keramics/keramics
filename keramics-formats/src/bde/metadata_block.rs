@@ -57,6 +57,9 @@ pub struct BdeMetadataBlock {
     /// Boot record offset.
     pub boot_record_offset: u64,
 
+    /// Boot record number of sectors.
+    pub boot_record_number_of_sectors: u32,
+
     /// Metadata area descriptors.
     pub metadata_area_descriptors: Option<BdeMetadataAreaDescriptors>,
 
@@ -81,6 +84,7 @@ impl BdeMetadataBlock {
             metadata_block_offset3: 0,
             mft_mirror_cluster_block_number: 0,
             boot_record_offset: 0,
+            boot_record_number_of_sectors: 0,
             metadata_area_descriptors: None,
             full_volume_encryption_key: None,
             key_protectors: Vec::new(),
@@ -115,6 +119,7 @@ impl BdeMetadataBlock {
         self.metadata_block_offset3 = block_header.metadata_block_offset3;
         self.mft_mirror_cluster_block_number = block_header.mft_mirror_cluster_block_number;
         self.boot_record_offset = block_header.boot_record_offset;
+        self.boot_record_number_of_sectors = block_header.boot_record_number_of_sectors;
 
         keramics_core::debug_trace_structure!(BdeMetadataHeader::debug_read_data(&data[64..]));
 

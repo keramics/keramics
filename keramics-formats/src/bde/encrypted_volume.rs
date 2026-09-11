@@ -23,16 +23,16 @@ use super::aes_ccm_encrypted_key::BdeAesCcmEncryptedKey;
 use super::block_range::{BdeBlockRange, BdeBlockRangeType};
 use super::block_reader::BdeBlockReader;
 use super::block_stream::BdeBlockStream;
-use super::boot_record::BdeBootRecord;
 use super::boot_record_togo::BdeBootRecordToGo;
 use super::boot_record_used_disk_space::BdeBootRecordUsedDiskSpace;
-use super::boot_record_vista::BdeBootRecordVista;
+use super::boot_record_v1::BdeBootRecordV1;
+use super::boot_record_v2::BdeBootRecordV2;
 use super::constants::*;
 use super::credential::BdeCredential;
 use super::encryption::BdeEncryption;
 use super::encryption_context::BdeEncryptionContext;
 use super::encryption_type::BdeEncryptionType;
-use super::enums::BdeKeyProtectorType;
+use super::enums::{BdeFormatVersion, BdeKeyProtectorType};
 use super::eow_block_map::BdeEowBlockMap;
 use super::eow_block_record::BdeEowBlockRecord;
 use super::eow_descriptor::BdeEowDescriptor;
@@ -47,6 +47,9 @@ use super::volume_master_key::BdeVolumeMasterKey;
 pub struct BdeEncryptedVolume {
     /// Data stream.
     data_stream: Option<DataStreamReference>,
+
+    /// Format version (or variant).
+    format_version: BdeFormatVersion,
 
     /// Volume identifier.
     volume_identifier: Uuid,
@@ -84,6 +87,7 @@ impl BdeEncryptedVolume {
     pub fn new() -> Self {
         Self {
             data_stream: None,
+            format_version: BdeFormatVersion::NotSet,
             volume_identifier: Uuid::new(),
             bytes_per_sector: 0,
             encryption_type: BdeEncryptionType::new(0),
@@ -124,6 +128,11 @@ impl BdeEncryptedVolume {
     /// Retrieves the description.
     pub fn get_description(&self) -> Option<&Ucs2String> {
         self.description.as_ref()
+    }
+
+    /// Retrieves the format version.
+    pub fn get_format_version(&self) -> &BdeFormatVersion {
+        &self.format_version
     }
 
     /// Retrieves the encryption type.
@@ -185,9 +194,9 @@ impl BdeEncryptedVolume {
         let metadata_block_size: usize;
 
         if &data[160..176] == BDE_IDENTIFIER {
-            keramics_core::debug_trace_structure!(BdeBootRecord::debug_read_data(&data));
+            keramics_core::debug_trace_structure!(BdeBootRecordV2::debug_read_data(&data));
 
-            let mut boot_record: BdeBootRecord = BdeBootRecord::new();
+            let mut boot_record: BdeBootRecordV2 = BdeBootRecordV2::new();
 
             match boot_record.read_data(&data) {
                 Ok(_) => {}
@@ -195,7 +204,7 @@ impl BdeEncryptedVolume {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to read boot record at offset: {} (0x{:08x})",
+                            "Unable to read boot record version 2 at offset: {} (0x{:08x})",
                             offset, offset
                         ),
                     );
@@ -208,11 +217,11 @@ impl BdeEncryptedVolume {
             metadata_block_size = 65536;
 
             self.bytes_per_sector = boot_record.bytes_per_sector;
+            self.format_version = BdeFormatVersion::Version2;
         } else if &data[160..176] == BDE_USED_DISK_SPACE_ONLY_IDENTIFIER {
             keramics_core::debug_trace_structure!(BdeBootRecordUsedDiskSpace::debug_read_data(
                 &data
             ));
-
             let mut boot_record: BdeBootRecordUsedDiskSpace = BdeBootRecordUsedDiskSpace::new();
 
             match boot_record.read_data(&data) {
@@ -221,7 +230,7 @@ impl BdeEncryptedVolume {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to read boot record at offset: {} (0x{:08x})",
+                            "Unable to read Used Disk Space Only boot record at offset: {} (0x{:08x})",
                             offset, offset
                         ),
                     );
@@ -236,6 +245,7 @@ impl BdeEncryptedVolume {
             eow_descriptor_offset2 = boot_record.eow_descriptor_offset2;
 
             self.bytes_per_sector = boot_record.bytes_per_sector;
+            self.format_version = BdeFormatVersion::UsedDiskSpaceOnly;
         } else if &data[424..440] == BDE_IDENTIFIER {
             keramics_core::debug_trace_structure!(BdeBootRecordToGo::debug_read_data(&data));
 
@@ -247,7 +257,7 @@ impl BdeEncryptedVolume {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to read ToGo boot record at offset: {} (0x{:08x})",
+                            "Unable to read To Go boot record at offset: {} (0x{:08x})",
                             offset, offset
                         ),
                     );
@@ -260,10 +270,11 @@ impl BdeEncryptedVolume {
             metadata_block_size = 65536;
 
             self.bytes_per_sector = boot_record.bytes_per_sector;
+            self.format_version = BdeFormatVersion::ToGo;
         } else if &data[3..11] == BDE_FILE_SYSTEM_SIGNATURE {
-            keramics_core::debug_trace_structure!(BdeBootRecordVista::debug_read_data(&data));
+            keramics_core::debug_trace_structure!(BdeBootRecordV1::debug_read_data(&data));
 
-            let mut boot_record: BdeBootRecordVista = BdeBootRecordVista::new();
+            let mut boot_record: BdeBootRecordV1 = BdeBootRecordV1::new();
 
             match boot_record.read_data(&data) {
                 Ok(_) => {}
@@ -271,7 +282,7 @@ impl BdeEncryptedVolume {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to read Vista boot record at offset: {} (0x{:08x})",
+                            "Unable to read boot record version 1 at offset: {} (0x{:08x})",
                             offset, offset
                         ),
                     );
@@ -288,6 +299,7 @@ impl BdeEncryptedVolume {
             metadata_block_size = 16384;
 
             self.bytes_per_sector = boot_record.bytes_per_sector;
+            self.format_version = BdeFormatVersion::Version1;
         } else {
             return Err(keramics_core::error_trace_new!("Unsupported format"));
         }
@@ -347,7 +359,7 @@ impl BdeEncryptedVolume {
                 0,
                 metadata_block.mft_mirror_cluster_block_number,
                 self.bytes_per_sector as u64,
-                BdeBlockRangeType::VistaBootSector,
+                BdeBlockRangeType::V1BootSector,
             ));
         } else if let Some(metadata_area_descriptors) = &metadata_block.metadata_area_descriptors {
             if metadata_area_descriptors.boot_record_offset == 0 {
@@ -359,6 +371,21 @@ impl BdeEncryptedVolume {
                 return Err(keramics_core::error_trace_new!(
                     "Invalid metadata areas descriptor - missing boot record size",
                 ));
+            }
+            if self.bytes_per_sector == 0 {
+                let bytes_per_sector: u64 = if metadata_block.boot_record_number_of_sectors == 0 {
+                    0
+                } else {
+                    metadata_area_descriptors.boot_record_size
+                        / (metadata_block.boot_record_number_of_sectors as u64)
+                };
+                if bytes_per_sector != 512 && bytes_per_sector != 4096 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported bytes per sector: {}",
+                        bytes_per_sector
+                    )));
+                }
+                self.bytes_per_sector = bytes_per_sector as u16;
             }
             // Block range to map the encrypted boot record to the start of the unlocked volume.
             metadata_ranges.push(BdeBlockRange::new(
@@ -1036,11 +1063,28 @@ mod tests {
             description,
             Some(Ucs2String::from("TEST TestVolume 2026-09-04")).as_ref()
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_format_version() -> Result<(), ErrorTrace> {
+        let encrypted_volume: BdeEncryptedVolume = get_encrypted_volume()?;
+
+        let format_version: &BdeFormatVersion = encrypted_volume.get_format_version();
+        assert_eq!(format_version, &BdeFormatVersion::Version2);
 
         Ok(())
     }
 
-    // TODO: add tests for get_encryption_type
+    #[test]
+    fn test_get_encryption_type() -> Result<(), ErrorTrace> {
+        let encrypted_volume: BdeEncryptedVolume = get_encrypted_volume()?;
+
+        let encryption_type: &BdeEncryptionType = encrypted_volume.get_encryption_type();
+        assert_eq!(encryption_type.method, 0x8002);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_identifier() -> Result<(), ErrorTrace> {
@@ -1055,8 +1099,26 @@ mod tests {
     }
 
     // TODO: add tests for get_key_protector_by_index
-    // TODO: add tests for get_number_of_key_protectors
-    // TODO: add tests for get_volume_size
+
+    #[test]
+    fn test_get_number_of_key_protectors() -> Result<(), ErrorTrace> {
+        let encrypted_volume: BdeEncryptedVolume = get_encrypted_volume()?;
+
+        let number_of_key_protectors: usize = encrypted_volume.get_number_of_key_protectors();
+        assert_eq!(number_of_key_protectors, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_volume_size() -> Result<(), ErrorTrace> {
+        let encrypted_volume: BdeEncryptedVolume = get_encrypted_volume()?;
+
+        let volume_size: u64 = encrypted_volume.get_volume_size();
+        assert_eq!(volume_size, 65994752);
+
+        Ok(())
+    }
 
     #[test]
     fn test_is_locked() -> Result<(), ErrorTrace> {
