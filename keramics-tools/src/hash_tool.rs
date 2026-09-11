@@ -19,7 +19,7 @@ use clap::{Args, Parser, Subcommand};
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
-use keramics_formats::{Path, PathComponent};
+use keramics_formats::{Path, PathCharacterMappings, PathComponent};
 use keramics_hashes::{
     DigestHashContext, Md5Context, Sha1Context, Sha224Context, Sha256Context, Sha512Context,
 };
@@ -224,7 +224,7 @@ impl HashTool {
                         }
                         None => display_path.clone(),
                     };
-                    let skip: bool = path_filter.is_match(path, name.as_ref());
+                    let skip: bool = path_filter.is_match(path, name.as_ref())?;
 
                     let hash_string: String = if skip {
                         String::from("N/A (skipped)")
@@ -377,20 +377,22 @@ impl HashTool {
             let mut path_filter: PathFilter = PathFilter::new();
 
             match file_system.as_ref() {
-                VfsFileSystem::Ntfs(_) => {
-                    // TODO: add support for case folding.
+                VfsFileSystem::Ntfs(ntfs_file_system) => {
+                    path_filter.set_case_folding(PathCharacterMappings::Ucs2(
+                        ntfs_file_system.get_case_folding_mappings(),
+                    ));
                     path_filter.add_signature(PathFilterSignature::new(
                         WindowsPath::from_str("\\$BadClus"),
                         Some(PathComponent::from(Ucs2String::from("$Bad"))),
-                    ));
+                    ))?;
                     path_filter.add_signature(PathFilterSignature::new(
                         WindowsPath::from_str("\\hiberfil.sys"),
                         None,
-                    ));
+                    ))?;
                     path_filter.add_signature(PathFilterSignature::new(
                         WindowsPath::from_str("\\pagefile.sys"),
                         None,
-                    ));
+                    ))?;
                     // TODO: add option for dfImageTools compatibility mode
                     // path_filter.add_signature(PathFilterSignature::new(
                     //     Path::from("/**"),

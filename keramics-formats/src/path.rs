@@ -17,6 +17,7 @@ use std::path::{Component, MAIN_SEPARATOR_STR, PathBuf};
 use keramics_core::ErrorTrace;
 use keramics_types::{ByteString, Ucs2String, Utf16String};
 
+use super::path_character_mappings::PathCharacterMappings;
 use super::path_component::PathComponent;
 
 /// Generic path.
@@ -107,6 +108,29 @@ impl Path {
     /// Retrieves a specific component.
     pub fn get_component_by_index(&self, component_index: usize) -> Option<&PathComponent> {
         self.components.get(component_index)
+    }
+
+    /// Creates a new `Path` with case folding applied.
+    pub fn new_with_case_folding(
+        &self,
+        case_folding_mappings: &PathCharacterMappings,
+    ) -> Result<Self, ErrorTrace> {
+        let mut components: Vec<PathComponent> = Vec::new();
+
+        for component in self.components.iter() {
+            match component.new_with_case_folding(case_folding_mappings) {
+                Ok(folded_component) => components.push(folded_component),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to apply case folding to path component"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+
+        Ok(Self { components })
     }
 
     /// Determines if the path is empty.
@@ -492,8 +516,9 @@ mod tests {
     use super::*;
 
     use std::ffi::OsString;
+    use std::sync::Arc;
 
-    use keramics_types::Ucs2String;
+    use keramics_types::{Ucs2CharacterMappings, Ucs2String, Utf16String};
 
     #[test]
     fn test_new_with_join() {
@@ -691,6 +716,75 @@ mod tests {
 
         let test_struct: Path = Path::from("");
         assert_eq!(test_struct.get_component_by_index(1), None);
+    }
+
+    #[test]
+    fn test_new_with_case_folding() -> Result<(), ErrorTrace> {
+        // Ucs2String component: mappings applied.
+        let mut mappings: Ucs2CharacterMappings = Ucs2CharacterMappings::new();
+        mappings.add(0x0041, 0x0061); // 'A' -> 'a'
+        let mappings: PathCharacterMappings = PathCharacterMappings::Ucs2(Arc::new(mappings));
+
+        let path = Path {
+            components: vec![
+                PathComponent::Root,
+                PathComponent::Ucs2String(Ucs2String::from("AB")),
+            ],
+        };
+        let folded: Path = path.new_with_case_folding(&mappings)?;
+        assert_eq!(
+            folded,
+            Path {
+                components: vec![
+                    PathComponent::Root,
+                    PathComponent::Ucs2String(Ucs2String::from("aB")), // only 'A' mapped
+                ]
+            }
+        );
+
+        // String component: folded via `to_lowercase()`.
+        let path = Path {
+            components: vec![PathComponent::String(String::from("HELLO"))],
+        };
+        let folded: Path = path.new_with_case_folding(&mappings)?;
+        assert_eq!(
+            folded,
+            Path {
+                components: vec![PathComponent::String(String::from("hello"))],
+            }
+        );
+
+        // Root and Parent pass through unchanged.
+        let path = Path {
+            components: vec![PathComponent::Root, PathComponent::Parent],
+        };
+        let folded: Path = path.new_with_case_folding(&mappings)?;
+        assert_eq!(
+            folded,
+            Path {
+                components: vec![PathComponent::Root, PathComponent::Parent],
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_new_with_case_folding_empty_mappings() -> Result<(), ErrorTrace> {
+        let empty_mappings: Ucs2CharacterMappings = Ucs2CharacterMappings::new();
+        let empty_mappings: PathCharacterMappings = PathCharacterMappings::Ucs2(Arc::new(empty_mappings));
+        let path = Path {
+            components: vec![PathComponent::Ucs2String(Ucs2String::from("AB"))],
+        };
+        let folded: Path = path.new_with_case_folding(&empty_mappings)?;
+        assert_eq!(
+            folded,
+            Path {
+                components: vec![PathComponent::Ucs2String(Ucs2String::from("AB"))],
+            }
+        );
+
+        Ok(())
     }
 
     #[test]

@@ -1,0 +1,48 @@
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may
+ * obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+
+use std::sync::Arc;
+
+use keramics_types::{Ucs2CharacterMappings, Utf16CharacterMappings};
+
+/// Character mappings for case folding of path components.
+#[derive(Clone)]
+pub enum PathCharacterMappings {
+    /// UCS-2 character mappings.
+    Ucs2(Arc<Ucs2CharacterMappings>),
+
+    /// UTF-16 character mappings.
+    Utf16(Arc<Utf16CharacterMappings>),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clone() {
+        let mappings: PathCharacterMappings =
+            PathCharacterMappings::Ucs2(Arc::new(Ucs2CharacterMappings::new()));
+        let cloned: PathCharacterMappings = mappings.clone();
+
+        assert!(matches!(cloned, PathCharacterMappings::Ucs2(_)));
+
+        let mappings: PathCharacterMappings =
+            PathCharacterMappings::Utf16(Arc::new(Utf16CharacterMappings::new(&[
+                (0x0061, 0x0041),
+            ])));
+        let cloned: PathCharacterMappings = mappings.clone();
+
+        assert!(matches!(cloned, PathCharacterMappings::Utf16(_)));
+    }
+}
