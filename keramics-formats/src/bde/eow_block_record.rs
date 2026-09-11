@@ -16,7 +16,7 @@ use std::io::SeekFrom;
 use keramics_checksums::ReversedCrc32Context;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_layout_map::LayoutMap;
-use keramics_types::bytes_to_u32_le;
+use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
 
 /// BitLocker Drive Encryption (BDE) Encrypt-on-Write (EOW) block bitmap range.
 pub struct BdeEowBlockBitmapRange {
@@ -50,10 +50,9 @@ impl BdeEowBlockBitmapRange {
         field(name = "physical_sector_size", data_type = "u32"),
         field(name = "number_of_bits", data_type = "u32"),
         field(name = "sequence_number", data_type = "u32"),
-        field(name = "unknown2", data_type = "u32"),
+        field(name = "unknown1", data_type = "u32"),
         field(name = "flags", data_type = "u32", format = "hex"),
         field(name = "checksum", data_type = "u32", format = "hex"),
-        field(name = "bitmap", data_type = "[u8; 16]", format = "hex"),
     ),
     methods("debug_read_data")
 )]
@@ -120,6 +119,11 @@ impl BdeEowBlockRecord {
         }
         if &data[0..10] != b"FVE-EOWBR\x00" {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
+        }
+        let header_size: u16 = bytes_to_u16_le!(data, 10);
+
+        if header_size != 36 {
+            return Err(keramics_core::error_trace_new!("Unsupported header size"));
         }
         let checksum: u32 = bytes_to_u32_le!(data, 32);
 

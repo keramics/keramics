@@ -16,7 +16,7 @@ use std::io::SeekFrom;
 use keramics_checksums::ReversedCrc32Context;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_layout_map::LayoutMap;
-use keramics_types::{bytes_to_u32_le, bytes_to_u64_le};
+use keramics_types::{bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -33,7 +33,6 @@ use keramics_types::{bytes_to_u32_le, bytes_to_u64_le};
         field(name = "block_record_offset2", data_type = "u32", format = "hex"),
         field(name = "block_record_size", data_type = "u32"),
         field(name = "checksum", data_type = "u32", format = "hex"),
-        field(name = "unknown1", data_type = "[u8; 452]"),
     ),
     methods("debug_read_data")
 )]
@@ -84,6 +83,11 @@ impl BdeEowBlockMap {
         }
         if &data[0..10] != b"FVE-EOWBM\x00" {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
+        }
+        let header_size: u16 = bytes_to_u16_le!(data, 10);
+
+        if header_size != 60 {
+            return Err(keramics_core::error_trace_new!("Unsupported header size"));
         }
         let checksum: u32 = bytes_to_u32_le!(data, 56);
 
