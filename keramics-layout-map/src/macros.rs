@@ -382,9 +382,10 @@ fn parse_bitmap_layout(
             )));
         }
     };
-    let _bitmap_layout: BitmapLayout = BitmapLayout::new(data_type, bit_order);
+    let bitmap_layout: BitmapLayout = BitmapLayout::new(data_type, bit_order);
 
     // TODO: add option for value size and byte order
+    _ = bitmap_layout;
     todo!();
 
     // Ok(bitmap_layout)

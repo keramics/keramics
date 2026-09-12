@@ -125,7 +125,7 @@ impl<K: Hash + Eq + Clone, V: Clone> SharedLruCache<K, V> {
     pub fn insert(&self, key: K, value: V) -> Result<(), ErrorTrace> {
         match self.cache.write() {
             Ok(mut cache) => {
-                let _: () = cache.insert(key, value);
+                _ = cache.insert(key, value);
                 Ok(())
             }
             Err(error) => Err(keramics_core::error_trace_new_with_error!(

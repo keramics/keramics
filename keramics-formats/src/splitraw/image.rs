@@ -128,7 +128,6 @@ impl SplitRawImage {
                 return Err(error);
             }
         }
-
         self.file_resolver = file_resolver.clone();
 
         Ok(())

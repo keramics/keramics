@@ -80,7 +80,7 @@ impl EwfHeader2 {
         let mut object_storage: EwfUtf16ObjectStorage =
             EwfUtf16ObjectStorage::new(&data[data_offset..], byte_order);
 
-        let _number_of_categories: u8 = match object_storage.next_line().as_deref() {
+        let number_of_categories: u8 = match object_storage.next_line().as_deref() {
             // "1"
             Some([0x0031]) => 1,
             // "3"

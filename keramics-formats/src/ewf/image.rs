@@ -642,6 +642,13 @@ impl EwfImage {
             let chunk_data_size: u32 = if chunk_data_offset < next_chunk_data_offset {
                 next_chunk_data_offset - chunk_data_offset
             } else {
+                #[cfg(feature = "debug-trace")]
+                DebugTrace::static_scope(|debug_trace| {
+                    debug_trace.print(format!(
+                        "EwfImage table entry: {} current offset: {} larger than next offset: {}",
+                        table_entry_index, chunk_data_offset, next_chunk_data_offset
+                    ));
+                });
                 next_table_entry
                     .chunk_data_offset
                     .saturating_sub(chunk_data_offset)

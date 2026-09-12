@@ -63,7 +63,7 @@ impl EwfHeader {
     ) -> Result<(), ErrorTrace> {
         let mut object_storage: EwfByteObjectStorage = EwfByteObjectStorage::new(data);
 
-        let _number_of_categories: u8 = match object_storage.next_line() {
+        let number_of_categories: u8 = match object_storage.next_line() {
             Some(b"1") => 1,
             Some(b"3") => 3,
             Some(_) => {
