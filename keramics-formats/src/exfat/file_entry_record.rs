@@ -82,7 +82,7 @@ impl ExFatFileEntryRecord {
         }
         self.file_attribute_flags = bytes_to_u16_le!(data, 4);
 
-        if &data[8..12] == &[0; 4] && data[20] == 0 {
+        if data[8..12] == [0; 4] && data[20] == 0 {
             self.creation_time = DateTime::NotSet;
         } else {
             let fat_time: u16 = bytes_to_u16_le!(data, 8);
@@ -95,7 +95,7 @@ impl ExFatFileEntryRecord {
 
             self.creation_time = DateTime::FatTimeDate10Ms(fat_time_date);
         }
-        if &data[12..16] == &[0; 4] && data[21] == 0 {
+        if data[12..16] == [0; 4] && data[21] == 0 {
             self.modification_time = DateTime::NotSet;
         } else {
             let fat_time: u16 = bytes_to_u16_le!(data, 12);
@@ -108,7 +108,7 @@ impl ExFatFileEntryRecord {
 
             self.modification_time = DateTime::FatTimeDate10Ms(fat_time_date);
         }
-        if &data[16..20] == &[0; 4] {
+        if data[16..20] == [0; 4] {
             self.access_time = DateTime::NotSet;
         } else {
             let mut fat_time_date: FatTimeDate = FatTimeDate::from_bytes(&data[16..20]);

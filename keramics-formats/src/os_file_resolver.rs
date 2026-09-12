@@ -64,7 +64,7 @@ impl FileResolver for OsFileResolver {
                 Ok(data_stream) => Ok(Some(data_stream)),
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
-                    return Err(error);
+                    Err(error)
                 }
             },
             Err(ref error) if error.kind() == ErrorKind::NotFound => Ok(None),

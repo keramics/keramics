@@ -61,19 +61,9 @@ impl<P: VfsPartition, V: VfsPartitionSystem + PartitionIterator<PartitionItem = 
                         Some(partition_index) => partition_index,
                         None => return false,
                     };
-                if partition_index == 0 || partition_index > self.number_of_partitions {
-                    false
-                } else {
-                    true
-                }
+                !(partition_index == 0 || partition_index > self.number_of_partitions)
             }
-            None => {
-                if path.is_empty() {
-                    false
-                } else {
-                    true
-                }
-            }
+            None => !path.is_empty(),
         }
     }
 

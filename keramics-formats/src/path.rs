@@ -95,7 +95,7 @@ impl Path {
 
         let parent_components: Vec<PathComponent> = if number_of_components == 0 {
             vec![]
-        } else if number_of_components == 1 && &self.components[0] != &PathComponent::Root {
+        } else if number_of_components == 1 && self.components[0] != PathComponent::Root {
             vec![PathComponent::Current]
         } else {
             self.components[0..number_of_components - 1].to_vec()
@@ -139,7 +139,7 @@ impl Path {
 
     /// Determines if the path is relative.
     pub fn is_relative(&self) -> bool {
-        self.components.len() >= 1 && self.components[0] != PathComponent::Root
+        !self.components.is_empty() && self.components[0] != PathComponent::Root
     }
 
     /// Determines if the path represents the root.

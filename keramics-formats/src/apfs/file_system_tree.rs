@@ -198,7 +198,7 @@ impl ApfsFileSystemTree {
 
             let mut key: ApfsFileSystemKey = ApfsFileSystemKey::new();
 
-            match key.read_data(&key_data) {
+            match key.read_data(key_data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read key");
@@ -215,8 +215,7 @@ impl ApfsFileSystemTree {
                 && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_EXTENDED_ATTRIBUTE
             {
                 if !is_branch {
-                    let (name, _): (ByteString, u32) = match self.read_name(&key_data, entry_index)
-                    {
+                    let (name, _): (ByteString, u32) = match self.read_name(key_data, entry_index) {
                         Ok(result) => result,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -452,7 +451,7 @@ impl ApfsFileSystemTree {
 
             let mut key: ApfsFileSystemKey = ApfsFileSystemKey::new();
 
-            match key.read_data(&key_data) {
+            match key.read_data(key_data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read key");
@@ -469,8 +468,7 @@ impl ApfsFileSystemTree {
                 && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD
             {
                 if !is_branch {
-                    let (name, _): (ByteString, u32) = match self.read_name(&key_data, entry_index)
-                    {
+                    let (name, _): (ByteString, u32) = match self.read_name(key_data, entry_index) {
                         Ok(result) => result,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -742,7 +740,7 @@ impl ApfsFileSystemTree {
 
             let mut key: ApfsFileSystemKey = ApfsFileSystemKey::new();
 
-            match key.read_data(&key_data) {
+            match key.read_data(key_data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read key");
@@ -759,7 +757,7 @@ impl ApfsFileSystemTree {
                 && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD
             {
                 let (key_name, key_name_hash): (ByteString, u32) =
-                    match self.read_name(&key_data, entry_index) {
+                    match self.read_name(key_data, entry_index) {
                         Ok(result) => result,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -1029,7 +1027,7 @@ impl ApfsFileSystemTree {
 
             let mut key: ApfsFileSystemKey = ApfsFileSystemKey::new();
 
-            match key.read_data(&key_data) {
+            match key.read_data(key_data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read key");
@@ -1046,7 +1044,7 @@ impl ApfsFileSystemTree {
                 && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_FILE_EXTENT
             {
                 if !is_branch {
-                    match self.read_extent(&node, &key_data, entry_index) {
+                    match self.read_extent(&node, key_data, entry_index) {
                         Ok(extent) => {
                             extents.push(extent);
                         }
@@ -1256,7 +1254,7 @@ impl ApfsFileSystemTree {
 
             let mut node: ApfsBtreeNode = ApfsBtreeNode::new();
 
-            match node.read_at_position(&data_stream, SeekFrom::Start(node_offset)) {
+            match node.read_at_position(data_stream, SeekFrom::Start(node_offset)) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -1370,7 +1368,7 @@ impl ApfsFileSystemTree {
 
             let mut key: ApfsFileSystemKey = ApfsFileSystemKey::new();
 
-            match key.read_data(&key_data) {
+            match key.read_data(key_data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read key");
@@ -1414,12 +1412,10 @@ impl ApfsFileSystemTree {
         {
             match node.get_value_data_by_index(last_entry_index) {
                 Some(value_data) => Ok(Some(value_data.to_vec())),
-                None => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unable to retrieve entry: {} value data of type: {}",
-                        last_entry_index, data_type
-                    )));
-                }
+                None => Err(keramics_core::error_trace_new!(format!(
+                    "Unable to retrieve entry: {} value data of type: {}",
+                    last_entry_index, data_type
+                ))),
             }
         } else {
             Ok(None)
@@ -1525,7 +1521,7 @@ impl ApfsFileSystemTree {
 
         let mut attribute_record: ApfsAttributeRecord = ApfsAttributeRecord::new();
 
-        match attribute_record.read_data(&value_data) {
+        match attribute_record.read_data(value_data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read attribute record");
@@ -1554,7 +1550,7 @@ impl ApfsFileSystemTree {
 
         let mut directory_record: ApfsDirectoryRecord = ApfsDirectoryRecord::new();
 
-        match directory_record.read_data(&value_data) {
+        match directory_record.read_data(value_data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read directory record");
@@ -1581,7 +1577,7 @@ impl ApfsFileSystemTree {
         ));
         let mut key: ApfsFileSystemKeyWithExtent = ApfsFileSystemKeyWithExtent::new();
 
-        match key.read_data(&key_data) {
+        match key.read_data(key_data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -1604,7 +1600,7 @@ impl ApfsFileSystemTree {
 
         let mut extent_record: ApfsExtentRecord = ApfsExtentRecord::new();
 
-        match extent_record.read_data(&value_data) {
+        match extent_record.read_data(value_data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read extent record");
@@ -1644,7 +1640,7 @@ impl ApfsFileSystemTree {
             );
             let mut key: ApfsFileSystemKeyWithNameAndHash = ApfsFileSystemKeyWithNameAndHash::new();
 
-            match key.read_data(&key_data) {
+            match key.read_data(key_data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -1664,7 +1660,7 @@ impl ApfsFileSystemTree {
 
             let mut key: ApfsFileSystemKeyWithName = ApfsFileSystemKeyWithName::new();
 
-            match key.read_data(&key_data) {
+            match key.read_data(key_data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(

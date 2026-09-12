@@ -217,8 +217,8 @@ impl UdifImage {
             &mut footer_signature,
             SeekFrom::End(-8)
         );
-        if &header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
-            || &footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
+        if header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
+            || footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
         {
             let mut cdsaencr_container: CdsaEncrContainer = CdsaEncrContainer::new();
 
@@ -315,8 +315,8 @@ impl UdifImage {
             &mut footer_signature,
             SeekFrom::End(-8)
         );
-        if &header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
-            || &footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
+        if header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
+            || footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
         {
             let mut cdsaencr_container: CdsaEncrContainer = CdsaEncrContainer::new();
 
@@ -435,7 +435,7 @@ impl UdifImage {
     ) -> Result<(), ErrorTrace> {
         let mut segment_file: UdifFile = UdifFile::new();
 
-        match segment_file.read_data_stream(&data_stream) {
+        match segment_file.read_data_stream(data_stream) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -488,7 +488,7 @@ impl UdifImage {
                     segment_number
                 )));
             }
-            if &segment_file.segment_set_identifier != &self.segment_set_identifier {
+            if segment_file.segment_set_identifier != self.segment_set_identifier {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unsupported segment file: {} - segment set identifier mismatch",
                     segment_number

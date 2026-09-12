@@ -35,7 +35,7 @@ impl CdsaEncrEncryptionContext {
     ) -> Result<(), ErrorTrace> {
         let block_number_data: [u8; 4] = block_number.to_be_bytes();
 
-        let mut initialization_vector: Vec<u8> =
+        let initialization_vector: Vec<u8> =
             match self.hmac_context.calculate_hmac(&block_number_data) {
                 Ok(data) => data,
                 Err(mut error) => {
@@ -51,7 +51,7 @@ impl CdsaEncrEncryptionContext {
             };
         match self
             .cipher_context
-            .decrypt(&mut initialization_vector, encrypted_data, data)
+            .decrypt(&initialization_vector, encrypted_data, data)
         {
             Ok(_) => {}
             Err(mut error) => {

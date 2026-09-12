@@ -77,7 +77,7 @@ impl Rc4Context {
     pub fn set_key(&mut self, key: &[u8]) -> Result<(), ErrorTrace> {
         let key_size: usize = key.len();
 
-        if key_size < 1 || key_size > 256 {
+        if !(1..=256).contains(&key_size) {
             return Err(keramics_core::error_trace_new!("Unsupported key size"));
         }
         let mut permutation_index: u8 = 0;

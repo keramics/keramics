@@ -124,7 +124,7 @@ impl<P: VfsPartition, V: PartitionIterator<PartitionItem = P>> VfsPartitionFileE
                             error,
                             format!("Unable to retrieve partition: {}", sub_file_entry_index)
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }

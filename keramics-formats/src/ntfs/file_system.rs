@@ -92,13 +92,12 @@ impl NtfsFileSystem {
 
     /// Retrieves the format version.
     pub fn get_format_version(&self) -> Option<(u8, u8)> {
-        match &self.volume_information {
-            Some(volume_information) => Some((
+        self.volume_information.as_ref().map(|volume_information| {
+            (
                 volume_information.major_format_version,
                 volume_information.minor_format_version,
-            )),
-            None => None,
-        }
+            )
+        })
     }
 
     /// Retrieves the index entry size.
@@ -113,10 +112,9 @@ impl NtfsFileSystem {
 
     /// Retrieves the volume flags.
     pub fn get_volume_flags(&self) -> Option<u16> {
-        match &self.volume_information {
-            Some(volume_information) => Some(volume_information.volume_flags),
-            None => None,
-        }
+        self.volume_information
+            .as_ref()
+            .map(|volume_information| volume_information.volume_flags)
     }
 
     /// Retrieves the volume label.
@@ -209,7 +207,7 @@ impl NtfsFileSystem {
                         NTFS_ROOT_DIRECTORY_IDENTIFIER
                     )
                 );
-                return Err(error);
+                Err(error)
             }
         }
     }
@@ -468,49 +466,43 @@ impl NtfsFileSystem {
                 "Unsupported MFT entry with attribute list"
             ));
         }
-        match mft_attributes.get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_NAME)
+        if let Some(mft_attribute) =
+            mft_attributes.get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_NAME)
         {
-            Some(mft_attribute) => {
-                if !mft_attribute.is_resident() {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unsupported non-resident $VOLUME_NAME attribute"
-                    ));
-                }
-                if mft_attribute.is_compressed() {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unsupported compressed $VOLUME_NAME attribute"
-                    ));
-                }
-                if mft_attribute.resident_data.len() % 2 != 0 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unsupported compressed $VOLUME_NAME attribute resident data - not a multiple of 2"
-                    ));
-                }
-                let volume_label: Ucs2String =
-                    Ucs2String::from_le_bytes(&mft_attribute.resident_data);
-
-                self.volume_label = Some(volume_label);
+            if !mft_attribute.is_resident() {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported non-resident $VOLUME_NAME attribute"
+                ));
             }
-            None => {}
+            if mft_attribute.is_compressed() {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported compressed $VOLUME_NAME attribute"
+                ));
+            }
+            if mft_attribute.resident_data.len() % 2 != 0 {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported compressed $VOLUME_NAME attribute resident data - not a multiple of 2"
+                ));
+            }
+            let volume_label: Ucs2String = Ucs2String::from_le_bytes(&mft_attribute.resident_data);
+
+            self.volume_label = Some(volume_label);
         };
-        match mft_attributes
+        if let Some(mft_attribute) = mft_attributes
             .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION)
         {
-            Some(mft_attribute) => {
-                let volume_information: NtfsVolumeInformation =
-                    match NtfsVolumeInformation::from_attribute(mft_attribute) {
-                        Ok(volume_information) => volume_information,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to create volume information from attribute"
-                            );
-                            return Err(error);
-                        }
-                    };
-                self.volume_information = Some(volume_information);
-            }
-            None => {}
+            let volume_information: NtfsVolumeInformation =
+                match NtfsVolumeInformation::from_attribute(mft_attribute) {
+                    Ok(volume_information) => volume_information,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to create volume information from attribute"
+                        );
+                        return Err(error);
+                    }
+                };
+            self.volume_information = Some(volume_information);
         };
         Ok(())
     }

@@ -50,7 +50,7 @@ impl FileResolver for VfsFileResolver {
             Ok(None) => Ok(None),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
-                return Err(error);
+                Err(error)
             }
         }
     }

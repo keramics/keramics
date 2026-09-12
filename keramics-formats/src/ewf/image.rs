@@ -216,7 +216,7 @@ impl EwfImage {
         file_resolver: &FileResolverReference,
         file_name: &PathComponent,
     ) -> Result<(), ErrorTrace> {
-        match self.read_segment_files(&file_resolver, file_name) {
+        match self.read_segment_files(file_resolver, file_name) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read segment files");
@@ -246,7 +246,7 @@ impl EwfImage {
                 EWF_SECTION_TYPE_DATA => {
                     let mut volume: EwfE01Volume = EwfE01Volume::new();
 
-                    match volume.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76)) {
+                    match volume.read_at_position(data_stream, SeekFrom::Start(file_offset + 76)) {
                         Ok(_) => {}
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -267,7 +267,7 @@ impl EwfImage {
                 EWF_SECTION_TYPE_DIGEST => {
                     let mut digest: EwfDigest = EwfDigest::new();
 
-                    match digest.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76)) {
+                    match digest.read_at_position(data_stream, SeekFrom::Start(file_offset + 76)) {
                         Ok(_) => {}
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -305,7 +305,7 @@ impl EwfImage {
                     let mut error2: EwfError2 = EwfError2::new();
 
                     match error2.read_at_position(
-                        &data_stream,
+                        data_stream,
                         section_header.size - 76,
                         SeekFrom::Start(file_offset + 76),
                     ) {
@@ -323,7 +323,7 @@ impl EwfImage {
                 EWF_SECTION_TYPE_HASH => {
                     let mut hash: EwfHash = EwfHash::new();
 
-                    match hash.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76)) {
+                    match hash.read_at_position(data_stream, SeekFrom::Start(file_offset + 76)) {
                         Ok(_) => {}
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -339,7 +339,7 @@ impl EwfImage {
                     let mut header: EwfHeader = EwfHeader::new();
 
                     match header.read_at_position(
-                        &data_stream,
+                        data_stream,
                         section_header.size - 76,
                         SeekFrom::Start(file_offset + 76),
                         &mut self.header_values,
@@ -364,7 +364,7 @@ impl EwfImage {
                     let mut header2: EwfHeader2 = EwfHeader2::new();
 
                     match header2.read_at_position(
-                        &data_stream,
+                        data_stream,
                         section_header.size - 76,
                         SeekFrom::Start(file_offset + 76),
                         &mut self.header_values,
@@ -383,7 +383,7 @@ impl EwfImage {
                     let mut ltree_header: EwfLtreeHeader = EwfLtreeHeader::new();
 
                     match ltree_header
-                        .read_at_position(&data_stream, SeekFrom::Start(file_offset + 76))
+                        .read_at_position(data_stream, SeekFrom::Start(file_offset + 76))
                     {
                         Ok(_) => {}
                         Err(mut error) => {
@@ -431,7 +431,7 @@ impl EwfImage {
                     let mut table2: EwfTable = EwfTable::new();
 
                     match table2.read_at_position(
-                        &data_stream,
+                        data_stream,
                         section_header.size - 76,
                         SeekFrom::Start(file_offset + 76),
                     ) {
@@ -603,7 +603,7 @@ impl EwfImage {
         let mut table: EwfTable = EwfTable::new();
 
         match table.read_at_position(
-            &data_stream,
+            data_stream,
             section_header.size - 76,
             SeekFrom::Start(file_offset + 76),
         ) {
@@ -641,15 +641,6 @@ impl EwfImage {
             };
             let chunk_data_size: u32 = if chunk_data_offset < next_chunk_data_offset {
                 next_chunk_data_offset - chunk_data_offset
-            } else if chunk_data_offset < next_table_entry.chunk_data_offset {
-                #[cfg(feature = "debug-trace")]
-                DebugTrace::static_scope(|debug_trace| {
-                    debug_trace.print(format!(
-                        "EwfImage table entry: {} current offset: {} larger than next offset: {}",
-                        table_entry_index, chunk_data_offset, next_chunk_data_offset
-                    ));
-                });
-                next_table_entry.chunk_data_offset - chunk_data_offset
             } else {
                 #[cfg(feature = "debug-trace")]
                 DebugTrace::static_scope(|debug_trace| {
@@ -658,7 +649,9 @@ impl EwfImage {
                         table_entry_index, chunk_data_offset, next_chunk_data_offset
                     ));
                 });
-                0
+                next_table_entry
+                    .chunk_data_offset
+                    .saturating_sub(chunk_data_offset)
             };
             let block_range_type: EwfBlockRangeType =
                 if chunk_data_size == 0 || chunk_data_size > (i32::MAX as u32) {
@@ -763,7 +756,7 @@ impl EwfImage {
             170 => {
                 let mut volume: EwfS01Volume = EwfS01Volume::new();
 
-                match volume.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76)) {
+                match volume.read_at_position(data_stream, SeekFrom::Start(file_offset + 76)) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to read volume");
@@ -778,7 +771,7 @@ impl EwfImage {
             1128 => {
                 let mut volume: EwfE01Volume = EwfE01Volume::new();
 
-                match volume.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76)) {
+                match volume.read_at_position(data_stream, SeekFrom::Start(file_offset + 76)) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to read volume");

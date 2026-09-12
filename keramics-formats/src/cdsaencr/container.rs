@@ -161,19 +161,19 @@ impl CdsaEncrContainer {
         );
         let data_stream_size: u64 = footer_offset + 8;
 
-        if &header_signature != CDSAENCR_CONTAINER_HEADER_SIGNATURE
-            && &footer_signature != CDSAENCR_CONTAINER_FOOTER_SIGNATURE
+        if header_signature != CDSAENCR_CONTAINER_HEADER_SIGNATURE
+            && footer_signature != CDSAENCR_CONTAINER_FOOTER_SIGNATURE
         {
             return Err(keramics_core::error_trace_new!("Missing header and footer"));
         }
-        if &header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
-            && &footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
+        if header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
+            && footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
         {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported format with both header and footer"
             ));
         }
-        if &header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE {
+        if header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE {
             let mut encrypted_container_header: CdsaEncrContainerHeader =
                 CdsaEncrContainerHeader::new();
 

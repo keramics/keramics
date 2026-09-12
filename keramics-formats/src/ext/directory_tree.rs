@@ -105,7 +105,7 @@ impl ExtDirectoryTree {
                 parent_inode_number,
             ));
         });
-        match self.read_node_data(&data, 4, data_size, entries) {
+        match self.read_node_data(data, 4, data_size, entries) {
             Ok(_) => Ok(()),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(

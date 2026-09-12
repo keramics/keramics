@@ -196,7 +196,7 @@ impl VmdkSparseFile {
                 file_header.secondary_grain_directory_start_sector * 512
             };
         self.number_of_grain_table_entries = file_header.number_of_grain_table_entries;
-        self.grain_size = (file_header.sectors_per_grain as u64) * 512;
+        self.grain_size = file_header.sectors_per_grain * 512;
         self.grain_directory.set_range(
             grain_directory_offset,
             number_of_grain_directory_entries as u32,

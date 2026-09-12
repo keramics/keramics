@@ -117,8 +117,7 @@ impl ScanTreeNode {
         let number_of_remaining_signatures: usize = remaining_signatures.len();
 
         if number_of_remaining_signatures == 1 {
-            self.default_scan_object =
-                Box::new(ScanObject::Signature(Arc::clone(&remaining_signatures[0])));
+            *self.default_scan_object = ScanObject::Signature(Arc::clone(&remaining_signatures[0]));
         } else if number_of_remaining_signatures > 1 {
             let mut sub_component_table: ComponentTable =
                 ComponentTable::new(&component_table.scan_tree_type);
@@ -138,7 +137,7 @@ impl ScanTreeNode {
                     return Err(error);
                 }
             }
-            self.default_scan_object = Box::new(ScanObject::ScanTreeNode(sub_node));
+            *self.default_scan_object = ScanObject::ScanTreeNode(sub_node);
         }
         Ok(())
     }

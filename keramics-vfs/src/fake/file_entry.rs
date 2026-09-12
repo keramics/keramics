@@ -56,9 +56,9 @@ impl FakeFileEntry {
             name: PathComponent::from(name),
             data_stream: None,
             file_type: VfsFileType::Directory,
-            access_time: Some(DateTime::FakeTime(current_time.clone())),
-            change_time: Some(DateTime::FakeTime(current_time.clone())),
-            creation_time: Some(DateTime::FakeTime(current_time.clone())),
+            access_time: Some(DateTime::FakeTime(current_time)),
+            change_time: Some(DateTime::FakeTime(current_time)),
+            creation_time: Some(DateTime::FakeTime(current_time)),
             modification_time: Some(DateTime::FakeTime(current_time)),
             size: 0,
         }
@@ -74,9 +74,9 @@ impl FakeFileEntry {
             name: PathComponent::from(name),
             data_stream: Some(Arc::new(RwLock::new(data_stream))),
             file_type: VfsFileType::File,
-            access_time: Some(DateTime::FakeTime(current_time.clone())),
-            change_time: Some(DateTime::FakeTime(current_time.clone())),
-            creation_time: Some(DateTime::FakeTime(current_time.clone())),
+            access_time: Some(DateTime::FakeTime(current_time)),
+            change_time: Some(DateTime::FakeTime(current_time)),
+            creation_time: Some(DateTime::FakeTime(current_time)),
             modification_time: Some(DateTime::FakeTime(current_time)),
             size: data_size,
         }
@@ -90,9 +90,9 @@ impl FakeFileEntry {
             name: PathComponent::Root,
             data_stream: None,
             file_type: VfsFileType::Directory,
-            access_time: Some(DateTime::FakeTime(current_time.clone())),
-            change_time: Some(DateTime::FakeTime(current_time.clone())),
-            creation_time: Some(DateTime::FakeTime(current_time.clone())),
+            access_time: Some(DateTime::FakeTime(current_time)),
+            change_time: Some(DateTime::FakeTime(current_time)),
+            creation_time: Some(DateTime::FakeTime(current_time)),
             modification_time: Some(DateTime::FakeTime(current_time)),
             size: 0,
         }
@@ -120,9 +120,7 @@ impl FakeFileEntry {
         }
         match self.data_stream.as_ref() {
             Some(data_stream) => Ok(Some(data_stream.clone())),
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
+            None => Err(keramics_core::error_trace_new!("Missing data stream")),
         }
     }
 

@@ -38,7 +38,7 @@ impl VfsPartition for MbrPartition {
     fn get_partition_number(&self) -> usize {
         let mbr_partition_index: usize = MbrPartition::get_partition_index(self);
 
-        (mbr_partition_index as usize) + 1
+        mbr_partition_index + 1
     }
 
     /// Retrieves the partition size.

@@ -465,11 +465,7 @@ impl FormatScanner {
         } else {
             (scan_context.footer_range_size - data_size) as usize
         };
-        let data_stream_offset: u64 = if scan_context.footer_range_size < data_size {
-            data_size - scan_context.footer_range_size
-        } else {
-            0
-        };
+        let data_stream_offset: u64 = data_size.saturating_sub(scan_context.footer_range_size);
         keramics_core::data_stream_read_at_position!(
             data_stream,
             &mut data[data_offset..],

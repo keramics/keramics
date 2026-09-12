@@ -94,7 +94,7 @@ impl UdifBlockTable {
         position: SeekFrom,
     ) -> Result<(), ErrorTrace> {
         // Note that 65536 is an arbitrary chosen limit.
-        if data_size < 204 || data_size > 65536 {
+        if !(204..=65536).contains(&data_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported block table data size: {} value out of bounds",
                 data_size

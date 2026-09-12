@@ -121,14 +121,13 @@ impl SplitRawImage {
         file_resolver: &FileResolverReference,
         file_name: &PathComponent,
     ) -> Result<(), ErrorTrace> {
-        match self.read_segment_files(&file_resolver, file_name) {
+        match self.read_segment_files(file_resolver, file_name) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read segment files");
                 return Err(error);
             }
         }
-        if self.number_of_segment_files <= 1 {}
         self.file_resolver = file_resolver.clone();
 
         Ok(())

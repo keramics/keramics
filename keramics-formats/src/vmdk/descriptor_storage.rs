@@ -236,10 +236,7 @@ impl<'a> VmdkDescriptorStorage<'a> {
         let filename_end_index: usize = if filename_start_index >= line_size {
             line.len()
         } else {
-            match line.iter().rposition(|byte| *byte == b'"') {
-                Some(index) => index,
-                None => return None,
-            }
+            line.iter().rposition(|byte| *byte == b'"')?
         };
         let file_name: Option<ByteString> = if filename_end_index >= line_size {
             None
@@ -292,10 +289,7 @@ impl<'a> VmdkDescriptorStorage<'a> {
         let filename_end_index: usize = if filename_start_index >= line_size {
             line.len()
         } else {
-            match line.iter().rposition(|byte| *byte == b'"') {
-                Some(index) => index,
-                None => return None,
-            }
+            line.iter().rposition(|byte| *byte == b'"')?
         };
         if filename_end_index >= line_size {
             None

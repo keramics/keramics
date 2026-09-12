@@ -124,12 +124,12 @@ impl SparseImageFile {
             &mut footer_signature,
             SeekFrom::End(-8)
         );
-        if &header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
-            || &footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
+        if header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
+            || footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
         {
             let mut cdsaencr_container: CdsaEncrContainer = CdsaEncrContainer::new();
 
-            match cdsaencr_container.read_data_stream(&data_stream) {
+            match cdsaencr_container.read_data_stream(data_stream) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -302,22 +302,16 @@ impl SparseImageFile {
             }
         };
         if result {
-            match cdsaencr_container.get_data_stream() {
-                Some(data_stream) => {
-                    match self.read_header_block(&data_stream) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to read header block"
-                            );
-                            return Err(error);
-                        }
+            if let Some(data_stream) = cdsaencr_container.get_data_stream() {
+                match self.read_header_block(&data_stream) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read header block");
+                        return Err(error);
                     }
-                    self.data_stream = Some(data_stream);
-                    self.is_locked = false;
                 }
-                None => {}
+                self.data_stream = Some(data_stream);
+                self.is_locked = false;
             }
         }
         Ok(!self.is_locked)

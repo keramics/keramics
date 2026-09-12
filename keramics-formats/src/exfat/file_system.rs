@@ -182,7 +182,7 @@ impl ExFatFileSystem {
 
         match directory_entries.read_at_cluster_block(
             data_stream,
-            &block_allocation_table,
+            block_allocation_table,
             self.root_directory_cluster_block_number,
         ) {
             Ok(_) => {}
@@ -221,7 +221,7 @@ impl ExFatFileSystem {
                 case_folding_mappings_record.data_size
             )));
         }
-        if case_folding_mappings_record.data_size % 2 != 0 {
+        if !case_folding_mappings_record.data_size.is_multiple_of(2) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported case folding mappings data size: {} not a multiple of 2",
                 case_folding_mappings_record.data_size
@@ -254,7 +254,7 @@ impl ExFatFileSystem {
                 )));
             }
         }
-        if &data[0..256] != EXFAT_FIRST_128_CASE_FOLDING_MAPPINGS {
+        if data[0..256] != EXFAT_FIRST_128_CASE_FOLDING_MAPPINGS {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported case folding mappings"
             ));
@@ -348,7 +348,7 @@ impl ExFatFileSystem {
             (self.root_directory_cluster_block_number as u64) * (self.cluster_block_size as u64)
         } else {
             let cluster_block_number: u32 =
-                (2 + ((file_entry_identifier as u64) - self.first_cluster_offset)
+                (2 + (file_entry_identifier - self.first_cluster_offset)
                     / (self.cluster_block_size as u64)) as u32;
 
             self.first_cluster_offset
@@ -441,7 +441,7 @@ impl ExFatFileSystem {
         self.root_directory_cluster_block_number = boot_record.root_directory_cluster_block_number;
         self.volume_serial_number = boot_record.volume_serial_number;
 
-        let mut number_of_clusters: u64 = boot_record.number_of_sectors as u64;
+        let mut number_of_clusters: u64 = boot_record.number_of_sectors;
         number_of_clusters -= (boot_record.number_of_allocation_tables as u64)
             * (boot_record.allocation_table_size as u64);
         number_of_clusters /= boot_record.sectors_per_cluster_block as u64;
@@ -452,7 +452,7 @@ impl ExFatFileSystem {
         self.first_cluster_offset =
             (boot_record.cluster_heap_start_sector as u64) * (boot_record.bytes_per_sector as u64);
         self.cluster_block_size =
-            (boot_record.bytes_per_sector as u32) * (boot_record.sectors_per_cluster_block as u32);
+            (boot_record.bytes_per_sector as u32) * boot_record.sectors_per_cluster_block;
 
         let block_allocation_table: Arc<ExFatBlockAllocationTable> =
             Arc::new(ExFatBlockAllocationTable::new(

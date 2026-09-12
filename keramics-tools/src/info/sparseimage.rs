@@ -86,11 +86,8 @@ impl SparseImageInfo {
             let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                match vfs_credential {
-                    VfsCredential::Passphrase(passphrase) => {
-                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                    }
-                    _ => {}
+                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
+                    credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
                 }
             }
             match sparseimage_file.unlock(&credentials) {

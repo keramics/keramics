@@ -58,7 +58,7 @@ impl VfsContext {
             Ok(data_stream) => Ok(data_stream),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
-                return Err(error);
+                Err(error)
             }
         }
     }
@@ -79,7 +79,7 @@ impl VfsContext {
             Ok(file_entry) => Ok(file_entry),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
-                return Err(error);
+                Err(error)
             }
         }
     }
@@ -90,13 +90,10 @@ impl VfsContext {
         vfs_location: &VfsLocation,
     ) -> Result<VfsFileSystemReference, ErrorTrace> {
         let vfs_type: &VfsType = vfs_location.get_type();
-        match vfs_type {
-            VfsType::Fake => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported type: VfsType::Fake"
-                ));
-            }
-            _ => {}
+        if vfs_type == &VfsType::Fake {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported type: VfsType::Fake"
+            ));
         };
         let parent_vfs_location: Option<&VfsLocation> = vfs_location.get_parent();
 
@@ -118,7 +115,7 @@ impl VfsContext {
                 },
                 None => None,
             };
-            let mut file_system: VfsFileSystem = VfsFileSystem::new(&vfs_type);
+            let mut file_system: VfsFileSystem = VfsFileSystem::new(vfs_type);
 
             match file_system.open(parent_file_system.as_ref(), &lookup_key) {
                 Ok(()) => {}
@@ -132,11 +129,9 @@ impl VfsContext {
         }
         match self.file_systems_cache.get(&lookup_key) {
             Some(file_system) => Ok(file_system.clone()),
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unable to retrieve cached file system"
-                ));
-            }
+            None => Err(keramics_core::error_trace_new!(
+                "Unable to retrieve cached file system"
+            )),
         }
     }
 }

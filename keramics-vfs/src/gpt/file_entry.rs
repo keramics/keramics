@@ -41,7 +41,7 @@ impl VfsPartition for GptPartition {
     fn get_partition_number(&self) -> usize {
         let gpt_partition_index: usize = GptPartition::get_partition_index(self);
 
-        (gpt_partition_index as usize) + 1
+        gpt_partition_index + 1
     }
 
     /// Retrieves the partition size.

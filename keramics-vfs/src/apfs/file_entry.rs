@@ -50,7 +50,7 @@ impl ApfsContainerFileEntry {
                         error,
                         "Unable to retrieve APFS file system",
                     );
-                    return Err(error);
+                    Err(error)
                 }
             },
         }
@@ -131,7 +131,7 @@ impl ApfsContainerFileEntry {
                             error,
                             format!("Unable to retrieve APFS volume: {}", sub_file_entry_index)
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }

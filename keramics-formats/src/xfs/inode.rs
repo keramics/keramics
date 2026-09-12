@@ -304,23 +304,19 @@ impl XfsInode {
                 ));
             }
         }
-        match self.extents.last() {
-            Some(packed_extent) => {
-                let number_of_blocks: u64 = self.data_size.div_ceil(block_size as u64);
-                let logical_block_number: u64 =
-                    packed_extent.logical_block_number + (packed_extent.number_of_blocks as u64);
+        if let Some(packed_extent) = self.extents.last() {
+            let number_of_blocks: u64 = self.data_size.div_ceil(block_size as u64);
+            let logical_block_number: u64 =
+                packed_extent.logical_block_number + (packed_extent.number_of_blocks as u64);
 
-                if logical_block_number < number_of_blocks {
-                    let mut sparse_extent: XfsPackedExtent = XfsPackedExtent::new();
-                    sparse_extent.number_of_blocks =
-                        (number_of_blocks - logical_block_number) as u32;
-                    sparse_extent.logical_block_number = logical_block_number;
-                    sparse_extent.extent_type = XfsExtentType::Sparse;
+            if logical_block_number < number_of_blocks {
+                let mut sparse_extent: XfsPackedExtent = XfsPackedExtent::new();
+                sparse_extent.number_of_blocks = (number_of_blocks - logical_block_number) as u32;
+                sparse_extent.logical_block_number = logical_block_number;
+                sparse_extent.extent_type = XfsExtentType::Sparse;
 
-                    self.extents.push(sparse_extent);
-                }
+                self.extents.push(sparse_extent);
             }
-            None => {}
         }
         Ok(())
     }

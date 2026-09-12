@@ -40,12 +40,12 @@ impl<'a> fmt::Display for BdeEncryptedVolumeInfo<'a> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "BitLocker Drive Encryption (BDE) information:")?;
 
-        let format_version_string: &str = match self.encrypted_volume.get_format_version() {
-            &BdeFormatVersion::NotSet => NOT_SET_VALUE,
-            &BdeFormatVersion::ToGo => "2.0 (To Go)",
-            &BdeFormatVersion::UsedDiskSpaceOnly => "2.0 (Used Disk Space Only)",
-            &BdeFormatVersion::Version1 => "1.0 (Vista)",
-            &BdeFormatVersion::Version2 => "2.0",
+        let format_version_string: &str = match *self.encrypted_volume.get_format_version() {
+            BdeFormatVersion::NotSet => NOT_SET_VALUE,
+            BdeFormatVersion::ToGo => "2.0 (To Go)",
+            BdeFormatVersion::UsedDiskSpaceOnly => "2.0 (Used Disk Space Only)",
+            BdeFormatVersion::Version1 => "1.0 (Vista)",
+            BdeFormatVersion::Version2 => "2.0",
         };
         writeln!(
             formatter,

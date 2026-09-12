@@ -74,7 +74,7 @@ impl NtfsMasterFileTable {
         for data_run in cluster_group.data_runs.iter() {
             let range_size: u64 = data_run.number_of_blocks * (self.cluster_block_size as u64);
 
-            if range_size % (self.mft_entry_size as u64) != 0 {
+            if !range_size.is_multiple_of(self.mft_entry_size as u64) {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unsupported data run - size: {} not a multitude of MFT entry size: {}",
                     range_size, self.mft_entry_size,
@@ -236,7 +236,7 @@ impl NtfsMasterFileTable {
                     };
                 let mut attribute_list: NtfsAttributeList = NtfsAttributeList::new();
 
-                match attribute_list.read_attribute(&mft_attribute, data_stream, cluster_block_size)
+                match attribute_list.read_attribute(mft_attribute, data_stream, cluster_block_size)
                 {
                     Ok(_) => {}
                     Err(mut error) => {
@@ -281,20 +281,16 @@ impl NtfsMasterFileTable {
                     return Err(error);
                 }
             }
-            match mft_attributes.get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
-                Some(mft_attribute) => {
-                    match self.add_cluster_group(&mft_attribute.data_cluster_groups[0]) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to add cluster group"
-                            );
-                            return Err(error);
-                        }
+            if let Some(mft_attribute) =
+                mft_attributes.get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_DATA)
+            {
+                match self.add_cluster_group(&mft_attribute.data_cluster_groups[0]) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to add cluster group");
+                        return Err(error);
                     }
                 }
-                None => {}
             };
         }
         Ok(())

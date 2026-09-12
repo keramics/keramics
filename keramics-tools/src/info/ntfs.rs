@@ -281,49 +281,36 @@ impl<'a> fmt::Display for NtfsFileEntryInfo<'a> {
             file_reference & 0x0000ffffffffffff,
             file_reference >> 48,
         )?;
-        match self.file_entry.get_name() {
-            Some(name) => writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?,
-            None => {}
+        if let Some(name) = self.file_entry.get_name() {
+            writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?
         };
         let file_size: u64 = self.file_entry.get_size();
         let byte_size: ByteSize = ByteSize::new(file_size, 1024);
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
-        match self.file_entry.get_creation_time() {
-            Some(date_time) => {
-                let date_time_info: NtfsDateTimeInfo = NtfsDateTimeInfo::new(date_time);
-                writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
-            }
-            None => {}
+        if let Some(date_time) = self.file_entry.get_creation_time() {
+            let date_time_info: NtfsDateTimeInfo = NtfsDateTimeInfo::new(date_time);
+            writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
         };
-        match self.file_entry.get_modification_time() {
-            Some(date_time) => {
-                let date_time_info: NtfsDateTimeInfo = NtfsDateTimeInfo::new(date_time);
-                writeln!(
-                    formatter,
-                    "    Modification time\t\t\t\t: {}",
-                    date_time_info
-                )?;
-            }
-            None => {}
+        if let Some(date_time) = self.file_entry.get_modification_time() {
+            let date_time_info: NtfsDateTimeInfo = NtfsDateTimeInfo::new(date_time);
+            writeln!(
+                formatter,
+                "    Modification time\t\t\t\t: {}",
+                date_time_info
+            )?;
         };
-        match self.file_entry.get_access_time() {
-            Some(date_time) => {
-                let date_time_info: NtfsDateTimeInfo = NtfsDateTimeInfo::new(date_time);
-                writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_info)?;
-            }
-            None => {}
+        if let Some(date_time) = self.file_entry.get_access_time() {
+            let date_time_info: NtfsDateTimeInfo = NtfsDateTimeInfo::new(date_time);
+            writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_info)?;
         };
-        match self.file_entry.get_entry_modification_time() {
-            Some(date_time) => {
-                let date_time_info: NtfsDateTimeInfo = NtfsDateTimeInfo::new(date_time);
-                writeln!(
-                    formatter,
-                    "    Entry modification time\t\t\t: {}",
-                    date_time_info
-                )?;
-            }
-            None => {}
+        if let Some(date_time) = self.file_entry.get_entry_modification_time() {
+            let date_time_info: NtfsDateTimeInfo = NtfsDateTimeInfo::new(date_time);
+            writeln!(
+                formatter,
+                "    Entry modification time\t\t\t: {}",
+                date_time_info
+            )?;
         };
         let flags: u32 = self.file_entry.get_file_attribute_flags();
         let flags_info: NtfsFileAttributeFlagsInfo = NtfsFileAttributeFlagsInfo::new(flags);
@@ -358,39 +345,30 @@ impl<'a> fmt::Display for NtfsFileSystemInfo<'a> {
             "New Technologies File System (NTFS) information:"
         )?;
 
-        match self.file_system.get_format_version() {
-            Some((major_version, minor_version)) => {
-                writeln!(
-                    formatter,
-                    "    Format version\t\t\t\t: {}.{}",
-                    major_version, minor_version
-                )?;
-            }
-            None => {}
+        if let Some((major_version, minor_version)) = self.file_system.get_format_version() {
+            writeln!(
+                formatter,
+                "    Format version\t\t\t\t: {}.{}",
+                major_version, minor_version
+            )?;
         }
-        match self.file_system.get_volume_label() {
-            Some(volume_label) => {
-                writeln!(formatter, "    Volume label\t\t\t\t: {}", volume_label)?;
-            }
-            None => {}
+        if let Some(volume_label) = self.file_system.get_volume_label() {
+            writeln!(formatter, "    Volume label\t\t\t\t: {}", volume_label)?;
         }
         writeln!(
             formatter,
             "    Volume serial number\t\t\t: 0x{:x}",
             self.file_system.volume_serial_number,
         )?;
-        match self.file_system.get_volume_flags() {
-            Some(volume_flags) => {
-                let flags_info: NtfsVolumeFlagsInfo = NtfsVolumeFlagsInfo::new(volume_flags);
+        if let Some(volume_flags) = self.file_system.get_volume_flags() {
+            let flags_info: NtfsVolumeFlagsInfo = NtfsVolumeFlagsInfo::new(volume_flags);
 
-                writeln!(
-                    formatter,
-                    "    Volume flags\t\t\t\t: 0x{:04x}",
-                    volume_flags
-                )?;
-                flags_info.fmt(formatter)?;
-            }
-            None => {}
+            writeln!(
+                formatter,
+                "    Volume flags\t\t\t\t: 0x{:04x}",
+                volume_flags
+            )?;
+            flags_info.fmt(formatter)?;
         }
         writeln!(formatter)?;
 
@@ -743,9 +721,8 @@ impl NtfsInfo {
             // TODO: add support for $BITMAP, $DATA, $INDEX_ALLOCATION, $INDEX_ROOT
             NtfsAttribute::Generic { mft_attribute } => {
                 // TODO: refactor into AttributeInfo
-                match &mft_attribute.name {
-                    Some(name) => println!("    Attribute name\t\t\t\t: {}", name),
-                    None => {}
+                if let Some(name) = &mft_attribute.name {
+                    println!("    Attribute name\t\t\t\t: {}", name)
                 };
                 let byte_size: ByteSize = ByteSize::new(mft_attribute.data_size, 1024);
                 println!("    Data size\t\t\t\t\t: {}", byte_size);
@@ -756,7 +733,7 @@ impl NtfsInfo {
                         mft_attribute.data_flags
                     );
                 }
-                if mft_attribute.data_cluster_groups.len() > 0 {
+                if !mft_attribute.data_cluster_groups.is_empty() {
                     let string_parts: Vec<String> = mft_attribute
                         .data_cluster_groups
                         .iter()

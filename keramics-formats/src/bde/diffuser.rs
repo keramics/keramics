@@ -21,7 +21,7 @@ impl BdeDiffuser {
     pub fn decrypt(data: &mut [u8]) -> Result<(), ErrorTrace> {
         let data_size = data.len();
 
-        if data_size < 32 || (data_size % 4) != 0 {
+        if data_size < 32 || !data_size.is_multiple_of(4) {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let mut values_32bit: Vec<u32> = data

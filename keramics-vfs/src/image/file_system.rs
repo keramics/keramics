@@ -56,19 +56,9 @@ impl<I: VfsImage<Layer = L>, L: VfsImageLayer> VfsImageFileSystem<I, L> {
                         Some(layer_index) => layer_index,
                         None => return false,
                     };
-                if layer_index == 0 || layer_index > self.number_of_layers {
-                    false
-                } else {
-                    true
-                }
+                !(layer_index == 0 || layer_index > self.number_of_layers)
             }
-            None => {
-                if path.is_empty() {
-                    false
-                } else {
-                    true
-                }
-            }
+            None => !path.is_empty(),
         }
     }
 

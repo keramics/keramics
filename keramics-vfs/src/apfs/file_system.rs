@@ -58,19 +58,9 @@ impl ApfsContainerFileSystem {
                     Some(volume_index) => volume_index,
                     None => return false,
                 };
-                if volume_index == 0 || volume_index > self.number_of_volumes {
-                    false
-                } else {
-                    true
-                }
+                !(volume_index == 0 || volume_index > self.number_of_volumes)
             }
-            None => {
-                if path.is_empty() {
-                    false
-                } else {
-                    true
-                }
-            }
+            None => !path.is_empty(),
         }
     }
 

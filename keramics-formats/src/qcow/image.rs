@@ -145,7 +145,7 @@ impl QcowImage {
         let mut file_index: usize = 0;
         while let Some(mut file) = files.pop() {
             if file_index > 0 {
-                match file.set_backing_file(&mut self.layers[file_index - 1]) {
+                match file.set_backing_file(&self.layers[file_index - 1]) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to set backing file");

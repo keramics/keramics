@@ -114,37 +114,34 @@ impl ExtInodeTable {
                 return Err(error);
             }
         }
-        match self.metadata_checksum_seed {
-            Some(checksum_seed) => {
-                let mut crc32_context: ReversedCrc32Context =
-                    ReversedCrc32Context::new(0x82f63b78, checksum_seed);
+        if let Some(checksum_seed) = self.metadata_checksum_seed {
+            let mut crc32_context: ReversedCrc32Context =
+                ReversedCrc32Context::new(0x82f63b78, checksum_seed);
 
-                let inode_number_data: [u8; 4] = inode_number.to_le_bytes();
-                crc32_context.update(&inode_number_data);
-                crc32_context.update(&data[100..104]);
-                crc32_context.update(&data[0..124]);
+            let inode_number_data: [u8; 4] = inode_number.to_le_bytes();
+            crc32_context.update(&inode_number_data);
+            crc32_context.update(&data[100..104]);
+            crc32_context.update(&data[0..124]);
+            crc32_context.update(&[0; 2]);
+            crc32_context.update(&data[126..128]);
+
+            if inode_size > 128 {
+                crc32_context.update(&data[128..130]);
                 crc32_context.update(&[0; 2]);
-                crc32_context.update(&data[126..128]);
-
-                if inode_size > 128 {
-                    crc32_context.update(&data[128..130]);
-                    crc32_context.update(&[0; 2]);
-                    crc32_context.update(&data[132..inode_size]);
-                }
-                let mut calculated_checksum: u32 = crc32_context.finalize();
-                calculated_checksum = 0xffffffff - calculated_checksum;
-
-                if inode_size <= 128 {
-                    calculated_checksum &= 0x0000ffff;
-                }
-                if inode.checksum != 0 && (inode.checksum as u32) != calculated_checksum {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Mismatch between stored: 0x{:04x} and calculated: 0x{:04x} checksums",
-                        inode.checksum, calculated_checksum
-                    )));
-                }
+                crc32_context.update(&data[132..inode_size]);
             }
-            None => {}
+            let mut calculated_checksum: u32 = crc32_context.finalize();
+            calculated_checksum = 0xffffffff - calculated_checksum;
+
+            if inode_size <= 128 {
+                calculated_checksum &= 0x0000ffff;
+            }
+            if inode.checksum != 0 && inode.checksum != calculated_checksum {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between stored: 0x{:04x} and calculated: 0x{:04x} checksums",
+                    inode.checksum, calculated_checksum
+                )));
+            }
         }
         Ok(inode)
     }

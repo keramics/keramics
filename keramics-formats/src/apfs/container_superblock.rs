@@ -156,7 +156,7 @@ impl ApfsContainerSuperblock {
         if &data[32..36] != APFS_CONTAINER_SUPERBLOCK_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
-        match self.object_header.read_data(&data) {
+        match self.object_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read object header");

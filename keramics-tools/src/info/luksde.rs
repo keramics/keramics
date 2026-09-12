@@ -99,11 +99,8 @@ impl LuksInfo {
             let mut credentials: Vec<LuksCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                match vfs_credential {
-                    VfsCredential::Passphrase(passphrase) => {
-                        credentials.push(LuksCredential::Passphrase(passphrase.clone()))
-                    }
-                    _ => {}
+                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
+                    credentials.push(LuksCredential::Passphrase(passphrase.clone()))
                 }
             }
             match luks_volume.unlock(&credentials) {

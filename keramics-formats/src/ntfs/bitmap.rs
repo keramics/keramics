@@ -158,7 +158,7 @@ impl NtfsBitmap {
                     );
                     block_ranges.push(block_range);
 
-                    virtual_cluster_number += data_run.number_of_blocks as u64;
+                    virtual_cluster_number += data_run.number_of_blocks;
                     virtual_cluster_offset += range_size;
                 }
                 if cluster_group.last_vcn != 0xffffffffffffffff

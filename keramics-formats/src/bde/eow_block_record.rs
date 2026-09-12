@@ -171,7 +171,7 @@ impl BdeEowBlockRecord {
         position: SeekFrom,
     ) -> Result<(), ErrorTrace> {
         // Note that 65536 is an arbitrary chosen limit.
-        if data_size < 60 || data_size > 65536 {
+        if !(60..=65536).contains(&data_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported Encrypt-on-Write (EOW) block record size: {} value out of bounds",
                 data_size

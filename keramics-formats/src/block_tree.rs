@@ -144,15 +144,13 @@ impl<T> BlockTree<T> {
                             error,
                             "Unable to insert value into root node"
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unable to obtain mutable reference to root node"
-                ));
-            }
+            None => Err(keramics_core::error_trace_new!(
+                "Unable to obtain mutable reference to root node"
+            )),
         }
     }
 }

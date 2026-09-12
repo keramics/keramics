@@ -925,7 +925,7 @@ impl LzfseContext {
         debug_trace.print_field(
             "values",
             debug_format_array(
-                &frequency_table
+                frequency_table
                     .iter()
                     .map(|&element| element.to_string())
                     .collect::<Vec<String>>()
@@ -1018,7 +1018,7 @@ impl LzfseContext {
             debug_trace.print_field(
                 "values",
                 debug_format_array(
-                    &frequency_table
+                    frequency_table
                         .iter()
                         .map(|&element| element.to_string())
                         .collect::<Vec<String>>()

@@ -92,7 +92,7 @@ impl FatDirectoryEntries {
 
     /// Determines if the directory entries were read.
     pub fn is_read(&self) -> bool {
-        return self.is_read;
+        self.is_read
     }
 
     /// Reads the directory entries from a buffer.
@@ -311,7 +311,7 @@ impl FatDirectoryEntries {
         position: SeekFrom,
     ) -> Result<(), ErrorTrace> {
         // 65536 entries x 32 bytes = 2097152 bytes (2 MiB)
-        if data_size < 32 || data_size > 2097152 {
+        if !(32..=2097152).contains(&data_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported directory entries data size: {} value out of bounds",
                 data_size

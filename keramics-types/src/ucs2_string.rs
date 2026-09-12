@@ -127,9 +127,9 @@ impl Ucs2String {
     pub fn from_byte_string(byte_string: &ByteString) -> Result<Self, ErrorTrace> {
         let mut elements: Vec<u16> = Vec::new();
 
-        let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
+        let character_decoder: CharacterDecoder = byte_string.get_character_decoder();
 
-        while let Some(result) = character_decoder.next() {
+        for result in character_decoder {
             match result {
                 Ok(code_points) => {
                     for code_point in code_points {
@@ -157,9 +157,9 @@ impl Ucs2String {
     ) -> Result<Self, ErrorTrace> {
         let mut elements: Vec<u16> = Vec::new();
 
-        let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
+        let character_decoder: CharacterDecoder = byte_string.get_character_decoder();
 
-        while let Some(result) = character_decoder.next() {
+        for result in character_decoder {
             match result {
                 Ok(code_points) => {
                     for code_point in code_points {

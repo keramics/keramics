@@ -52,13 +52,10 @@ impl FakeFileSystem {
                 path.new_with_join_path_components(&path_components)
             }
         };
-        match self.paths.insert(file_entry_path, Arc::new(file_entry)) {
-            Some(_) => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unable to add file entry given path is already set"
-                ));
-            }
-            None => {}
+        if let Some(_) = self.paths.insert(file_entry_path, Arc::new(file_entry)) {
+            return Err(keramics_core::error_trace_new!(
+                "Unable to add file entry given path is already set"
+            ));
         }
         Ok(())
     }

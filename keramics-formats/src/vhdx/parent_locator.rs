@@ -158,7 +158,7 @@ impl VhdxParentLocator {
         position: SeekFrom,
     ) -> Result<(), ErrorTrace> {
         // Note that 65536 is an arbitrary chosen limit.
-        if data_size < 20 || data_size > 65536 {
+        if !(20..=65536).contains(&data_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported parent locator data size: {} value out of bounds",
                 data_size

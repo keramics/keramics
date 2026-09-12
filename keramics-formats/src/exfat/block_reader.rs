@@ -71,9 +71,7 @@ impl ExFatBlockReader {
             let mut logical_offset: u64 = 0;
             let mut next_physical_offset: u64 = 0;
 
-            while cluster_block_number >= 2
-                && cluster_block_number < EXFAT_LARGEST_CLUSTER_BLOCK_NUMBER
-            {
+            while (2..EXFAT_LARGEST_CLUSTER_BLOCK_NUMBER).contains(&cluster_block_number) {
                 if read_cluster_block_numbers.contains(&cluster_block_number) {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Cluster block: {} already read",
@@ -142,7 +140,7 @@ impl BlockReader for ExFatBlockReader {
         let mut current_offset: u64 = offset;
 
         let mut range_index: usize = match self.block_ranges.binary_search_by(|block_range| {
-            let range_end_offset: u64 = block_range.logical_offset + (block_range.size as u64);
+            let range_end_offset: u64 = block_range.logical_offset + block_range.size;
 
             if current_offset >= range_end_offset {
                 Ordering::Less

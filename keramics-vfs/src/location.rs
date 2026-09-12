@@ -79,16 +79,16 @@ impl VfsLocation {
     /// Retrieves the path.
     pub fn get_path(&self) -> &Path {
         match self {
-            VfsLocation::Base { path, .. } => &path,
-            VfsLocation::Layer { path, .. } => &path,
+            VfsLocation::Base { path, .. } => path,
+            VfsLocation::Layer { path, .. } => path,
         }
     }
 
     /// Retrieves the type.
     pub fn get_type(&self) -> &VfsType {
         match self {
-            VfsLocation::Base { vfs_type, .. } => &vfs_type,
-            VfsLocation::Layer { vfs_type, .. } => &vfs_type,
+            VfsLocation::Base { vfs_type, .. } => vfs_type,
+            VfsLocation::Layer { vfs_type, .. } => vfs_type,
         }
     }
 }
@@ -98,14 +98,14 @@ impl fmt::Display for VfsLocation {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self {
             VfsLocation::Base { path, vfs_type } => {
-                write!(formatter, "{}: {}\n", vfs_type, path)
+                writeln!(formatter, "{}: {}", vfs_type, path)
             }
             VfsLocation::Layer {
                 path,
                 parent,
                 vfs_type,
             } => {
-                write!(formatter, "{}{}: {}\n", parent, vfs_type, path)
+                writeln!(formatter, "{}{}: {}", parent, vfs_type, path)
             }
         }
     }

@@ -137,7 +137,7 @@ impl Fat32BootRecord {
                 Some(data_index) => &data[71..82 - data_index],
                 None => &data[71..82],
             };
-            boot_record.volume_label.elements.extend_from_slice(&slice);
+            boot_record.volume_label.elements.extend_from_slice(slice);
         }
         Ok(())
     }

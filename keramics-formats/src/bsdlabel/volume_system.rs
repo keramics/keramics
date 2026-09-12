@@ -96,7 +96,7 @@ impl PartitionIterator for BsdDiskLabelVolumeSystem {
         match self.disklabel_entries.get(partition_index) {
             Some(partition_entry) => match self.data_stream.as_ref() {
                 Some(data_stream) => Ok(BsdDiskLabelPartition::new(
-                    &data_stream,
+                    data_stream,
                     self.bytes_per_sector,
                     partition_entry,
                 )),

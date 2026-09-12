@@ -15,6 +15,6 @@ mod attribute;
 mod document;
 mod element;
 
-pub use attribute::XmlAttribute;
+// pub use attribute::XmlAttribute;
 pub use document::XmlDocument;
 pub use element::XmlElement;

@@ -94,11 +94,8 @@ impl VfsImage for QcowImage {
             let mut credentials: Vec<QcowCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                match vfs_credential {
-                    VfsCredential::Passphrase(passphrase) => {
-                        credentials.push(QcowCredential::Passphrase(passphrase.clone()))
-                    }
-                    _ => {}
+                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
+                    credentials.push(QcowCredential::Passphrase(passphrase.clone()))
                 }
             }
             match self.unlock(&credentials) {

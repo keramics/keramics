@@ -50,8 +50,8 @@ impl EwfHeader {
                 offset, offset
             )
         );
-
         keramics_core::debug_trace_data!("EwfHeader", offset, &data, uncompressed_data_size);
+
         self.read_data(&data, header_values)
     }
 
@@ -63,7 +63,7 @@ impl EwfHeader {
     ) -> Result<(), ErrorTrace> {
         let mut object_storage: EwfByteObjectStorage = EwfByteObjectStorage::new(data);
 
-        let number_of_categories: u8 = match object_storage.next_line().as_deref() {
+        let number_of_categories: u8 = match object_storage.next_line() {
             Some(b"1") => 1,
             Some(b"3") => 3,
             Some(_) => {
@@ -80,7 +80,7 @@ impl EwfHeader {
         // TODO: if number_of_categories == 1 then format is at least EnCase 1
         // TODO: if number_of_categories == 3 then format is at least linen 5
 
-        match object_storage.next_line().as_deref() {
+        match object_storage.next_line() {
             Some(b"main") => {}
             Some(_) => {
                 return Err(keramics_core::error_trace_new!(
@@ -184,7 +184,7 @@ impl EwfHeader {
         header_values: &mut HashMap<EwfHeaderValueType, EwfHeaderValue>,
     ) -> Result<(), ErrorTrace> {
         // Note that 16777216 is an arbitrary chosen limit.
-        if data_size < 2 || data_size > 16777216 {
+        if !(2..=16777216).contains(&data_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported header data size: {} value out of bounds",
                 data_size

@@ -81,7 +81,7 @@ impl BdeVolumeMasterKey {
         while data_offset < data_size - 8 {
             let data_end_offset: usize = data_offset + 8;
 
-            if &data[data_offset..data_end_offset] == &[0; 8] {
+            if data[data_offset..data_end_offset] == [0; 8] {
                 break;
             }
             keramics_core::debug_trace_structure!(BdeMetadataEntryHeader::debug_read_data(
@@ -334,7 +334,7 @@ impl BdeVolumeMasterKey {
         keramics_core::debug_trace_data!("BdeUnlockedKey", 0, &self.key, key_size);
         keramics_core::debug_trace_data!("BdeUnlockedKeyTag", 0, &tag, 16);
 
-        Ok(&aes_ccm_encrypted_key.tag == &tag)
+        Ok(aes_ccm_encrypted_key.tag == tag)
     }
 }
 

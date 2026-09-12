@@ -41,7 +41,7 @@ impl DebugTrace {
                 "{} data of size: {} at offset: {} (0x{:08x})\n",
                 description, data_size, offset, offset
             ));
-            mediator.debug_print(format_as_hexdump(&data, group));
+            mediator.debug_print(format_as_hexdump(data, group));
         }
     }
 
@@ -52,7 +52,7 @@ impl DebugTrace {
 
         if mediator.debug_output {
             mediator.debug_print(format!("    {}\n", identifier));
-            mediator.debug_print(format_as_hexdump(&data, true));
+            mediator.debug_print(format_as_hexdump(data, true));
         }
     }
 
@@ -181,13 +181,13 @@ impl<'a> DebugTraceScope<'a> {
         group: bool,
     ) {
         if self.debug_output {
-            _ = write!(
+            _ = writeln!(
                 self.output,
-                "{} data of size: {} at offset: {} (0x{:08x})\n",
+                "{} data of size: {} at offset: {} (0x{:08x})",
                 description, data_size, offset, offset
             );
             self.output
-                .push_str(format_as_hexdump(&data, group).as_str());
+                .push_str(format_as_hexdump(data, group).as_str());
         }
     }
 
@@ -195,9 +195,8 @@ impl<'a> DebugTraceScope<'a> {
     #[inline(always)]
     pub fn print_data_field(&mut self, identifier: &str, data: &[u8]) {
         if self.debug_output {
-            _ = write!(self.output, "    {}\n", identifier);
-            self.output
-                .push_str(format_as_hexdump(&data, true).as_str());
+            _ = writeln!(self.output, "    {}", identifier);
+            self.output.push_str(format_as_hexdump(data, true).as_str());
         }
     }
 
@@ -213,7 +212,7 @@ impl<'a> DebugTraceScope<'a> {
     #[inline(always)]
     pub fn print_field<V: Display>(&mut self, identifier: &str, value: V) {
         if self.debug_output {
-            _ = write!(self.output, "    {}: {},\n", identifier, value);
+            _ = writeln!(self.output, "    {}: {},", identifier, value);
         }
     }
 
@@ -221,7 +220,7 @@ impl<'a> DebugTraceScope<'a> {
     #[inline(always)]
     pub fn print_start(&mut self, identifier: &str) {
         if self.debug_output {
-            _ = write!(self.output, "{} {{\n", identifier);
+            _ = writeln!(self.output, "{} {{", identifier);
         }
     }
 
@@ -237,7 +236,7 @@ impl<'a> DebugTraceScope<'a> {
     #[inline(always)]
     pub fn print_value<V: Display>(&mut self, description: &str, value: V) {
         if self.debug_output {
-            _ = write!(self.output, "{}: {}\n", description, value);
+            _ = writeln!(self.output, "{}: {}", description, value);
         }
     }
 }
@@ -269,14 +268,14 @@ impl<'a> DebugTraceStaticScope<'a> {
             "{} data of size: {} at offset: {} (0x{:08x})\n",
             description, data_size, offset, offset
         ));
-        self.mediator.debug_print(format_as_hexdump(&data, group));
+        self.mediator.debug_print(format_as_hexdump(data, group));
     }
 
     /// Prints a data field.
     #[inline(always)]
     pub fn print_data_field(&self, identifier: &str, data: &[u8]) {
         self.mediator.debug_print(format!("    {}\n", identifier));
-        self.mediator.debug_print(format_as_hexdump(&data, true));
+        self.mediator.debug_print(format_as_hexdump(data, true));
     }
 
     /// Prints the end of a trace.

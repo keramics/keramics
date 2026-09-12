@@ -59,7 +59,7 @@ impl Pkcs7Context {
                 "Invalid padded data size value too small"
             ));
         }
-        if padded_data_size % block_size != 0 {
+        if !padded_data_size.is_multiple_of(block_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid padded data size value not a multitude of block size: {}",
                 block_size

@@ -51,8 +51,8 @@ impl EwfHeader2 {
                 offset, offset
             )
         );
-
         keramics_core::debug_trace_data!("EwfHeader2", offset, &data, uncompressed_data_size);
+
         self.read_data(&data, header_values)
     }
 
@@ -207,7 +207,7 @@ impl EwfHeader2 {
         header_values: &mut HashMap<EwfHeaderValueType, EwfHeaderValue>,
     ) -> Result<(), ErrorTrace> {
         // Note that 16777216 is an arbitrary chosen limit.
-        if data_size < 2 || data_size > 16777216 {
+        if !(2..=16777216).contains(&data_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported header2 data size: {} value out of bounds",
                 data_size

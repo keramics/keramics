@@ -95,7 +95,7 @@ impl UtilTool {
         match checksum {
             ChecksumType::Adler32 => {
                 let mut adler32_context: Adler32Context = Adler32Context::new(initial_value as u32);
-                adler32_context.update(&data);
+                adler32_context.update(data);
                 let checksum: u32 = adler32_context.finalize();
 
                 println!(
@@ -106,7 +106,7 @@ impl UtilTool {
             ChecksumType::Crc32 => {
                 let mut crc32_context: Crc32Context =
                     Crc32Context::new(polynomial as u32, initial_value as u32);
-                crc32_context.update(&data);
+                crc32_context.update(data);
                 let checksum: u32 = crc32_context.finalize();
 
                 println!(
@@ -117,7 +117,7 @@ impl UtilTool {
             ChecksumType::Fletcher64 => {
                 let mut fletcher64_context: Fletcher64Context =
                     Fletcher64Context::new(initial_value);
-                fletcher64_context.update(&data);
+                fletcher64_context.update(data);
                 let checksum: u64 = fletcher64_context.finalize();
 
                 println!(
@@ -137,7 +137,7 @@ impl UtilTool {
             CompressionType::Adc => {
                 let mut adc_context: AdcContext = AdcContext::new();
 
-                match adc_context.decompress(&compressed_data, &mut data) {
+                match adc_context.decompress(compressed_data, &mut data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -151,7 +151,7 @@ impl UtilTool {
             CompressionType::Bzip2 => {
                 let mut bzip2_context: Bzip2Context = Bzip2Context::new();
 
-                match bzip2_context.decompress(&compressed_data, &mut data) {
+                match bzip2_context.decompress(compressed_data, &mut data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -165,7 +165,7 @@ impl UtilTool {
             CompressionType::Deflate => {
                 let mut deflate_context: DeflateContext = DeflateContext::new();
 
-                match deflate_context.decompress(&compressed_data, &mut data) {
+                match deflate_context.decompress(compressed_data, &mut data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -179,7 +179,7 @@ impl UtilTool {
             CompressionType::Lzfse => {
                 let mut lzfse_context: LzfseContext = LzfseContext::new();
 
-                match lzfse_context.decompress(&compressed_data, &mut data) {
+                match lzfse_context.decompress(compressed_data, &mut data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -193,7 +193,7 @@ impl UtilTool {
             CompressionType::Lznt1 => {
                 let mut lznt1_context: Lznt1Context = Lznt1Context::new();
 
-                match lznt1_context.decompress(&compressed_data, &mut data) {
+                match lznt1_context.decompress(compressed_data, &mut data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -207,7 +207,7 @@ impl UtilTool {
             CompressionType::Lzvn => {
                 let mut lzvn_context: LzvnContext = LzvnContext::new();
 
-                match lzvn_context.decompress(&compressed_data, &mut data) {
+                match lzvn_context.decompress(compressed_data, &mut data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -221,7 +221,7 @@ impl UtilTool {
             CompressionType::Lzx => {
                 let mut lzx_context: LzxContext = LzxContext::new();
 
-                match lzx_context.decompress(&compressed_data, &mut data) {
+                match lzx_context.decompress(compressed_data, &mut data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -235,7 +235,7 @@ impl UtilTool {
             CompressionType::Lzxpress => {
                 let mut lzxpress_context: LzxpressContext = LzxpressContext::new();
 
-                match lzxpress_context.decompress(&compressed_data, &mut data) {
+                match lzxpress_context.decompress(compressed_data, &mut data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -250,7 +250,7 @@ impl UtilTool {
                 let mut lzxpress_huffman_context: LzxpressHuffmanContext =
                     LzxpressHuffmanContext::new();
 
-                match lzxpress_huffman_context.decompress(&compressed_data, &mut data) {
+                match lzxpress_huffman_context.decompress(compressed_data, &mut data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -264,7 +264,7 @@ impl UtilTool {
             CompressionType::Zlib => {
                 let mut zlib_context: ZlibContext = ZlibContext::new();
 
-                match zlib_context.decompress(&compressed_data, &mut data) {
+                match zlib_context.decompress(compressed_data, &mut data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(

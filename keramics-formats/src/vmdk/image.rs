@@ -70,7 +70,7 @@ impl VmdkImage {
         let mut image_layers: Vec<VmdkImageLayer> = Vec::new();
 
         let mut image_layer: VmdkImageLayer = VmdkImageLayer::new();
-        match image_layer.open(file_resolver, &file_name) {
+        match image_layer.open(file_resolver, file_name) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read top image layer");
@@ -107,7 +107,7 @@ impl VmdkImage {
         let mut image_layer_index: usize = 0;
         while let Some(mut image_layer) = image_layers.pop() {
             if image_layer_index > 0 {
-                match image_layer.set_parent(&mut self.layers[image_layer_index - 1]) {
+                match image_layer.set_parent(&self.layers[image_layer_index - 1]) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to set parent");

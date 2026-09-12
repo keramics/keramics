@@ -67,7 +67,7 @@ impl XfsDirectoryListElement {
             let mut block_header: XfsDirectoryListElementHeaderV2 =
                 XfsDirectoryListElementHeaderV2::new();
 
-            match block_header.read_data(&data) {
+            match block_header.read_data(data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -84,7 +84,7 @@ impl XfsDirectoryListElement {
             let mut block_header: XfsDirectoryListElementHeaderV3 =
                 XfsDirectoryListElementHeaderV3::new();
 
-            match block_header.read_data(&data) {
+            match block_header.read_data(data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -133,7 +133,7 @@ impl XfsDirectoryListElement {
         let mut entry_index: usize = 0;
 
         while data_offset < entries_data_end_offset {
-            if &data[data_offset..data_offset + 2] == &[0xff, 0xff] {
+            if data[data_offset..data_offset + 2] == [0xff, 0xff] {
                 keramics_core::debug_trace_structure!(
                     XfsDirectoryListElementUnusedEntryV2::debug_read_data(&data[data_offset..])
                 );

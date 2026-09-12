@@ -21,14 +21,14 @@ use keramics_vfs::{VfsFileEntry, VfsLocation, VfsResolver, VfsResolverReference,
 
 use crate::enums::DisplayPathType;
 
-const C0_CONTROL_CHARACTERS: [&'static str; 32] = [
+const C0_CONTROL_CHARACTERS: [&str; 32] = [
     "\\x00", "\\x01", "\\x02", "\\x03", "\\x04", "\\x05", "\\x06", "\\x07", "\\x08", "\\x09",
     "\\x0a", "\\x0b", "\\x0c", "\\x0d", "\\x0e", "\\x0f", "\\x10", "\\x11", "\\x12", "\\x13",
     "\\x14", "\\x15", "\\x16", "\\x17", "\\x18", "\\x19", "\\x1a", "\\x1b", "\\x1c", "\\x1d",
     "\\x1e", "\\x1f",
 ];
 
-static C1_CONTROL_CHARACTERS: [&'static str; 33] = [
+static C1_CONTROL_CHARACTERS: [&str; 33] = [
     "\\x7f", "\\x80", "\\x81", "\\x82", "\\x83", "\\x84", "\\x85", "\\x86", "\\x87", "\\x88",
     "\\x89", "\\x8a", "\\x8b", "\\x8c", "\\x8d", "\\x8e", "\\x8f", "\\x90", "\\x91", "\\x92",
     "\\x93", "\\x94", "\\x95", "\\x96", "\\x97", "\\x98", "\\x99", "\\x9a", "\\x9b", "\\x9c",
@@ -78,8 +78,8 @@ impl DisplayPath {
             PathComponent::ByteString(byte_string) => {
                 let mut escaped_string: String = String::with_capacity(byte_string.len() * 2);
 
-                let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
-                while let Some(result) = character_decoder.next() {
+                let character_decoder: CharacterDecoder = byte_string.get_character_decoder();
+                for result in character_decoder {
                     match result {
                         Ok(code_points) => {
                             for code_point in code_points {
@@ -275,18 +275,12 @@ impl DisplayPath {
                                     None => None,
                                 }
                             }
-                            Some(VfsFileEntry::Gpt(gpt_file_entry)) => {
-                                match gpt_file_entry.get_identifier() {
-                                    Some(identifier) => Some(format!("/gpt{{{}}}", identifier)),
-                                    None => None,
-                                }
-                            }
-                            Some(VfsFileEntry::LinuxLvm(lvm_file_entry)) => {
-                                match lvm_file_entry.get_identifier() {
-                                    Some(identifier) => Some(format!("/lvm{{{}}}", identifier)),
-                                    None => None,
-                                }
-                            }
+                            Some(VfsFileEntry::Gpt(gpt_file_entry)) => gpt_file_entry
+                                .get_identifier()
+                                .map(|identifier| format!("/gpt{{{}}}", identifier)),
+                            Some(VfsFileEntry::LinuxLvm(lvm_file_entry)) => lvm_file_entry
+                                .get_identifier()
+                                .map(|identifier| format!("/lvm{{{}}}", identifier)),
                             _ => None,
                         },
                         Err(mut error) => {

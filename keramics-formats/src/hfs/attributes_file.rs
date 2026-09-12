@@ -203,19 +203,16 @@ impl HfsAttributesFile {
                                         record_index
                                     )));
                                 }
-                                match attributes.insert(name.clone(), attribute_record) {
-                                    Some(_) => {
-                                        return Err(keramics_core::error_trace_new!(format!(
-                                            "Unsupported multiple attributes with the name: {}",
-                                            name
-                                        )));
-                                    }
-                                    None => {}
+                                if attributes.insert(name.clone(), attribute_record).is_some() {
+                                    return Err(keramics_core::error_trace_new!(format!(
+                                        "Unsupported multiple attributes with the name: {}",
+                                        name
+                                    )));
                                 }
                             }
                         }
                     } else if record_index > 0 {
-                        let data_offset: usize = last_key.size as usize;
+                        let data_offset: usize = last_key.size;
 
                         if data_offset + 4 > last_record_data.len() {
                             return Err(keramics_core::error_trace_new!(format!(
@@ -259,7 +256,7 @@ impl HfsAttributesFile {
             last_record_data = record_data;
         }
         if is_branch && record_index > 0 {
-            let data_offset: usize = last_key.size as usize;
+            let data_offset: usize = last_key.size;
 
             if data_offset + 4 > last_record_data.len() {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -326,7 +323,7 @@ impl HfsAttributesFile {
         key: &HfsAttributeKey,
         record_data: &[u8],
     ) -> Result<HfsAttributeRecord, ErrorTrace> {
-        let data_offset: usize = key.size as usize;
+        let data_offset: usize = key.size;
 
         if data_offset + 4 > record_data.len() {
             return Err(keramics_core::error_trace_new!(format!(

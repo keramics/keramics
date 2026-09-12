@@ -335,7 +335,7 @@ impl CdsaEncrContainerFooter {
         cipher_context: &CdsaEncrCipherContext,
         wrapped_key_data: &[u8],
     ) -> Result<Option<Vec<u8>>, ErrorTrace> {
-        let mut initialization_vector: Vec<u8> = vec![
+        let initialization_vector: Vec<u8> = vec![
             0x4a, 0xdd, 0xa2, 0x2c, 0x79, 0xe8, 0x21, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00,
         ];
@@ -349,8 +349,8 @@ impl CdsaEncrContainerFooter {
         let mut intermediate_key_data: Vec<u8> = vec![0; intermediate_key_data_size];
 
         match cipher_context.decrypt(
-            &mut initialization_vector,
-            &wrapped_key_data,
+            &initialization_vector,
+            wrapped_key_data,
             &mut intermediate_key_data,
         ) {
             Ok(_) => {}
@@ -382,7 +382,7 @@ impl CdsaEncrContainerFooter {
         let mut reversed_key_data: Vec<u8> = result_key_data.to_vec();
         reversed_key_data.reverse();
 
-        let mut initialization_vector: Vec<u8> = reversed_key_data[0..8].to_vec();
+        let initialization_vector: Vec<u8> = reversed_key_data[0..8].to_vec();
 
         let final_key_data_size: usize = reversed_key_data[8..].len();
 
@@ -394,7 +394,7 @@ impl CdsaEncrContainerFooter {
         let mut final_key_data: Vec<u8> = vec![0; final_key_data_size];
 
         match cipher_context.decrypt(
-            &mut initialization_vector,
+            &initialization_vector,
             &reversed_key_data[8..],
             &mut final_key_data,
         ) {
@@ -427,7 +427,7 @@ impl CdsaEncrContainerFooter {
                 return Err(error);
             }
         };
-        if &result_key_data[0..4] == &[0; 4] {
+        if result_key_data[0..4] == [0; 4] {
             Ok(Some(result_key_data[4..].to_vec()))
         } else {
             Ok(None)

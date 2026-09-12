@@ -318,7 +318,7 @@ impl HfsFileEntry {
                     "Invalid symbolic link target size values out of bounds"
                 ));
             }
-            let mut block_stream: HfsBlockStream = match self.get_block_stream(&fork_descriptor) {
+            let mut block_stream: HfsBlockStream = match self.get_block_stream(fork_descriptor) {
                 Ok(block_stream) => block_stream,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to retrieve block stream");
@@ -368,7 +368,7 @@ impl HfsFileEntry {
                                 Some(fork_descriptor) => fork_descriptor,
                                 None => return Ok(None),
                             };
-                        match self.get_block_stream(&fork_descriptor) {
+                        match self.get_block_stream(fork_descriptor) {
                             Ok(block_stream) => Arc::new(RwLock::new(block_stream)),
                             Err(mut error) => {
                                 keramics_core::error_trace_add_frame!(
@@ -427,7 +427,7 @@ impl HfsFileEntry {
                     Some(fork_descriptor) => fork_descriptor,
                     None => return Ok(None),
                 };
-                match self.get_block_stream(&fork_descriptor) {
+                match self.get_block_stream(fork_descriptor) {
                     Ok(block_stream) => Ok(Some(Arc::new(RwLock::new(block_stream)))),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -448,9 +448,7 @@ impl HfsFileEntry {
         }
         match self.get_data_stream() {
             Ok(Some(data_stream)) => Ok(Some(HfsFork::new(HfsForkType::Data, data_stream))),
-            Ok(None) => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
+            Ok(None) => Err(keramics_core::error_trace_new!("Missing data stream")),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
                 Err(error)
@@ -475,7 +473,7 @@ impl HfsFileEntry {
             Some(fork_descriptor) => fork_descriptor,
             None => return Ok(None),
         };
-        match self.get_block_stream(&fork_descriptor) {
+        match self.get_block_stream(fork_descriptor) {
             Ok(block_stream) => Ok(Some(HfsFork::new(
                 HfsForkType::Resource,
                 Arc::new(RwLock::new(block_stream)),
@@ -569,11 +567,9 @@ impl HfsFileEntry {
                 );
                 Ok(Arc::new(RwLock::new(data_stream)))
             }
-            _ => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported attribute record type"
-                ));
-            }
+            _ => Err(keramics_core::error_trace_new!(
+                "Unsupported attribute record type"
+            )),
         }
     }
 
@@ -723,8 +719,8 @@ impl HfsFileEntry {
         }
         let lookup_name: HfsString = HfsString::from("com.apple.decmpfs");
 
-        match self.attributes.get_value_by_key(&lookup_name) {
-            Some(attribute_record) => match attribute_record {
+        if let Some(attribute_record) = self.attributes.get_value_by_key(&lookup_name) {
+            match attribute_record {
                 HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
                     let mut compressed_data_header: DecmpfsHeader = DecmpfsHeader::new();
 
@@ -770,8 +766,7 @@ impl HfsFileEntry {
                         "Unsupported decmpfs attribute record type"
                     ));
                 }
-            },
-            None => {}
+            }
         }
         Ok(())
     }

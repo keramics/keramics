@@ -260,7 +260,7 @@ impl Des3Context {
         }
         let encrypted_data_size: usize = encrypted_data.len();
 
-        if encrypted_data_size % DES3_BLOCK_SIZE != 0 {
+        if !encrypted_data_size.is_multiple_of(DES3_BLOCK_SIZE) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid encrypted data size value not a multitude of block size: {}",
                 DES3_BLOCK_SIZE
@@ -317,7 +317,7 @@ impl Des3Context {
         }
         let data_size: usize = data.len();
 
-        if data_size % DES3_BLOCK_SIZE != 0 {
+        if !data_size.is_multiple_of(DES3_BLOCK_SIZE) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid data size value not a multitude of block size: {}",
                 DES3_BLOCK_SIZE
@@ -411,7 +411,7 @@ impl CryptCbc for Des3Context {
         }
         let encrypted_data_size: usize = encrypted_data.len();
 
-        if encrypted_data_size % 8 != 0 {
+        if !encrypted_data_size.is_multiple_of(8) {
             return Err(keramics_core::error_trace_new!(
                 "Invalid encrypted data size value not a multitude of block size: 8"
             ));
@@ -461,7 +461,7 @@ impl CryptCbc for Des3Context {
         }
         let data_size: usize = data.len();
 
-        if data_size % 8 != 0 {
+        if !data_size.is_multiple_of(8) {
             return Err(keramics_core::error_trace_new!(
                 "Invalid data size value not a multitude of block size: 8"
             ));

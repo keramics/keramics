@@ -210,7 +210,7 @@ impl CdsaEncrPassphraseWrappedKey {
                 let mut padded_key_data: Vec<u8> = vec![0; self.wrapped_key_data.len()];
 
                 match cipher_context.decrypt(
-                    &mut initialization_vector,
+                    &initialization_vector,
                     &self.wrapped_key_data,
                     &mut padded_key_data,
                 ) {

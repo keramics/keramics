@@ -190,7 +190,7 @@ impl DecmpfsBlockReader {
             &mut data,
             SeekFrom::Start(0)
         );
-        if &data == DECMPFS_HEADER_SIGNATURE {
+        if data == DECMPFS_HEADER_SIGNATURE {
             self.block_offsets = vec![16];
 
             return Ok(());

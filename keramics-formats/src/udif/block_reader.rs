@@ -64,7 +64,7 @@ impl UdifBlockReader {
             UdifCompressionMethod::Adc => {
                 let mut adc_context: AdcContext = AdcContext::new();
 
-                match adc_context.decompress(&compressed_data, data) {
+                match adc_context.decompress(compressed_data, data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -78,7 +78,7 @@ impl UdifBlockReader {
             UdifCompressionMethod::Bzip2 => {
                 let mut bzip2_context: Bzip2Context = Bzip2Context::new();
 
-                match bzip2_context.decompress(&compressed_data, data) {
+                match bzip2_context.decompress(compressed_data, data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -92,7 +92,7 @@ impl UdifBlockReader {
             UdifCompressionMethod::Lzfse => {
                 let mut lzfse_context: LzfseContext = LzfseContext::new();
 
-                match lzfse_context.decompress(&compressed_data, data) {
+                match lzfse_context.decompress(compressed_data, data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(

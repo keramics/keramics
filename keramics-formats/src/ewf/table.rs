@@ -109,7 +109,7 @@ impl EwfTable {
         position: SeekFrom,
     ) -> Result<(), ErrorTrace> {
         // Note that 16777216 is an arbitrary chosen limit.
-        if data_size < 28 || data_size > 16777216 {
+        if !(28..=16777216).contains(&data_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported table data size: {} value out of bounds",
                 data_size

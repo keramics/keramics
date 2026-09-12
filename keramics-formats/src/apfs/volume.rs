@@ -268,66 +268,63 @@ impl ApfsVolume {
             // If the container key bag is locked the volume is also locked.
             self.is_locked = container_key_bag.is_locked;
 
-            match container_key_bag.get_entry(&volume_identifier, 3) {
-                Some(entry_data) => {
-                    keramics_core::debug_trace_data_and_structure!(
-                        "ApfsVolumeKeyBagBlockRange",
-                        0,
-                        &entry_data,
-                        entry_data.len(),
-                        ApfsBlockRange::debug_read_data(&entry_data)
-                    );
-                    let mut block_range: ApfsBlockRange = ApfsBlockRange::new();
+            if let Some(entry_data) = container_key_bag.get_entry(&volume_identifier, 3) {
+                keramics_core::debug_trace_data_and_structure!(
+                    "ApfsVolumeKeyBagBlockRange",
+                    0,
+                    &entry_data,
+                    entry_data.len(),
+                    ApfsBlockRange::debug_read_data(&entry_data)
+                );
+                let mut block_range: ApfsBlockRange = ApfsBlockRange::new();
 
-                    match block_range.read_data(entry_data) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to read volume key bag block range"
-                            );
-                            return Err(error);
-                        }
+                match block_range.read_data(entry_data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read volume key bag block range"
+                        );
+                        return Err(error);
                     }
-                    if block_range.block_number == 0 || block_range.number_of_blocks == 0 {
-                        return Err(keramics_core::error_trace_new!(
-                            "Invalid volume key bag block range"
-                        ));
-                    }
-                    let key_bag_offset: u64 = block_range.block_number * (self.block_size as u64);
-                    let key_bag_size: u64 = block_range.number_of_blocks * (self.block_size as u64);
-
-                    let mut key_bag: ApfsKeyBag = ApfsKeyBag::new(
-                        self.bytes_per_sector,
-                        &superblock.volume_identifier,
-                        &superblock.volume_identifier,
-                    );
-                    match key_bag.read_at_position(
-                        &self.data_stream,
-                        key_bag_size,
-                        SeekFrom::Start(key_bag_offset),
-                    ) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to read key bag at offset: {} (0x{:08x}))",
-                                    key_bag_offset, key_bag_offset
-                                )
-                            );
-                            return Err(error);
-                        }
-                    }
-                    if key_bag.object_header.object_type != 0x72656373 {
-                        return Err(keramics_core::error_trace_new!(
-                            "Unsupported volume key bag object type"
-                        ));
-                    }
-                    // The volume has a key bag and therefore is locked.
-                    self.is_locked = true;
                 }
-                None => {}
+                if block_range.block_number == 0 || block_range.number_of_blocks == 0 {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid volume key bag block range"
+                    ));
+                }
+                let key_bag_offset: u64 = block_range.block_number * (self.block_size as u64);
+                let key_bag_size: u64 = block_range.number_of_blocks * (self.block_size as u64);
+
+                let mut key_bag: ApfsKeyBag = ApfsKeyBag::new(
+                    self.bytes_per_sector,
+                    &superblock.volume_identifier,
+                    &superblock.volume_identifier,
+                );
+                match key_bag.read_at_position(
+                    &self.data_stream,
+                    key_bag_size,
+                    SeekFrom::Start(key_bag_offset),
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to read key bag at offset: {} (0x{:08x}))",
+                                key_bag_offset, key_bag_offset
+                            )
+                        );
+                        return Err(error);
+                    }
+                }
+                if key_bag.object_header.object_type != 0x72656373 {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported volume key bag object type"
+                    ));
+                }
+                // The volume has a key bag and therefore is locked.
+                self.is_locked = true;
             }
         }
         // TODO: add snapshot support

@@ -50,9 +50,9 @@ impl fmt::Display for CdsaEncrEncryptionType {
             };
             let mode_string: String = match &self.mode {
                 2 | 3 => String::from("ECB"),
-                4 | 5 | 6 => String::from("CBC"),
-                7 | 8 | 9 => String::from("CFB"),
-                10 | 11 | 12 => String::from("OFB"),
+                4..=6 => String::from("CBC"),
+                7..=9 => String::from("CFB"),
+                10..=12 => String::from("OFB"),
                 _ => format!("0x{:08x}", self.method),
             };
             let suffix: Option<String> = match &self.mode {

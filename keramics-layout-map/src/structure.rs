@@ -894,7 +894,7 @@ impl StructureLayout {
         let data_size: usize = self.get_data_size();
         let data_size_literal: Literal = Literal::usize_unsuffixed(data_size);
 
-        let name_string: String = format!("{}", self.name);
+        let name_string: String = self.name.to_string();
 
         quote! {
             pub(crate) fn read_at_position(

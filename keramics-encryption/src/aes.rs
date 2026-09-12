@@ -55,16 +55,16 @@ const fn generate_forward_sbox(powers_table: &[u8; 256], logs_table: &[u8; 256])
         let table_index: u8 = 255 - logs_table[sbox_index];
         let mut byte_value: u8 = powers_table[table_index as usize];
 
-        let mut substitution_value: u8 = ((byte_value << 1) & 0xff) | (byte_value >> 7);
+        let mut substitution_value: u8 = byte_value.rotate_left(1);
         byte_value ^= substitution_value;
 
-        substitution_value = ((substitution_value << 1) & 0xff) | (substitution_value >> 7);
+        substitution_value = substitution_value.rotate_left(1);
         byte_value ^= substitution_value;
 
-        substitution_value = ((substitution_value << 1) & 0xff) | (substitution_value >> 7);
+        substitution_value = substitution_value.rotate_left(1);
         byte_value ^= substitution_value;
 
-        substitution_value = ((substitution_value << 1) & 0xff) | (substitution_value >> 7);
+        substitution_value = substitution_value.rotate_left(1);
         byte_value ^= substitution_value ^ 0x63;
 
         forward_sbox[sbox_index] = byte_value;
@@ -946,7 +946,7 @@ impl CryptCbc for AesContext {
                 "Invalid encrypted data size value too small"
             ));
         }
-        if encrypted_data_size % AES_BLOCK_SIZE != 0 {
+        if !encrypted_data_size.is_multiple_of(AES_BLOCK_SIZE) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid encrypted data size value not a multitude of block size: {}",
                 AES_BLOCK_SIZE
@@ -1020,7 +1020,7 @@ impl CryptCbc for AesContext {
                 "Invalid data size value too small"
             ));
         }
-        if data_size % AES_BLOCK_SIZE != 0 {
+        if !data_size.is_multiple_of(AES_BLOCK_SIZE) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid data size value not a multitude of block size: {}",
                 AES_BLOCK_SIZE
@@ -1082,7 +1082,7 @@ impl CryptCcm for AesContext {
         }
         let nonce_size: usize = nonce.len();
 
-        if nonce_size < 7 || nonce_size > 13 {
+        if !(7..=13).contains(&nonce_size) {
             return Err(keramics_core::error_trace_new!("Unsupported nonce size"));
         }
         let associated_data_size: usize = associated_data.len();
@@ -1101,7 +1101,7 @@ impl CryptCcm for AesContext {
         }
         let tag_size: usize = tag.len();
 
-        if !(4..=16).contains(&tag_size) || (tag_size % 2) != 0 {
+        if !(4..=16).contains(&tag_size) || !tag_size.is_multiple_of(2) {
             return Err(keramics_core::error_trace_new!("Unsupported tag size"));
         }
         let l_value: usize = 15 - nonce_size;
@@ -1214,7 +1214,7 @@ impl CryptCcm for AesContext {
         let nonce_size: usize = nonce.len();
         let data_size: usize = data.len();
 
-        if nonce_size < 7 || nonce_size > 13 {
+        if !(7..=13).contains(&nonce_size) {
             return Err(keramics_core::error_trace_new!("Unsupported nonce size"));
         }
         let associated_data_size: usize = associated_data.len();
@@ -1226,7 +1226,7 @@ impl CryptCcm for AesContext {
         }
         let tag_size: usize = tag.len();
 
-        if !(4..=16).contains(&tag_size) || (tag_size % 2) != 0 {
+        if !(4..=16).contains(&tag_size) || !tag_size.is_multiple_of(2) {
             return Err(keramics_core::error_trace_new!("Unsupported tag size"));
         }
         if data_size > encrypted_data.len() {
@@ -1345,7 +1345,7 @@ impl CryptEcb for AesContext {
                 "Invalid encrypted data size value too small"
             ));
         }
-        if encrypted_data_size % AES_BLOCK_SIZE != 0 {
+        if !encrypted_data_size.is_multiple_of(AES_BLOCK_SIZE) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid encrypted data size value not a multitude of block size: {}",
                 AES_BLOCK_SIZE
@@ -1392,7 +1392,7 @@ impl CryptEcb for AesContext {
                 "Invalid data size value too small"
             ));
         }
-        if data_size % AES_BLOCK_SIZE != 0 {
+        if !data_size.is_multiple_of(AES_BLOCK_SIZE) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid data size value not a multitude of block size: {}",
                 AES_BLOCK_SIZE

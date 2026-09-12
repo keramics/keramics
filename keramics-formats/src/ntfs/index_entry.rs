@@ -79,7 +79,7 @@ impl NtfsIndexEntry {
     ) -> Result<(), ErrorTrace> {
         // Note that 42 is the minimum index entry size and 65535 is chosen given the fix-up values
         // and attributes offsets of the index entry are 16-bit.
-        if data_size < 42 || data_size > 65535 {
+        if !(42..=65535).contains(&data_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported index entry data size: {} value out of bounds",
                 data_size

@@ -160,7 +160,7 @@ impl HfsCatalogFile {
                 }
                 if !is_branch {
                     if key.parent_identifier == parent_identifier {
-                        let mut data_offset: usize = key.size as usize;
+                        let mut data_offset: usize = key.size;
 
                         if self.btree_file.format == HfsFormat::Hfs {
                             let alignment_padding: usize =
@@ -215,7 +215,7 @@ impl HfsCatalogFile {
                     }
                 } else if record_index > 0 {
                     if key.parent_identifier == parent_identifier {
-                        let data_offset: usize = last_key.size as usize;
+                        let data_offset: usize = last_key.size;
 
                         if data_offset + 4 > last_record_data.len() {
                             return Err(keramics_core::error_trace_new!(format!(
@@ -259,7 +259,7 @@ impl HfsCatalogFile {
             record_index += 1;
         }
         if is_branch && record_index > 0 {
-            let data_offset: usize = last_key.size as usize;
+            let data_offset: usize = last_key.size;
 
             if data_offset + 4 > last_record_data.len() {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -496,7 +496,7 @@ impl HfsCatalogFile {
                     } else if key.size == 0 {
                         false
                     } else {
-                        let mut data_offset: usize = key.size as usize;
+                        let mut data_offset: usize = key.size;
 
                         if self.btree_file.format == HfsFormat::Hfs {
                             let alignment_padding: usize =
@@ -598,7 +598,7 @@ impl HfsCatalogFile {
             record_index += 1;
         }
         if is_branch && record_index > 0 {
-            let data_offset: usize = last_key.size as usize;
+            let data_offset: usize = last_key.size;
 
             if data_offset + 4 > last_record_data.len() {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -765,7 +765,7 @@ impl HfsCatalogFile {
             record_index += 1;
         }
         if is_branch && record_index > 0 {
-            let data_offset: usize = last_key.size as usize;
+            let data_offset: usize = last_key.size;
 
             if data_offset + 4 > last_record_data.len() {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -832,7 +832,7 @@ impl HfsCatalogFile {
         key: &HfsCatalogKey,
         record_data: &[u8],
     ) -> Result<HfsDirectoryEntry, ErrorTrace> {
-        let mut data_offset: usize = key.size as usize;
+        let mut data_offset: usize = key.size;
 
         if self.btree_file.format == HfsFormat::Hfs {
             let alignment_padding: usize = calculate_alignment_padding(data_offset, 2);
@@ -915,7 +915,7 @@ impl HfsCatalogFile {
         key: &HfsCatalogKey,
         record_data: &[u8],
     ) -> Result<HfsCatalogThreadRecord, ErrorTrace> {
-        let mut data_offset: usize = key.size as usize;
+        let mut data_offset: usize = key.size;
         let data_size: usize = record_data.len();
 
         if self.btree_file.format == HfsFormat::Hfs {

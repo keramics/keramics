@@ -261,7 +261,7 @@ impl VmdkImageLayer {
         descriptor_size: u64,
     ) -> Result<(), ErrorTrace> {
         // Note that 16777216 is an arbitrary chosen limit.
-        if descriptor_size < 21 || descriptor_size > 16777216 {
+        if !(21..=16777216).contains(&descriptor_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported descriptor size: {} value out of bounds",
                 descriptor_size
@@ -276,7 +276,7 @@ impl VmdkImageLayer {
         );
         let mut descriptor_storage: VmdkDescriptorStorage = VmdkDescriptorStorage::new(&data);
 
-        match descriptor_storage.next_line().as_deref() {
+        match descriptor_storage.next_line() {
             Some(line) => {
                 match VmdkDescriptorStorage::to_ascii_lowercase(VmdkDescriptorStorage::trim(line))
                     .as_slice()

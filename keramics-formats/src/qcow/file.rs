@@ -429,17 +429,14 @@ impl QcowFile {
         let mut key_unlocked: bool = false;
 
         for credential in credentials.iter() {
-            match credential {
-                QcowCredential::Passphrase(passphrase) => {
-                    if encryption_type.method == 1 {
-                        let data_size: usize = min(passphrase.len(), 16);
+            if let QcowCredential::Passphrase(passphrase) = credential {
+                if encryption_type.method == 1 {
+                    let data_size: usize = min(passphrase.len(), 16);
 
-                        user_key[0..data_size].copy_from_slice(&passphrase[0..data_size]);
+                    user_key[0..data_size].copy_from_slice(&passphrase[0..data_size]);
 
-                        key_unlocked = true;
-                    }
+                    key_unlocked = true;
                 }
-                _ => {}
             }
         }
         if key_unlocked {
