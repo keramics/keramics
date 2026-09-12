@@ -20,17 +20,17 @@ assert_availability_binary genisoimage
 
 set -e
 
-sudo mkdir -p ${MOUNT_POINT}
+sudo mkdir -p "${MOUNT_POINT}"
 
 mkdir -p test_data/iso9660
 
 # Create an ISO9660 level 3 file system
 IMAGE_FILE="test_data/iso9660/level3.iso"
 
-sudo mount -o loop,rw test_data/ext/ext2.raw ${MOUNT_POINT}
+sudo mount -o loop,rw test_data/ext/ext2.raw "${MOUNT_POINT}"
 
-genisoimage -input-charset utf8 -iso-level 3 -o ${IMAGE_FILE} ${MOUNT_POINT}
+genisoimage -input-charset utf8 -iso-level 3 -o "${IMAGE_FILE}" "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 exit ${EXIT_SUCCESS}

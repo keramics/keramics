@@ -24,7 +24,7 @@ assert_availability_binary truncate
 
 set -e
 
-sudo mkdir -p ${MOUNT_POINT}
+sudo mkdir -p "${MOUNT_POINT}"
 
 mkdir -p test_data/ext
 
@@ -33,50 +33,50 @@ IMAGE_FILE="test_data/ext/ext2.raw"
 IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-mke2fs -I 128 -L ext2_test -q -t ext2 ${IMAGE_FILE}
+mke2fs -I 128 -L ext2_test -q -t ext2 "${IMAGE_FILE}"
 
-sudo mount -o loop,rw ${IMAGE_FILE} ${MOUNT_POINT}
+sudo mount -o loop,rw "${IMAGE_FILE}" "${MOUNT_POINT}"
 
-sudo chown ${USER} ${MOUNT_POINT}
+sudo chown "${USER}" "${MOUNT_POINT}"
 
-create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
+create_test_file_entries_with_extended_attributes "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 # Create an ext3 file system.
 IMAGE_FILE="test_data/ext/ext3.raw"
 IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-mke2fs -L ext3_test -q -t ext3 ${IMAGE_FILE}
+mke2fs -L ext3_test -q -t ext3 "${IMAGE_FILE}"
 
-sudo mount -o loop,rw ${IMAGE_FILE} ${MOUNT_POINT}
+sudo mount -o loop,rw "${IMAGE_FILE}" "${MOUNT_POINT}"
 
-sudo chown ${USER} ${MOUNT_POINT}
+sudo chown "${USER}" "${MOUNT_POINT}"
 
-create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
+create_test_file_entries_with_extended_attributes "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 # Create an ext4 file system.
 IMAGE_FILE="test_data/ext/ext4.raw"
 IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-mke2fs -L ext4_test -q -t ext4 ${IMAGE_FILE}
+mke2fs -L ext4_test -q -t ext4 "${IMAGE_FILE}"
 
-sudo mount -o loop,rw ${IMAGE_FILE} ${MOUNT_POINT}
+sudo mount -o loop,rw "${IMAGE_FILE}" "${MOUNT_POINT}"
 
-sudo chown ${USER} ${MOUNT_POINT}
+sudo chown "${USER}" "${MOUNT_POINT}"
 
-create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
+create_test_file_entries_with_extended_attributes "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 exit ${EXIT_SUCCESS}

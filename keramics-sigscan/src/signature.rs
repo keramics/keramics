@@ -65,10 +65,13 @@ impl Signature {
         buffer_size: usize,
     ) -> bool {
         let pattern_offset: u64 = match self.pattern_type {
-            PatternType::BoundToEnd => data_size - self.pattern_offset as u64,
+            PatternType::BoundToEnd => data_size.saturating_sub(self.pattern_offset as u64),
             PatternType::BoundToStart => self.pattern_offset as u64,
             PatternType::Unbound => data_offset,
         };
+        if self.pattern_type == PatternType::BoundToEnd && self.pattern_offset as u64 > data_size {
+            return false;
+        }
         let mediator: MediatorReference = Mediator::current();
         if mediator.debug_output {
             mediator.debug_print("Signature::scan_buffer {\n");

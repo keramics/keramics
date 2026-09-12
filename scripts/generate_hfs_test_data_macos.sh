@@ -30,14 +30,14 @@ mkdir -p test_data/hfs
 IMAGE_FILE="test_data/hfs/hfsplus"
 IMAGE_SIZE="4M"
 
-rm -f ${IMAGE_FILE}.dmg
+rm -f "${IMAGE_FILE}.dmg"
 
-hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type UDIF -volname hfsplus_test ${IMAGE_FILE}
+hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type UDIF -volname hfsplus_test "${IMAGE_FILE}"
 
-hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
+hdiutil attach "${IMAGE_FILE}.dmg" -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-detach_image ${IMAGE_FILE}.dmg
+detach_image "${IMAGE_FILE}.dmg"
 
 exit ${EXIT_SUCCESS}

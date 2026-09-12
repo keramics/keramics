@@ -28,7 +28,7 @@ assert_availability_binary truncate
 
 set -e
 
-sudo mkdir -p ${MOUNT_POINT}
+sudo mkdir -p "${MOUNT_POINT}"
 
 mkdir -p test_data/gpt
 
@@ -39,9 +39,9 @@ IMAGE_FILE="test_data/gpt/gpt.raw"
 IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-gdisk ${IMAGE_FILE} <<EOT
+gdisk "${IMAGE_FILE}" <<EOT
 n
 1
 2048
@@ -56,29 +56,29 @@ w
 y
 EOT
 
-sudo losetup -o $(( 2048 * ${SECTOR_SIZE} )) --sizelimit $(( 1024 * 1024 )) /dev/loop99 ${IMAGE_FILE}
+sudo losetup -o $(( 2048 * SECTOR_SIZE )) --sizelimit $(( 1024 * 1024 )) /dev/loop99 "${IMAGE_FILE}"
 
 sudo mke2fs -I 128 -L "ext2_test" -q -t ext2 /dev/loop99
 
-sudo mount -o loop,rw /dev/loop99 ${MOUNT_POINT}
+sudo mount -o loop,rw /dev/loop99 "${MOUNT_POINT}"
 
-sudo chown ${USER} ${MOUNT_POINT}
+sudo chown "${USER}" "${MOUNT_POINT}"
 
-create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
+create_test_file_entries_with_extended_attributes "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 sudo losetup -d /dev/loop99
 
-sudo losetup -o $(( 4096 * ${SECTOR_SIZE} )) --sizelimit $(( 1536 * 1024 )) /dev/loop99 ${IMAGE_FILE}
+sudo losetup -o $(( 4096 * SECTOR_SIZE )) --sizelimit $(( 1536 * 1024 )) /dev/loop99 "${IMAGE_FILE}"
 
 sudo mkntfs -F -L "ntfs_test" -q -s ${SECTOR_SIZE} /dev/loop99
 
-sudo mount -o loop,rw /dev/loop99 ${MOUNT_POINT}
+sudo mount -o loop,rw /dev/loop99 "${MOUNT_POINT}"
 
-create_test_file_entries_with_long_file_name ${MOUNT_POINT}
+create_test_file_entries_with_long_file_name "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 sudo losetup -d /dev/loop99
 
@@ -88,9 +88,9 @@ IMAGE_FILE="test_data/gpt/empty_with_mbr.raw"
 IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-gdisk ${IMAGE_FILE} <<EOT
+gdisk "${IMAGE_FILE}" <<EOT
 o
 y
 w
@@ -98,7 +98,7 @@ y
 EOT
 
 # Note that fdisk will write into the GPT partition entries area if the partition start offset is not set correctly.
-fdisk -u ${IMAGE_FILE} <<EOT
+fdisk -u "${IMAGE_FILE}" <<EOT
 M
 d
 n
@@ -109,17 +109,17 @@ p
 w
 EOT
 
-sudo losetup -o $(( 48 * ${SECTOR_SIZE} )) --sizelimit $(( 256 * 1024 )) /dev/loop99 ${IMAGE_FILE}
+sudo losetup -o $(( 48 * SECTOR_SIZE )) --sizelimit $(( 256 * 1024 )) /dev/loop99 "${IMAGE_FILE}"
 
 sudo mke2fs -I 128 -L "ext2_test" -q -t ext2 /dev/loop99
 
-sudo mount -o loop,rw /dev/loop99 ${MOUNT_POINT}
+sudo mount -o loop,rw /dev/loop99 "${MOUNT_POINT}"
 
-sudo chown ${USER} ${MOUNT_POINT}
+sudo chown "${USER}" "${MOUNT_POINT}"
 
-create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
+create_test_file_entries_with_extended_attributes "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 sudo losetup -d /dev/loop99
 

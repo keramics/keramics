@@ -21,7 +21,7 @@ assert_availability_binary mkfs.exfat
 
 set -e
 
-sudo mkdir -p ${MOUNT_POINT}
+sudo mkdir -p "${MOUNT_POINT}"
 
 mkdir -p test_data/exfat
 
@@ -38,15 +38,15 @@ then
     IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
     SECTOR_SIZE=512
 
-    dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+    dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-    mkfs.exfat -L "exfat_test" ${IMAGE_FILE}
+    mkfs.exfat -L "exfat_test" "${IMAGE_FILE}"
 
-    sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
+    sudo mount -o loop,rw,gid="${CURRENT_GID}",uid="${CURRENT_UID}" "${IMAGE_FILE}" "${MOUNT_POINT}"
 
-    create_test_file_entries_with_long_file_name ${MOUNT_POINT}
+    create_test_file_entries_with_long_file_name "${MOUNT_POINT}"
 
-    sudo umount ${MOUNT_POINT}
+    sudo umount "${MOUNT_POINT}"
 fi
 
 exit ${EXIT_SUCCESS}

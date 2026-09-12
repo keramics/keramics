@@ -22,7 +22,7 @@ assert_availability_binary qemu-img
 
 set -e
 
-sudo mkdir -p ${MOUNT_POINT}
+sudo mkdir -p "${MOUNT_POINT}"
 
 mkdir -p test_data/fat
 mkdir -p test_data/qcow
@@ -32,52 +32,52 @@ IMAGE_FILE="test_data/fat/fat12.raw"
 IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-mkfs.fat -F 12 -n "FAT12_TEST" -S ${SECTOR_SIZE} ${IMAGE_FILE}
+mkfs.fat -F 12 -n "FAT12_TEST" -S ${SECTOR_SIZE} "${IMAGE_FILE}"
 
-sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
+sudo mount -o loop,rw,gid="${CURRENT_GID}",uid="${CURRENT_UID}" "${IMAGE_FILE}" "${MOUNT_POINT}"
 
-create_test_file_entries_with_long_file_name ${MOUNT_POINT}
+create_test_file_entries_with_long_file_name "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 # Create QCOW image with a FAT-16 file system.
 IMAGE_FILE="test_data/fat/fat16.raw"
 IMAGE_SIZE=$(( 16 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-mkfs.fat -F 16 -n "FAT16_TEST" -S ${SECTOR_SIZE} ${IMAGE_FILE}
+mkfs.fat -F 16 -n "FAT16_TEST" -S ${SECTOR_SIZE} "${IMAGE_FILE}"
 
-sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
+sudo mount -o loop,rw,gid="${CURRENT_GID}",uid="${CURRENT_UID}" "${IMAGE_FILE}" "${MOUNT_POINT}"
 
-create_test_file_entries_with_long_file_name ${MOUNT_POINT}
+create_test_file_entries_with_long_file_name "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
-qemu-img convert -f raw -O qcow2 ${IMAGE_FILE} test_data/qcow/fat16.qcow2
+qemu-img convert -f raw -O qcow2 "${IMAGE_FILE}" test_data/qcow/fat16.qcow2
 
-rm -f ${IMAGE_FILE}
+rm -f "${IMAGE_FILE}"
 
 # Create QCOW image with a FAT-32 file system.
 IMAGE_FILE="test_data/fat/fat32.raw"
 IMAGE_SIZE=$(( 64 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-mkfs.fat -F 32 -n "FAT32_TEST" -S ${SECTOR_SIZE} ${IMAGE_FILE}
+mkfs.fat -F 32 -n "FAT32_TEST" -S ${SECTOR_SIZE} "${IMAGE_FILE}"
 
-sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
+sudo mount -o loop,rw,gid="${CURRENT_GID}",uid="${CURRENT_UID}" "${IMAGE_FILE}" "${MOUNT_POINT}"
 
-create_test_file_entries_with_long_file_name ${MOUNT_POINT}
+create_test_file_entries_with_long_file_name "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
-qemu-img convert -f raw -O qcow2 ${IMAGE_FILE} test_data/qcow/fat32.qcow2
+qemu-img convert -f raw -O qcow2 "${IMAGE_FILE}" test_data/qcow/fat32.qcow2
 
-rm -f ${IMAGE_FILE}
+rm -f "${IMAGE_FILE}"
 
 exit ${EXIT_SUCCESS}

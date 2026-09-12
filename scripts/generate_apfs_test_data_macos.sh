@@ -30,14 +30,14 @@ mkdir -p test_data/apfs
 IMAGE_FILE="test_data/apfs/apfs"
 IMAGE_SIZE="4M"
 
-rm -f ${IMAGE_FILE}.dmg
+rm -f "${IMAGE_FILE}.dmg"
 
-hdiutil create -fs 'APFS' -size ${IMAGE_SIZE} -type UDIF -volname apfs_test ${IMAGE_FILE}
+hdiutil create -fs 'APFS' -size ${IMAGE_SIZE} -type UDIF -volname apfs_test "${IMAGE_FILE}"
 
-hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
+hdiutil attach "${IMAGE_FILE}.dmg" -noautoopen -nobrowse
 
 create_file_entries "/Volumes/apfs_test"
 
-detach_image ${IMAGE_FILE}.dmg
+detach_image "${IMAGE_FILE}.dmg"
 
 exit ${EXIT_SUCCESS}

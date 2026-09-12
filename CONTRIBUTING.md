@@ -106,12 +106,6 @@ cargo build --all-features
 cargo test --all-features
 ```
 
-**Check the formatting of documentation.**
-
-```bash
-rumdl check
-```
-
 ### Python bindings
 
 **Format Python code.**
@@ -124,6 +118,22 @@ black .
 
 ```bash
 cd keramics-python/ && tox -epy314
+```
+
+### Bash scripts
+
+**Check the formatting of bash scripts.**
+
+```bash
+find scripts/ -name "*.sh" -exec shellcheck {} +
+```
+
+### Documentation (Markdown)
+
+**Check the formatting of Markdown files.**
+
+```bash
+rumdl check
 ```
 
 ## Adding support for a data format

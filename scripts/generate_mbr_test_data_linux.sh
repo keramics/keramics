@@ -27,7 +27,7 @@ assert_availability_binary truncate
 
 set -e
 
-sudo mkdir -p ${MOUNT_POINT}
+sudo mkdir -p "${MOUNT_POINT}"
 
 mkdir -p test_data/mbr
 
@@ -38,9 +38,9 @@ IMAGE_FILE="test_data/mbr/mbr.raw"
 IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-fdisk -b ${SECTOR_SIZE} -u ${IMAGE_FILE} <<EOT
+fdisk -b ${SECTOR_SIZE} -u "${IMAGE_FILE}" <<EOT
 n
 p
 1
@@ -61,29 +61,29 @@ t
 w
 EOT
 
-sudo losetup -o $(( 1 * ${SECTOR_SIZE} )) --sizelimit $(( 1024 * 1024 )) /dev/loop99 ${IMAGE_FILE}
+sudo losetup -o $(( 1 * SECTOR_SIZE )) --sizelimit $(( 1024 * 1024 )) /dev/loop99 "${IMAGE_FILE}"
 
 sudo mke2fs -I 128 -L "ext2_test" -q -t ext2 /dev/loop99
 
-sudo mount -o loop,rw /dev/loop99 ${MOUNT_POINT}
+sudo mount -o loop,rw /dev/loop99 "${MOUNT_POINT}"
 
-sudo chown ${USER} ${MOUNT_POINT}
+sudo chown "${USER}" "${MOUNT_POINT}"
 
-create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
+create_test_file_entries_with_extended_attributes "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 sudo losetup -d /dev/loop99
 
-sudo losetup -o $(( 4096 * ${SECTOR_SIZE} )) --sizelimit $(( 1536 * 1024 )) /dev/loop99 ${IMAGE_FILE}
+sudo losetup -o $(( 4096 * SECTOR_SIZE )) --sizelimit $(( 1536 * 1024 )) /dev/loop99 "${IMAGE_FILE}"
 
 sudo mkntfs -F -L "ntfs_test" -q -s ${SECTOR_SIZE} /dev/loop99
 
-sudo mount -o loop,rw /dev/loop99 ${MOUNT_POINT}
+sudo mount -o loop,rw /dev/loop99 "${MOUNT_POINT}"
 
-create_test_file_entries_with_long_file_name ${MOUNT_POINT}
+create_test_file_entries_with_long_file_name "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 sudo losetup -d /dev/loop99
 

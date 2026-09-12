@@ -28,7 +28,7 @@ assert_availability_binary()
 {
 	local BINARY=$1
 
-	which ${BINARY} > /dev/null 2>&1
+	which "${BINARY}" > /dev/null 2>&1
 	if test $? -ne ${EXIT_SUCCESS}
 	then
 		echo "Missing binary: ${BINARY}"
@@ -48,38 +48,42 @@ create_test_file_entries()
 	MOUNT_POINT=$1
 
 	# Create an empty file
-	touch ${MOUNT_POINT}/emptyfile
+	touch "${MOUNT_POINT}/emptyfile"
 
 	# Create a directory
-	mkdir ${MOUNT_POINT}/testdir1
+	mkdir "${MOUNT_POINT}/testdir1"
 
 	# Create a file that can be stored as inline data
-	echo "My file" > ${MOUNT_POINT}/testdir1/testfile1
+	echo "My file" > "${MOUNT_POINT}/testdir1/testfile1"
 
 	# Create a file that cannot be stored as inline data
-	cp LICENSE ${MOUNT_POINT}/testdir1/TestFile2
+	cp LICENSE "${MOUNT_POINT}/testdir1/TestFile2"
 
 	# Create a hard link to a file
-	ln ${MOUNT_POINT}/testdir1/testfile1 ${MOUNT_POINT}/file_hardlink1
+	ln "${MOUNT_POINT}/testdir1/testfile1" "${MOUNT_POINT}/file_hardlink1"
 
 	# Create a symbolic link to a file
-	ln -s ${MOUNT_POINT}/testdir1/testfile1 ${MOUNT_POINT}/file_symboliclink1
+	ln -s "${MOUNT_POINT}/testdir1/testfile1" "${MOUNT_POINT}/file_symboliclink1"
 
 	# Create a hard link to a directory
 	# ln: hard link not allowed for directory
 
 	# Create a symbolic link to a directory
-	ln -s ${MOUNT_POINT}/testdir1 ${MOUNT_POINT}/directory_symboliclink1
+	ln -s "${MOUNT_POINT}/testdir1" "${MOUNT_POINT}/directory_symboliclink1"
 
 	# Create a file with an UTF-8 NFC encoded filename
-	touch `printf "${MOUNT_POINT}/nfc_t\xc3\xa9stfil\xc3\xa8"`
+	FILE_NAME=$(printf "%s/nfc_t\xc3\xa9stfil\xc3\xa8" "${MOUNT_POINT}")
+	touch "${FILE_NAME}"
 
 	# Create a file with an UTF-8 NFD encoded filename
-	touch `printf "${MOUNT_POINT}/nfd_te\xcc\x81stfile\xcc\x80"`
+	FILE_NAME=$(printf "%s/nfd_te\xcc\x81stfile\xcc\x80" "${MOUNT_POINT}")
+	touch "${FILE_NAME}"
 
 	# Create a file with an UTF-8 NFD encoded filename
-	touch `printf "${MOUNT_POINT}/nfd_\xc2\xbe"`
+	FILE_NAME=$(printf "%s/nfd_\xc2\xbe" "${MOUNT_POINT}")
+	touch "${FILE_NAME}"
 
 	# Create a file with an UTF-8 NFKD encoded filename
-	touch `printf "${MOUNT_POINT}/nfkd_3\xe2\x81\x844"`
+	FILE_NAME=$(printf "%s/nfkd_3\xe2\x81\x844" "${MOUNT_POINT}")
+	touch "${FILE_NAME}"
 }

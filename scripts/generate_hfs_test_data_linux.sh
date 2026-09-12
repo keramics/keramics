@@ -22,7 +22,7 @@ assert_availability_binary mkfs.hfsplus
 
 set -e
 
-sudo mkdir -p ${MOUNT_POINT}
+sudo mkdir -p "${MOUNT_POINT}"
 
 mkdir -p test_data/hfs
 
@@ -39,17 +39,17 @@ then
     IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
     SECTOR_SIZE=512
 
-    dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+    dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-    hformat -f -l "hfs_test" ${IMAGE_FILE} 0
+    hformat -f -l "hfs_test" "${IMAGE_FILE}" 0
 
-    sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
+    sudo mount -o loop,rw,gid="${CURRENT_GID}",uid="${CURRENT_UID}" "${IMAGE_FILE}" "${MOUNT_POINT}"
 
-    sudo chown ${USERNAME} ${MOUNT_POINT}
+    sudo chown "${USERNAME}" "${MOUNT_POINT}"
 
-    create_test_file_entries ${MOUNT_POINT}
+    create_test_file_entries "${MOUNT_POINT}"
 
-    sudo umount ${MOUNT_POINT}
+    sudo umount "${MOUNT_POINT}"
 fi
 
 set +e
@@ -65,17 +65,17 @@ then
     IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
     SECTOR_SIZE=512
 
-    dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+    dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-    mkfs.hfsplus -v "hfsplus_test" ${IMAGE_FILE}
+    mkfs.hfsplus -v "hfsplus_test" "${IMAGE_FILE}"
 
-    sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
+    sudo mount -o loop,rw,gid="${CURRENT_GID}",uid="${CURRENT_UID}" "${IMAGE_FILE}" "${MOUNT_POINT}"
 
-    sudo chown ${USERNAME} ${MOUNT_POINT}
+    sudo chown "${USERNAME}" "${MOUNT_POINT}"
 
-    create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
+    create_test_file_entries_with_extended_attributes "${MOUNT_POINT}"
 
-    sudo umount ${MOUNT_POINT}
+    sudo umount "${MOUNT_POINT}"
 fi
 
 # Create a HFS-wrapped HFS+ file system.
