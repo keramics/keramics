@@ -148,11 +148,9 @@ impl<T> BlockTree<T> {
                     }
                 }
             }
-            None => {
-                Err(keramics_core::error_trace_new!(
-                    "Unable to obtain mutable reference to root node"
-                ))
-            }
+            None => Err(keramics_core::error_trace_new!(
+                "Unable to obtain mutable reference to root node"
+            )),
         }
     }
 }

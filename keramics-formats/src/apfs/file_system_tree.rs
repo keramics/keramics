@@ -215,8 +215,7 @@ impl ApfsFileSystemTree {
                 && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_EXTENDED_ATTRIBUTE
             {
                 if !is_branch {
-                    let (name, _): (ByteString, u32) = match self.read_name(key_data, entry_index)
-                    {
+                    let (name, _): (ByteString, u32) = match self.read_name(key_data, entry_index) {
                         Ok(result) => result,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -469,8 +468,7 @@ impl ApfsFileSystemTree {
                 && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD
             {
                 if !is_branch {
-                    let (name, _): (ByteString, u32) = match self.read_name(key_data, entry_index)
-                    {
+                    let (name, _): (ByteString, u32) = match self.read_name(key_data, entry_index) {
                         Ok(result) => result,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -1414,12 +1412,10 @@ impl ApfsFileSystemTree {
         {
             match node.get_value_data_by_index(last_entry_index) {
                 Some(value_data) => Ok(Some(value_data.to_vec())),
-                None => {
-                    Err(keramics_core::error_trace_new!(format!(
-                        "Unable to retrieve entry: {} value data of type: {}",
-                        last_entry_index, data_type
-                    )))
-                }
+                None => Err(keramics_core::error_trace_new!(format!(
+                    "Unable to retrieve entry: {} value data of type: {}",
+                    last_entry_index, data_type
+                ))),
             }
         } else {
             Ok(None)

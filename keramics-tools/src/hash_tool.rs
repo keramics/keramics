@@ -680,7 +680,8 @@ fn main() -> ExitCode {
                         println!("No file system found in source");
                         return ExitCode::FAILURE;
                     }
-                    let name: Option<PathComponent> = command_arguments.name.as_ref().map(PathComponent::from);
+                    let name: Option<PathComponent> =
+                        command_arguments.name.as_ref().map(PathComponent::from);
                     let path: Path = Path::from(&command_arguments.path);
 
                     match hash_tool.calculate_hash_from_scan_node_with_path(

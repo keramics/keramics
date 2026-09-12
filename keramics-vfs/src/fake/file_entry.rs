@@ -120,9 +120,7 @@ impl FakeFileEntry {
         }
         match self.data_stream.as_ref() {
             Some(data_stream) => Ok(Some(data_stream.clone())),
-            None => {
-                Err(keramics_core::error_trace_new!("Missing data stream"))
-            }
+            None => Err(keramics_core::error_trace_new!("Missing data stream")),
         }
     }
 

@@ -545,17 +545,15 @@ impl ApfsFileEntry {
         let lookup_name: ByteString = ByteString::from("com.apple.decmpfs");
 
         if let Some(attribute_record) = self.attributes.get_value_by_key(&lookup_name) {
-            let data_stream: DataStreamReference =
-                match self.get_extended_attribute_data_stream(attribute_record) {
-                    Ok(data_stream) => data_stream,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve data stream"
-                        );
-                        return Err(error);
-                    }
-                };
+            let data_stream: DataStreamReference = match self
+                .get_extended_attribute_data_stream(attribute_record)
+            {
+                Ok(data_stream) => data_stream,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                    return Err(error);
+                }
+            };
             let mut compressed_data_header: DecmpfsHeader = DecmpfsHeader::new();
 
             match compressed_data_header.read_at_position(&data_stream, SeekFrom::Start(0)) {

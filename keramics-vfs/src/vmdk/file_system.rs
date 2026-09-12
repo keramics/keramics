@@ -56,9 +56,7 @@ impl VmdkFileSystem {
                 }
                 path_component == "vmdk1"
             }
-            None => {
-                !path.is_empty()
-            }
+            None => !path.is_empty(),
         }
     }
 

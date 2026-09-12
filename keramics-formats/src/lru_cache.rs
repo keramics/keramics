@@ -103,12 +103,10 @@ impl<K: Hash + Eq + Clone, V: Clone> SharedLruCache<K, V> {
     pub fn contains(&self, key: &K) -> Result<bool, ErrorTrace> {
         match self.cache.read() {
             Ok(cache) => Ok(cache.contains(key)),
-            Err(error) => {
-                Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain read lock on cache",
-                    error
-                ))
-            }
+            Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                "Unable to obtain read lock on cache",
+                error
+            )),
         }
     }
 
@@ -116,12 +114,10 @@ impl<K: Hash + Eq + Clone, V: Clone> SharedLruCache<K, V> {
     pub fn get(&self, key: &K) -> Result<Option<V>, ErrorTrace> {
         match self.cache.write() {
             Ok(mut cache) => Ok(cache.get(key).cloned()),
-            Err(error) => {
-                Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain write lock on cache",
-                    error
-                ))
-            }
+            Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                "Unable to obtain write lock on cache",
+                error
+            )),
         }
     }
 
@@ -131,13 +127,11 @@ impl<K: Hash + Eq + Clone, V: Clone> SharedLruCache<K, V> {
             Ok(mut cache) => {
                 let _: () = cache.insert(key, value);
                 Ok(())
-            },
-            Err(error) => {
-                Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain write lock on cache",
-                    error
-                ))
             }
+            Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                "Unable to obtain write lock on cache",
+                error
+            )),
         }
     }
 }

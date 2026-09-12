@@ -311,8 +311,7 @@ impl XfsInode {
 
             if logical_block_number < number_of_blocks {
                 let mut sparse_extent: XfsPackedExtent = XfsPackedExtent::new();
-                sparse_extent.number_of_blocks =
-                    (number_of_blocks - logical_block_number) as u32;
+                sparse_extent.number_of_blocks = (number_of_blocks - logical_block_number) as u32;
                 sparse_extent.logical_block_number = logical_block_number;
                 sparse_extent.extent_type = XfsExtentType::Sparse;
 

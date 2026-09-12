@@ -92,10 +92,12 @@ impl NtfsFileSystem {
 
     /// Retrieves the format version.
     pub fn get_format_version(&self) -> Option<(u8, u8)> {
-        self.volume_information.as_ref().map(|volume_information| (
+        self.volume_information.as_ref().map(|volume_information| {
+            (
                 volume_information.major_format_version,
                 volume_information.minor_format_version,
-            ))
+            )
+        })
     }
 
     /// Retrieves the index entry size.
@@ -110,7 +112,9 @@ impl NtfsFileSystem {
 
     /// Retrieves the volume flags.
     pub fn get_volume_flags(&self) -> Option<u16> {
-        self.volume_information.as_ref().map(|volume_information| volume_information.volume_flags)
+        self.volume_information
+            .as_ref()
+            .map(|volume_information| volume_information.volume_flags)
     }
 
     /// Retrieves the volume label.
@@ -462,7 +466,9 @@ impl NtfsFileSystem {
                 "Unsupported MFT entry with attribute list"
             ));
         }
-        if let Some(mft_attribute) = mft_attributes.get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_NAME) {
+        if let Some(mft_attribute) =
+            mft_attributes.get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_NAME)
+        {
             if !mft_attribute.is_resident() {
                 return Err(keramics_core::error_trace_new!(
                     "Unsupported non-resident $VOLUME_NAME attribute"
@@ -478,13 +484,13 @@ impl NtfsFileSystem {
                     "Unsupported compressed $VOLUME_NAME attribute resident data - not a multiple of 2"
                 ));
             }
-            let volume_label: Ucs2String =
-                Ucs2String::from_le_bytes(&mft_attribute.resident_data);
+            let volume_label: Ucs2String = Ucs2String::from_le_bytes(&mft_attribute.resident_data);
 
             self.volume_label = Some(volume_label);
         };
         if let Some(mft_attribute) = mft_attributes
-            .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION) {
+            .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION)
+        {
             let volume_information: NtfsVolumeInformation =
                 match NtfsVolumeInformation::from_attribute(mft_attribute) {
                     Ok(volume_information) => volume_information,

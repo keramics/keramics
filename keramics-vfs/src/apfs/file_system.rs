@@ -60,9 +60,7 @@ impl ApfsContainerFileSystem {
                 };
                 !(volume_index == 0 || volume_index > self.number_of_volumes)
             }
-            None => {
-                !path.is_empty()
-            }
+            None => !path.is_empty(),
         }
     }
 

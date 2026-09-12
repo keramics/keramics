@@ -286,12 +286,10 @@ impl ApfsObjectMapTree {
         } else if last_key.object_identifier == object_identifier {
             match node.get_value_data_by_index(last_entry_index) {
                 Some(value_data) => Ok(Some(value_data.to_vec())),
-                None => {
-                    Err(keramics_core::error_trace_new!(format!(
-                        "Unable to retrieve entry: {} value data",
-                        last_entry_index
-                    )))
-                }
+                None => Err(keramics_core::error_trace_new!(format!(
+                    "Unable to retrieve entry: {} value data",
+                    last_entry_index
+                ))),
             }
         } else {
             Ok(None)

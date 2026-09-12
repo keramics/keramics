@@ -281,14 +281,13 @@ impl NtfsMasterFileTable {
                     return Err(error);
                 }
             }
-            if let Some(mft_attribute) = mft_attributes.get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
+            if let Some(mft_attribute) =
+                mft_attributes.get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_DATA)
+            {
                 match self.add_cluster_group(&mft_attribute.data_cluster_groups[0]) {
                     Ok(_) => {}
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to add cluster group"
-                        );
+                        keramics_core::error_trace_add_frame!(error, "Unable to add cluster group");
                         return Err(error);
                     }
                 }

@@ -58,9 +58,7 @@ impl SparseBundleFileSystem {
                 }
                 path_component == "sparsebundle1"
             }
-            None => {
-                !path.is_empty()
-            }
+            None => !path.is_empty(),
         }
     }
 

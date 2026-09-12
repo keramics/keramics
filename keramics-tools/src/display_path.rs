@@ -275,12 +275,12 @@ impl DisplayPath {
                                     None => None,
                                 }
                             }
-                            Some(VfsFileEntry::Gpt(gpt_file_entry)) => {
-                                gpt_file_entry.get_identifier().map(|identifier| format!("/gpt{{{}}}", identifier))
-                            }
-                            Some(VfsFileEntry::LinuxLvm(lvm_file_entry)) => {
-                                lvm_file_entry.get_identifier().map(|identifier| format!("/lvm{{{}}}", identifier))
-                            }
+                            Some(VfsFileEntry::Gpt(gpt_file_entry)) => gpt_file_entry
+                                .get_identifier()
+                                .map(|identifier| format!("/gpt{{{}}}", identifier)),
+                            Some(VfsFileEntry::LinuxLvm(lvm_file_entry)) => lvm_file_entry
+                                .get_identifier()
+                                .map(|identifier| format!("/lvm{{{}}}", identifier)),
                             _ => None,
                         },
                         Err(mut error) => {

@@ -504,7 +504,8 @@ impl BdeEncryptedVolume {
                 }
                 unencrypted_range.logical_offset = metadata_range_end_offset;
                 unencrypted_range.physical_offset = metadata_range_end_offset;
-                unencrypted_range.size = unencrypted_range_end_offset.saturating_sub(metadata_range_end_offset);
+                unencrypted_range.size =
+                    unencrypted_range_end_offset.saturating_sub(metadata_range_end_offset);
             }
             if unencrypted_range.size > 0 {
                 adjusted_ranges.push(unencrypted_range);

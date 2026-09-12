@@ -52,9 +52,7 @@ impl BdeFileSystem {
                 }
                 path_component == "bde1"
             }
-            None => {
-                !path.is_empty()
-            }
+            None => !path.is_empty(),
         }
     }
 

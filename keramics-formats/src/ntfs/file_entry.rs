@@ -169,7 +169,9 @@ impl NtfsFileEntry {
 
     /// Retrieves the parent file reference from the ($I30) directory entry.
     pub fn get_parent_file_reference(&self) -> Option<u64> {
-        self.directory_entry.as_ref().map(|directory_entry| directory_entry.file_name.parent_file_reference)
+        self.directory_entry
+            .as_ref()
+            .map(|directory_entry| directory_entry.file_name.parent_file_reference)
     }
 
     /// Retrieves the size.
@@ -602,10 +604,7 @@ impl NtfsFileEntry {
             ) {
                 Ok(_) => {}
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read attribute list"
-                    );
+                    keramics_core::error_trace_add_frame!(error, "Unable to read attribute list");
                     return Err(error);
                 }
             }
@@ -636,10 +635,7 @@ impl NtfsFileEntry {
                 match mft_entry.read_attributes(&mut self.mft_attributes) {
                     Ok(_) => {}
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read attributes"
-                        );
+                        keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
                         return Err(error);
                     }
                 }

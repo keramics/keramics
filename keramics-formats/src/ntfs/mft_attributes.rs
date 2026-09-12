@@ -176,12 +176,10 @@ impl NtfsMftAttributes {
     ) -> Result<&NtfsMftAttribute, ErrorTrace> {
         match self.attributes.get(attribute_index) {
             Some(mft_attribute) => Ok(mft_attribute),
-            None => {
-                Err(keramics_core::error_trace_new!(format!(
-                    "Missing attribute: {}",
-                    attribute_index
-                )))
-            }
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing attribute: {}",
+                attribute_index
+            ))),
         }
     }
 

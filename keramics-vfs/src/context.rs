@@ -129,11 +129,9 @@ impl VfsContext {
         }
         match self.file_systems_cache.get(&lookup_key) {
             Some(file_system) => Ok(file_system.clone()),
-            None => {
-                Err(keramics_core::error_trace_new!(
-                    "Unable to retrieve cached file system"
-                ))
-            }
+            None => Err(keramics_core::error_trace_new!(
+                "Unable to retrieve cached file system"
+            )),
         }
     }
 }

@@ -58,9 +58,7 @@ impl UdifFileSystem {
                 }
                 path_component == "udif1"
             }
-            None => {
-                !path.is_empty()
-            }
+            None => !path.is_empty(),
         }
     }
 

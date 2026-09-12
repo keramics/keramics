@@ -561,10 +561,7 @@ impl XmlPlist {
     }
 
     /// Parses a XML plist string content.
-    fn parse_plist_string_content(
-        &self,
-        inner_pairs: Pairs<Rule>,
-    ) -> Result<String, ErrorTrace> {
+    fn parse_plist_string_content(&self, inner_pairs: Pairs<Rule>) -> Result<String, ErrorTrace> {
         let mut string_parts: Vec<&str> = Vec::new();
 
         for token_pair in inner_pairs {

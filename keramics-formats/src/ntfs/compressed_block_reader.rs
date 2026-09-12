@@ -97,7 +97,10 @@ impl NtfsCompressedBlockReader {
         self.compression_unit_size =
             (data_attribute.compression_unit_size as usize) * (self.cluster_block_size as usize);
 
-        if !data_attribute.allocated_data_size.is_multiple_of(self.compression_unit_size as u64) {
+        if !data_attribute
+            .allocated_data_size
+            .is_multiple_of(self.compression_unit_size as u64)
+        {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported allocated data size not a multitude of compression unit size"
             ));

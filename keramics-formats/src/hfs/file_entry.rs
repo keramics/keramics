@@ -448,9 +448,7 @@ impl HfsFileEntry {
         }
         match self.get_data_stream() {
             Ok(Some(data_stream)) => Ok(Some(HfsFork::new(HfsForkType::Data, data_stream))),
-            Ok(None) => {
-                Err(keramics_core::error_trace_new!("Missing data stream"))
-            }
+            Ok(None) => Err(keramics_core::error_trace_new!("Missing data stream")),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
                 Err(error)
@@ -569,11 +567,9 @@ impl HfsFileEntry {
                 );
                 Ok(Arc::new(RwLock::new(data_stream)))
             }
-            _ => {
-                Err(keramics_core::error_trace_new!(
-                    "Unsupported attribute record type"
-                ))
-            }
+            _ => Err(keramics_core::error_trace_new!(
+                "Unsupported attribute record type"
+            )),
         }
     }
 
@@ -723,53 +719,55 @@ impl HfsFileEntry {
         }
         let lookup_name: HfsString = HfsString::from("com.apple.decmpfs");
 
-        if let Some(attribute_record) = self.attributes.get_value_by_key(&lookup_name) { match attribute_record {
-            HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
-                let mut compressed_data_header: DecmpfsHeader = DecmpfsHeader::new();
+        if let Some(attribute_record) = self.attributes.get_value_by_key(&lookup_name) {
+            match attribute_record {
+                HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
+                    let mut compressed_data_header: DecmpfsHeader = DecmpfsHeader::new();
 
-                keramics_core::debug_trace_data_and_structure!(
-                    "DecmpfsHeader",
-                    0,
-                    &attribute_inline_data_record.data,
-                    attribute_inline_data_record.data_size,
-                    DecmpfsHeader::debug_read_data(&attribute_inline_data_record.data)
-                );
-                match compressed_data_header.read_data(&attribute_inline_data_record.data) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read decmpfs header"
-                        );
-                        return Err(error);
+                    keramics_core::debug_trace_data_and_structure!(
+                        "DecmpfsHeader",
+                        0,
+                        &attribute_inline_data_record.data,
+                        attribute_inline_data_record.data_size,
+                        DecmpfsHeader::debug_read_data(&attribute_inline_data_record.data)
+                    );
+                    match compressed_data_header.read_data(&attribute_inline_data_record.data) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read decmpfs header"
+                            );
+                            return Err(error);
+                        }
                     }
-                }
-                match self.get_data_fork_descriptor() {
-                    Some(fork_descriptor) => {
-                        if fork_descriptor.size != 0 {
+                    match self.get_data_fork_descriptor() {
+                        Some(fork_descriptor) => {
+                            if fork_descriptor.size != 0 {
+                                return Err(keramics_core::error_trace_new!(
+                                    "Unsupported non-empty data fork"
+                                ));
+                            }
+                        }
+                        None => {
                             return Err(keramics_core::error_trace_new!(
-                                "Unsupported non-empty data fork"
+                                "Missing data fork descriptor"
                             ));
                         }
                     }
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Missing data fork descriptor"
-                        ));
-                    }
+                    self.hide_resource_fork = match compressed_data_header.compression_method {
+                        4 | 8 | 12 | 14 => true,
+                        _ => false,
+                    };
+                    self.compressed_data_header = Some(compressed_data_header);
                 }
-                self.hide_resource_fork = match compressed_data_header.compression_method {
-                    4 | 8 | 12 | 14 => true,
-                    _ => false,
-                };
-                self.compressed_data_header = Some(compressed_data_header);
+                _ => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported decmpfs attribute record type"
+                    ));
+                }
             }
-            _ => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported decmpfs attribute record type"
-                ));
-            }
-        } }
+        }
         Ok(())
     }
 

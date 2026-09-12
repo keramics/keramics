@@ -641,7 +641,11 @@ impl EwfImage {
             };
             let chunk_data_size: u32 = if chunk_data_offset < next_chunk_data_offset {
                 next_chunk_data_offset - chunk_data_offset
-            } else { next_table_entry.chunk_data_offset.saturating_sub(chunk_data_offset) };
+            } else {
+                next_table_entry
+                    .chunk_data_offset
+                    .saturating_sub(chunk_data_offset)
+            };
             let block_range_type: EwfBlockRangeType =
                 if chunk_data_size == 0 || chunk_data_size > (i32::MAX as u32) {
                     EwfBlockRangeType::Corrupt

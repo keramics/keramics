@@ -123,9 +123,7 @@ impl VfsFileSystem {
                         Err(error)
                     }
                 },
-                None => {
-                    Err(keramics_core::error_trace_new!("Missing APFS file system"))
-                }
+                None => Err(keramics_core::error_trace_new!("Missing APFS file system")),
             },
             VfsFileSystem::ApfsContainer(apfs_container_file_system) => {
                 Ok(apfs_container_file_system.file_entry_exists(path))
@@ -499,9 +497,7 @@ impl VfsFileSystem {
                         Err(error)
                     }
                 },
-                None => {
-                    Err(keramics_core::error_trace_new!("Missing APFS file system"))
-                }
+                None => Err(keramics_core::error_trace_new!("Missing APFS file system")),
             },
             VfsFileSystem::ApfsContainer(apfs_container_file_system) => {
                 let apfs_container_file_entry: ApfsContainerFileEntry =

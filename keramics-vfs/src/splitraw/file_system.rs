@@ -55,9 +55,7 @@ impl SplitRawFileSystem {
                 }
                 path_component == "raw1"
             }
-            None => {
-                !path.is_empty()
-            }
+            None => !path.is_empty(),
         }
     }
 

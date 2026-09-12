@@ -78,9 +78,7 @@ pub enum StorageMediaImage {
 
 impl StorageMediaImage {
     /// Opens a storage media image.
-    fn get_base_path_and_file_name(
-        path: &PathBuf,
-    ) -> Result<(PathBuf, &str), ErrorTrace> {
+    fn get_base_path_and_file_name(path: &PathBuf) -> Result<(PathBuf, &str), ErrorTrace> {
         let mut base_path: PathBuf = path.clone();
         base_path.pop();
 
@@ -208,7 +206,11 @@ impl StorageMediaImage {
                     format_identifier
                 )));
             }
-            None => if let Ok(storage_media_image) = Self::open_splitraw_image(path) { return Ok(storage_media_image) },
+            None => {
+                if let Ok(storage_media_image) = Self::open_splitraw_image(path) {
+                    return Ok(storage_media_image);
+                }
+            }
         };
         // Scan for volume and file system formats to detect encrypted volumes and raw storage
         // media images.
@@ -550,9 +552,7 @@ impl StorageMediaImage {
                 return Err(error);
             }
         };
-        Ok(Self::Raw {
-            data_stream,
-        })
+        Ok(Self::Raw { data_stream })
     }
 
     /// Opens a sparsebundle image.

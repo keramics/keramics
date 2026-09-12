@@ -196,8 +196,7 @@ impl<'a> DebugTraceScope<'a> {
     pub fn print_data_field(&mut self, identifier: &str, data: &[u8]) {
         if self.debug_output {
             _ = writeln!(self.output, "    {}", identifier);
-            self.output
-                .push_str(format_as_hexdump(data, true).as_str());
+            self.output.push_str(format_as_hexdump(data, true).as_str());
         }
     }
 

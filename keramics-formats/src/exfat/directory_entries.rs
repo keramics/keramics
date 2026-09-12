@@ -317,8 +317,7 @@ impl ExFatDirectoryEntries {
         let mut read_cluster_block_numbers: HashSet<u32> = HashSet::new();
         let mut entries: Vec<ExFatDirectoryEntry> = Vec::new();
 
-        while (2..EXFAT_LARGEST_CLUSTER_BLOCK_NUMBER).contains(&cluster_block_number)
-        {
+        while (2..EXFAT_LARGEST_CLUSTER_BLOCK_NUMBER).contains(&cluster_block_number) {
             if read_cluster_block_numbers.contains(&cluster_block_number) {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Cluster block: {} already read",

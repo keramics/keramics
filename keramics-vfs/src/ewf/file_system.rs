@@ -55,9 +55,7 @@ impl EwfFileSystem {
                 }
                 path_component == "ewf1"
             }
-            None => {
-                !path.is_empty()
-            }
+            None => !path.is_empty(),
         }
     }
 

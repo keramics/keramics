@@ -240,10 +240,16 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
-            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_device_identifier().map(|device_identifier| *device_identifier as u64),
-            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_device_identifier().map(|device_identifier| *device_identifier as u64),
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry
+                .get_device_identifier()
+                .map(|device_identifier| *device_identifier as u64),
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry
+                .get_device_identifier()
+                .map(|device_identifier| *device_identifier as u64),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_device_identifier(),
-            VfsFileEntry::Xfs(xfs_file_entry) => xfs_file_entry.get_device_identifier().map(|device_identifier| *device_identifier as u64),
+            VfsFileEntry::Xfs(xfs_file_entry) => xfs_file_entry
+                .get_device_identifier()
+                .map(|device_identifier| *device_identifier as u64),
         }
     }
 
@@ -273,7 +279,9 @@ impl VfsFileEntry {
             | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Apfs(apfs_file_entry) => Some(apfs_file_entry.get_file_mode() as u32),
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_file_mode() as u32),
-            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_file_mode().map(|file_mode| *file_mode as u32),
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry
+                .get_file_mode()
+                .map(|file_mode| *file_mode as u32),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_file_mode(),
             VfsFileEntry::Xfs(xfs_file_entry) => Some(xfs_file_entry.get_file_mode() as u32),
         }
@@ -493,14 +501,18 @@ impl VfsFileEntry {
     /// Retrieves the name.
     pub fn get_name(&self) -> Option<PathComponent> {
         match self {
-            VfsFileEntry::Apfs(apfs_file_entry) => apfs_file_entry.get_name().map(PathComponent::from),
+            VfsFileEntry::Apfs(apfs_file_entry) => {
+                apfs_file_entry.get_name().map(PathComponent::from)
+            }
             VfsFileEntry::ApfsContainer(apfs_container_file_entry) => {
                 Some(apfs_container_file_entry.get_name())
             }
             VfsFileEntry::Apm(apm_file_entry) => Some(apm_file_entry.get_name()),
             VfsFileEntry::Bde(bde_file_entry) => Some(bde_file_entry.get_name()),
             VfsFileEntry::Ewf(ewf_file_entry) => Some(ewf_file_entry.get_name()),
-            VfsFileEntry::ExFat(exfat_file_entry) => exfat_file_entry.get_name().map(PathComponent::from),
+            VfsFileEntry::ExFat(exfat_file_entry) => {
+                exfat_file_entry.get_name().map(PathComponent::from)
+            }
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_name().map(PathComponent::from),
             VfsFileEntry::Fake(fake_file_entry) => {
                 let path_component: &PathComponent = fake_file_entry.get_name();
@@ -522,7 +534,9 @@ impl VfsFileEntry {
             },
             VfsFileEntry::LinuxLvm(lvm_file_entry) => Some(lvm_file_entry.get_name()),
             VfsFileEntry::Mbr(mbr_file_entry) => Some(mbr_file_entry.get_name()),
-            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_name().map(PathComponent::from),
+            VfsFileEntry::Ntfs(ntfs_file_entry) => {
+                ntfs_file_entry.get_name().map(PathComponent::from)
+            }
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_name().map(PathComponent::from),
             VfsFileEntry::Pdi(pdi_file_entry) => Some(pdi_file_entry.get_name()),
             VfsFileEntry::Qcow(qcow_file_entry) => Some(qcow_file_entry.get_name()),
@@ -718,12 +732,13 @@ impl VfsFileEntry {
                             .collect::<Vec<PathComponent>>();
 
                         // Strip trailing empty path component.
-                        if path_components.last().is_some_and(|path_component| {
-                            match path_component {
+                        if path_components
+                            .last()
+                            .is_some_and(|path_component| match path_component {
                                 PathComponent::Ucs2String(ucs2_string) => ucs2_string.is_empty(),
                                 _ => false,
-                            }
-                        }) {
+                            })
+                        {
                             path_components.pop();
                         }
                         Ok(Some(Path::from(path_components)))

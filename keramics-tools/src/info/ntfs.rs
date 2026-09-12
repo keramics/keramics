@@ -281,7 +281,9 @@ impl<'a> fmt::Display for NtfsFileEntryInfo<'a> {
             file_reference & 0x0000ffffffffffff,
             file_reference >> 48,
         )?;
-        if let Some(name) = self.file_entry.get_name() { writeln!(formatter, "    Name\t\t\t\t\t: {}", name)? };
+        if let Some(name) = self.file_entry.get_name() {
+            writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?
+        };
         let file_size: u64 = self.file_entry.get_size();
         let byte_size: ByteSize = ByteSize::new(file_size, 1024);
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
@@ -719,7 +721,9 @@ impl NtfsInfo {
             // TODO: add support for $BITMAP, $DATA, $INDEX_ALLOCATION, $INDEX_ROOT
             NtfsAttribute::Generic { mft_attribute } => {
                 // TODO: refactor into AttributeInfo
-                if let Some(name) = &mft_attribute.name { println!("    Attribute name\t\t\t\t: {}", name) };
+                if let Some(name) = &mft_attribute.name {
+                    println!("    Attribute name\t\t\t\t: {}", name)
+                };
                 let byte_size: ByteSize = ByteSize::new(mft_attribute.data_size, 1024);
                 println!("    Data size\t\t\t\t\t: {}", byte_size);
 

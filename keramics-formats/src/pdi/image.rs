@@ -669,13 +669,15 @@ impl PdiImage {
     /// Reads snapshots from DiskDescriptor.xml.
     fn read_snapshots(&mut self, xml_element: &XmlElement) -> Result<(), ErrorTrace> {
         for sub_xml_element in xml_element.sub_elements.iter() {
-            if sub_xml_element.name.as_str() == "Shot" { match self.read_snapshot(sub_xml_element) {
-                Ok(snapshot_descriptor) => self.snapshots.push(snapshot_descriptor),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read snapshot");
-                    return Err(error);
+            if sub_xml_element.name.as_str() == "Shot" {
+                match self.read_snapshot(sub_xml_element) {
+                    Ok(snapshot_descriptor) => self.snapshots.push(snapshot_descriptor),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read snapshot");
+                        return Err(error);
+                    }
                 }
-            } }
+            }
         }
         Ok(())
     }
@@ -751,13 +753,15 @@ impl PdiImage {
     /// Reads storage data from DiskDescriptor.xml.
     fn read_storage_data(&mut self, xml_element: &XmlElement) -> Result<(), ErrorTrace> {
         for sub_xml_element in xml_element.sub_elements.iter() {
-            if sub_xml_element.name.as_str() == "Storage" { match self.read_storage(sub_xml_element) {
-                Ok(segment_descriptor) => self.segments.push(segment_descriptor),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read storage");
-                    return Err(error);
+            if sub_xml_element.name.as_str() == "Storage" {
+                match self.read_storage(sub_xml_element) {
+                    Ok(segment_descriptor) => self.segments.push(segment_descriptor),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read storage");
+                        return Err(error);
+                    }
                 }
-            } }
+            }
         }
         Ok(())
     }

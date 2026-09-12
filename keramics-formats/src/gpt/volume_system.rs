@@ -113,7 +113,11 @@ impl GptVolumeSystem {
         } else {
             for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter() {
                 if partition_table_header
-                    .read_at_position(data_stream, SeekFrom::Start(*bytes_per_sector as u64)).is_ok() { self.bytes_per_sector = *bytes_per_sector };
+                    .read_at_position(data_stream, SeekFrom::Start(*bytes_per_sector as u64))
+                    .is_ok()
+                {
+                    self.bytes_per_sector = *bytes_per_sector
+                };
                 if self.bytes_per_sector != 0 {
                     break;
                 }
@@ -276,12 +280,10 @@ impl PartitionIterator for GptVolumeSystem {
                 )),
                 None => Err(keramics_core::error_trace_new!("Missing data stream")),
             },
-            None => {
-                Err(keramics_core::error_trace_new!(format!(
-                    "No partition with index: {}",
-                    partition_index
-                )))
-            }
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No partition with index: {}",
+                partition_index
+            ))),
         }
     }
 }

@@ -588,16 +588,18 @@ impl ExtInfo {
     ) -> Result<ExtFileSystem, ErrorTrace> {
         let mut ext_file_system: ExtFileSystem = ExtFileSystem::new();
 
-        if let Some(encoding) = character_encoding { match ext_file_system.set_character_encoding(encoding) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to set character encoding"
-                );
-                return Err(error);
+        if let Some(encoding) = character_encoding {
+            match ext_file_system.set_character_encoding(encoding) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to set character encoding"
+                    );
+                    return Err(error);
+                }
             }
-        } }
+        }
         match ext_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
             Err(mut error) => {

@@ -133,12 +133,10 @@ impl CdsaEncrEncryption {
                     }
                 }
             }
-            _ => {
-                Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported padding type: {}",
-                    padding_type
-                )))
-            }
+            _ => Err(keramics_core::error_trace_new!(format!(
+                "Unsupported padding type: {}",
+                padding_type
+            ))),
         }
     }
 
@@ -257,12 +255,10 @@ impl CdsaEncrEncryption {
                     }
                 }
             }
-            _ => {
-                Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported padding type: {}",
-                    padding_type
-                )))
-            }
+            _ => Err(keramics_core::error_trace_new!(format!(
+                "Unsupported padding type: {}",
+                padding_type
+            ))),
         }
     }
 }

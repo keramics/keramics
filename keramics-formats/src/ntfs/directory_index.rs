@@ -135,7 +135,8 @@ impl NtfsDirectoryIndex {
             )));
         }
         if let Some(mft_attribute) = mft_attributes
-            .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION) {
+            .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION)
+        {
             let standard_information: NtfsStandardInformation =
                 match NtfsStandardInformation::from_attribute(mft_attribute) {
                     Ok(standard_information) => standard_information,
@@ -156,19 +157,23 @@ impl NtfsDirectoryIndex {
         }
         // Note that the $INDEX_ALLOCATION attribute is optional.
         if let Some(mft_attribute) = mft_attributes
-            .get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_INDEX_ALLOCATION) { match self
-            .index
-            .initialize(index_root_header.index_entry_size, mft_attribute)
+            .get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_INDEX_ALLOCATION)
         {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to initialize index");
-                return Err(error);
+            match self
+                .index
+                .initialize(index_root_header.index_entry_size, mft_attribute)
+            {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to initialize index");
+                    return Err(error);
+                }
             }
-        } }
+        }
         // Note that the $BITMAP attribute is optional.
-        if let Some(mft_attribute) = mft_attributes
-            .get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_BITMAP) {
+        if let Some(mft_attribute) =
+            mft_attributes.get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_BITMAP)
+        {
             let mut bitmap: NtfsBitmap =
                 NtfsBitmap::new(self.index.cluster_block_size, self.index.index_entry_size);
 

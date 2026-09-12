@@ -306,10 +306,7 @@ impl SparseImageFile {
                 match self.read_header_block(&data_stream) {
                     Ok(_) => {}
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read header block"
-                        );
+                        keramics_core::error_trace_add_frame!(error, "Unable to read header block");
                         return Err(error);
                     }
                 }

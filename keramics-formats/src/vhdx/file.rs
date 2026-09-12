@@ -421,7 +421,9 @@ impl VhdxFile {
         };
         let mut physical_sector_size: u32 = 0;
 
-        if let Some(metadata_table_entry) = metadata_table.get_entry(&VHDX_PHYSICAL_SECTOR_SIZE_METADATA_IDENTIFIER) {
+        if let Some(metadata_table_entry) =
+            metadata_table.get_entry(&VHDX_PHYSICAL_SECTOR_SIZE_METADATA_IDENTIFIER)
+        {
             if metadata_table_entry.item_size != 4 {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unsupported physical sector size metadata item size: {}",
@@ -486,7 +488,9 @@ impl VhdxFile {
             debug_trace.print_field("virtual_disk_identifier", virtual_disk_identifier);
             debug_trace.print_end();
         });
-        if let Some(metadata_table_entry) = metadata_table.get_entry(&VHDX_PARENT_LOCATOR_METADATA_IDENTIFIER) {
+        if let Some(metadata_table_entry) =
+            metadata_table.get_entry(&VHDX_PARENT_LOCATOR_METADATA_IDENTIFIER)
+        {
             let mut parent_locator: VhdxParentLocator = VhdxParentLocator::new();
             let metadata_item_offset: u64 =
                 metadata_region.data_offset + metadata_table_entry.item_offset as u64;
@@ -498,10 +502,7 @@ impl VhdxFile {
             ) {
                 Ok(_) => {}
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read parent locator"
-                    );
+                    keramics_core::error_trace_add_frame!(error, "Unable to read parent locator");
                     return Err(error);
                 }
             }
@@ -509,8 +510,7 @@ impl VhdxFile {
                 // TODO: improve handling of invalid string.
                 let uuid_string: String = ucs2_string.to_string();
 
-                let parent_identifier: Uuid = match Uuid::from_string(uuid_string.as_str())
-                {
+                let parent_identifier: Uuid = match Uuid::from_string(uuid_string.as_str()) {
                     Ok(uuid) => uuid,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(

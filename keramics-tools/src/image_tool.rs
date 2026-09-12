@@ -266,13 +266,15 @@ impl ImageTool {
         }
         println!("{}", Bodyfile::FILE_HEADER);
 
-        if let Some(scan_node) = vfs_scan_context.root_node { match self.print_scan_node_as_bodyfile(&scan_node, calculate_md5) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to print root scan node");
-                return Err(error);
+        if let Some(scan_node) = vfs_scan_context.root_node {
+            match self.print_scan_node_as_bodyfile(&scan_node, calculate_md5) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to print root scan node");
+                    return Err(error);
+                }
             }
-        } }
+        }
         Ok(())
     }
 
@@ -615,25 +617,24 @@ impl ImageTool {
 
                 // TODO: print index names
                 for attribute_index in 0..number_of_attributes {
-                    let attribute: NtfsAttribute = match ntfs_file_entry
-                        .get_attribute_by_index(attribute_index)
-                    {
-                        Ok(attribute) => attribute,
-                        Err(mut error) => {
-                            let file_reference: u64 = ntfs_file_entry.get_file_reference();
+                    let attribute: NtfsAttribute =
+                        match ntfs_file_entry.get_attribute_by_index(attribute_index) {
+                            Ok(attribute) => attribute,
+                            Err(mut error) => {
+                                let file_reference: u64 = ntfs_file_entry.get_file_reference();
 
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to retrieve NTFS MFT entry: {}-{} attribute: {}",
-                                    file_reference & 0x0000ffffffffffff,
-                                    file_reference >> 48,
-                                    attribute_index
-                                )
-                            );
-                            return Err(error);
-                        }
-                    };
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable to retrieve NTFS MFT entry: {}-{} attribute: {}",
+                                        file_reference & 0x0000ffffffffffff,
+                                        file_reference >> 48,
+                                        attribute_index
+                                    )
+                                );
+                                return Err(error);
+                            }
+                        };
                     if let NtfsAttribute::FileName { file_name } = attribute {
                         if file_name.get_parent_file_reference() != parent_file_reference
                             || Some(file_name.get_name()) != name
@@ -643,19 +644,18 @@ impl ImageTool {
                         if file_name.get_name_space() == NTFS_NAME_SPACE_DOS {
                             continue;
                         }
-                        let file_name_access_time: String =
-                            match Bodyfile::format_as_timestamp(Some(
-                                file_name.get_access_time(),
-                            )) {
-                                Ok(timestamp_string) => timestamp_string,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to format $FILE_NAME access time"
-                                    );
-                                    return Err(error);
-                                }
-                            };
+                        let file_name_access_time: String = match Bodyfile::format_as_timestamp(
+                            Some(file_name.get_access_time()),
+                        ) {
+                            Ok(timestamp_string) => timestamp_string,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to format $FILE_NAME access time"
+                                );
+                                return Err(error);
+                            }
+                        };
                         let file_name_modification_time: String =
                             match Bodyfile::format_as_timestamp(Some(
                                 file_name.get_modification_time(),
@@ -669,32 +669,30 @@ impl ImageTool {
                                     return Err(error);
                                 }
                             };
-                        let file_name_change_time: String =
-                            match Bodyfile::format_as_timestamp(Some(
-                                file_name.get_entry_modification_time(),
-                            )) {
-                                Ok(timestamp_string) => timestamp_string,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to format $FILE_NAME entry modification time"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        let file_name_creation_time: String =
-                            match Bodyfile::format_as_timestamp(Some(
-                                file_name.get_creation_time(),
-                            )) {
-                                Ok(timestamp_string) => timestamp_string,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to format $FILE_NAME creation time"
-                                    );
-                                    return Err(error);
-                                }
-                            };
+                        let file_name_change_time: String = match Bodyfile::format_as_timestamp(
+                            Some(file_name.get_entry_modification_time()),
+                        ) {
+                            Ok(timestamp_string) => timestamp_string,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to format $FILE_NAME entry modification time"
+                                );
+                                return Err(error);
+                            }
+                        };
+                        let file_name_creation_time: String = match Bodyfile::format_as_timestamp(
+                            Some(file_name.get_creation_time()),
+                        ) {
+                            Ok(timestamp_string) => timestamp_string,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to format $FILE_NAME creation time"
+                                );
+                                return Err(error);
+                            }
+                        };
                         println!(
                             "{}|{}{} ($FILE_NAME)|{}|{}|{}|{}|{}|{}|{}|{}|{}",
                             md5,
@@ -864,11 +862,9 @@ impl ImageTool {
                         _ => path.to_string(),
                     };
                     match apfs_container_file_entry.get_identifier() {
-                        Some(identifier) => format!(
-                            "{} (alias: /apfs{{{}}})",
-                            path_string,
-                            identifier
-                        ),
+                        Some(identifier) => {
+                            format!("{} (alias: /apfs{{{}}})", path_string, identifier)
+                        }
                         _ => path_string,
                     }
                 }
@@ -878,11 +874,9 @@ impl ImageTool {
                         _ => path.to_string(),
                     };
                     match gpt_file_entry.get_identifier() {
-                        Some(identifier) => format!(
-                            "{} (alias: /gpt{{{}}})",
-                            path_string,
-                            identifier
-                        ),
+                        Some(identifier) => {
+                            format!("{} (alias: /gpt{{{}}})", path_string, identifier)
+                        }
                         _ => path_string,
                     }
                 }
@@ -892,11 +886,9 @@ impl ImageTool {
                         _ => path.to_string(),
                     };
                     match lvm_file_entry.get_identifier() {
-                        Some(identifier) => format!(
-                            "{} (alias: /lvm{{{}}})",
-                            path_string,
-                            identifier
-                        ),
+                        Some(identifier) => {
+                            format!("{} (alias: /lvm{{{}}})", path_string, identifier)
+                        }
                         _ => path_string,
                     }
                 }
@@ -910,11 +902,9 @@ impl ImageTool {
                         _ => path.to_string(),
                     };
                     match pdi_file_entry.get_identifier() {
-                        Some(identifier) => format!(
-                            "{} (alias: /pdi{{{}}})",
-                            path_string,
-                            identifier
-                        ),
+                        Some(identifier) => {
+                            format!("{} (alias: /pdi{{{}}})", path_string, identifier)
+                        }
                         _ => path_string,
                     }
                 }
@@ -924,11 +914,9 @@ impl ImageTool {
                         _ => path.to_string(),
                     };
                     match vhd_file_entry.get_identifier() {
-                        Some(identifier) => format!(
-                            "{} (alias: /vhd{{{}}})",
-                            path_string,
-                            identifier
-                        ),
+                        Some(identifier) => {
+                            format!("{} (alias: /vhd{{{}}})", path_string, identifier)
+                        }
                         _ => path_string,
                     }
                 }
@@ -938,11 +926,9 @@ impl ImageTool {
                         _ => path.to_string(),
                     };
                     match vhdx_file_entry.get_identifier() {
-                        Some(identifier) => format!(
-                            "{} (alias: /vhdx{{{}}})",
-                            path_string,
-                            identifier
-                        ),
+                        Some(identifier) => {
+                            format!("{} (alias: /vhdx{{{}}})", path_string, identifier)
+                        }
                         _ => path_string,
                     }
                 }
@@ -996,13 +982,15 @@ impl ImageTool {
 
         let mut levels: Vec<bool> = Vec::new();
 
-        if let Some(scan_node) = vfs_scan_context.root_node { match self.print_scan_node_as_hierarchy(&scan_node, &mut levels) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to print root scan node");
-                return Err(error);
+        if let Some(scan_node) = vfs_scan_context.root_node {
+            match self.print_scan_node_as_hierarchy(&scan_node, &mut levels) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to print root scan node");
+                    return Err(error);
+                }
             }
-        } }
+        }
         println!();
 
         Ok(())

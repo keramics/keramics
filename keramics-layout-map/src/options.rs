@@ -92,14 +92,15 @@ impl Parse for FieldDataTypeOption {
             number_of_elements_str = number_of_elements_str.trim();
         }
         if data_type_str.ends_with(">")
-            && let Some(value_index) = data_type_str.chars().rev().position(|value| value == '<') {
-                let string_size: usize = data_type_str.len();
-                // Note that value_index is relative to end of the string.
-                let value_index: usize = string_size - value_index - 1;
+            && let Some(value_index) = data_type_str.chars().rev().position(|value| value == '<')
+        {
+            let string_size: usize = data_type_str.len();
+            // Note that value_index is relative to end of the string.
+            let value_index: usize = string_size - value_index - 1;
 
-                extended_type_str = &data_type_str[value_index + 1..string_size - 1];
-                data_type_str = &data_type_str[0..value_index];
-            }
+            extended_type_str = &data_type_str[value_index + 1..string_size - 1];
+            data_type_str = &data_type_str[0..value_index];
+        }
         let value: DataType = match data_type_str {
             "ApfsTime" => DataType::ApfsTime,
             "BitField8" => DataType::BitField8,

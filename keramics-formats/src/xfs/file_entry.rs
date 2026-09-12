@@ -260,11 +260,9 @@ impl XfsFileEntry {
                     self.inode.data_size,
                 )),
             )))),
-            _ => {
-                Err(keramics_core::error_trace_new!(
-                    "Unsupported data fork type",
-                ))
-            }
+            _ => Err(keramics_core::error_trace_new!(
+                "Unsupported data fork type",
+            )),
         }
     }
 
