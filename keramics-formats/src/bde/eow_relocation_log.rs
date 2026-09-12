@@ -44,7 +44,7 @@ impl BdeEowRelocationLog {
         }
         let mut data: Vec<u8> = vec![0; data_size];
 
-        let _offset: u64 =
+        let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
 
         let mut data_offset: usize = 0;

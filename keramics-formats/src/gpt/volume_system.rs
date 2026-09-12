@@ -148,7 +148,7 @@ impl GptVolumeSystem {
                         SeekFrom::End(-(self.bytes_per_sector as i64)),
                     ) {
                         Ok(_) => {}
-                        Err(_error) => {
+                        Err(error) => {
                             #[cfg(feature = "debug-trace")]
                             DebugTrace::static_scope(|debug_trace| {
                                 debug_trace.print(format!(

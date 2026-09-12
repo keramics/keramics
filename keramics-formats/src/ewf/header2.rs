@@ -43,7 +43,7 @@ impl EwfHeader2 {
         // header. Note that the uncompressed header size should be a multitude of 2 bytes.
         let mut data: Vec<u8> = vec![0; compressed_data_size * 4];
 
-        let _uncompressed_data_size: usize = crate::zlib_decompress!(
+        let uncompressed_data_size: usize = crate::zlib_decompress!(
             compressed_data,
             &mut data,
             format!(
@@ -51,8 +51,8 @@ impl EwfHeader2 {
                 offset, offset
             )
         );
-
         keramics_core::debug_trace_data!("EwfHeader2", offset, &data, uncompressed_data_size);
+
         self.read_data(&data, header_values)
     }
 
