@@ -119,32 +119,32 @@ create_file_entries()
     if test -x "${AFSCTOOL}"
     then
         # Create a file that uses HFS+ compression (decmpfs) compression method 3
-    	FILE_NAME="${MOUNT_POINT}/testdir1/compressed1"
+        FILE_NAME="${MOUNT_POINT}/testdir1/compressed1"
         echo "My compressed file" > "${FILE_NAME}"
         ${AFSCTOOL} -c -T ZLIB "${FILE_NAME}"
 
         # Create a file that uses HFS+ compression (decmpfs) compression method 4
-    	FILE_NAME="${MOUNT_POINT}/testdir1/compressed2"
+        FILE_NAME="${MOUNT_POINT}/testdir1/compressed2"
         ditto --nohfsCompression LICENSE "${FILE_NAME}"
         ${AFSCTOOL} -c -T ZLIB "${FILE_NAME}"
 
         # Create a file that uses HFS+ compression (decmpfs) compression method 7
-    	FILE_NAME="${MOUNT_POINT}/testdir1/compressed3"
+        FILE_NAME="${MOUNT_POINT}/testdir1/compressed3"
         echo "My compressed file" > "${FILE_NAME}"
         ${AFSCTOOL} -c -T LZVN "${FILE_NAME}"
 
         # Create a file that uses HFS+ compression (decmpfs) compression method 8
-    	FILE_NAME="${MOUNT_POINT}/testdir1/compressed4"
+        FILE_NAME="${MOUNT_POINT}/testdir1/compressed4"
         ditto --nohfsCompression LICENSE "${FILE_NAME}"
         ${AFSCTOOL} -c -T LZVN "${FILE_NAME}"
 
         # Create a file that uses HFS+ compression (decmpfs) compression method 11
-    	FILE_NAME="${MOUNT_POINT}/testdir1/compressed5"
+        FILE_NAME="${MOUNT_POINT}/testdir1/compressed5"
         echo "My compressed file" > "${FILE_NAME}"
         ${AFSCTOOL} -c -T LZFSE "${FILE_NAME}"
 
         # Create a file that uses HFS+ compression (decmpfs) compression method 12
-    	FILE_NAME="${MOUNT_POINT}/testdir1/compressed6"
+        FILE_NAME="${MOUNT_POINT}/testdir1/compressed6"
         ditto --nohfsCompression LICENSE "${FILE_NAME}"
         ${AFSCTOOL} -c -T LZFSE "$FILE_NAME}"
     fi
