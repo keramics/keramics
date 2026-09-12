@@ -47,8 +47,8 @@ IMAGE_FILE="test_data/sparseimage/hfsplus_aes128"
 
 rm -f "${IMAGE_FILE}.sparseimage"
 
-echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE} -encryption AES-128 -format UDSP -stdinpass -o "${IMAGE_FILE}"
+echo -n KeRaMiCs | hdiutil convert "${BASE_IMAGE_FILE}" -encryption AES-128 -format UDSP -stdinpass -o "${IMAGE_FILE}"
 
-# echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE} -encryption AES-128 -format UDSP -stdinpass -tgtimagekey encrypted-encoding-version=1 -o "${IMAGE_FILE}"
+# echo -n KeRaMiCs | hdiutil convert "${BASE_IMAGE_FILE}" -encryption AES-128 -format UDSP -stdinpass -tgtimagekey encrypted-encoding-version=1 -o "${IMAGE_FILE}"
 
 exit ${EXIT_SUCCESS}
