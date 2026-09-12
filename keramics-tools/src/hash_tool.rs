@@ -224,32 +224,47 @@ impl HashTool {
                         }
                         None => display_path.clone(),
                     };
-                    let skip: bool = path_filter.is_match(path, name.as_ref())?;
-
-                    let hash_string: String = if skip {
-                        String::from("N/A (skipped)")
-                    } else {
-                        match self.calculate_hash_from_data_fork(&data_fork) {
-                            Ok(hash_string) => hash_string,
-                            Err(mut error) => {
-                                if self.stop_on_error {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        format!(
-                                            "Unable to calculate hash of data stream: {}",
-                                            display_path_and_name
-                                        )
-                                    );
-                                    return Err(error);
+                    match path_filter.is_match(path, name.as_ref()) {
+                        Ok(is_match) => {
+                            let hash_string: String = if is_match {
+                                String::from("N/A (skipped)")
+                            } else {
+                                match self.calculate_hash_from_data_fork(&data_fork) {
+                                    Ok(hash_string) => hash_string,
+                                    Err(mut error) => {
+                                        if self.stop_on_error {
+                                            keramics_core::error_trace_add_frame!(
+                                                error,
+                                                format!(
+                                                    "Unable to calculate hash of data stream: {}",
+                                                    display_path_and_name
+                                                )
+                                            );
+                                            return Err(error);
+                                        }
+                                        String::from("N/A (error)")
+                                    }
                                 }
-                                String::from("N/A (error)")
+                            };
+                            println!(
+                                "{}\t{}{}",
+                                hash_string, file_system_display_path, display_path_and_name
+                            );
+                        }
+                        Err(mut error) => {
+                            if self.stop_on_error {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable to determine if path filter applies to data stream: {}",
+                                        display_path_and_name
+                                    )
+                                );
+                                return Err(error);
                             }
+                            println!("N/A (error)\t{}", display_path);
                         }
                     };
-                    println!(
-                        "{}\t{}{}",
-                        hash_string, file_system_display_path, display_path_and_name
-                    );
                 }
                 Err(mut error) => {
                     if self.stop_on_error {
@@ -384,15 +399,15 @@ impl HashTool {
                     path_filter.add_signature(PathFilterSignature::new(
                         WindowsPath::from_str("\\$BadClus"),
                         Some(PathComponent::from(Ucs2String::from("$Bad"))),
-                    ))?;
+                    ));
                     path_filter.add_signature(PathFilterSignature::new(
                         WindowsPath::from_str("\\hiberfil.sys"),
                         None,
-                    ))?;
+                    ));
                     path_filter.add_signature(PathFilterSignature::new(
                         WindowsPath::from_str("\\pagefile.sys"),
                         None,
-                    ))?;
+                    ));
                     // TODO: add option for dfImageTools compatibility mode
                     // path_filter.add_signature(PathFilterSignature::new(
                     //     Path::from("/**"),

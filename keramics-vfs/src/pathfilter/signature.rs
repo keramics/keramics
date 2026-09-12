@@ -11,7 +11,8 @@
  * under the License.
  */
 
-use keramics_formats::{Path, PathComponent};
+use keramics_core::ErrorTrace;
+use keramics_formats::{Path, PathCharacterMappings, PathComponent};
 
 /// Path filter signature.
 #[derive(Debug, PartialEq)]
@@ -24,11 +25,47 @@ pub struct PathFilterSignature {
 }
 
 impl PathFilterSignature {
-    /// Create a new signature.
+    /// Create a new path filter signature.
     pub fn new(path: Path, data_fork_name: Option<PathComponent>) -> Self {
         Self {
             path,
             data_fork_name,
         }
     }
+
+    /// Creates a new path filter signature with case folding applied.
+    pub fn new_with_case_folding(
+        &self,
+        mappings: &PathCharacterMappings,
+    ) -> Result<Self, ErrorTrace> {
+        let path: Path = match self.path.new_with_case_folding(mappings) {
+            Ok(case_folded_path) => case_folded_path,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to apply case folding on path"
+                );
+                return Err(error);
+            }
+        };
+        let data_fork_name: Option<PathComponent> = match &self.data_fork_name {
+            Some(name) => match name.new_with_case_folding(mappings) {
+                Ok(case_folded_name) => Some(case_folded_name),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to apply case folding on data fork name"
+                    );
+                    return Err(error);
+                }
+            },
+            None => None,
+        };
+        Ok(Self {
+            path,
+            data_fork_name,
+        })
+    }
 }
+
+// TODO: add tests for new_with_case_folding

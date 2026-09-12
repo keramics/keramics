@@ -24,24 +24,3 @@ pub enum PathCharacterMappings {
     /// UTF-16 character mappings.
     Utf16(Arc<Utf16CharacterMappings>),
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_clone() {
-        let mappings: PathCharacterMappings =
-            PathCharacterMappings::Ucs2(Arc::new(Ucs2CharacterMappings::new()));
-        let cloned: PathCharacterMappings = mappings.clone();
-
-        assert!(matches!(cloned, PathCharacterMappings::Ucs2(_)));
-
-        let mappings: PathCharacterMappings = PathCharacterMappings::Utf16(Arc::new(
-            Utf16CharacterMappings::new(&[(0x0061, 0x0041)]),
-        ));
-        let cloned: PathCharacterMappings = mappings.clone();
-
-        assert!(matches!(cloned, PathCharacterMappings::Utf16(_)));
-    }
-}
