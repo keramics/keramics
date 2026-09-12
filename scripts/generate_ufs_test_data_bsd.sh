@@ -22,7 +22,7 @@ assert_availability_binary newfs
 
 set -e
 
-mkdir -p ${MOUNT_POINT}
+mkdir -p "${MOUNT_POINT}"
 
 mkdir -p test_data/ufs
 
@@ -34,20 +34,20 @@ IMAGE_FILE="test_data/ufs/ufs1.raw"
 
 echo "Generating: ${IMAGE_FILE}"
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-mdconfig -a -t vnode -f ${IMAGE_FILE} -u 9
+mdconfig -a -t vnode -f "${IMAGE_FILE}" -u 9
 
 gpart create -s bsd md9
 gpart add -t freebsd-ufs md9
 
 newfs -L ufs1_test -O 1 md9a
 
-mount /dev/md9a ${MOUNT_POINT}
+mount /dev/md9a "${MOUNT_POINT}"
 
-create_test_file_entries ${MOUNT_POINT}
+create_test_file_entries "${MOUNT_POINT}"
 
-umount ${MOUNT_POINT}
+umount "${MOUNT_POINT}"
 
 mdconfig -d -u 9
 
@@ -56,20 +56,20 @@ IMAGE_FILE="test_data/ufs/ufs2.raw"
 
 echo "Generating: ${IMAGE_FILE}"
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-mdconfig -a -t vnode -f ${IMAGE_FILE} -u 9
+mdconfig -a -t vnode -f "${IMAGE_FILE}" -u 9
 
 gpart create -s bsd md9
 gpart add -t freebsd-ufs md9
 
 newfs -L ufs2_test -O 2 md9a
 
-mount /dev/md9a ${MOUNT_POINT}
+mount /dev/md9a "${MOUNT_POINT}"
 
-create_test_file_entries ${MOUNT_POINT}
+create_test_file_entries "${MOUNT_POINT}"
 
-umount ${MOUNT_POINT}
+umount "${MOUNT_POINT}"
 
 mdconfig -d -u 9
 

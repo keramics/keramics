@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::cmp::min;
+use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -72,6 +72,50 @@ impl<'a> ScanContext<'a> {
         }
     }
 
+    /// Checks for signatures in the scan tree that also match at the current position.
+    fn check_additional_matching_signatures(
+        &mut self,
+        scan_tree: &'a ScanTree,
+        matched_signature: &Arc<Signature>,
+        buffer: &[u8],
+        buffer_offset: usize,
+        buffer_size: usize,
+    ) {
+        for signature in scan_tree.root_node.get_signatures().iter() {
+            if Arc::ptr_eq(signature, matched_signature) {
+                continue;
+            }
+            if !signature.scan_buffer(
+                self.data_offset,
+                self.data_size,
+                buffer,
+                buffer_offset,
+                buffer_size,
+            ) {
+                continue;
+            }
+            let pattern_offset: u64 = match signature.pattern_type {
+                PatternType::Unbound => self.get_unbound_match_offset(buffer_offset),
+                _ => self.get_signature_match_offset(signature),
+            };
+            self.results.insert(pattern_offset, signature.clone());
+        }
+    }
+
+    /// Retrieves the offset at which a signature matches.
+    fn get_signature_match_offset(&self, signature: &Signature) -> u64 {
+        match signature.pattern_type {
+            PatternType::BoundToEnd => self.data_size - signature.pattern_offset as u64,
+            PatternType::BoundToStart => signature.pattern_offset as u64,
+            PatternType::Unbound => self.data_offset,
+        }
+    }
+
+    /// Retrieves the data offset at which an unbound signature matched.
+    fn get_unbound_match_offset(&self, buffer_offset: usize) -> u64 {
+        self.data_offset + buffer_offset as u64
+    }
+
     /// Scans a buffer with a specific scan tree.
     fn scan_buffer_with_scan_tree(
         &mut self,
@@ -100,12 +144,18 @@ impl<'a> ScanContext<'a> {
                 }
                 ScanResult::Signature(signature) => {
                     let pattern_offset: u64 = match signature.pattern_type {
-                        PatternType::BoundToEnd => self.data_size - signature.pattern_offset as u64,
-                        PatternType::BoundToStart => signature.pattern_offset as u64,
-                        PatternType::Unbound => self.data_offset,
+                        PatternType::Unbound => self.get_unbound_match_offset(buffer_offset),
+                        _ => self.get_signature_match_offset(&signature),
                     };
-                    self.results.insert(pattern_offset, Arc::clone(&signature));
+                    self.results.insert(pattern_offset, signature.clone());
 
+                    self.check_additional_matching_signatures(
+                        scan_tree,
+                        &signature,
+                        buffer,
+                        buffer_offset,
+                        buffer_size,
+                    );
                     skip_value = signature.pattern_size;
                 }
                 _ => {
@@ -134,7 +184,7 @@ impl<'a> ScanContext<'a> {
             if scan_tree.pattern_type != PatternType::Unbound {
                 break;
             }
-            buffer_offset += skip_value;
+            buffer_offset += max(skip_value, 1);
         }
     }
 
@@ -247,6 +297,72 @@ mod tests {
     }
 
     #[test]
+    fn test_scan_buffer_with_bound_to_start_signature_at_different_offsets() {
+        let pattern: &[u8] = "conectix".as_bytes();
+
+        let mut scanner: Scanner = Scanner::new();
+        scanner.add_signature(Signature::new(
+            "vhd1",
+            PatternType::BoundToStart,
+            0,
+            pattern,
+        ));
+        scanner.add_signature(Signature::new(
+            "vhd16",
+            PatternType::BoundToStart,
+            16,
+            pattern,
+        ));
+        scanner.build().unwrap();
+
+        // A buffer where both signatures match at their expected offsets.
+        let mut data: [u8; 64] = [0; 64];
+        data[0..8].copy_from_slice(pattern);
+        data[16..24].copy_from_slice(pattern);
+
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 64);
+        scan_context.scan_buffer(&data);
+
+        assert_eq!(scan_context.results.len(), 2);
+        assert_eq!(
+            scan_context.results.get(&0).unwrap().identifier.as_str(),
+            "vhd1"
+        );
+        assert_eq!(
+            scan_context.results.get(&16).unwrap().identifier.as_str(),
+            "vhd16"
+        );
+
+        // A buffer where only the offset 0 signature matches.
+        let mut data: [u8; 64] = [0; 64];
+        data[0..8].copy_from_slice(pattern);
+
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 64);
+        scan_context.scan_buffer(&data);
+
+        assert_eq!(scan_context.results.len(), 1);
+        assert_eq!(
+            scan_context.results.get(&0).unwrap().identifier.as_str(),
+            "vhd1"
+        );
+        assert!(scan_context.results.get(&16).is_none());
+
+        // A buffer where only the offset 16 signature matches.
+        let mut data: [u8; 64] = [0; 64];
+        data[16..24].copy_from_slice(pattern);
+
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 64);
+        scan_context.scan_buffer(&data);
+
+        assert_eq!(scan_context.results.len(), 1);
+        assert_eq!(
+            scan_context.results.get(&16).unwrap().identifier.as_str(),
+            "vhd16"
+        );
+        assert!(scan_context.results.get(&0).is_none());
+    }
+
+    #[test]
     fn test_scan_buffer_with_bound_to_end_signature() {
         let data: [u8; 128] = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -309,6 +425,68 @@ mod tests {
     }
 
     #[test]
+    fn test_scan_buffer_with_bound_to_end_signature_at_different_offsets() {
+        let pattern: &[u8] = "conectix".as_bytes();
+
+        let mut scanner: Scanner = Scanner::new();
+        scanner.add_signature(Signature::new(
+            "vhd_e16",
+            PatternType::BoundToEnd,
+            16,
+            pattern,
+        ));
+        scanner.add_signature(Signature::new(
+            "vhd_e8",
+            PatternType::BoundToEnd,
+            8,
+            pattern,
+        ));
+        scanner.build().unwrap();
+
+        // A buffer where both signatures match at their expected offsets.
+        let mut data: [u8; 64] = [0; 64];
+        data[48..56].copy_from_slice(pattern);
+        data[56..64].copy_from_slice(pattern);
+
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 64);
+        scan_context.scan_buffer(&data);
+
+        assert!(!scan_context.results.is_empty());
+        for (offset, signature) in scan_context.results.iter() {
+            assert_eq!(data[*offset as usize..*offset as usize + 8], pattern[..]);
+            assert!(["vhd_e16", "vhd_e8",].contains(&signature.identifier.as_str()));
+        }
+
+        // A buffer where only the offset 8 (from end) signature matches.
+        let mut data: [u8; 64] = [0; 64];
+        data[56..64].copy_from_slice(pattern);
+
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 64);
+        scan_context.scan_buffer(&data);
+
+        assert_eq!(scan_context.results.len(), 1);
+        assert_eq!(
+            scan_context.results.get(&56).unwrap().identifier.as_str(),
+            "vhd_e8"
+        );
+        assert!(scan_context.results.get(&48).is_none());
+
+        // A buffer where only the offset 16 (from end) signature matches.
+        let mut data: [u8; 64] = [0; 64];
+        data[48..56].copy_from_slice(pattern);
+
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 64);
+        scan_context.scan_buffer(&data);
+
+        assert_eq!(scan_context.results.len(), 1);
+        assert_eq!(
+            scan_context.results.get(&48).unwrap().identifier.as_str(),
+            "vhd_e16"
+        );
+        assert!(scan_context.results.get(&56).is_none());
+    }
+
+    #[test]
     fn test_scan_buffer_with_unbound_signature() {
         let mut scanner: Scanner = Scanner::new();
         scanner.add_signature(Signature::new(
@@ -335,6 +513,55 @@ mod tests {
         scan_context.scan_buffer(&data);
 
         assert_eq!(scan_context.results.len(), 1);
+    }
+
+    #[test]
+    fn test_scan_buffer_with_unbound_signature_at_different_offsets() {
+        let pattern: &[u8] = "conectix".as_bytes();
+
+        let mut scanner: Scanner = Scanner::new();
+        scanner.add_signature(Signature::new("test1", PatternType::Unbound, 0, pattern));
+        scanner.build().unwrap();
+
+        let mut data: [u8; 64] = [0; 64];
+        data[16..24].copy_from_slice(pattern);
+        data[32..40].copy_from_slice(pattern);
+
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 64);
+        scan_context.scan_buffer(&data);
+
+        assert_eq!(scan_context.results.len(), 2);
+        assert_eq!(
+            scan_context.results.get(&16).unwrap().identifier.as_str(),
+            "test1"
+        );
+        assert_eq!(
+            scan_context.results.get(&32).unwrap().identifier.as_str(),
+            "test1"
+        );
+
+        // A single occurrence is reported at the data offset of the occurrence.
+        let mut data: [u8; 64] = [0; 64];
+        data[32..40].copy_from_slice(pattern);
+
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 64);
+        scan_context.scan_buffer(&data);
+
+        assert_eq!(scan_context.results.len(), 1);
+        assert_eq!(
+            scan_context.results.get(&32).unwrap().identifier.as_str(),
+            "test1"
+        );
+        assert!(scan_context.results.get(&16).is_none());
+
+        // A non-matching buffer yields no results.
+        let data: [u8; 64] = [0; 64];
+
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 64);
+        scan_context.scan_buffer(&data);
+
+        assert_eq!(scan_context.results.len(), 0);
+        assert_eq!(scan_context.data_offset, 64);
     }
 
     #[test]

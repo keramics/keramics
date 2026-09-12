@@ -27,7 +27,7 @@ assert_availability_binary truncate
 
 set -e
 
-sudo mkdir -p ${MOUNT_POINT}
+sudo mkdir -p "${MOUNT_POINT}"
 
 mkdir -p test_data/sgilabel
 
@@ -36,9 +36,9 @@ IMAGE_FILE="test_data/sgilabel/sgilabel.raw"
 IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-fdisk -C 8 -H 16 -S 63 ${IMAGE_FILE} <<EOF
+fdisk -C 8 -H 16 -S 63 "${IMAGE_FILE}" <<EOF
 x
 g
 r
@@ -49,17 +49,17 @@ n
 w
 EOF
 
-sudo losetup -o $(( 5040 * ${SECTOR_SIZE} )) --sizelimit $(( 1024 * 1024 )) /dev/loop99 ${IMAGE_FILE}
+sudo losetup -o $(( 5040 * SECTOR_SIZE )) --sizelimit $(( 1024 * 1024 )) /dev/loop99 "${IMAGE_FILE}"
 
 sudo mke2fs -I 128 -L "ext2_test" -q -t ext2 /dev/loop99
 
-sudo mount -o loop,rw /dev/loop99 ${MOUNT_POINT}
+sudo mount -o loop,rw /dev/loop99 "${MOUNT_POINT}"
 
-sudo chown ${USER} ${MOUNT_POINT}
+sudo chown "${USER}" "${MOUNT_POINT}"
 
-create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
+create_test_file_entries_with_extended_attributes "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 sudo losetup -d /dev/loop99
 

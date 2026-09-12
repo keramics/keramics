@@ -30,25 +30,25 @@ mkdir -p test_data/sparsebundle
 IMAGE_FILE="test_data/sparsebundle/hfsplus"
 IMAGE_SIZE="4M"
 
-rm -rf ${IMAGE_FILE}.sparsebundle
+rm -rf "${IMAGE_FILE}.sparsebundle"
 
-hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSEBUNDLE -volname hfsplus_test ${IMAGE_FILE}
+hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSEBUNDLE -volname hfsplus_test "${IMAGE_FILE}"
 
-hdiutil attach ${IMAGE_FILE}.sparsebundle -noautoopen -nobrowse
+hdiutil attach "${IMAGE_FILE}.sparsebundle" -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-detach_image ${IMAGE_FILE}.sparsebundle
+detach_image "${IMAGE_FILE}.sparsebundle"
 
 BASE_IMAGE_FILE="${IMAGE_FILE}.sparsebundle"
 
 # Create an AES-128 encrypted sparsebundle with a HFS+ file system
 IMAGE_FILE="test_data/sparsebundle/hfsplus_aes128"
 
-rm -rf ${IMAGE_FILE}.sparsebundle
+rm -rf "${IMAGE_FILE}.sparsebundle"
 
-echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE} -encryption AES-128 -format UDSB -stdinpass -o ${IMAGE_FILE}
+echo -n KeRaMiCs | hdiutil convert "${BASE_IMAGE_FILE}" -encryption AES-128 -format UDSB -stdinpass -o "${IMAGE_FILE}"
 
-# echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE} -encryption AES-128 -format UDSP -stdinpass -tgtimagekey encrypted-encoding-version=1 -o ${IMAGE_FILE}
+# echo -n KeRaMiCs | hdiutil convert "${BASE_IMAGE_FILE}" -encryption AES-128 -format UDSP -stdinpass -tgtimagekey encrypted-encoding-version=1 -o "${IMAGE_FILE}"
 
 exit ${EXIT_SUCCESS}

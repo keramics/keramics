@@ -226,15 +226,15 @@ mod tests {
         let mut scan_context: ScanContext = ScanContext::new(&scanner, 252);
         scan_context.scan_buffer(&data);
 
-        assert_eq!(scan_context.results.len(), 2);
+        assert_eq!(scan_context.results.len(), 3);
+
+        let signature: &Arc<Signature> = scan_context.results.get(&0).unwrap();
+        assert_eq!(signature.identifier.as_str(), "msiecf1");
 
         let signature: &Arc<Signature> = scan_context.results.get(&180).unwrap();
         assert_eq!(signature.identifier.as_str(), "vhd1");
 
-        let result: bool = scan_context
-            .results
-            .values()
-            .any(|signature| signature.identifier.as_str() == "test1");
-        assert_eq!(result, true);
+        let signature: &Arc<Signature> = scan_context.results.get(&80).unwrap();
+        assert_eq!(signature.identifier.as_str(), "test1");
     }
 }

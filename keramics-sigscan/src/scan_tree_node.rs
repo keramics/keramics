@@ -169,6 +169,29 @@ impl ScanTreeNode {
         Ok(())
     }
 
+    /// Recursively retrieves the signatures.
+    pub(super) fn get_signatures(&self) -> Vec<Arc<Signature>> {
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
+
+        for scan_object in self.scan_objects.values() {
+            match scan_object {
+                ScanObject::Signature(signature) => {
+                    if !signatures.contains(signature) {
+                        signatures.push(Arc::clone(signature));
+                    }
+                }
+                ScanObject::ScanTreeNode(scan_tree_node) => {
+                    for sub_signature in scan_tree_node.get_signatures() {
+                        if !signatures.contains(&sub_signature) {
+                            signatures.push(sub_signature);
+                        }
+                    }
+                }
+            }
+        }
+        signatures
+    }
+
     /// Scans a buffer for a matching scan object.
     pub(super) fn scan_buffer(
         &self,

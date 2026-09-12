@@ -24,7 +24,7 @@ assert_availability_binary truncate
 
 set -e
 
-sudo mkdir -p ${MOUNT_POINT}
+sudo mkdir -p "${MOUNT_POINT}"
 
 mkdir -p test_data/xfs
 
@@ -33,25 +33,25 @@ IMAGE_FILE="test_data/xfs/xfs.raw"
 IMAGE_SIZE=$(( 16 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
 # Note that these environment variables are necessary to allow for a XFS file system < 300 MiB.
 export TEST_DEV=1
 export TEST_DIR=1
 export QA_CHECK_FS=1
 
-mkfs.xfs -b size=4096 -i size=512 -L "xfs_test" -m bigtime=0 -q -s size=${SECTOR_SIZE} ${IMAGE_FILE}
+mkfs.xfs -b size=4096 -i size=512 -L "xfs_test" -m bigtime=0 -q -s size=${SECTOR_SIZE} "${IMAGE_FILE}"
 
 export TEST_DEV=
 export TEST_DIR=
 export QA_CHECK_FS=
 
-sudo mount -o loop,rw ${IMAGE_FILE} ${MOUNT_POINT}
+sudo mount -o loop,rw "${IMAGE_FILE}" "${MOUNT_POINT}"
 
-sudo chown ${USER} ${MOUNT_POINT}
+sudo chown "${USER}" "${MOUNT_POINT}"
 
-create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
+create_test_file_entries_with_extended_attributes "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 exit ${EXIT_SUCCESS}

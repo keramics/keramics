@@ -21,7 +21,7 @@ assert_availability_binary mkntfs
 
 set -e
 
-sudo mkdir -p ${MOUNT_POINT}
+sudo mkdir -p "${MOUNT_POINT}"
 
 mkdir -p test_data/ntfs
 
@@ -30,14 +30,14 @@ IMAGE_FILE="test_data/ntfs/ntfs.raw"
 IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-sudo mkntfs -F -L "ntfs_test" -q -s ${SECTOR_SIZE} ${IMAGE_FILE}
+sudo mkntfs -F -L "ntfs_test" -q -s ${SECTOR_SIZE} "${IMAGE_FILE}"
 
-sudo mount -o loop,rw ${IMAGE_FILE} ${MOUNT_POINT}
+sudo mount -o loop,rw "${IMAGE_FILE}" "${MOUNT_POINT}"
 
-create_test_file_entries_with_long_file_name ${MOUNT_POINT}
+create_test_file_entries_with_long_file_name "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 exit ${EXIT_SUCCESS}

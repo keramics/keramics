@@ -32,6 +32,7 @@ ORIGINAL_HOSTNAME=$(hostname)
 
 set -e
 
+# shellcheck disable=SC2329
 cleanup() {
     if test -n "${ORIGINAL_HOSTNAME}"
     then
@@ -43,7 +44,7 @@ trap cleanup EXIT
 
 sudo hostname keramics
 
-sudo mkdir -p ${MOUNT_POINT}
+sudo mkdir -p "${MOUNT_POINT}"
 
 mkdir -p test_data/linuxlvm
 
@@ -53,9 +54,9 @@ IMAGE_FILE="/tmp/lvm.raw"
 IMAGE_SIZE=$(( 9 * 1024 * 1024 ))
 SECTOR_SIZE=512
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-sudo losetup /dev/loop99 ${IMAGE_FILE}
+sudo losetup /dev/loop99 "${IMAGE_FILE}"
 
 sudo pvcreate -q /dev/loop99 2>&1 | sed '/is using an old PV header, modify the VG to update/ d;/open failed: No medium found/ d'
 
@@ -65,13 +66,13 @@ sudo lvcreate --name test_logical_volume1 -q --size 4m --type linear test_volume
 
 sudo mke2fs -I 128 -L "ext2_test" -q -t ext2 /dev/test_volume_group/test_logical_volume1
 
-sudo mount -o loop,rw /dev/test_volume_group/test_logical_volume1 ${MOUNT_POINT}
+sudo mount -o loop,rw /dev/test_volume_group/test_logical_volume1 "${MOUNT_POINT}"
 
-sudo chown ${USER} ${MOUNT_POINT}
+sudo chown "${USER}" "${MOUNT_POINT}"
 
-create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
+create_test_file_entries_with_extended_attributes "${MOUNT_POINT}"
 
-sudo umount ${MOUNT_POINT}
+sudo umount "${MOUNT_POINT}"
 
 sudo lvcreate --name test_logical_volume2 -q --size 4m --type linear test_volume_group 2>&1 | sed '/is using an old PV header, modify the VG to update/ d;/open failed: No medium found/ d'
 
@@ -79,6 +80,6 @@ sudo vgchange --activate n -q test_volume_group 2>&1 | sed '/is using an old PV 
 
 sudo losetup -d /dev/loop99
 
-mv ${IMAGE_FILE} test_data/linuxlvm/lvm2.raw
+mv "${IMAGE_FILE}" test_data/linuxlvm/lvm2.raw
 
 exit ${EXIT_SUCCESS}

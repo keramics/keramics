@@ -23,7 +23,7 @@ assert_availability_binary newfs
 
 set -e
 
-mkdir -p ${MOUNT_POINT}
+mkdir -p "${MOUNT_POINT}"
 
 mkdir -p test_data/bsdlabel
 
@@ -35,19 +35,19 @@ IMAGE_FILE="test_data/bsdlabel/bsdlabel.raw"
 
 echo "Generating: ${IMAGE_FILE}"
 
-dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+dd if=/dev/zero of="${IMAGE_FILE}" bs=${SECTOR_SIZE} count=$(( IMAGE_SIZE / SECTOR_SIZE )) 2> /dev/null
 
-mdconfig -a -t vnode -f ${IMAGE_FILE} -u 9
+mdconfig -a -t vnode -f "${IMAGE_FILE}" -u 9
 
 bsdlabel -w -B md9 auto
 
 newfs -L ufs1_test -O 1 md9a
 
-mount /dev/md9a ${MOUNT_POINT}
+mount /dev/md9a "${MOUNT_POINT}"
 
-create_test_file_entries ${MOUNT_POINT}
+create_test_file_entries "${MOUNT_POINT}"
 
-umount ${MOUNT_POINT}
+umount "${MOUNT_POINT}"
 
 mdconfig -d -u 9
 
