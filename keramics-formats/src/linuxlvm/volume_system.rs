@@ -189,7 +189,7 @@ impl LinuxLvmVolumeSystem {
                 }
             }
             let data_area_descriptor: &LinuxLvmDataAreaDescriptor =
-                match physical_volume_label.metadata_area_descriptors.get(0) {
+                match physical_volume_label.metadata_area_descriptors.first() {
                     Some(data_area_descriptor) => data_area_descriptor,
                     None => {
                         return Err(keramics_core::error_trace_new!(
@@ -405,7 +405,7 @@ impl LinuxLvmVolumeSystem {
             }
         }
         let location_descriptor: &LinuxLvmRawLocationDescriptor =
-            match metadata_area_header.location_descriptors.get(0) {
+            match metadata_area_header.location_descriptors.first() {
                 Some(location_descriptor) => location_descriptor,
                 None => {
                     return Err(keramics_core::error_trace_new!(

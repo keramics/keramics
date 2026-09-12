@@ -197,10 +197,7 @@ impl OsFileEntry {
 
     /// Retrieves the symbolic link target.
     pub fn get_symbolic_link_target(&self) -> Option<PathBuf> {
-        match read_link(&self.path) {
-            Ok(link_target) => Some(link_target),
-            Err(_) => None,
-        }
+        read_link(&self.path).ok()
     }
 
     /// Retrieves the number of sub file entries.

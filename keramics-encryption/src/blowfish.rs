@@ -231,7 +231,7 @@ impl BlowfishContext {
                 "Invalid encrypted data size value too small"
             ));
         }
-        if encrypted_data_size % BLOWFISH_BLOCK_SIZE != 0 {
+        if !encrypted_data_size.is_multiple_of(BLOWFISH_BLOCK_SIZE) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid encrypted data size value not a multitude of block size: {}",
                 BLOWFISH_BLOCK_SIZE
@@ -292,7 +292,7 @@ impl BlowfishContext {
                 "Invalid data size value too small"
             ));
         }
-        if data_size % BLOWFISH_BLOCK_SIZE != 0 {
+        if !data_size.is_multiple_of(BLOWFISH_BLOCK_SIZE) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid data size value not a multitude of block size: {}",
                 BLOWFISH_BLOCK_SIZE
@@ -353,7 +353,7 @@ impl CryptContext for BlowfishContext {
     fn set_key(&mut self, key: &[u8]) -> Result<(), ErrorTrace> {
         let key_size: usize = key.len();
 
-        if key_size < 1 || key_size > 56 {
+        if !(1..=56).contains(&key_size) {
             return Err(keramics_core::error_trace_new!("Unsupported key size"));
         }
         self.permutation_values = vec![0; 18];
@@ -464,7 +464,7 @@ impl CryptCbc for BlowfishContext {
                 "Invalid encrypted data size value too small"
             ));
         }
-        if encrypted_data_size % BLOWFISH_BLOCK_SIZE != 0 {
+        if !encrypted_data_size.is_multiple_of(BLOWFISH_BLOCK_SIZE) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid encrypted data size value not a multitude of block size: {}",
                 BLOWFISH_BLOCK_SIZE
@@ -517,7 +517,7 @@ impl CryptCbc for BlowfishContext {
                 "Invalid data size value too small"
             ));
         }
-        if data_size % BLOWFISH_BLOCK_SIZE != 0 {
+        if !data_size.is_multiple_of(BLOWFISH_BLOCK_SIZE) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid data size value not a multitude of block size: {}",
                 BLOWFISH_BLOCK_SIZE

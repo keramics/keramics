@@ -100,7 +100,7 @@ impl Fat12BootRecord {
                 Some(data_index) => &data[43..54 - data_index],
                 None => &data[43..54],
             };
-            boot_record.volume_label.elements.extend_from_slice(&slice);
+            boot_record.volume_label.elements.extend_from_slice(slice);
         }
         Ok(())
     }

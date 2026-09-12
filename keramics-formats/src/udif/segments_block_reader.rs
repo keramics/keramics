@@ -103,8 +103,8 @@ impl UdifSegmentsBlockReader {
             &mut footer_signature,
             SeekFrom::End(-8)
         );
-        if &header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
-            || &footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
+        if header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
+            || footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
         {
             let mut cdsaencr_container: CdsaEncrContainer = CdsaEncrContainer::new();
 

@@ -65,10 +65,7 @@ impl NtfsMftAttributes {
     /// Adds an attribute.
     pub fn add_attribute(&mut self, mut attribute: NtfsMftAttribute) -> Result<(), ErrorTrace> {
         if !self.attribute_groups.contains_key(&attribute.name) {
-            let attribute_name: Option<Ucs2String> = match &attribute.name {
-                Some(name) => Some(name.clone()),
-                None => None,
-            };
+            let attribute_name: Option<Ucs2String> = attribute.name.clone();
             let attribute_group: NtfsMftAttributeGroup = NtfsMftAttributeGroup::new();
             self.attribute_groups
                 .insert(attribute_name, attribute_group);
@@ -180,10 +177,10 @@ impl NtfsMftAttributes {
         match self.attributes.get(attribute_index) {
             Some(mft_attribute) => Ok(mft_attribute),
             None => {
-                return Err(keramics_core::error_trace_new!(format!(
+                Err(keramics_core::error_trace_new!(format!(
                     "Missing attribute: {}",
                     attribute_index
-                )));
+                )))
             }
         }
     }

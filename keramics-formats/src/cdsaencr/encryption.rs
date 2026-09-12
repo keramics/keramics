@@ -129,15 +129,15 @@ impl CdsaEncrEncryption {
                     Ok(_) => Ok(()),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to add PKCS7 padding");
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }
             _ => {
-                return Err(keramics_core::error_trace_new!(format!(
+                Err(keramics_core::error_trace_new!(format!(
                     "Unsupported padding type: {}",
                     padding_type
-                )));
+                )))
             }
         }
     }
@@ -197,11 +197,11 @@ impl CdsaEncrEncryption {
     }
 
     /// Removes padding.
-    pub fn remove_padding<'a>(
+    pub fn remove_padding(
         padding_type: u32,
         block_size: usize,
-        padded_data: &'a [u8],
-    ) -> Result<&'a [u8], ErrorTrace> {
+        padded_data: &[u8],
+    ) -> Result<&[u8], ErrorTrace> {
         match padding_type {
             0 => Ok(padded_data),
             2 | 3 => {
@@ -217,7 +217,7 @@ impl CdsaEncrEncryption {
                         "Invalid padded data size value too small"
                     ));
                 }
-                if padded_data_size % block_size != 0 {
+                if !padded_data_size.is_multiple_of(block_size) {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Invalid padded data size value not a multitude of block size: {}",
                         block_size
@@ -253,15 +253,15 @@ impl CdsaEncrEncryption {
                             error,
                             "Unable to remove PKCS7 padding"
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }
             _ => {
-                return Err(keramics_core::error_trace_new!(format!(
+                Err(keramics_core::error_trace_new!(format!(
                     "Unsupported padding type: {}",
                     padding_type
-                )));
+                )))
             }
         }
     }

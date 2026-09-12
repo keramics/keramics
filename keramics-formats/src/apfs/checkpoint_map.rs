@@ -61,7 +61,7 @@ impl ApfsCheckpointMap {
         if data.len() < 4096 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        match self.object_header.read_data(&data) {
+        match self.object_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read object header");

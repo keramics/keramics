@@ -56,7 +56,7 @@ impl LinuxLvmPhysicalVolumeLabel {
         let mut volume_label_header: LinuxLvmPhysicalVolumeLabelHeader =
             LinuxLvmPhysicalVolumeLabelHeader::new();
 
-        match volume_label_header.read_data(&data) {
+        match volume_label_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -110,7 +110,7 @@ impl LinuxLvmPhysicalVolumeLabel {
         for (descriptor_index, chunk) in data[data_offset..].chunks_exact(16).enumerate() {
             data_offset += 16;
 
-            if chunk == &[0; 16] {
+            if chunk == [0; 16] {
                 break;
             }
             keramics_core::debug_trace_structure!(LinuxLvmDataAreaDescriptor::debug_read_data(
@@ -141,7 +141,7 @@ impl LinuxLvmPhysicalVolumeLabel {
         data_area_logical_offset = 0;
 
         for (descriptor_index, chunk) in data[data_offset..].chunks_exact(16).enumerate() {
-            if chunk == &[0; 16] {
+            if chunk == [0; 16] {
                 break;
             }
             keramics_core::debug_trace_structure!(LinuxLvmDataAreaDescriptor::debug_read_data(

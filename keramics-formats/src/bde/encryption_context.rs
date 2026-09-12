@@ -141,7 +141,7 @@ impl BdeEncryptionContext {
                         return Err(error);
                     }
                 }
-                if let Some(_) = &self.diffuser_context {
+                if self.diffuser_context.is_some() {
                     match BdeDiffuser::decrypt(data) {
                         Ok(_) => {}
                         Err(mut error) => {

@@ -53,9 +53,9 @@ impl XmlDocument {
                 return Err(keramics_core::error_trace_new!("Missing XML document"));
             }
         };
-        let mut inner_pairs: Pairs<Rule> = token_pair.into_inner();
+        let inner_pairs: Pairs<Rule> = token_pair.into_inner();
 
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
             match rule {
                 Rule::element => {
@@ -133,7 +133,7 @@ impl XmlDocument {
                 )));
             }
         };
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -178,12 +178,12 @@ impl XmlDocument {
     /// Parses XML element content.
     fn parse_element_content(
         &self,
-        mut inner_pairs: Pairs<Rule>,
+        inner_pairs: Pairs<Rule>,
         xml_element: &mut XmlElement,
     ) -> Result<(), ErrorTrace> {
         let mut string_parts: Vec<&str> = Vec::new();
 
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
             match rule {
                 Rule::character_data => {
@@ -222,7 +222,7 @@ impl XmlDocument {
 
         let mut xml_element: XmlElement = XmlElement::new(name);
 
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {

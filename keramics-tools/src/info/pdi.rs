@@ -193,9 +193,9 @@ impl PdiInfo {
 
                 println!("            Path\t\t\t\t: {}", segment_file.get_path());
 
-                let file_type_string: &str = match segment_file.get_file_type() {
-                    &PdiSegmentFileType::Compressed => "Compressed",
-                    &PdiSegmentFileType::Plain => "Plain",
+                let file_type_string: &str = match *segment_file.get_file_type() {
+                    PdiSegmentFileType::Compressed => "Compressed",
+                    PdiSegmentFileType::Plain => "Plain",
                     _ => "Unknown",
                 };
                 println!("            Type\t\t\t\t: {}", file_type_string);
@@ -215,7 +215,7 @@ impl PdiInfo {
                     }
                 };
             let snapshot_information: PdiSnapshotInfo =
-                PdiSnapshotInfo::new(snapshot_index, &pdi_snapshot);
+                PdiSnapshotInfo::new(snapshot_index, pdi_snapshot);
 
             print!("{}", snapshot_information);
         }

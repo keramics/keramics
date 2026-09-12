@@ -178,7 +178,7 @@ impl UdifResourceMap {
         position: SeekFrom,
     ) -> Result<(), ErrorTrace> {
         // Note that 65536 is an arbitrary chosen limit.
-        if data_size < 28 || data_size > 65536 {
+        if !(28..=65536).contains(&data_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported resource map data size: {} value out of bounds",
                 data_size

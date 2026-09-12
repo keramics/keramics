@@ -36,7 +36,7 @@ impl BdeEowRelocationLog {
         position: SeekFrom,
     ) -> Result<(), ErrorTrace> {
         // Note that 16777216 is an arbitrary chosen limit.
-        if data_size < 1024 || data_size > 16777216 {
+        if !(1024..=16777216).contains(&data_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported Encrypt-on-Write (EOW) relocation log size: {} value out of bounds",
                 data_size
@@ -44,7 +44,7 @@ impl BdeEowRelocationLog {
         }
         let mut data: Vec<u8> = vec![0; data_size];
 
-        let offset: u64 =
+        let _offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
 
         let mut data_offset: usize = 0;

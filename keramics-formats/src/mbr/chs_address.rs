@@ -58,7 +58,7 @@ impl MbrChsAddress {
     /// Determines if the CHS address is empty.
     #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
-        return self.head == 0 && self.cylinder == 0 && self.sector == 0;
+        self.head == 0 && self.cylinder == 0 && self.sector == 0
     }
 
     /// Reads the CHS address from a buffer.

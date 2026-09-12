@@ -115,7 +115,7 @@ impl UdifFile {
             &mut signature,
             SeekFrom::End(-512)
         );
-        if &signature != UDIF_FILE_FOOTER_SIGNATURE {
+        if signature != UDIF_FILE_FOOTER_SIGNATURE {
             // Unencrypted UDIF without footer.
             self.data_fork_offset = 0;
             self.data_fork_size = footer_offset + 512;
@@ -349,7 +349,7 @@ impl UdifFile {
 
             let mut block_table: UdifBlockTable = UdifBlockTable::new();
 
-            match block_table.read_data(&data) {
+            match block_table.read_data(data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read block table");

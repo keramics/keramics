@@ -59,7 +59,7 @@ impl NtfsFixupValues {
             let buffer_end_offset: usize = buffer_offset + 2;
 
             if buffer_end_offset <= buffer_size {
-                if &buffer[buffer_offset..buffer_end_offset] != &placeholder_value_data {
+                if buffer[buffer_offset..buffer_end_offset] != placeholder_value_data {
                     // TODO: flag corruption
                     let placeholder_value: u16 = bytes_to_u16_le!(placeholder_value_data, 0);
                     let fixup_value: u16 = bytes_to_u16_le!(buffer, fixup_value_offset);

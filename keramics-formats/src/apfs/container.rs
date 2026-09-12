@@ -144,7 +144,7 @@ impl ApfsContainer {
         };
         let object_map_value: ApfsObjectMapValue = match self
             .object_map_tree
-            .get_value_by_identifier(&data_stream, object_identifier, self.transaction_identifier)
+            .get_value_by_identifier(data_stream, object_identifier, self.transaction_identifier)
         {
             Ok(Some(object_map_value)) => object_map_value,
             Ok(None) => {
@@ -196,7 +196,7 @@ impl ApfsContainer {
     ) -> Result<(), ErrorTrace> {
         let mut superblock: ApfsContainerSuperblock = ApfsContainerSuperblock::new();
 
-        match superblock.read_at_position(&data_stream, SeekFrom::Start(0)) {
+        match superblock.read_at_position(data_stream, SeekFrom::Start(0)) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -220,7 +220,7 @@ impl ApfsContainer {
                 superblock.block_size
             )));
         }
-        match self.read_checkpoint_descriptor_area(&data_stream, &mut superblock) {
+        match self.read_checkpoint_descriptor_area(data_stream, &mut superblock) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -249,7 +249,7 @@ impl ApfsContainer {
                 &superblock.container_identifier,
             );
             match key_bag.read_at_position(
-                &data_stream,
+                data_stream,
                 key_bag_size,
                 SeekFrom::Start(key_bag_offset),
             ) {
@@ -293,7 +293,7 @@ impl ApfsContainer {
         while offset < end_offset {
             let mut object_header: ApfsObjectHeader = ApfsObjectHeader::new();
 
-            match object_header.read_at_position(&data_stream, SeekFrom::Start(offset)) {
+            match object_header.read_at_position(data_stream, SeekFrom::Start(offset)) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -319,7 +319,7 @@ impl ApfsContainer {
                     if object_header.transaction_identifier
                         > superblock.object_header.transaction_identifier
                     {
-                        match superblock.read_at_position(&data_stream, SeekFrom::Start(offset)) {
+                        match superblock.read_at_position(data_stream, SeekFrom::Start(offset)) {
                             Ok(_) => {}
                             Err(mut error) => {
                                 keramics_core::error_trace_add_frame!(
@@ -354,7 +354,7 @@ impl ApfsContainer {
             let mut checkpoint_map: ApfsCheckpointMap = ApfsCheckpointMap::new();
 
             match checkpoint_map
-                .read_at_position(&data_stream, SeekFrom::Start(checkpoint_map_offset))
+                .read_at_position(data_stream, SeekFrom::Start(checkpoint_map_offset))
             {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -386,7 +386,7 @@ impl ApfsContainer {
 
         let mut object_map: ApfsObjectMap = ApfsObjectMap::new();
 
-        match object_map.read_at_position(&data_stream, SeekFrom::Start(object_map_offset)) {
+        match object_map.read_at_position(data_stream, SeekFrom::Start(object_map_offset)) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(

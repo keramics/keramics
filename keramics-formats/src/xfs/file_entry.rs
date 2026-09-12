@@ -261,9 +261,9 @@ impl XfsFileEntry {
                 )),
             )))),
             _ => {
-                return Err(keramics_core::error_trace_new!(
+                Err(keramics_core::error_trace_new!(
                     "Unsupported data fork type",
-                ));
+                ))
             }
         }
     }
@@ -275,7 +275,7 @@ impl XfsFileEntry {
     ) -> Result<DataStreamReference, ErrorTrace> {
         match attribute_record {
             XfsAttribute::InlineData(inline_data) => Ok(Arc::new(RwLock::new(
-                FakeDataStream::new(&inline_data, inline_data.len() as u64),
+                FakeDataStream::new(inline_data, inline_data.len() as u64),
             ))),
         }
     }

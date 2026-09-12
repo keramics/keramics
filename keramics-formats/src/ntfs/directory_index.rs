@@ -134,64 +134,52 @@ impl NtfsDirectoryIndex {
                 index_root_header.index_entry_size
             )));
         }
-        match mft_attributes
-            .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION)
-        {
-            Some(mft_attribute) => {
-                let standard_information: NtfsStandardInformation =
-                    match NtfsStandardInformation::from_attribute(mft_attribute) {
-                        Ok(standard_information) => standard_information,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to create standard information from attribute"
-                            );
-                            return Err(error);
-                        }
-                    };
-                // Note that recent version of NTFS support case-sensitive file names.
-                if standard_information.maximum_number_of_versions == 0
-                    && standard_information.version_number == 1
-                {
-                    self.use_case_folding = false;
-                }
-            }
-            None => {}
-        }
-        // Note that the $INDEX_ALLOCATION attribute is optional.
-        match mft_attributes
-            .get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_INDEX_ALLOCATION)
-        {
-            Some(mft_attribute) => match self
-                .index
-                .initialize(index_root_header.index_entry_size, mft_attribute)
-            {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to initialize index");
-                    return Err(error);
-                }
-            },
-            None => {}
-        }
-        // Note that the $BITMAP attribute is optional.
-        match mft_attributes
-            .get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_BITMAP)
-        {
-            Some(mft_attribute) => {
-                let mut bitmap: NtfsBitmap =
-                    NtfsBitmap::new(self.index.cluster_block_size, self.index.index_entry_size);
-
-                match bitmap.initialize(data_stream, mft_attribute) {
-                    Ok(_) => {}
+        if let Some(mft_attribute) = mft_attributes
+            .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION) {
+            let standard_information: NtfsStandardInformation =
+                match NtfsStandardInformation::from_attribute(mft_attribute) {
+                    Ok(standard_information) => standard_information,
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to initialize bitmap");
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to create standard information from attribute"
+                        );
                         return Err(error);
                     }
-                }
-                self.bitmap = Some(bitmap);
+                };
+            // Note that recent version of NTFS support case-sensitive file names.
+            if standard_information.maximum_number_of_versions == 0
+                && standard_information.version_number == 1
+            {
+                self.use_case_folding = false;
             }
-            None => {}
+        }
+        // Note that the $INDEX_ALLOCATION attribute is optional.
+        if let Some(mft_attribute) = mft_attributes
+            .get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_INDEX_ALLOCATION) { match self
+            .index
+            .initialize(index_root_header.index_entry_size, mft_attribute)
+        {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to initialize index");
+                return Err(error);
+            }
+        } }
+        // Note that the $BITMAP attribute is optional.
+        if let Some(mft_attribute) = mft_attributes
+            .get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_BITMAP) {
+            let mut bitmap: NtfsBitmap =
+                NtfsBitmap::new(self.index.cluster_block_size, self.index.index_entry_size);
+
+            match bitmap.initialize(data_stream, mft_attribute) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to initialize bitmap");
+                    return Err(error);
+                }
+            }
+            self.bitmap = Some(bitmap);
         }
         self.root_node_data = i30_index_root_attribute.resident_data.clone();
         self.is_initialized = true;
@@ -419,7 +407,7 @@ impl NtfsDirectoryIndex {
                                 sub_node_vcn
                             ),
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }

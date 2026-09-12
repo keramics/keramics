@@ -104,46 +104,31 @@ impl PlistObject {
 
     /// Retrieves a bytes value for a specific key.
     pub fn get_bytes_by_key(&self, key: &str) -> Option<&[u8]> {
-        let data_object: &PlistObject = match self.get_object_by_key(key) {
-            Some(plist_object) => plist_object,
-            None => return None,
-        };
+        let data_object: &PlistObject = self.get_object_by_key(key)?;
         data_object.as_bytes()
     }
 
     /// Retrieves an integer value for a specific key.
     pub fn get_integer_by_key(&self, key: &str) -> Option<&i64> {
-        let integer_object: &PlistObject = match self.get_object_by_key(key) {
-            Some(plist_object) => plist_object,
-            None => return None,
-        };
+        let integer_object: &PlistObject = self.get_object_by_key(key)?;
         integer_object.as_integer()
     }
 
     /// Retrieves an object value for a specific key.
     pub fn get_object_by_key(&self, key: &str) -> Option<&PlistObject> {
-        let hashmap: &HashMap<String, PlistObject> = match self.as_hashmap() {
-            Some(hashmap) => hashmap,
-            None => return None,
-        };
+        let hashmap: &HashMap<String, PlistObject> = self.as_hashmap()?;
         hashmap.get(key)
     }
 
     /// Retrieves a string value for a specific key.
     pub fn get_string_by_key(&self, key: &str) -> Option<&String> {
-        let string_object: &PlistObject = match self.get_object_by_key(key) {
-            Some(plist_object) => plist_object,
-            None => return None,
-        };
+        let string_object: &PlistObject = self.get_object_by_key(key)?;
         string_object.as_string()
     }
 
     /// Retrieves a slice value for a specific key.
     pub fn get_slice_by_key(&self, key: &str) -> Option<&[PlistObject]> {
-        let array_object: &PlistObject = match self.get_object_by_key(key) {
-            Some(plist_object) => plist_object,
-            None => return None,
-        };
+        let array_object: &PlistObject = self.get_object_by_key(key)?;
         array_object.as_slice()
     }
 }

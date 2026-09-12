@@ -149,7 +149,7 @@ impl HfsMasterDirectoryBlock {
         for data_offset in (134..146).step_by(4) {
             let data_end_offset = data_offset + 4;
 
-            if &data[data_offset..data_end_offset] == [0; 4] {
+            if data[data_offset..data_end_offset] == [0; 4] {
                 break;
             }
             let mut extent_descriptor: HfsExtentDescriptor = HfsExtentDescriptor::new();
@@ -177,7 +177,7 @@ impl HfsMasterDirectoryBlock {
         for data_offset in (150..162).step_by(4) {
             let data_end_offset = data_offset + 4;
 
-            if &data[data_offset..data_end_offset] == [0; 4] {
+            if data[data_offset..data_end_offset] == [0; 4] {
                 break;
             }
             let mut extent_descriptor: HfsExtentDescriptor = HfsExtentDescriptor::new();

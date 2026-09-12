@@ -95,7 +95,7 @@ impl FatBlockAllocationTable {
         );
         let entry: u32 = match &self.format {
             FatFormat::Fat12 => {
-                if entry_index % 2 == 0 {
+                if entry_index.is_multiple_of(2) {
                     (bytes_to_u16_le!(data, 0) & 0x0fff) as u32
                 } else {
                     (bytes_to_u16_le!(data, 1) >> 4) as u32

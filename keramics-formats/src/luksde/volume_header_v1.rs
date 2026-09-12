@@ -96,7 +96,7 @@ impl LuksVolumeHeaderV1 {
         if &data[0..6] != LUKS_VOLUME_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
-        if &data[6..8] != &[0x00, 0x01] {
+        if data[6..8] != [0x00, 0x01] {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported format version"
             ));

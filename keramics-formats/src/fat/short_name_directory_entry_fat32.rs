@@ -79,18 +79,18 @@ impl Fat32ShortNameDirectoryEntry {
                 }
             }
         }
-        if &data[13..18] == &[0; 5] {
+        if data[13..18] == [0; 5] {
             directory_entry.creation_time = DateTime::NotSet;
         } else {
             directory_entry.creation_time =
                 DateTime::FatTimeDate10Ms(FatTimeDate10Ms::from_bytes(&data[13..18]));
         }
-        if &data[18..20] == &[0; 2] {
+        if data[18..20] == [0; 2] {
             directory_entry.access_time = DateTime::NotSet;
         } else {
             directory_entry.access_time = DateTime::FatDate(FatDate::from_bytes(&data[18..20]));
         }
-        if &data[22..26] == &[0; 4] {
+        if data[22..26] == [0; 4] {
             directory_entry.access_time = DateTime::NotSet;
         } else {
             directory_entry.modification_time =

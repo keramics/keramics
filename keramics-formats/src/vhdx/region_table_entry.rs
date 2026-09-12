@@ -62,11 +62,7 @@ impl VhdxRegionTableEntry {
         self.type_identifier = Uuid::from_le_bytes(&data[0..16]);
         self.data_offset = bytes_to_u64_le!(data, 16);
         self.data_size = bytes_to_u32_le!(data, 24);
-        self.is_required = if is_required_flag & 0x00000001 == 0 {
-            false
-        } else {
-            true
-        };
+        self.is_required = is_required_flag & 0x00000001 != 0;
         Ok(())
     }
 }

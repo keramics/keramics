@@ -86,8 +86,8 @@ impl ApmVolumeSystem {
                 &mut partition_map_signature,
                 SeekFrom::Start(offset)
             );
-            if &partition_map_signature[0..2] == APM_PARTITION_MAP_SIGNATURE
-                && &partition_map_signature[48..67] == APM_PARTITION_MAP_TYPE
+            if partition_map_signature[0..2] == APM_PARTITION_MAP_SIGNATURE
+                && partition_map_signature[48..67] == APM_PARTITION_MAP_TYPE
             {
                 self.bytes_per_sector = *bytes_per_sector;
                 break;
@@ -163,7 +163,7 @@ impl PartitionIterator for ApmVolumeSystem {
         match self.partition_map_entries.get(partition_index) {
             Some(partition_entry) => match self.data_stream.as_ref() {
                 Some(data_stream) => Ok(ApmPartition::new(
-                    &data_stream,
+                    data_stream,
                     self.bytes_per_sector,
                     partition_entry,
                 )),

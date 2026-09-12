@@ -81,7 +81,7 @@ impl OsFileSystem {
             Ok(false) => Err(keramics_core::error_trace_new!("Missing file entry")),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open OS root directory");
-                return Err(error);
+                Err(error)
             }
         }
     }

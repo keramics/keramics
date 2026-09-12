@@ -60,7 +60,7 @@ impl<K: Hash + Eq + Clone, V> LruCache<K, V> {
     /// Retrieves a specific value from the cache.
     pub fn get(&mut self, key: &K) -> Option<&V> {
         match self.values.get(key) {
-            Some(entry) => Some(&(*entry).value),
+            Some(entry) => Some(&entry.value),
             None => None,
         }
     }
@@ -68,7 +68,7 @@ impl<K: Hash + Eq + Clone, V> LruCache<K, V> {
     /// Retrieves a specific mutable value from the cache.
     pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
         match self.values.get_mut(key) {
-            Some(entry) => Some(&mut (*entry).value),
+            Some(entry) => Some(&mut entry.value),
             None => None,
         }
     }
@@ -104,10 +104,10 @@ impl<K: Hash + Eq + Clone, V: Clone> SharedLruCache<K, V> {
         match self.cache.read() {
             Ok(cache) => Ok(cache.contains(key)),
             Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
+                Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain read lock on cache",
                     error
-                ));
+                ))
             }
         }
     }
@@ -117,10 +117,10 @@ impl<K: Hash + Eq + Clone, V: Clone> SharedLruCache<K, V> {
         match self.cache.write() {
             Ok(mut cache) => Ok(cache.get(key).cloned()),
             Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
+                Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain write lock on cache",
                     error
-                ));
+                ))
             }
         }
     }
@@ -128,12 +128,15 @@ impl<K: Hash + Eq + Clone, V: Clone> SharedLruCache<K, V> {
     /// Inserts a specific value into the cache.
     pub fn insert(&self, key: K, value: V) -> Result<(), ErrorTrace> {
         match self.cache.write() {
-            Ok(mut cache) => Ok(cache.insert(key, value)),
+            Ok(mut cache) => {
+                let _: () = cache.insert(key, value);
+                Ok(())
+            },
             Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
+                Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain write lock on cache",
                     error
-                ));
+                ))
             }
         }
     }

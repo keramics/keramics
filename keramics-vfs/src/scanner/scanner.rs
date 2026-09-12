@@ -279,32 +279,29 @@ impl VfsScanner {
 
                 match path.file_name() {
                     Some(file_name) => match file_name.extension() {
-                        Ok(Some(extension)) => match extension.to_string().as_str() {
-                            "sparsebundle" => {
-                                let sub_node_path: Path = Path::from("/");
-                                let sub_node_vfs_location: VfsLocation = vfs_location
-                                    .new_with_layer(&VfsType::SparseBundle, sub_node_path);
-                                let mut sub_scan_node: VfsScanNode =
-                                    VfsScanNode::new(sub_node_vfs_location);
+                        Ok(Some(extension)) => if extension.to_string().as_str() == "sparsebundle" {
+                            let sub_node_path: Path = Path::from("/");
+                            let sub_node_vfs_location: VfsLocation = vfs_location
+                                .new_with_layer(&VfsType::SparseBundle, sub_node_path);
+                            let mut sub_scan_node: VfsScanNode =
+                                VfsScanNode::new(sub_node_vfs_location);
 
-                                match self.scan_for_sub_nodes(
-                                    scan_options,
-                                    &file_system,
-                                    vfs_location,
-                                    &mut sub_scan_node,
-                                ) {
-                                    Ok(_) => {}
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            "Unable to scan for sub nodes"
-                                        );
-                                        return Err(error);
-                                    }
+                            match self.scan_for_sub_nodes(
+                                scan_options,
+                                &file_system,
+                                vfs_location,
+                                &mut sub_scan_node,
+                            ) {
+                                Ok(_) => {}
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to scan for sub nodes"
+                                    );
+                                    return Err(error);
                                 }
-                                scan_node.sub_nodes.push(sub_scan_node);
                             }
-                            _ => {}
+                            scan_node.sub_nodes.push(sub_scan_node);
                         },
                         Ok(None) => {}
                         Err(mut error) => {
@@ -424,7 +421,7 @@ impl VfsScanner {
                         error,
                         "Unable to scan data stream for file system formats"
                     );
-                    return Err(error);
+                    Err(error)
                 }
             },
             VfsType::Ewf
@@ -592,11 +589,8 @@ impl VfsScanner {
             let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                match vfs_credential {
-                    VfsCredential::Passphrase(passphrase) => {
-                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                    }
-                    _ => {}
+                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
+                    credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
                 }
             }
             match cdsaencr_container.unlock(&credentials) {
@@ -689,41 +683,38 @@ impl VfsScanner {
             let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_path);
             let mut layer_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location);
 
-            match self.scan_for_format(&node_file_system, &layer_scan_node.location)? {
-                Some(format_identifier) => {
-                    let sub_node_vfs_type: VfsType = match Self::get_vfs_type(&format_identifier) {
-                        Some(vfs_type) => vfs_type,
-                        None => {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Found unsupported format signature: {}",
-                                format_identifier
-                            )));
-                        }
-                    };
-                    let sub_node_path: Path = Path::from("/");
-                    let sub_node_vfs_location: VfsLocation = layer_scan_node
-                        .location
-                        .new_with_layer(&sub_node_vfs_type, sub_node_path);
-                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
-
-                    match self.scan_for_sub_nodes(
-                        scan_options,
-                        &node_file_system,
-                        &layer_scan_node.location,
-                        &mut sub_scan_node,
-                    ) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to scan for sub nodes"
-                            );
-                            return Err(error);
-                        }
+            if let Some(format_identifier) = self.scan_for_format(&node_file_system, &layer_scan_node.location)? {
+                let sub_node_vfs_type: VfsType = match Self::get_vfs_type(&format_identifier) {
+                    Some(vfs_type) => vfs_type,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Found unsupported format signature: {}",
+                            format_identifier
+                        )));
                     }
-                    layer_scan_node.sub_nodes.push(sub_scan_node);
+                };
+                let sub_node_path: Path = Path::from("/");
+                let sub_node_vfs_location: VfsLocation = layer_scan_node
+                    .location
+                    .new_with_layer(&sub_node_vfs_type, sub_node_path);
+                let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
+
+                match self.scan_for_sub_nodes(
+                    scan_options,
+                    &node_file_system,
+                    &layer_scan_node.location,
+                    &mut sub_scan_node,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan for sub nodes"
+                        );
+                        return Err(error);
+                    }
                 }
-                None => {}
+                layer_scan_node.sub_nodes.push(sub_scan_node);
             }
             scan_node.sub_nodes.push(layer_scan_node);
         }
@@ -1010,7 +1001,7 @@ impl VfsScanner {
                     }
                 }
             }
-            VfsType::Os => match self.scan_for_format(&file_system, vfs_location)? {
+            VfsType::Os => match self.scan_for_format(file_system, vfs_location)? {
                 Some(FormatIdentifier::CdsaEncr) => {
                     // TODO: Set VfsType::SparseImage based on extension?
                     scan_node.add_locked_sub_node(&VfsType::Udif);
@@ -1494,36 +1485,32 @@ impl VfsScanner {
             };
 
         match vfs_type {
-            VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel => {
-                if scan_options.partitions == VfsScanOptionGroup::NotSet {
+            VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel
+                if scan_options.partitions == VfsScanOptionGroup::NotSet => {
                     // TODO: invoke mediator to ask which partitions to include.
                 }
-            }
-            VfsType::LinuxLvm => {
-                if scan_options.volumes == VfsScanOptionGroup::NotSet {
+            VfsType::LinuxLvm
+                if scan_options.volumes == VfsScanOptionGroup::NotSet => {
                     // TODO: invoke mediator to ask which volumes to include.
                 }
-            }
             _ => {}
         };
         for volume_index in 0..number_of_volumes {
             let vfs_type: &VfsType = scan_node.get_type();
 
             match vfs_type {
-                VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel => {
+                VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel
                     if scan_options.partitions != VfsScanOptionGroup::NotSet
                         && !scan_options.partitions.contains_index(volume_index + 1)
-                    {
+                    => {
                         continue;
                     }
-                }
-                VfsType::LinuxLvm => {
+                VfsType::LinuxLvm
                     if scan_options.volumes != VfsScanOptionGroup::NotSet
                         && !scan_options.volumes.contains_index(volume_index + 1)
-                    {
+                    => {
                         continue;
                     }
-                }
                 _ => {}
             };
             // TODO: use volume identifier in location?
@@ -1533,41 +1520,38 @@ impl VfsScanner {
             let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_path);
             let mut volume_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location);
 
-            match self.scan_for_format(&node_file_system, &volume_scan_node.location)? {
-                Some(format_identifier) => {
-                    let sub_node_vfs_type: VfsType = match Self::get_vfs_type(&format_identifier) {
-                        Some(vfs_type) => vfs_type,
-                        None => {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Found unsupported format signature: {}",
-                                format_identifier
-                            )));
-                        }
-                    };
-                    let sub_node_path: Path = Path::from("/");
-                    let sub_node_vfs_location: VfsLocation = volume_scan_node
-                        .location
-                        .new_with_layer(&sub_node_vfs_type, sub_node_path);
-                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
-
-                    match self.scan_for_sub_nodes(
-                        scan_options,
-                        &node_file_system,
-                        &volume_scan_node.location,
-                        &mut sub_scan_node,
-                    ) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to scan for sub nodes"
-                            );
-                            return Err(error);
-                        }
+            if let Some(format_identifier) = self.scan_for_format(&node_file_system, &volume_scan_node.location)? {
+                let sub_node_vfs_type: VfsType = match Self::get_vfs_type(&format_identifier) {
+                    Some(vfs_type) => vfs_type,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Found unsupported format signature: {}",
+                            format_identifier
+                        )));
                     }
-                    volume_scan_node.sub_nodes.push(sub_scan_node);
+                };
+                let sub_node_path: Path = Path::from("/");
+                let sub_node_vfs_location: VfsLocation = volume_scan_node
+                    .location
+                    .new_with_layer(&sub_node_vfs_type, sub_node_path);
+                let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
+
+                match self.scan_for_sub_nodes(
+                    scan_options,
+                    &node_file_system,
+                    &volume_scan_node.location,
+                    &mut sub_scan_node,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan for sub nodes"
+                        );
+                        return Err(error);
+                    }
                 }
-                None => {}
+                volume_scan_node.sub_nodes.push(sub_scan_node);
             }
             scan_node.sub_nodes.push(volume_scan_node);
         }

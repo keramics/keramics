@@ -147,7 +147,7 @@ impl HashTool {
                 return Err(error);
             }
         };
-        let hash_string: String = match self.calculate_hash_from_data_stream(&data_stream) {
+        let hash_string: String = match self.calculate_hash_from_data_stream(data_stream) {
             Ok(hash) => hash,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -391,30 +391,27 @@ impl HashTool {
             };
             let mut path_filter: PathFilter = PathFilter::new();
 
-            match file_system.as_ref() {
-                VfsFileSystem::Ntfs(ntfs_file_system) => {
-                    path_filter.set_case_folding(PathCharacterMappings::Ucs2(
-                        ntfs_file_system.get_case_folding_mappings(),
-                    ));
-                    path_filter.add_signature(PathFilterSignature::new(
-                        WindowsPath::from_str("\\$BadClus"),
-                        Some(PathComponent::from(Ucs2String::from("$Bad"))),
-                    ));
-                    path_filter.add_signature(PathFilterSignature::new(
-                        WindowsPath::from_str("\\hiberfil.sys"),
-                        None,
-                    ));
-                    path_filter.add_signature(PathFilterSignature::new(
-                        WindowsPath::from_str("\\pagefile.sys"),
-                        None,
-                    ));
-                    // TODO: add option for dfImageTools compatibility mode
-                    // path_filter.add_signature(PathFilterSignature::new(
-                    //     Path::from("/**"),
-                    //     Some(PathComponent::from("WofCompressedData")),
-                    // ));
-                }
-                _ => {}
+            if let VfsFileSystem::Ntfs(ntfs_file_system) = file_system.as_ref() {
+                path_filter.set_case_folding(PathCharacterMappings::Ucs2(
+                    ntfs_file_system.get_case_folding_mappings(),
+                ));
+                path_filter.add_signature(PathFilterSignature::new(
+                    WindowsPath::from_str("\\$BadClus"),
+                    Some(PathComponent::from(Ucs2String::from("$Bad"))),
+                ));
+                path_filter.add_signature(PathFilterSignature::new(
+                    WindowsPath::from_str("\\hiberfil.sys"),
+                    None,
+                ));
+                path_filter.add_signature(PathFilterSignature::new(
+                    WindowsPath::from_str("\\pagefile.sys"),
+                    None,
+                ));
+                // TODO: add option for dfImageTools compatibility mode
+                // path_filter.add_signature(PathFilterSignature::new(
+                //     Path::from("/**"),
+                //     Some(PathComponent::from("WofCompressedData")),
+                // ));
             }
             match path_filter.build() {
                 Ok(_) => {}
@@ -683,10 +680,7 @@ fn main() -> ExitCode {
                         println!("No file system found in source");
                         return ExitCode::FAILURE;
                     }
-                    let name: Option<PathComponent> = match command_arguments.name {
-                        Some(ref name) => Some(PathComponent::from(name)),
-                        None => None,
-                    };
+                    let name: Option<PathComponent> = command_arguments.name.as_ref().map(PathComponent::from);
                     let path: Path = Path::from(&command_arguments.path);
 
                     match hash_tool.calculate_hash_from_scan_node_with_path(

@@ -56,18 +56,10 @@ impl SparseBundleFileSystem {
                 if path.get_number_of_components() > 2 {
                     return false;
                 }
-                if path_component != "sparsebundle1" {
-                    false
-                } else {
-                    true
-                }
+                path_component == "sparsebundle1"
             }
             None => {
-                if path.is_empty() {
-                    false
-                } else {
-                    true
-                }
+                !path.is_empty()
             }
         }
     }
@@ -182,11 +174,8 @@ impl SparseBundleFileSystem {
             let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                match vfs_credential {
-                    VfsCredential::Passphrase(passphrase) => {
-                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                    }
-                    _ => {}
+                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
+                    credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
                 }
             }
             match image.unlock(&credentials) {

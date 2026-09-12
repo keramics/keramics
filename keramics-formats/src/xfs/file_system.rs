@@ -300,7 +300,7 @@ impl XfsFileSystem {
                 .push(inode_information.inode_btree_root_block_number);
 
             allocation_group_index += 1;
-            superblock_offset += allocation_group_size as u64;
+            superblock_offset += allocation_group_size;
 
             if allocation_group_index >= number_of_allocation_groups || allocation_group_size == 0 {
                 break;

@@ -78,7 +78,7 @@ impl ApfsKeyBag {
         }
         keramics_core::debug_trace_structure!(ApfsObjectHeader::debug_read_data(data));
 
-        match self.object_header.read_data(&data) {
+        match self.object_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read object header");
@@ -176,7 +176,7 @@ impl ApfsKeyBag {
         position: SeekFrom,
     ) -> Result<(), ErrorTrace> {
         // Note that 65536 is an arbitrary chosen limit.
-        if data_size < 48 || data_size > 65536 {
+        if !(48..=65536).contains(&data_size) {
             return Err(keramics_core::error_trace_new!(
                 "Invalid key bag size value out of bounds"
             ));

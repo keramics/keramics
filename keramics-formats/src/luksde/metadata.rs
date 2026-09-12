@@ -56,9 +56,9 @@ impl LuksMetadata {
                 return Err(keramics_core::error_trace_new!("Missing metadata"));
             }
         };
-        let mut inner_pairs: Pairs<Rule> = token_pair.into_inner();
+        let inner_pairs: Pairs<Rule> = token_pair.into_inner();
 
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -87,7 +87,7 @@ impl LuksMetadata {
     }
 
     /// Parses a config object.
-    fn parse_config_object(&mut self, mut inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
+    fn parse_config_object(&mut self, _inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
         Ok(())
     }
 
@@ -136,8 +136,8 @@ impl LuksMetadata {
     }
 
     /// Parses a digests object.
-    fn parse_digests_object(&mut self, mut inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
-        while let Some(token_pair) = inner_pairs.next() {
+    fn parse_digests_object(&mut self, inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -193,7 +193,7 @@ impl LuksMetadata {
     fn parse_keyslot_property(
         &mut self,
         mut inner_pairs: Pairs<Rule>,
-        key_slot: &mut LuksKeySlot,
+        _key_slot: &mut LuksKeySlot,
     ) -> Result<(), ErrorTrace> {
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
@@ -211,7 +211,7 @@ impl LuksMetadata {
                 // TODO: parse.
             }
             Rule::json_property => {
-                let (identifier, value): (&str, &str) =
+                let (identifier, _value): (&str, &str) =
                     match self.parse_json_property(token_pair.into_inner()) {
                         Ok(result) => result,
                         Err(mut error) => {
@@ -251,11 +251,11 @@ impl LuksMetadata {
     /// Parses a keyslot object.
     fn parse_keyslot_object(
         &mut self,
-        mut inner_pairs: Pairs<Rule>,
+        inner_pairs: Pairs<Rule>,
     ) -> Result<LuksKeySlot, ErrorTrace> {
         let mut key_slot: LuksKeySlot = LuksKeySlot::new();
 
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -338,8 +338,8 @@ impl LuksMetadata {
     }
 
     /// Parses a keyslots object.
-    fn parse_keyslots_object(&mut self, mut inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
-        while let Some(token_pair) = inner_pairs.next() {
+    fn parse_keyslots_object(&mut self, inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -412,8 +412,8 @@ impl LuksMetadata {
     }
 
     /// Parses a segments object.
-    fn parse_segments_object(&mut self, mut inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
-        while let Some(token_pair) = inner_pairs.next() {
+    fn parse_segments_object(&mut self, inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -442,13 +442,13 @@ impl LuksMetadata {
     }
 
     /// Parses a tokens property.
-    fn parse_tokens_property(&mut self, mut inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
+    fn parse_tokens_property(&mut self, _inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
         Ok(())
     }
 
     /// Parses a tokens object.
-    fn parse_tokens_object(&mut self, mut inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
-        while let Some(token_pair) = inner_pairs.next() {
+    fn parse_tokens_object(&mut self, inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -477,8 +477,8 @@ impl LuksMetadata {
     }
 
     /// Parses a top level property.
-    fn parse_top_level_property(&mut self, mut inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
-        while let Some(token_pair) = inner_pairs.next() {
+    fn parse_top_level_property(&mut self, inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -584,7 +584,7 @@ impl LuksMetadata {
                 "Unsupported non-ASCII metadata"
             ));
         }
-        match self.parse(&string.trim_end_matches('\0')) {
+        match self.parse(string.trim_end_matches('\0')) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(

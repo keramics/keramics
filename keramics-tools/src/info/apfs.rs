@@ -505,7 +505,7 @@ impl ApfsInfo {
 
     /// Prints information about a file entry.
     fn print_file_entry(file_entry: &mut ApfsFileEntry) -> Result<(), ErrorTrace> {
-        let file_entry_information: ApfsFileEntryInfo = ApfsFileEntryInfo::new(&file_entry);
+        let file_entry_information: ApfsFileEntryInfo = ApfsFileEntryInfo::new(file_entry);
 
         print!("{}", file_entry_information);
 

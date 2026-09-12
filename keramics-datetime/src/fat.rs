@@ -88,8 +88,8 @@ fn fat_get_time_values_with_fraction(time: u16, fraction: u8) -> (u8, u8, u8, u8
     let milliseconds: u16 = ((seconds as u16) * 100) + (fraction as u16);
 
     (
-        hours as u8,
-        minutes as u8,
+        hours,
+        minutes,
         (milliseconds / 100) as u8,
         (milliseconds % 100) as u8,
     )

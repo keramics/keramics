@@ -61,7 +61,7 @@ impl<'a> fmt::Display for GptPartitionInfo<'a> {
         )?;
         let type_identifier: &Uuid = self.partition.get_type_identifier();
 
-        match self.get_type_identifier_string(&type_identifier) {
+        match self.get_type_identifier_string(type_identifier) {
             Some(type_identifier_string) => {
                 writeln!(
                     formatter,

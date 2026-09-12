@@ -421,33 +421,30 @@ impl VhdxFile {
         };
         let mut physical_sector_size: u32 = 0;
 
-        match metadata_table.get_entry(&VHDX_PHYSICAL_SECTOR_SIZE_METADATA_IDENTIFIER) {
-            Some(metadata_table_entry) => {
-                if metadata_table_entry.item_size != 4 {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported physical sector size metadata item size: {}",
-                        metadata_table_entry.item_size
-                    )));
-                }
-                let mut data: [u8; 4] = [0; 4];
-                let metadata_item_offset: u64 =
-                    metadata_region.data_offset + metadata_table_entry.item_offset as u64;
-
-                keramics_core::data_stream_read_at_position!(
-                    data_stream,
-                    &mut data,
-                    SeekFrom::Start(metadata_item_offset)
-                );
-                physical_sector_size = bytes_to_u32_le!(data, 0);
-
-                if physical_sector_size != 512 && physical_sector_size != 4096 {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Invalid physical sector size: {} value out of bounds",
-                        physical_sector_size
-                    )));
-                }
+        if let Some(metadata_table_entry) = metadata_table.get_entry(&VHDX_PHYSICAL_SECTOR_SIZE_METADATA_IDENTIFIER) {
+            if metadata_table_entry.item_size != 4 {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported physical sector size metadata item size: {}",
+                    metadata_table_entry.item_size
+                )));
             }
-            None => {}
+            let mut data: [u8; 4] = [0; 4];
+            let metadata_item_offset: u64 =
+                metadata_region.data_offset + metadata_table_entry.item_offset as u64;
+
+            keramics_core::data_stream_read_at_position!(
+                data_stream,
+                &mut data,
+                SeekFrom::Start(metadata_item_offset)
+            );
+            physical_sector_size = bytes_to_u32_le!(data, 0);
+
+            if physical_sector_size != 512 && physical_sector_size != 4096 {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid physical sector size: {} value out of bounds",
+                    physical_sector_size
+                )));
+            }
         };
         let virtual_disk_identifier: Uuid;
 
@@ -489,70 +486,55 @@ impl VhdxFile {
             debug_trace.print_field("virtual_disk_identifier", virtual_disk_identifier);
             debug_trace.print_end();
         });
-        match metadata_table.get_entry(&VHDX_PARENT_LOCATOR_METADATA_IDENTIFIER) {
-            Some(metadata_table_entry) => {
-                let mut parent_locator: VhdxParentLocator = VhdxParentLocator::new();
-                let metadata_item_offset: u64 =
-                    metadata_region.data_offset + metadata_table_entry.item_offset as u64;
+        if let Some(metadata_table_entry) = metadata_table.get_entry(&VHDX_PARENT_LOCATOR_METADATA_IDENTIFIER) {
+            let mut parent_locator: VhdxParentLocator = VhdxParentLocator::new();
+            let metadata_item_offset: u64 =
+                metadata_region.data_offset + metadata_table_entry.item_offset as u64;
 
-                match parent_locator.read_at_position(
-                    data_stream,
-                    metadata_table_entry.item_size,
-                    SeekFrom::Start(metadata_item_offset),
-                ) {
-                    Ok(_) => {}
+            match parent_locator.read_at_position(
+                data_stream,
+                metadata_table_entry.item_size,
+                SeekFrom::Start(metadata_item_offset),
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read parent locator"
+                    );
+                    return Err(error);
+                }
+            }
+            if let Some(ucs2_string) = parent_locator.get_entry("parent_linkage") {
+                // TODO: improve handling of invalid string.
+                let uuid_string: String = ucs2_string.to_string();
+
+                let parent_identifier: Uuid = match Uuid::from_string(uuid_string.as_str())
+                {
+                    Ok(uuid) => uuid,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read parent locator"
+                            "Unable to parse parent identifier",
                         );
                         return Err(error);
                     }
-                }
-                match parent_locator.get_entry("parent_linkage") {
-                    Some(ucs2_string) => {
-                        // TODO: improve handling of invalid string.
-                        let uuid_string: String = ucs2_string.to_string();
-
-                        let parent_identifier: Uuid = match Uuid::from_string(uuid_string.as_str())
-                        {
-                            Ok(uuid) => uuid,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to parse parent identifier",
-                                );
-                                return Err(error);
-                            }
-                        };
-                        self.parent_identifier = Some(parent_identifier);
-                    }
-                    None => {}
                 };
-                match parent_locator.get_entry("absolute_win32_path") {
-                    Some(ucs2_string) => {
-                        self.parent_name = Some(ucs2_string.clone());
-                    }
-                    None => {}
+                self.parent_identifier = Some(parent_identifier);
+            };
+            if let Some(ucs2_string) = parent_locator.get_entry("absolute_win32_path") {
+                self.parent_name = Some(ucs2_string.clone());
+            };
+            if self.parent_name.is_none() {
+                if let Some(ucs2_string) = parent_locator.get_entry("volume_path") {
+                    self.parent_name = Some(ucs2_string.clone());
                 };
-                if self.parent_name.is_none() {
-                    match parent_locator.get_entry("volume_path") {
-                        Some(ucs2_string) => {
-                            self.parent_name = Some(ucs2_string.clone());
-                        }
-                        None => {}
-                    };
-                }
-                if self.parent_name.is_none() {
-                    match parent_locator.get_entry("relative_path") {
-                        Some(ucs2_string) => {
-                            self.parent_name = Some(ucs2_string.clone());
-                        }
-                        None => {}
-                    };
-                }
             }
-            None => {}
+            if self.parent_name.is_none() {
+                if let Some(ucs2_string) = parent_locator.get_entry("relative_path") {
+                    self.parent_name = Some(ucs2_string.clone());
+                };
+            }
         };
         Ok(())
     }

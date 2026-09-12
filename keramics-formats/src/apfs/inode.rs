@@ -155,10 +155,7 @@ impl ApfsInode {
                     return Err(error);
                 }
             }
-            self.name = match extended_fields.get(&4) {
-                Some(field_data) => Some(ByteString::from(field_data)),
-                None => None,
-            };
+            self.name = extended_fields.get(&4).map(ByteString::from);
             self.data_stream_descriptor = match extended_fields.get(&8) {
                 Some(field_data) => {
                     keramics_core::debug_trace_structure!(

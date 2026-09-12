@@ -118,13 +118,13 @@ impl<'a> fmt::Display for EwfImageInfo<'a> {
         }
         let md5_hash: &[u8] = self.image.get_md5_hash();
 
-        if md5_hash != &[0; 16] {
+        if md5_hash != [0; 16] {
             let hash_string: String = format_as_string(md5_hash);
             writeln!(formatter, "        MD5\t\t\t\t\t: {}", hash_string)?;
         }
         let sha1_hash: &[u8] = self.image.get_sha1_hash();
 
-        if sha1_hash != &[0; 20] {
+        if sha1_hash != [0; 20] {
             let hash_string: String = format_as_string(sha1_hash);
             writeln!(formatter, "        SHA1\t\t\t\t\t: {}", hash_string)?;
         }

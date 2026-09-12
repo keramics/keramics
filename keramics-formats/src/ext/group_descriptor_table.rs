@@ -68,7 +68,7 @@ impl ExtGroupDescriptorTable {
 
             let data_end_offset: usize = data_offset + self.group_descriptor_size;
 
-            if &data[data_offset..data_end_offset] == &empty_group_descriptor {
+            if data[data_offset..data_end_offset] == empty_group_descriptor {
                 break;
             }
             // Note that the ExtGroupDescriptor read functions rely on the size of the group descriptor.
@@ -85,32 +85,29 @@ impl ExtGroupDescriptorTable {
                     return Err(error);
                 }
             }
-            match self.metadata_checksum_seed {
-                Some(checksum_seed) => {
-                    // TODO: add support for crc16 used by EXT4_FEATURE_RO_COMPAT_GDT_CSUM
-                    let mut crc32_context: ReversedCrc32Context =
-                        ReversedCrc32Context::new(0x82f63b78, checksum_seed);
+            if let Some(checksum_seed) = self.metadata_checksum_seed {
+                // TODO: add support for crc16 used by EXT4_FEATURE_RO_COMPAT_GDT_CSUM
+                let mut crc32_context: ReversedCrc32Context =
+                    ReversedCrc32Context::new(0x82f63b78, checksum_seed);
 
-                    let group_number_data: [u8; 4] =
-                        (self.first_group_number + group_number).to_le_bytes();
-                    crc32_context.update(&group_number_data);
-                    crc32_context.update(&data[data_offset..data_offset + 30]);
-                    crc32_context.update(&[0; 2]);
-                    crc32_context.update(&data[data_offset + 32..data_end_offset]);
+                let group_number_data: [u8; 4] =
+                    (self.first_group_number + group_number).to_le_bytes();
+                crc32_context.update(&group_number_data);
+                crc32_context.update(&data[data_offset..data_offset + 30]);
+                crc32_context.update(&[0; 2]);
+                crc32_context.update(&data[data_offset + 32..data_end_offset]);
 
-                    let mut calculated_checksum: u32 = crc32_context.finalize();
-                    calculated_checksum = (0xffffffff - calculated_checksum) & 0x0000ffff;
+                let mut calculated_checksum: u32 = crc32_context.finalize();
+                calculated_checksum = (0xffffffff - calculated_checksum) & 0x0000ffff;
 
-                    if group_descriptor.checksum != 0
-                        && (group_descriptor.checksum as u32) != calculated_checksum
-                    {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Mismatch between stored: 0x{:04x} and calculated: 0x{:04x} checksums",
-                            group_descriptor.checksum, calculated_checksum
-                        )));
-                    }
+                if group_descriptor.checksum != 0
+                    && (group_descriptor.checksum as u32) != calculated_checksum
+                {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Mismatch between stored: 0x{:04x} and calculated: 0x{:04x} checksums",
+                        group_descriptor.checksum, calculated_checksum
+                    )));
                 }
-                None => {}
             };
             data_offset = data_end_offset;
 

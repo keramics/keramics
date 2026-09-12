@@ -120,11 +120,11 @@ impl VfsFileSystem {
                             error,
                             "Unable to retrieve APFS file entry"
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 },
                 None => {
-                    return Err(keramics_core::error_trace_new!("Missing APFS file system"));
+                    Err(keramics_core::error_trace_new!("Missing APFS file system"))
                 }
             },
             VfsFileSystem::ApfsContainer(apfs_container_file_system) => {
@@ -167,7 +167,7 @@ impl VfsFileSystem {
                             error,
                             "Unable to determine if fake file entry exists"
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }
@@ -194,7 +194,7 @@ impl VfsFileSystem {
                             error,
                             "Unable to retrieve HFS file entry"
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }
@@ -209,7 +209,7 @@ impl VfsFileSystem {
                             error,
                             "Unable to retrieve NTFS file entry"
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }
@@ -500,7 +500,7 @@ impl VfsFileSystem {
                     }
                 },
                 None => {
-                    return Err(keramics_core::error_trace_new!("Missing APFS file system"));
+                    Err(keramics_core::error_trace_new!("Missing APFS file system"))
                 }
             },
             VfsFileSystem::ApfsContainer(apfs_container_file_system) => {

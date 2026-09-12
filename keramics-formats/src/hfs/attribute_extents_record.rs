@@ -69,7 +69,7 @@ impl HfsAttributeExtentsRecord {
         for data_offset in (8..72).step_by(8) {
             let data_end_offset = data_offset + 8;
 
-            if &data[data_offset..data_end_offset] == [0; 8] {
+            if data[data_offset..data_end_offset] == [0; 8] {
                 break;
             }
             let mut extent_descriptor: HfsExtentDescriptor = HfsExtentDescriptor::new();

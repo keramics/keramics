@@ -119,7 +119,7 @@ impl PyFatTimeDate10Ms {
     pub fn timestamp(&self) -> PyResult<u32> {
         let (seconds, fraction): (u32, u32) = self.fat_time_date.get_number_of_seconds();
 
-        Ok((seconds * 100) + (fraction as u32))
+        Ok((seconds * 100) + fraction)
     }
 }
 

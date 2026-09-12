@@ -42,7 +42,7 @@ impl XfsDirectoryListElementUnusedEntryV2 {
         if data.len() < 6 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        if &data[0..2] != &[0xff, 0xff] {
+        if data[0..2] != [0xff, 0xff] {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.entry_size = bytes_to_u16_be!(data, 2);

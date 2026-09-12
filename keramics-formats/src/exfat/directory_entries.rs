@@ -100,7 +100,7 @@ impl ExFatDirectoryEntries {
 
     /// Determines if the directory entries were read.
     pub fn is_read(&self) -> bool {
-        return self.is_read;
+        self.is_read
     }
 
     /// Reads the directory entries from a buffer.
@@ -317,7 +317,7 @@ impl ExFatDirectoryEntries {
         let mut read_cluster_block_numbers: HashSet<u32> = HashSet::new();
         let mut entries: Vec<ExFatDirectoryEntry> = Vec::new();
 
-        while cluster_block_number >= 2 && cluster_block_number < EXFAT_LARGEST_CLUSTER_BLOCK_NUMBER
+        while (2..EXFAT_LARGEST_CLUSTER_BLOCK_NUMBER).contains(&cluster_block_number)
         {
             if read_cluster_block_numbers.contains(&cluster_block_number) {
                 return Err(keramics_core::error_trace_new!(format!(

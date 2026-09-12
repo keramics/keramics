@@ -78,9 +78,9 @@ pub enum StorageMediaImage {
 
 impl StorageMediaImage {
     /// Opens a storage media image.
-    fn get_base_path_and_file_name<'a>(
-        path: &'a PathBuf,
-    ) -> Result<(PathBuf, &'a str), ErrorTrace> {
+    fn get_base_path_and_file_name(
+        path: &PathBuf,
+    ) -> Result<(PathBuf, &str), ErrorTrace> {
         let mut base_path: PathBuf = path.clone();
         base_path.pop();
 
@@ -208,10 +208,7 @@ impl StorageMediaImage {
                     format_identifier
                 )));
             }
-            None => match Self::open_splitraw_image(path) {
-                Ok(storage_media_image) => return Ok(storage_media_image),
-                Err(_) => {}
-            },
+            None => if let Ok(storage_media_image) = Self::open_splitraw_image(path) { return Ok(storage_media_image) },
         };
         // Scan for volume and file system formats to detect encrypted volumes and raw storage
         // media images.
@@ -376,11 +373,8 @@ impl StorageMediaImage {
             let mut credentials: Vec<LuksCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                match vfs_credential {
-                    VfsCredential::Passphrase(passphrase) => {
-                        credentials.push(LuksCredential::Passphrase(passphrase.clone()))
-                    }
-                    _ => {}
+                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
+                    credentials.push(LuksCredential::Passphrase(passphrase.clone()))
                 }
             }
             match luks_volume.unlock(&credentials) {
@@ -507,11 +501,8 @@ impl StorageMediaImage {
             let mut credentials: Vec<QcowCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                match vfs_credential {
-                    VfsCredential::Passphrase(passphrase) => {
-                        credentials.push(QcowCredential::Passphrase(passphrase.clone()))
-                    }
-                    _ => {}
+                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
+                    credentials.push(QcowCredential::Passphrase(passphrase.clone()))
                 }
             }
             match qcow_image.unlock(&credentials) {
@@ -560,13 +551,13 @@ impl StorageMediaImage {
             }
         };
         Ok(Self::Raw {
-            data_stream: data_stream,
+            data_stream,
         })
     }
 
     /// Opens a sparsebundle image.
     fn open_sparsebundle_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&path) {
+        let file_resolver: FileResolverReference = match open_os_file_resolver(path) {
             Ok(file_resolver) => file_resolver,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -594,11 +585,8 @@ impl StorageMediaImage {
             let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                match vfs_credential {
-                    VfsCredential::Passphrase(passphrase) => {
-                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                    }
-                    _ => {}
+                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
+                    credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
                 }
             }
             match sparsebundle_image.unlock(&credentials) {
@@ -647,11 +635,8 @@ impl StorageMediaImage {
             let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                match vfs_credential {
-                    VfsCredential::Passphrase(passphrase) => {
-                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                    }
-                    _ => {}
+                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
+                    credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
                 }
             }
             match sparseimage_file.unlock(&credentials) {
@@ -767,11 +752,8 @@ impl StorageMediaImage {
             let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                match vfs_credential {
-                    VfsCredential::Passphrase(passphrase) => {
-                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                    }
-                    _ => {}
+                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
+                    credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
                 }
             }
             match udif_image.unlock(&credentials) {

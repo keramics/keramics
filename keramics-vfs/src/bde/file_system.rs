@@ -50,18 +50,10 @@ impl BdeFileSystem {
                 if path.get_number_of_components() > 2 {
                     return false;
                 }
-                if path_component != "bde1" {
-                    false
-                } else {
-                    true
-                }
+                path_component == "bde1"
             }
             None => {
-                if path.is_empty() {
-                    false
-                } else {
-                    true
-                }
+                !path.is_empty()
             }
         }
     }

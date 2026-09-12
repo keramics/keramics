@@ -291,15 +291,9 @@ impl ExtFileSystem {
             } else if self.features.has_sparse_superblock2() {
                 false
             // Only block group numbers that are a power of 3, 5 or 7 contain a superblock.
-            } else if block_group_number == 1
+            } else { block_group_number == 1
                 || block_group_number == exponent3
-                || block_group_number == exponent5
-                || block_group_number == exponent7
-            {
-                true
-            } else {
-                false
-            };
+                || block_group_number == exponent5 || block_group_number == exponent7 };
             if block_group_has_superblock {
                 let mut superblock_offset: u64 = block_group_offset;
 

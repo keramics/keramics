@@ -112,12 +112,8 @@ impl GptVolumeSystem {
             }
         } else {
             for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter() {
-                match partition_table_header
-                    .read_at_position(data_stream, SeekFrom::Start(*bytes_per_sector as u64))
-                {
-                    Ok(_) => self.bytes_per_sector = *bytes_per_sector,
-                    Err(_) => {}
-                };
+                if partition_table_header
+                    .read_at_position(data_stream, SeekFrom::Start(*bytes_per_sector as u64)).is_ok() { self.bytes_per_sector = *bytes_per_sector };
                 if self.bytes_per_sector != 0 {
                     break;
                 }
@@ -148,7 +144,7 @@ impl GptVolumeSystem {
                         SeekFrom::End(-(self.bytes_per_sector as i64)),
                     ) {
                         Ok(_) => {}
-                        Err(error) => {
+                        Err(_error) => {
                             #[cfg(feature = "debug-trace")]
                             DebugTrace::static_scope(|debug_trace| {
                                 debug_trace.print(format!(
@@ -276,15 +272,15 @@ impl PartitionIterator for GptVolumeSystem {
                 Some(data_stream) => Ok(GptPartition::new(
                     data_stream,
                     self.bytes_per_sector,
-                    &partition_entry,
+                    partition_entry,
                 )),
                 None => Err(keramics_core::error_trace_new!("Missing data stream")),
             },
             None => {
-                return Err(keramics_core::error_trace_new!(format!(
+                Err(keramics_core::error_trace_new!(format!(
                     "No partition with index: {}",
                     partition_index
-                )));
+                )))
             }
         }
     }

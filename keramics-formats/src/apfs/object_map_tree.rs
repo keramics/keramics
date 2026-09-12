@@ -102,7 +102,7 @@ impl ApfsObjectMapTree {
 
             let mut node: ApfsBtreeNode = ApfsBtreeNode::new();
 
-            match node.read_at_position(&data_stream, SeekFrom::Start(node_offset)) {
+            match node.read_at_position(data_stream, SeekFrom::Start(node_offset)) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -247,7 +247,7 @@ impl ApfsObjectMapTree {
 
             let mut key: ApfsObjectMapKey = ApfsObjectMapKey::new();
 
-            match key.read_data(&key_data) {
+            match key.read_data(key_data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read key");
@@ -287,10 +287,10 @@ impl ApfsObjectMapTree {
             match node.get_value_data_by_index(last_entry_index) {
                 Some(value_data) => Ok(Some(value_data.to_vec())),
                 None => {
-                    return Err(keramics_core::error_trace_new!(format!(
+                    Err(keramics_core::error_trace_new!(format!(
                         "Unable to retrieve entry: {} value data",
                         last_entry_index
-                    )));
+                    )))
                 }
             }
         } else {

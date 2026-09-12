@@ -108,7 +108,7 @@ impl FatFileSystem {
     /// Retrieves the volume label.
     pub fn get_volume_label(&self) -> Option<&ByteString> {
         match self.root_directory_volume_label.as_ref() {
-            Some(label) => return Some(label),
+            Some(label) => Some(label),
             None => self.volume_label.as_ref(),
         }
     }
@@ -436,7 +436,7 @@ impl FatFileSystem {
             match directory_entries.read_at_position(
                 data_stream,
                 self.root_directory_size,
-                SeekFrom::Start(self.root_directory_offset as u64),
+                SeekFrom::Start(self.root_directory_offset),
             ) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -453,7 +453,7 @@ impl FatFileSystem {
         } else {
             match directory_entries.read_at_cluster_block(
                 data_stream,
-                &block_allocation_table,
+                block_allocation_table,
                 self.root_directory_cluster_block_number,
             ) {
                 Ok(_) => {}

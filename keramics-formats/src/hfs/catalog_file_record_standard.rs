@@ -103,7 +103,7 @@ impl HfsStandardCatalogFileRecord {
         for data_offset in (74..86).step_by(4) {
             let data_end_offset = data_offset + 4;
 
-            if &data[data_offset..data_end_offset] == [0; 4] {
+            if data[data_offset..data_end_offset] == [0; 4] {
                 break;
             }
             let mut extent_descriptor: HfsExtentDescriptor = HfsExtentDescriptor::new();
@@ -132,7 +132,7 @@ impl HfsStandardCatalogFileRecord {
         for data_offset in (86..98).step_by(4) {
             let data_end_offset = data_offset + 4;
 
-            if &data[data_offset..data_end_offset] == [0; 4] {
+            if data[data_offset..data_end_offset] == [0; 4] {
                 break;
             }
             let mut extent_descriptor: HfsExtentDescriptor = HfsExtentDescriptor::new();

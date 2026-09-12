@@ -113,7 +113,7 @@ impl LinuxLvmFileEntry {
                             error,
                             format!("Unable to retrieve volume: {}", sub_file_entry_index)
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }

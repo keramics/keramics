@@ -51,7 +51,7 @@ impl GptPartition {
         Self {
             data_stream: data_stream.clone(),
             partition_index: partition_entry.index,
-            offset: (partition_entry.start_block_number as u64) * (bytes_per_sector as u64),
+            offset: partition_entry.start_block_number * (bytes_per_sector as u64),
             type_identifier: partition_entry.type_identifier.clone(),
             identifier: partition_entry.identifier.clone(),
             size: partition_entry.get_number_of_blocks() * (bytes_per_sector as u64),

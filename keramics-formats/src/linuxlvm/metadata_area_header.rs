@@ -69,7 +69,7 @@ impl LinuxLvmMetadataAreaHeader {
         self.format_version = bytes_to_u32_le!(data, 20);
 
         for (descriptor_index, chunk) in data[40..136].chunks_exact(24).enumerate() {
-            if chunk == &[0; 24] {
+            if chunk == [0; 24] {
                 break;
             }
             let mut raw_location_descriptor: LinuxLvmRawLocationDescriptor =

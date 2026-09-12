@@ -93,7 +93,7 @@ impl VmdkSparseFileHeader {
         if &data[0..4] != VMDK_SPARSE_FILE_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
-        if &data[73..77] != [0x0a, 0x20, 0x0d, 0x0a] {
+        if data[73..77] != [0x0a, 0x20, 0x0d, 0x0a] {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported character values"
             ));

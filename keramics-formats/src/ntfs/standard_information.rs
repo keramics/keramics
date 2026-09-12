@@ -137,7 +137,7 @@ impl NtfsStandardInformation {
         if data_size < 48 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        let filetime: Filetime = Filetime::from_bytes(&data);
+        let filetime: Filetime = Filetime::from_bytes(data);
 
         self.creation_time = if filetime.timestamp == 0 {
             DateTime::NotSet

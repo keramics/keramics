@@ -312,7 +312,7 @@ impl BdeMetadataBlock {
         data_size: usize,
         position: SeekFrom,
     ) -> Result<(), ErrorTrace> {
-        if data_size < 112 || data_size > 65536 {
+        if !(112..=65536).contains(&data_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported metadata block data size: {} value out of bounds",
                 data_size

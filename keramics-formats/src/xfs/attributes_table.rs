@@ -49,7 +49,7 @@ impl XfsAttributesTable {
 
         let mut header: XfsAttributesTableHeader = XfsAttributesTableHeader::new();
 
-        match header.read_data(&data) {
+        match header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read header");

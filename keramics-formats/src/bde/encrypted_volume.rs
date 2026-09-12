@@ -504,12 +504,7 @@ impl BdeEncryptedVolume {
                 }
                 unencrypted_range.logical_offset = metadata_range_end_offset;
                 unencrypted_range.physical_offset = metadata_range_end_offset;
-                unencrypted_range.size = if unencrypted_range_end_offset < metadata_range_end_offset
-                {
-                    0
-                } else {
-                    unencrypted_range_end_offset - metadata_range_end_offset
-                };
+                unencrypted_range.size = unencrypted_range_end_offset.saturating_sub(metadata_range_end_offset);
             }
             if unencrypted_range.size > 0 {
                 adjusted_ranges.push(unencrypted_range);
@@ -782,47 +777,44 @@ impl BdeEncryptedVolume {
                     for (key_protector_index, key_protector) in
                         self.key_protectors.iter().enumerate()
                     {
-                        match key_protector.protector_type {
-                            BdeKeyProtectorType::Passphrase => {
-                                let mut volume_master_key: BdeVolumeMasterKey =
-                                    BdeVolumeMasterKey::new();
+                        if key_protector.protector_type == BdeKeyProtectorType::Passphrase {
+                            let mut volume_master_key: BdeVolumeMasterKey =
+                                BdeVolumeMasterKey::new();
 
-                                match volume_master_key.read_at_position(
-                                    data_stream,
-                                    key_protector.size,
-                                    SeekFrom::Start(key_protector.offset),
-                                ) {
-                                    Ok(_) => {}
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            format!(
-                                                "Unable to read volume master key: {}",
-                                                key_protector_index
-                                            ),
-                                        );
-                                        return Err(error);
-                                    }
-                                }
-                                match volume_master_key.unlock_with_password_hash(&password_hash) {
-                                    Ok(true) => {
-                                        vmk_key = volume_master_key.key;
-                                        vmk_key_unlocked = true;
-                                    }
-                                    Ok(false) => {}
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            format!(
-                                                "Unable to unlock volume master key: {} with password",
-                                                key_protector_index
-                                            ),
-                                        );
-                                        return Err(error);
-                                    }
+                            match volume_master_key.read_at_position(
+                                data_stream,
+                                key_protector.size,
+                                SeekFrom::Start(key_protector.offset),
+                            ) {
+                                Ok(_) => {}
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        format!(
+                                            "Unable to read volume master key: {}",
+                                            key_protector_index
+                                        ),
+                                    );
+                                    return Err(error);
                                 }
                             }
-                            _ => {}
+                            match volume_master_key.unlock_with_password_hash(&password_hash) {
+                                Ok(true) => {
+                                    vmk_key = volume_master_key.key;
+                                    vmk_key_unlocked = true;
+                                }
+                                Ok(false) => {}
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        format!(
+                                            "Unable to unlock volume master key: {} with password",
+                                            key_protector_index
+                                        ),
+                                    );
+                                    return Err(error);
+                                }
+                            }
                         }
                     }
                     if vmk_key_unlocked {
@@ -844,47 +836,44 @@ impl BdeEncryptedVolume {
                     for (key_protector_index, key_protector) in
                         self.key_protectors.iter().enumerate()
                     {
-                        match key_protector.protector_type {
-                            BdeKeyProtectorType::RecoveryPassword => {
-                                let mut volume_master_key: BdeVolumeMasterKey =
-                                    BdeVolumeMasterKey::new();
+                        if key_protector.protector_type == BdeKeyProtectorType::RecoveryPassword {
+                            let mut volume_master_key: BdeVolumeMasterKey =
+                                BdeVolumeMasterKey::new();
 
-                                match volume_master_key.read_at_position(
-                                    data_stream,
-                                    key_protector.size,
-                                    SeekFrom::Start(key_protector.offset),
-                                ) {
-                                    Ok(_) => {}
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            format!(
-                                                "Unable to read volume master key: {}",
-                                                key_protector_index
-                                            ),
-                                        );
-                                        return Err(error);
-                                    }
-                                }
-                                match volume_master_key.unlock_with_password_hash(&password_hash) {
-                                    Ok(true) => {
-                                        vmk_key = volume_master_key.key;
-                                        vmk_key_unlocked = true;
-                                    }
-                                    Ok(false) => {}
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            format!(
-                                                "Unable to unlock volume master key: {} with recovery password",
-                                                key_protector_index
-                                            ),
-                                        );
-                                        return Err(error);
-                                    }
+                            match volume_master_key.read_at_position(
+                                data_stream,
+                                key_protector.size,
+                                SeekFrom::Start(key_protector.offset),
+                            ) {
+                                Ok(_) => {}
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        format!(
+                                            "Unable to read volume master key: {}",
+                                            key_protector_index
+                                        ),
+                                    );
+                                    return Err(error);
                                 }
                             }
-                            _ => {}
+                            match volume_master_key.unlock_with_password_hash(&password_hash) {
+                                Ok(true) => {
+                                    vmk_key = volume_master_key.key;
+                                    vmk_key_unlocked = true;
+                                }
+                                Ok(false) => {}
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        format!(
+                                            "Unable to unlock volume master key: {} with recovery password",
+                                            key_protector_index
+                                        ),
+                                    );
+                                    return Err(error);
+                                }
+                            }
                         }
                     }
                     if vmk_key_unlocked {
@@ -949,7 +938,7 @@ impl BdeEncryptedVolume {
                             return Err(error);
                         }
                     };
-                    if &aes_ccm_encrypted_key.tag == &tag {
+                    if aes_ccm_encrypted_key.tag == tag {
                         let fvek_key_size: usize = fvek_key.len();
 
                         keramics_core::debug_trace_data!(

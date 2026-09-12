@@ -211,7 +211,7 @@ impl ExFatFileEntry {
     /// Reads the sub directory entries.
     fn read_sub_directory_entries(&mut self) -> Result<(), ErrorTrace> {
         let cluster_block_number: u32 = match &self.directory_entry {
-            Some(directory_entry) => directory_entry.data_start_cluster as u32,
+            Some(directory_entry) => directory_entry.data_start_cluster,
             None => {
                 return Err(keramics_core::error_trace_new!("Missing directory entry"));
             }

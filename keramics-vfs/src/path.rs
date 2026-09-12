@@ -24,10 +24,7 @@ impl VfsPath {
         if !string.starts_with(prefix) {
             return None;
         }
-        match string[prefix.len()..].parse::<usize>() {
-            Ok(numeric_suffix) => Some(numeric_suffix),
-            Err(_) => None,
-        }
+        string[prefix.len()..].parse::<usize>().ok()
     }
 }
 

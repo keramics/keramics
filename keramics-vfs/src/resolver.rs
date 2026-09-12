@@ -49,10 +49,10 @@ impl VfsResolver {
         match self.context.write() {
             Ok(mut context) => context.get_data_stream_by_location_and_name(vfs_location, name),
             Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
+                Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain write lock on context",
                     error
-                ));
+                ))
             }
         }
     }
@@ -65,10 +65,10 @@ impl VfsResolver {
         match self.context.write() {
             Ok(mut context) => context.get_file_entry_by_location(vfs_location),
             Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
+                Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain write lock on context",
                     error
-                ));
+                ))
             }
         }
     }
@@ -81,10 +81,10 @@ impl VfsResolver {
         match self.context.write() {
             Ok(mut context) => context.open_file_system(vfs_location),
             Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
+                Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain write lock on context",
                     error
-                ));
+                ))
             }
         }
     }

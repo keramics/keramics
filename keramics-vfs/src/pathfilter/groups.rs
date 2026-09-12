@@ -42,7 +42,7 @@ impl ComponentGroup {
         path_component: &PathComponent,
         signature: &Arc<PathFilterSignature>,
     ) {
-        match self.path_groups.get_mut(&path_component) {
+        match self.path_groups.get_mut(path_component) {
             Some(path_group) => path_group.append_signature(signature),
             None => {
                 let mut path_group: PathGroup = PathGroup::new(path_component);

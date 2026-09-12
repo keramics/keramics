@@ -60,9 +60,9 @@ impl LinuxLvmMetadata {
                 return Err(keramics_core::error_trace_new!("Missing metadata"));
             }
         };
-        let mut inner_pairs: Pairs<Rule> = token_pair.into_inner();
+        let inner_pairs: Pairs<Rule> = token_pair.into_inner();
 
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -119,7 +119,7 @@ impl LinuxLvmMetadata {
 
         logical_volume.name = token_pair.as_str().to_string();
 
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -212,7 +212,7 @@ impl LinuxLvmMetadata {
     /// Parses logical volumes.
     fn parse_logical_volumes(
         &self,
-        mut inner_pairs: Pairs<Rule>,
+        inner_pairs: Pairs<Rule>,
         volume_group: &mut LinuxLvmVolumeGroup,
     ) -> Result<(), ErrorTrace> {
         if !volume_group.logical_volumes.is_empty() {
@@ -220,7 +220,7 @@ impl LinuxLvmMetadata {
                 "Logical volumes already set"
             ));
         }
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -282,7 +282,7 @@ impl LinuxLvmMetadata {
         }
         physical_volume.name = name.to_string();
 
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -396,7 +396,7 @@ impl LinuxLvmMetadata {
     /// Parses physical volumes.
     fn parse_physical_volumes(
         &self,
-        mut inner_pairs: Pairs<Rule>,
+        inner_pairs: Pairs<Rule>,
         volume_group: &mut LinuxLvmVolumeGroup,
     ) -> Result<(), ErrorTrace> {
         if !volume_group.physical_volumes.is_empty() {
@@ -404,7 +404,7 @@ impl LinuxLvmMetadata {
                 "Physical volumes already set"
             ));
         }
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -445,7 +445,7 @@ impl LinuxLvmMetadata {
 
         segment.name = token_pair.as_str().to_string();
 
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -587,13 +587,13 @@ impl LinuxLvmMetadata {
     /// Parses stripes.
     fn parse_stripes(
         &self,
-        mut inner_pairs: Pairs<Rule>,
+        inner_pairs: Pairs<Rule>,
         segment: &mut LinuxLvmSegment,
     ) -> Result<(), ErrorTrace> {
         if !segment.stripes.is_empty() {
             return Err(keramics_core::error_trace_new!("Stripes already set"));
         }
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -645,7 +645,7 @@ impl LinuxLvmMetadata {
 
         volume_group.name = token_pair.as_str().to_string();
 
-        while let Some(token_pair) = inner_pairs.next() {
+        for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
             match rule {
@@ -829,7 +829,7 @@ impl LinuxLvmMetadata {
                 "Unsupported non-ASCII metadata"
             ));
         }
-        match self.parse(&string.trim_end_matches('\0')) {
+        match self.parse(string.trim_end_matches('\0')) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(

@@ -32,7 +32,7 @@ pub struct Utf16CharacterMappings {
 
 impl Utf16CharacterMappings {
     /// Creates a new UTF-16 character mappings.
-    pub fn new(mappings: &[(u32, u32)]) -> Self {
+    pub fn new(_mappings: &[(u32, u32)]) -> Self {
         Self {
             mappings: HashMap::new(),
         }
@@ -122,7 +122,7 @@ impl Utf16String {
         while let Some(element) = elements_iterator.next() {
             let mut code_point: u32 = *element as u32;
 
-            if code_point >= 0x0000d800 && code_point <= 0x0000dbff {
+            if (0x0000d800..=0x0000dbff).contains(&code_point) {
                 let low_surrogate: u32 = match elements_iterator.next() {
                     Some(next_element) => *next_element as u32,
                     None => {
@@ -131,7 +131,7 @@ impl Utf16String {
                         ));
                     }
                 };
-                if low_surrogate < 0x0000dc00 || low_surrogate > 0x0000dfff {
+                if !(0x0000dc00..=0x0000dfff).contains(&low_surrogate) {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid UTF-16 low surrogate value out of bounds"
                     ));
@@ -163,9 +163,9 @@ impl Utf16String {
     pub fn from_byte_string(byte_string: &ByteString) -> Result<Self, ErrorTrace> {
         let mut elements: Vec<u16> = Vec::new();
 
-        let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
+        let character_decoder: CharacterDecoder = byte_string.get_character_decoder();
 
-        while let Some(result) = character_decoder.next() {
+        for result in character_decoder {
             match result {
                 Ok(code_points) => {
                     for mut code_point in code_points {
@@ -194,9 +194,9 @@ impl Utf16String {
     ) -> Result<Self, ErrorTrace> {
         let mut elements: Vec<u16> = Vec::new();
 
-        let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
+        let character_decoder: CharacterDecoder = byte_string.get_character_decoder();
 
-        while let Some(result) = character_decoder.next() {
+        for result in character_decoder {
             match result {
                 Ok(code_points) => {
                     for code_point in code_points {

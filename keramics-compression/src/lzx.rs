@@ -261,7 +261,7 @@ impl LzxContext {
         debug_trace.print_field(
             "code_sizes",
             debug_format_array(
-                &aligned_offsets_code_sizes
+                aligned_offsets_code_sizes
                     .iter()
                     .map(|&element| element.to_string())
                     .collect::<Vec<String>>()
@@ -450,7 +450,7 @@ impl LzxContext {
                 }
                 let mut literals_huffman_tree: HuffmanTree = HuffmanTree::new(256 + 240, 16);
 
-                match literals_huffman_tree.build(&literals_code_sizes) {
+                match literals_huffman_tree.build(literals_code_sizes) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -472,7 +472,7 @@ impl LzxContext {
                 }
                 let mut match_sizes_huffman_tree: HuffmanTree = HuffmanTree::new(249, 16);
 
-                match match_sizes_huffman_tree.build(&match_sizes_code_sizes) {
+                match match_sizes_huffman_tree.build(match_sizes_code_sizes) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -721,7 +721,7 @@ impl LzxContext {
         debug_trace.print_field(
             "code_sizes",
             debug_format_array(
-                &pre_code_sizes
+                pre_code_sizes
                     .iter()
                     .map(|&element| element.to_string())
                     .collect::<Vec<String>>()

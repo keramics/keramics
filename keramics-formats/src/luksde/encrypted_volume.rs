@@ -303,7 +303,7 @@ impl LuksEncryptedVolume {
             (key_slot.key_material_start_sector as u64) * (self.bytes_per_sector as u64);
         let key_material_size: usize = self.key_size * (key_slot.number_of_stripes as usize);
 
-        if key_material_size % (self.bytes_per_sector as usize) != 0 {
+        if !key_material_size.is_multiple_of(self.bytes_per_sector as usize) {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported key material size - not a multitude of sector size"
             ));
@@ -322,7 +322,7 @@ impl LuksEncryptedVolume {
             SeekFrom::Start(key_material_offset),
         );
         let encryption_context: LuksEncryptionContext =
-            match LuksEncryption::get_encryption_context(&self.encryption_type, &user_key) {
+            match LuksEncryption::get_encryption_context(&self.encryption_type, user_key) {
                 Ok(Some(context)) => context,
                 Ok(None) => {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -432,80 +432,77 @@ impl LuksEncryptedVolume {
         let mut master_key_unlocked: bool = false;
 
         for credential in credentials.iter() {
-            match credential {
-                LuksCredential::Passphrase(passphrase) => {
-                    for key_slot in self.key_slots.iter() {
-                        if key_slot.number_of_stripes == 0 {
-                            return Err(keramics_core::error_trace_new!(
-                                "Unsupported key slot - number of stripes not set"
-                            ));
-                        }
-                        let mut user_key: Vec<u8> = vec![0; self.key_size];
+            if let LuksCredential::Passphrase(passphrase) = credential {
+                for key_slot in self.key_slots.iter() {
+                    if key_slot.number_of_stripes == 0 {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unsupported key slot - number of stripes not set"
+                        ));
+                    }
+                    let mut user_key: Vec<u8> = vec![0; self.key_size];
 
-                        match self.derive_user_key(key_slot, passphrase, &mut user_key) {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to derive user key"
-                                );
-                                return Err(error);
-                            }
-                        }
-                        match self.derive_master_key(key_slot, &user_key, &mut master_key) {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to derive master key"
-                                );
-                                return Err(error);
-                            }
-                        }
-                        let mut key_derivation_context: LuksKeyDerivationContext =
-                            match LuksEncryption::get_key_derivation_context(
-                                self.hashing_method.as_str(),
-                                &self.salt,
-                                self.number_of_iterations as usize,
-                            ) {
-                                Ok(Some(context)) => context,
-                                Ok(None) => {
-                                    return Err(keramics_core::error_trace_new!(format!(
-                                        "Unsupported key derivation method: {}",
-                                        self.hashing_method
-                                    )));
-                                }
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        format!(
-                                            "Unable to retrieve key derivation context for method: {}",
-                                            self.hashing_method
-                                        )
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        let mut master_key_validation_hash: [u8; 20] = [0; 20];
-
-                        match key_derivation_context
-                            .derive_key(&master_key, &mut master_key_validation_hash)
-                        {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to derive validation hash from master key"
-                                );
-                                return Err(error);
-                            }
-                        }
-                        if &master_key_validation_hash == self.validation_hash.as_slice() {
-                            master_key_unlocked = true;
+                    match self.derive_user_key(key_slot, passphrase, &mut user_key) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to derive user key"
+                            );
+                            return Err(error);
                         }
                     }
+                    match self.derive_master_key(key_slot, &user_key, &mut master_key) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to derive master key"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    let mut key_derivation_context: LuksKeyDerivationContext =
+                        match LuksEncryption::get_key_derivation_context(
+                            self.hashing_method.as_str(),
+                            &self.salt,
+                            self.number_of_iterations as usize,
+                        ) {
+                            Ok(Some(context)) => context,
+                            Ok(None) => {
+                                return Err(keramics_core::error_trace_new!(format!(
+                                    "Unsupported key derivation method: {}",
+                                    self.hashing_method
+                                )));
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable to retrieve key derivation context for method: {}",
+                                        self.hashing_method
+                                    )
+                                );
+                                return Err(error);
+                            }
+                        };
+                    let mut master_key_validation_hash: [u8; 20] = [0; 20];
+
+                    match key_derivation_context
+                        .derive_key(&master_key, &mut master_key_validation_hash)
+                    {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to derive validation hash from master key"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    if master_key_validation_hash == self.validation_hash.as_slice() {
+                        master_key_unlocked = true;
+                    }
                 }
-                _ => {}
             }
         }
         if master_key_unlocked {

@@ -316,10 +316,7 @@ fn main() -> ExitCode {
     }
     match arguments.command {
         Commands::Path(command_arguments) => {
-            let name: Option<PathComponent> = match command_arguments.name {
-                Some(ref name) => Some(PathComponent::from(name)),
-                None => None,
-            };
+            let name: Option<PathComponent> = command_arguments.name.as_ref().map(PathComponent::from);
             let path: Path = Path::from(&command_arguments.path);
 
             match export_tool.export_data_stream_from_scan_node_with_path(

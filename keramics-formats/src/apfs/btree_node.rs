@@ -68,7 +68,7 @@ impl ApfsBtreeNode {
                     key_data,
                     entry.key_data_size
                 );
-                Some(&key_data)
+                Some(key_data)
             }
             None => None,
         }
@@ -88,7 +88,7 @@ impl ApfsBtreeNode {
                     value_data,
                     entry.value_data_size
                 );
-                Some(&value_data)
+                Some(value_data)
             }
             None => None,
         }
@@ -113,7 +113,7 @@ impl ApfsBtreeNode {
         }
         keramics_core::debug_trace_structure!(ApfsObjectHeader::debug_read_data(data));
 
-        match self.object_header.read_data(&data) {
+        match self.object_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read object header");

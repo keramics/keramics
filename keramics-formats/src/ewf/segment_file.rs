@@ -54,10 +54,10 @@ impl EwfSegmentFile {
             };
             let mut extension_segment_number: u32 = (segment_number as u32) - 100;
 
-            extension[2] = base_character + (extension_segment_number % 26) as u32;
+            extension[2] = base_character + (extension_segment_number % 26);
             extension_segment_number /= 26;
 
-            extension[1] = base_character + (extension_segment_number % 26) as u32;
+            extension[1] = base_character + (extension_segment_number % 26);
             extension_segment_number /= 26;
 
             extension[0] = first_character + extension_segment_number;

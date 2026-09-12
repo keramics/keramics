@@ -50,7 +50,7 @@ impl LinuxLvmBlockReader {
             file_resolver: file_resolver.clone(),
             data_file_descriptors: data_file_descriptors.to_vec(),
             extents: extents.to_vec(),
-            size: size,
+            size,
         }
     }
 }

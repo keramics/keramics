@@ -117,7 +117,7 @@ impl SparseBundleImage {
         file_resolver: &FileResolverReference,
         file_name: &PathComponent,
     ) -> Result<(), ErrorTrace> {
-        match self.read_info_plist_file(&file_resolver, file_name) {
+        match self.read_info_plist_file(file_resolver, file_name) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -127,7 +127,7 @@ impl SparseBundleImage {
                 return Err(error);
             }
         }
-        match self.read_token_file(&file_resolver) {
+        match self.read_token_file(file_resolver) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read token file");
@@ -301,8 +301,8 @@ impl SparseBundleImage {
             &mut footer_signature,
             SeekFrom::End(-8)
         );
-        if &header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
-            || &footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
+        if header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
+            || footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
         {
             let mut encrypted_container: CdsaEncrContainer = CdsaEncrContainer::new();
 

@@ -90,7 +90,7 @@ impl<T: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize>
             *padding_byte ^= *key_byte;
         }
         self.digest_context.update(&inner_padding);
-        self.digest_context.update(&data);
+        self.digest_context.update(data);
         let inner_hash: Vec<u8> = self.digest_context.finalize();
 
         self.digest_context.update(&outer_padding);

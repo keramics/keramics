@@ -256,7 +256,7 @@ impl HfsInfo {
         format: &HfsFormat,
         file_entry: &mut HfsFileEntry,
     ) -> Result<(), ErrorTrace> {
-        let file_entry_information: HfsFileEntryInfo = HfsFileEntryInfo::new(format, &file_entry);
+        let file_entry_information: HfsFileEntryInfo = HfsFileEntryInfo::new(format, file_entry);
 
         print!("{}", file_entry_information);
 

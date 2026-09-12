@@ -134,7 +134,7 @@ impl ExtAttributesBlock {
         data_size: usize,
         entries: &mut IndexedHashMap<ByteString, ExtAttributesEntry>,
     ) -> Result<(), ErrorTrace> {
-        if data_size < 32 || data_size > 65536 {
+        if !(32..=65536).contains(&data_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported attributes block data size: {} value out of bounds",
                 data_size

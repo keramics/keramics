@@ -169,10 +169,7 @@ impl NtfsFileEntry {
 
     /// Retrieves the parent file reference from the ($I30) directory entry.
     pub fn get_parent_file_reference(&self) -> Option<u64> {
-        match &self.directory_entry {
-            Some(directory_entry) => Some(directory_entry.file_name.parent_file_reference),
-            None => None,
-        }
+        self.directory_entry.as_ref().map(|directory_entry| directory_entry.file_name.parent_file_reference)
     }
 
     /// Retrieves the size.
@@ -565,7 +562,7 @@ impl NtfsFileEntry {
             Ok(None) => Ok(None),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve directory entry");
-                return Err(error);
+                Err(error)
             }
         }
     }
@@ -584,72 +581,69 @@ impl NtfsFileEntry {
                 return Err(error);
             }
         }
-        match self.mft_attributes.attribute_list {
-            Some(attribute_index) => {
-                let mft_attribute: &NtfsMftAttribute =
-                    match self.mft_attributes.get_attribute_by_index(attribute_index) {
-                        Ok(attribute) => attribute,
+        if let Some(attribute_index) = self.mft_attributes.attribute_list {
+            let mft_attribute: &NtfsMftAttribute =
+                match self.mft_attributes.get_attribute_by_index(attribute_index) {
+                    Ok(attribute) => attribute,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve attribute: {}", attribute_index)
+                        );
+                        return Err(error);
+                    }
+                };
+            let mut attribute_list: NtfsAttributeList = NtfsAttributeList::new();
+
+            match attribute_list.read_attribute(
+                mft_attribute,
+                &self.data_stream,
+                self.mft.cluster_block_size,
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read attribute list"
+                    );
+                    return Err(error);
+                }
+            }
+            let mut mft_entries_set: HashSet<u64> = HashSet::new();
+
+            for entry in attribute_list.entries.iter() {
+                let mft_entry_number: u64 = entry.file_reference & 0x0000ffffffffffff;
+                if mft_entry_number != self.mft_entry_number {
+                    mft_entries_set.insert(mft_entry_number);
+                }
+            }
+            let mut mft_entries: Vec<u64> = mft_entries_set.drain().collect::<Vec<u64>>();
+
+            mft_entries.sort();
+
+            for mft_entry_number in mft_entries.iter() {
+                let mft_entry: NtfsMftEntry =
+                    match self.mft.get_entry(&self.data_stream, *mft_entry_number) {
+                        Ok(mft_entry) => mft_entry,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                format!("Unable to retrieve attribute: {}", attribute_index)
+                                "Unable to retrieve MFT entry"
                             );
                             return Err(error);
                         }
                     };
-                let mut attribute_list: NtfsAttributeList = NtfsAttributeList::new();
-
-                match attribute_list.read_attribute(
-                    &mft_attribute,
-                    &self.data_stream,
-                    self.mft.cluster_block_size,
-                ) {
+                match mft_entry.read_attributes(&mut self.mft_attributes) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read attribute list"
+                            "Unable to read attributes"
                         );
                         return Err(error);
                     }
                 }
-                let mut mft_entries_set: HashSet<u64> = HashSet::new();
-
-                for entry in attribute_list.entries.iter() {
-                    let mft_entry_number: u64 = entry.file_reference & 0x0000ffffffffffff;
-                    if mft_entry_number != self.mft_entry_number {
-                        mft_entries_set.insert(mft_entry_number);
-                    }
-                }
-                let mut mft_entries: Vec<u64> = mft_entries_set.drain().collect::<Vec<u64>>();
-
-                mft_entries.sort();
-
-                for mft_entry_number in mft_entries.iter() {
-                    let mft_entry: NtfsMftEntry =
-                        match self.mft.get_entry(&self.data_stream, *mft_entry_number) {
-                            Ok(mft_entry) => mft_entry,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to retrieve MFT entry"
-                                );
-                                return Err(error);
-                            }
-                        };
-                    match mft_entry.read_attributes(&mut self.mft_attributes) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to read attributes"
-                            );
-                            return Err(error);
-                        }
-                    }
-                }
             }
-            None => {}
         };
         let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from("$I30"));
 

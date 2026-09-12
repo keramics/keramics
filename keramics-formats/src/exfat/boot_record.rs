@@ -102,7 +102,7 @@ impl ExFatBootRecord {
         }
         let bytes_per_sector: u8 = data[108];
 
-        if bytes_per_sector < 9 || bytes_per_sector > 12 {
+        if !(9..=12).contains(&bytes_per_sector) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid bytes per sector: {} value out of bounds",
                 bytes_per_sector,

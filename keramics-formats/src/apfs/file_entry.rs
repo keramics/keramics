@@ -221,18 +221,15 @@ impl ApfsFileEntry {
         if self.symbolic_link_target.is_none() && self.is_symbolic_link() {
             let lookup_name: ByteString = ByteString::from("com.apple.fs.symlink");
 
-            match self.attributes.get_value_by_key(&lookup_name) {
-                Some(attribute_record) => {
-                    if attribute_record.flags & 0x0002 != 0 {
-                        self.symbolic_link_target =
-                            Some(ByteString::from(attribute_record.inline_data.as_slice()));
-                    } else {
-                        return Err(keramics_core::error_trace_new!(
-                            "Unsupported symlink attribute record type"
-                        ));
-                    }
+            if let Some(attribute_record) = self.attributes.get_value_by_key(&lookup_name) {
+                if attribute_record.flags & 0x0002 != 0 {
+                    self.symbolic_link_target =
+                        Some(ByteString::from(attribute_record.inline_data.as_slice()));
+                } else {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported symlink attribute record type"
+                    ));
                 }
-                None => {}
             }
         }
         Ok(self.symbolic_link_target.as_ref())
@@ -547,43 +544,40 @@ impl ApfsFileEntry {
         }
         let lookup_name: ByteString = ByteString::from("com.apple.decmpfs");
 
-        match self.attributes.get_value_by_key(&lookup_name) {
-            Some(attribute_record) => {
-                let data_stream: DataStreamReference =
-                    match self.get_extended_attribute_data_stream(attribute_record) {
-                        Ok(data_stream) => data_stream,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to retrieve data stream"
-                            );
-                            return Err(error);
-                        }
-                    };
-                let mut compressed_data_header: DecmpfsHeader = DecmpfsHeader::new();
-
-                match compressed_data_header.read_at_position(&data_stream, SeekFrom::Start(0)) {
-                    Ok(_) => {}
+        if let Some(attribute_record) = self.attributes.get_value_by_key(&lookup_name) {
+            let data_stream: DataStreamReference =
+                match self.get_extended_attribute_data_stream(attribute_record) {
+                    Ok(data_stream) => data_stream,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read decmpfs header at offset: 0 (0x00000000)"
+                            "Unable to retrieve data stream"
                         );
                         return Err(error);
                     }
-                }
-                let data_fork_size: u64 = match self.inode.data_stream_descriptor.as_ref() {
-                    Some(data_stream_descriptor) => data_stream_descriptor.size,
-                    None => 0,
                 };
-                if data_fork_size != 0 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unsupported non-empty data fork"
-                    ));
+            let mut compressed_data_header: DecmpfsHeader = DecmpfsHeader::new();
+
+            match compressed_data_header.read_at_position(&data_stream, SeekFrom::Start(0)) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read decmpfs header at offset: 0 (0x00000000)"
+                    );
+                    return Err(error);
                 }
-                self.compressed_data_header = Some(compressed_data_header);
             }
-            None => {}
+            let data_fork_size: u64 = match self.inode.data_stream_descriptor.as_ref() {
+                Some(data_stream_descriptor) => data_stream_descriptor.size,
+                None => 0,
+            };
+            if data_fork_size != 0 {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported non-empty data fork"
+                ));
+            }
+            self.compressed_data_header = Some(compressed_data_header);
         }
         Ok(())
     }

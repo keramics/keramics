@@ -198,8 +198,8 @@ impl XfsExtentsTree {
         }
         read_block_numbers.insert(block_number);
 
-        if &btree_node.signature != &XFS_EXTENT_TREE_SIGNATURE
-            && &btree_node.signature != &XFS_EXTENT_TREE_V5_SIGNATURE
+        if btree_node.signature != XFS_EXTENT_TREE_SIGNATURE
+            && btree_node.signature != XFS_EXTENT_TREE_V5_SIGNATURE
         {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported extent B-tree node signature"

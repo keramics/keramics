@@ -113,7 +113,7 @@ impl MbrVolumeSystem {
                             &mut boot_signature,
                             SeekFrom::Start(offset + 510)
                         );
-                        if &boot_signature == MBR_BOOT_SIGNATURE {
+                        if boot_signature == MBR_BOOT_SIGNATURE {
                             self.bytes_per_sector = *bytes_per_sector;
                             break;
                         }
@@ -192,7 +192,7 @@ impl MbrVolumeSystem {
                     );
                     // Some file systems like exFat, FAT and NTFS use the MBR boot signature in
                     // their boot sectors.
-                    if &boot_signature == MBR_BOOT_SIGNATURE {
+                    if boot_signature == MBR_BOOT_SIGNATURE {
                         self.bytes_per_sector = *bytes_per_sector;
 
                         break;
@@ -216,7 +216,7 @@ impl MbrVolumeSystem {
                 last_end_address_lba =
                     partition_entry.start_address_lba + (partition_entry.number_of_sectors as u64);
                 let end_offset: u64 =
-                    (last_end_address_lba as u64) * (self.bytes_per_sector as u64);
+                    last_end_address_lba * (self.bytes_per_sector as u64);
 
                 // TODO: mark the partition as corrupt
                 if end_offset > data_stream_size {

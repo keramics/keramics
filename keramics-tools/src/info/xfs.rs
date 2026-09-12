@@ -368,19 +368,16 @@ impl XfsInfo {
     ) -> Result<XfsFileSystem, ErrorTrace> {
         let mut xfs_file_system: XfsFileSystem = XfsFileSystem::new();
 
-        match character_encoding {
-            Some(encoding) => match xfs_file_system.set_character_encoding(encoding) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to set character encoding"
-                    );
-                    return Err(error);
-                }
-            },
-            None => {}
-        }
+        if let Some(encoding) = character_encoding { match xfs_file_system.set_character_encoding(encoding) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to set character encoding"
+                );
+                return Err(error);
+            }
+        } }
         match xfs_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
             Err(mut error) => {
@@ -403,7 +400,7 @@ impl XfsInfo {
                 return Err(error);
             }
         };
-        let mut file_entry_information: XfsFileEntryInfo = XfsFileEntryInfo::new(&file_entry);
+        let mut file_entry_information: XfsFileEntryInfo = XfsFileEntryInfo::new(file_entry);
         file_entry_information.symbolic_link_target = symbolic_link_target;
 
         print!("{}", file_entry_information);
