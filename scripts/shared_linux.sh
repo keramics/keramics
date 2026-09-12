@@ -94,7 +94,7 @@ create_test_file_entries_with_extended_attributes()
     touch "${FILE_NAME}"
 
     # Create a file with an UTF-8 NFD encoded filename
-    FILE_NAME=$(printf "$%s/nfd_te\xcc\x81stfile\xcc\x80" "${MOUNT_POINT}")
+    FILE_NAME=$(printf "%s/nfd_te\xcc\x81stfile\xcc\x80" "${MOUNT_POINT}")
     touch "${FILE_NAME}"
 
     # Create a file with an UTF-8 NFD encoded filename
