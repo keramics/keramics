@@ -82,6 +82,8 @@ impl ExFatFileSystem {
         self.bytes_per_sector
     }
 
+    // TODO: add get_case_folding_mappings
+
     /// Retrieves the volume label.
     pub fn get_volume_label(&self) -> Option<&Ucs2String> {
         self.volume_label.as_ref()

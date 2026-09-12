@@ -108,39 +108,6 @@ impl VfsFileSystem {
         }
     }
 
-    /// Retrieves the type.
-    #[allow(dead_code)]
-    pub(super) fn get_type(&self) -> VfsType {
-        match self {
-            VfsFileSystem::Apfs(_) => VfsType::Apfs,
-            VfsFileSystem::ApfsContainer(_) => VfsType::ApfsContainer,
-            VfsFileSystem::Apm(_) => VfsType::Apm,
-            VfsFileSystem::Bde(_) => VfsType::Bde,
-            VfsFileSystem::Ewf(_) => VfsType::Ewf,
-            VfsFileSystem::ExFat(_) => VfsType::ExFat,
-            VfsFileSystem::Ext(_) => VfsType::Ext,
-            VfsFileSystem::Fake(_) => VfsType::Fake,
-            VfsFileSystem::Fat(_) => VfsType::Fat,
-            VfsFileSystem::Gpt(_) => VfsType::Gpt,
-            VfsFileSystem::Hfs(_) => VfsType::Hfs,
-            VfsFileSystem::LinuxLvm(_) => VfsType::LinuxLvm,
-            VfsFileSystem::Mbr(_) => VfsType::Mbr,
-            VfsFileSystem::Ntfs(_) => VfsType::Ntfs,
-            VfsFileSystem::Os => VfsType::Os,
-            VfsFileSystem::Pdi(_) => VfsType::Pdi,
-            VfsFileSystem::Qcow(_) => VfsType::Qcow,
-            VfsFileSystem::SgiDiskLabel(_) => VfsType::SgiDiskLabel,
-            VfsFileSystem::SparseBundle(_) => VfsType::SparseBundle,
-            VfsFileSystem::SparseImage(_) => VfsType::SparseImage,
-            VfsFileSystem::SplitRaw(_) => VfsType::SplitRaw,
-            VfsFileSystem::Udif(_) => VfsType::Udif,
-            VfsFileSystem::Vhd(_) => VfsType::Vhd,
-            VfsFileSystem::Vhdx(_) => VfsType::Vhdx,
-            VfsFileSystem::Vmdk(_) => VfsType::Vmdk,
-            VfsFileSystem::Xfs(_) => VfsType::Xfs,
-        }
-    }
-
     /// Determines if the file entry with the specified path exists.
     pub fn file_entry_exists(&self, path: &Path) -> Result<bool, ErrorTrace> {
         match self {
@@ -280,6 +247,8 @@ impl VfsFileSystem {
             }
         }
     }
+
+    // TODO: add get_case_folding_mappings
 
     /// Retrieves a data stream with the specified path.
     #[inline(always)]
@@ -707,6 +676,39 @@ impl VfsFileSystem {
                     Err(error)
                 }
             },
+        }
+    }
+
+    /// Retrieves the type.
+    #[allow(dead_code)]
+    pub(super) fn get_type(&self) -> VfsType {
+        match self {
+            VfsFileSystem::Apfs(_) => VfsType::Apfs,
+            VfsFileSystem::ApfsContainer(_) => VfsType::ApfsContainer,
+            VfsFileSystem::Apm(_) => VfsType::Apm,
+            VfsFileSystem::Bde(_) => VfsType::Bde,
+            VfsFileSystem::Ewf(_) => VfsType::Ewf,
+            VfsFileSystem::ExFat(_) => VfsType::ExFat,
+            VfsFileSystem::Ext(_) => VfsType::Ext,
+            VfsFileSystem::Fake(_) => VfsType::Fake,
+            VfsFileSystem::Fat(_) => VfsType::Fat,
+            VfsFileSystem::Gpt(_) => VfsType::Gpt,
+            VfsFileSystem::Hfs(_) => VfsType::Hfs,
+            VfsFileSystem::LinuxLvm(_) => VfsType::LinuxLvm,
+            VfsFileSystem::Mbr(_) => VfsType::Mbr,
+            VfsFileSystem::Ntfs(_) => VfsType::Ntfs,
+            VfsFileSystem::Os => VfsType::Os,
+            VfsFileSystem::Pdi(_) => VfsType::Pdi,
+            VfsFileSystem::Qcow(_) => VfsType::Qcow,
+            VfsFileSystem::SgiDiskLabel(_) => VfsType::SgiDiskLabel,
+            VfsFileSystem::SparseBundle(_) => VfsType::SparseBundle,
+            VfsFileSystem::SparseImage(_) => VfsType::SparseImage,
+            VfsFileSystem::SplitRaw(_) => VfsType::SplitRaw,
+            VfsFileSystem::Udif(_) => VfsType::Udif,
+            VfsFileSystem::Vhd(_) => VfsType::Vhd,
+            VfsFileSystem::Vhdx(_) => VfsType::Vhdx,
+            VfsFileSystem::Vmdk(_) => VfsType::Vmdk,
+            VfsFileSystem::Xfs(_) => VfsType::Xfs,
         }
     }
 

@@ -25,7 +25,7 @@ pub struct PathFilter {
     /// Scan paths.
     signatures: Vec<Arc<PathFilterSignature>>,
 
-    /// Case folding mappings; `None` means exact match.
+    /// Case folding mappings.
     case_folding_mappings: Option<PathCharacterMappings>,
 
     /// Prefix scan tree.
@@ -82,8 +82,7 @@ impl PathFilter {
         Ok(())
     }
 
-    /// Determines whether the given path matches the filter. If case folding is enabled,
-    /// `path` and `data_fork_name` are normalized before comparison.
+    /// Determines whether the given path matches the filter.
     pub fn is_match(
         &self,
         path: &Path,
@@ -92,9 +91,27 @@ impl PathFilter {
         let (path, data_fork_name): (Path, Option<PathComponent>) =
             match &self.case_folding_mappings {
                 Some(mappings) => {
-                    let path: Path = path.new_with_case_folding(mappings)?;
+                    let path: Path = match path.new_with_case_folding(mappings) {
+                        Ok(case_folded_path) => case_folded_path,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to apply case folding on path"
+                            );
+                            return Err(error);
+                        }
+                    };
                     let data_fork_name: Option<PathComponent> = match data_fork_name {
-                        Some(name) => Some(name.new_with_case_folding(mappings)?),
+                        Some(name) => match name.new_with_case_folding(mappings) {
+                            Ok(case_folded_name) => Some(case_folded_name),
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to apply case folding on data fork name"
+                                );
+                                return Err(error);
+                            }
+                        },
                         None => None,
                     };
                     (path, data_fork_name)
@@ -156,12 +173,7 @@ mod tests {
             Path::from("/Windows/System32/winevt/Logs/Application.evtx"),
             None,
         ));
-        path_filter.build()?;
-
-        let path: Path = Path::from("/Windows/System32/winevt/Logs/Application.evtx");
-        assert!(path_filter.is_match(&path, None)?);
-
-        Ok(())
+        path_filter.build()
     }
 
     #[test]
@@ -185,6 +197,10 @@ mod tests {
         let path: Path = Path::from("/Windows/SoftwareDistribution/DataStore/DataStore.edb");
         let result: bool = path_filter.is_match(&path, None)?;
         assert_eq!(result, true);
+
+        let path: Path = Path::from("/WINDOWS/SoftwareDistribution/DataStore/DataStore.edb");
+        let result: bool = path_filter.is_match(&path, None)?;
+        assert_eq!(result, false);
 
         let path: Path = Path::from("/Windows/System32/winevt/Logs/Security.evtx");
         let result: bool = path_filter.is_match(&path, None)?;
@@ -239,23 +255,6 @@ mod tests {
         assert_eq!(result, true);
 
         let path: Path = Path::from("/windows/system32/winevt/logs/security.evtx");
-        let result: bool = path_filter.is_match(&path, None)?;
-        assert_eq!(result, false);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_is_match_without_case_folding_is_case_sensitive() -> Result<(), ErrorTrace> {
-        let mut path_filter: PathFilter = PathFilter::new();
-
-        path_filter.add_signature(PathFilterSignature::new(
-            Path::from("/testdir1/testfile1"),
-            None,
-        ));
-        path_filter.build()?;
-
-        let path: Path = Path::from("/TESTDIR1/testfile1");
         let result: bool = path_filter.is_match(&path, None)?;
         assert_eq!(result, false);
 
