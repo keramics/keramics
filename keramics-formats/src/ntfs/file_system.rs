@@ -124,6 +124,11 @@ impl NtfsFileSystem {
         self.volume_label.as_ref()
     }
 
+    /// Retrieves the case folding mappings.
+    pub fn get_case_folding_mappings(&self) -> Arc<Ucs2CharacterMappings> {
+        Arc::clone(&self.case_folding_mappings)
+    }
+
     /// Retrieves the file entry for a specific identifier (MFT entry number).
     pub fn get_file_entry_by_identifier(
         &self,

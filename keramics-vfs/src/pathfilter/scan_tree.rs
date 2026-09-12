@@ -74,8 +74,6 @@ impl ScanTree {
                 ScanObject::ScanTreeNode(scan_tree_node) => {
                     match path.components.get(scan_tree_node.component_index) {
                         Some(path_component) => {
-                            // TODO: handle case folding
-
                             scan_object = match scan_tree_node.scan_objects.get(path_component) {
                                 Some(sub_scan_object) => sub_scan_object,
                                 None => &scan_tree_node.default_scan_object,
@@ -190,8 +188,6 @@ mod tests {
         let path: Path = Path::from("/Windows/SoftwareDistribution/DataStore/DataStore.edb");
         let scan_result: Option<&PathFilterSignature> = scan_tree.scan_path(&path);
         assert!(scan_result.is_none());
-
-        // TODO: add test with case folding
 
         Ok(())
     }

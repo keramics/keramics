@@ -19,7 +19,7 @@ use clap::{Args, Parser, Subcommand};
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
-use keramics_formats::{Path, PathComponent};
+use keramics_formats::{Path, PathCharacterMappings, PathComponent};
 use keramics_hashes::{
     DigestHashContext, Md5Context, Sha1Context, Sha224Context, Sha256Context, Sha512Context,
 };
@@ -224,32 +224,47 @@ impl HashTool {
                         }
                         None => display_path.clone(),
                     };
-                    let skip: bool = path_filter.is_match(path, name.as_ref());
-
-                    let hash_string: String = if skip {
-                        String::from("N/A (skipped)")
-                    } else {
-                        match self.calculate_hash_from_data_fork(&data_fork) {
-                            Ok(hash_string) => hash_string,
-                            Err(mut error) => {
-                                if self.stop_on_error {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        format!(
-                                            "Unable to calculate hash of data stream: {}",
-                                            display_path_and_name
-                                        )
-                                    );
-                                    return Err(error);
+                    match path_filter.is_match(path, name.as_ref()) {
+                        Ok(is_match) => {
+                            let hash_string: String = if is_match {
+                                String::from("N/A (skipped)")
+                            } else {
+                                match self.calculate_hash_from_data_fork(&data_fork) {
+                                    Ok(hash_string) => hash_string,
+                                    Err(mut error) => {
+                                        if self.stop_on_error {
+                                            keramics_core::error_trace_add_frame!(
+                                                error,
+                                                format!(
+                                                    "Unable to calculate hash of data stream: {}",
+                                                    display_path_and_name
+                                                )
+                                            );
+                                            return Err(error);
+                                        }
+                                        String::from("N/A (error)")
+                                    }
                                 }
-                                String::from("N/A (error)")
+                            };
+                            println!(
+                                "{}\t{}{}",
+                                hash_string, file_system_display_path, display_path_and_name
+                            );
+                        }
+                        Err(mut error) => {
+                            if self.stop_on_error {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable to determine if path filter applies to data stream: {}",
+                                        display_path_and_name
+                                    )
+                                );
+                                return Err(error);
                             }
+                            println!("N/A (error)\t{}", display_path);
                         }
                     };
-                    println!(
-                        "{}\t{}{}",
-                        hash_string, file_system_display_path, display_path_and_name
-                    );
                 }
                 Err(mut error) => {
                     if self.stop_on_error {
@@ -377,8 +392,10 @@ impl HashTool {
             let mut path_filter: PathFilter = PathFilter::new();
 
             match file_system.as_ref() {
-                VfsFileSystem::Ntfs(_) => {
-                    // TODO: add support for case folding.
+                VfsFileSystem::Ntfs(ntfs_file_system) => {
+                    path_filter.set_case_folding(PathCharacterMappings::Ucs2(
+                        ntfs_file_system.get_case_folding_mappings(),
+                    ));
                     path_filter.add_signature(PathFilterSignature::new(
                         WindowsPath::from_str("\\$BadClus"),
                         Some(PathComponent::from(Ucs2String::from("$Bad"))),

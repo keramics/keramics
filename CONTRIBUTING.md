@@ -88,11 +88,10 @@ git checkout -b feature
 This project uses standard `cargo` workflows. Please ensure your changes pass all local checks
 before submitting a Pull Request (PR).
 
-**Format Rust and Python code.**
+**Format Rust code.**
 
 ```bash
 cargo fmt --all
-black .
 ```
 
 **Build the project.**
@@ -113,6 +112,20 @@ cargo test --all-features
 rumdl check
 ```
 
+### Python bindings
+
+**Format Python code.**
+
+```bash
+black .
+```
+
+**Run the tests locally.**
+
+```bash
+cd keramics-python/ && tox -epy314
+```
+
 ## Adding support for a data format
 
 **Start with test data.**
@@ -130,15 +143,19 @@ If the test data was not authored by you (as the contributor), make sure you hav
 it and mention its orginal source in "ACKNOWLEDGEMENTS.md". **Do not include test data that cannot
 be redistributed.**
 
-**Document the data format.** Data formats change over time, hence documentating its structures is
-important. Data format documentation can be found in the "docs/formats" directory and is hosted on:
+**Document the data format.**
+
+Data formats change over time, hence documentating its structures is important. Data format
+documentation can be found in the "docs/formats" directory and is hosted on:
 [keramics.github.io](https://keramics.github.io)
 
 This project uses [mdBook](https://rust-lang.github.io/mdBook) and therefore requires
 [CommonMark](https://commonmark.org/) compliant Markdown.
 
-**Code style.** More details will be added at a later date but for now write your code closest to
-English natural language, for an international audience, as possible.
+**Code style.**
+
+More details will be added at a later date but for now write your code closest to English natural
+language, for an international audience, as possible.
 
 ## Submitting a Pull Request (PR)
 

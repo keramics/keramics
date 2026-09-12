@@ -17,6 +17,7 @@ use std::path::{Component, MAIN_SEPARATOR_STR, PathBuf};
 use keramics_core::ErrorTrace;
 use keramics_types::{ByteString, Ucs2String, Utf16String};
 
+use super::path_character_mappings::PathCharacterMappings;
 use super::path_component::PathComponent;
 
 /// Generic path.
@@ -27,6 +28,28 @@ pub struct Path {
 }
 
 impl Path {
+    /// Creates a new `Path` with case folding applied.
+    pub fn new_with_case_folding(
+        &self,
+        case_folding_mappings: &PathCharacterMappings,
+    ) -> Result<Self, ErrorTrace> {
+        let mut components: Vec<PathComponent> = Vec::new();
+
+        for component in self.components.iter() {
+            match component.new_with_case_folding(case_folding_mappings) {
+                Ok(folded_component) => components.push(folded_component),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to apply case folding to path component"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        Ok(Self { components })
+    }
+
     /// Creates a new path of the current path joined with the path.
     pub fn new_with_join(&self, path: &Path) -> Self {
         self.new_with_join_path_components(&path.components)
@@ -492,8 +515,37 @@ mod tests {
     use super::*;
 
     use std::ffi::OsString;
+    use std::sync::Arc;
 
-    use keramics_types::Ucs2String;
+    use keramics_types::Ucs2CharacterMappings;
+    use keramics_types::constants::UCS2_CASE_MAPPINGS;
+
+    #[test]
+    fn test_new_with_case_folding() -> Result<(), ErrorTrace> {
+        let mappings: PathCharacterMappings = PathCharacterMappings::Ucs2(Arc::new(
+            Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice()),
+        ));
+        let path = Path {
+            components: vec![
+                PathComponent::Root,
+                PathComponent::Ucs2String(Ucs2String::from("directory")),
+                PathComponent::Ucs2String(Ucs2String::from("filename.txt")),
+            ],
+        };
+        let test_struct: Path = path.new_with_case_folding(&mappings)?;
+
+        assert_eq!(
+            test_struct,
+            Path {
+                components: vec![
+                    PathComponent::Root,
+                    PathComponent::Ucs2String(Ucs2String::from("DIRECTORY")),
+                    PathComponent::Ucs2String(Ucs2String::from("FILENAME.TXT")),
+                ]
+            }
+        );
+        Ok(())
+    }
 
     #[test]
     fn test_new_with_join() {

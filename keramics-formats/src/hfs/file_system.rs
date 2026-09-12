@@ -78,6 +78,8 @@ impl HfsFileSystem {
         }
     }
 
+    // TODO: add get_case_folding_mappings
+
     /// Retrieves the embedded volume extent.
     pub fn get_embedded_volume_extent(&self) -> Option<&HfsExtentDescriptor> {
         self.embedded_volume_extent.as_ref()
