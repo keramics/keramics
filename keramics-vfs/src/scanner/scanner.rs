@@ -419,6 +419,7 @@ impl VfsScanner {
                 }
                 Ok(result)
             }
+            // TODO: for LUKS also scan for LVM
             VfsType::Bde | VfsType::Luksde => {
                 match self.scan_for_file_system_format(&data_stream) {
                     Ok(scan_results) => Ok(scan_results),
