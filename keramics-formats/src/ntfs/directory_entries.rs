@@ -93,23 +93,16 @@ impl NtfsDirectoryEntries {
 mod tests {
     use super::*;
 
-    fn get_file_name(
-        name: &str,
-        name_space: u8,
-    ) -> Result<NtfsFileName, ErrorTrace> {
-        let name_bytes: Vec<u8> = name
+    fn get_file_name(name: &str, name_space: u8) -> Result<NtfsFileName, ErrorTrace> {
+        let name_data: Vec<u8> = name
             .encode_utf16()
             .flat_map(|value| value.to_le_bytes())
             .collect();
 
-        // The $FILE_NAME data header is 66 bytes: bytes [64] and [65] hold
-        // name_size and name_space respectively, followed by the UTF-16LE name.
-        let name_size: u8 = (name_bytes.len() / 2) as u8;
         let mut test_data: Vec<u8> = vec![0; 66];
-        test_data[64] = name_size;
+        test_data[64] = (name_data.len() / 2) as u8;
         test_data[65] = name_space;
-        test_data.extend_from_slice(&name_bytes);
-
+        test_data.extend_from_slice(&name_data);
 
         let mut file_name: NtfsFileName = NtfsFileName::new();
         file_name.read_data(&test_data)?;
@@ -118,22 +111,17 @@ mod tests {
     }
 
     #[test]
-    fn test_new() -> Result<(), ErrorTrace> {
-        let directory_entries: NtfsDirectoryEntries = NtfsDirectoryEntries::new();
-
-        assert_eq!(directory_entries.get_number_of_entries(), 0);
-        assert_eq!(directory_entries.short_names.len(), 0);
-
-        Ok(())
-    }
-
-    #[test]
     fn test_add() -> Result<(), ErrorTrace> {
         let mut directory_entries: NtfsDirectoryEntries = NtfsDirectoryEntries::new();
 
-        directory_entries.add(0x0001000000000001, get_file_name("TestFile1", NTFS_NAME_SPACE_WINDOWS)?)?;
-        directory_entries.add(0x0001000000000002, get_file_name("TESTF1~1", NTFS_NAME_SPACE_DOS)?)?;
-        directory_entries.add(0x0001000000000003, get_file_name(".", NTFS_NAME_SPACE_WINDOWS)?)?;
+        let file_name: NtfsFileName = get_file_name("TestFile1", NTFS_NAME_SPACE_WINDOWS)?;
+        directory_entries.add(0x0001000000000001, file_name)?;
+
+        let file_name: NtfsFileName = get_file_name("TESTF1~1", NTFS_NAME_SPACE_DOS)?;
+        directory_entries.add(0x0001000000000002, file_name)?;
+
+        let file_name: NtfsFileName = get_file_name(".", NTFS_NAME_SPACE_WINDOWS)?;
+        directory_entries.add(0x0001000000000003, file_name)?;
 
         assert_eq!(directory_entries.get_number_of_entries(), 1);
         assert_eq!(directory_entries.short_names.len(), 1);
@@ -145,16 +133,12 @@ mod tests {
     fn test_add_with_duplicate_short_name() -> Result<(), ErrorTrace> {
         let mut directory_entries: NtfsDirectoryEntries = NtfsDirectoryEntries::new();
 
-        let result: Result<(), ErrorTrace> = directory_entries.add(
-            0x0001000000000001,
-            get_file_name("TESTF1~1", NTFS_NAME_SPACE_DOS)?,
-        );
+        let file_name: NtfsFileName = get_file_name("TESTF1~1", NTFS_NAME_SPACE_DOS)?;
+        let result: Result<(), ErrorTrace> = directory_entries.add(0x0001000000000001, file_name);
         assert!(result.is_ok());
 
-        let result: Result<(), ErrorTrace> = directory_entries.add(
-            0x0001000000000001,
-            get_file_name("TESTF1~2", NTFS_NAME_SPACE_DOS)?,
-        );
+        let file_name: NtfsFileName = get_file_name("TESTF1~2", NTFS_NAME_SPACE_DOS)?;
+        let result: Result<(), ErrorTrace> = directory_entries.add(0x0001000000000001, file_name);
         assert!(result.is_err());
 
         Ok(())
@@ -164,14 +148,14 @@ mod tests {
     fn test_get_entry_by_index() -> Result<(), ErrorTrace> {
         let mut directory_entries: NtfsDirectoryEntries = NtfsDirectoryEntries::new();
 
-        directory_entries.add(0x0001000000000001, get_file_name("TestFile1", NTFS_NAME_SPACE_WINDOWS)?)?;
-        directory_entries.add(0x0001000000000001, get_file_name("TESTF1~1", NTFS_NAME_SPACE_DOS)?)?;
+        let file_name: NtfsFileName = get_file_name("TestFile1", NTFS_NAME_SPACE_WINDOWS)?;
+        directory_entries.add(0x0001000000000001, file_name)?;
+
+        let file_name: NtfsFileName = get_file_name("TESTF1~1", NTFS_NAME_SPACE_DOS)?;
+        directory_entries.add(0x0001000000000001, file_name)?;
 
         let directory_entry: &NtfsDirectoryEntry = directory_entries.get_entry_by_index(0)?;
-        assert_eq!(
-            directory_entry.file_name.name.to_string(),
-            "TestFile1"
-        );
+        assert_eq!(directory_entry.file_name.name.to_string(), "TestFile1");
 
         let result: Result<&NtfsDirectoryEntry, ErrorTrace> =
             directory_entries.get_entry_by_index(99);

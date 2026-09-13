@@ -86,38 +86,6 @@ pub enum VfsFileEntry {
 }
 
 impl VfsFileEntry {
-    /// Retrieves the type.
-    pub(super) fn get_type(&self) -> VfsType {
-        match self {
-            VfsFileEntry::Apfs(_) => VfsType::Apfs,
-            VfsFileEntry::ApfsContainer(_) => VfsType::ApfsContainer,
-            VfsFileEntry::Apm(_) => VfsType::Apm,
-            VfsFileEntry::Bde(_) => VfsType::Bde,
-            VfsFileEntry::Ewf(_) => VfsType::Ewf,
-            VfsFileEntry::ExFat(_) => VfsType::ExFat,
-            VfsFileEntry::Ext(_) => VfsType::Ext,
-            VfsFileEntry::Fake(_) => VfsType::Fake,
-            VfsFileEntry::Fat(_) => VfsType::Fat,
-            VfsFileEntry::Gpt(_) => VfsType::Gpt,
-            VfsFileEntry::Hfs(_) => VfsType::Hfs,
-            VfsFileEntry::LinuxLvm(_) => VfsType::LinuxLvm,
-            VfsFileEntry::Mbr(_) => VfsType::Mbr,
-            VfsFileEntry::Ntfs(_) => VfsType::Ntfs,
-            VfsFileEntry::Os(_) => VfsType::Os,
-            VfsFileEntry::Pdi(_) => VfsType::Pdi,
-            VfsFileEntry::Qcow(_) => VfsType::Qcow,
-            VfsFileEntry::SgiDiskLabel(_) => VfsType::SgiDiskLabel,
-            VfsFileEntry::SparseBundle(_) => VfsType::SparseBundle,
-            VfsFileEntry::SparseImage(_) => VfsType::SparseImage,
-            VfsFileEntry::SplitRaw(_) => VfsType::SplitRaw,
-            VfsFileEntry::Udif(_) => VfsType::Udif,
-            VfsFileEntry::Vhd(_) => VfsType::Vhd,
-            VfsFileEntry::Vhdx(_) => VfsType::Vhdx,
-            VfsFileEntry::Vmdk(_) => VfsType::Vmdk,
-            VfsFileEntry::Xfs(_) => VfsType::Xfs,
-        }
-    }
-
     /// Retrieves the access time.
     pub fn get_access_time(&self) -> Option<&DateTime> {
         match self {
@@ -763,6 +731,38 @@ impl VfsFileEntry {
                     Err(error)
                 }
             },
+        }
+    }
+
+    /// Retrieves the type.
+    pub(super) fn get_type(&self) -> VfsType {
+        match self {
+            VfsFileEntry::Apfs(_) => VfsType::Apfs,
+            VfsFileEntry::ApfsContainer(_) => VfsType::ApfsContainer,
+            VfsFileEntry::Apm(_) => VfsType::Apm,
+            VfsFileEntry::Bde(_) => VfsType::Bde,
+            VfsFileEntry::Ewf(_) => VfsType::Ewf,
+            VfsFileEntry::ExFat(_) => VfsType::ExFat,
+            VfsFileEntry::Ext(_) => VfsType::Ext,
+            VfsFileEntry::Fake(_) => VfsType::Fake,
+            VfsFileEntry::Fat(_) => VfsType::Fat,
+            VfsFileEntry::Gpt(_) => VfsType::Gpt,
+            VfsFileEntry::Hfs(_) => VfsType::Hfs,
+            VfsFileEntry::LinuxLvm(_) => VfsType::LinuxLvm,
+            VfsFileEntry::Mbr(_) => VfsType::Mbr,
+            VfsFileEntry::Ntfs(_) => VfsType::Ntfs,
+            VfsFileEntry::Os(_) => VfsType::Os,
+            VfsFileEntry::Pdi(_) => VfsType::Pdi,
+            VfsFileEntry::Qcow(_) => VfsType::Qcow,
+            VfsFileEntry::SgiDiskLabel(_) => VfsType::SgiDiskLabel,
+            VfsFileEntry::SparseBundle(_) => VfsType::SparseBundle,
+            VfsFileEntry::SparseImage(_) => VfsType::SparseImage,
+            VfsFileEntry::SplitRaw(_) => VfsType::SplitRaw,
+            VfsFileEntry::Udif(_) => VfsType::Udif,
+            VfsFileEntry::Vhd(_) => VfsType::Vhd,
+            VfsFileEntry::Vhdx(_) => VfsType::Vhdx,
+            VfsFileEntry::Vmdk(_) => VfsType::Vmdk,
+            VfsFileEntry::Xfs(_) => VfsType::Xfs,
         }
     }
 

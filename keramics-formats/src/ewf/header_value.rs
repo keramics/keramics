@@ -17,6 +17,7 @@ use keramics_datetime::PosixTime32;
 use keramics_types::{ByteString, Utf16String};
 
 /// Expert Witness Compression Format (EWF) header value.
+#[derive(Debug, PartialEq)]
 pub enum EwfHeaderValue {
     Byte(ByteString),
     PosixTime(PosixTime32),
@@ -61,14 +62,7 @@ mod tests {
         let test_bytes: [u8; 4] = [0x74, 0x65, 0x73, 0x74];
 
         let header_value: EwfHeaderValue = EwfHeaderValue::from_bytes(&test_bytes);
-
-        match header_value {
-            EwfHeaderValue::Byte(byte_string) => assert_eq!(
-                byte_string.elements,
-                vec![0x74, 0x65, 0x73, 0x74]
-            ),
-            _ => panic!("Unexpected header value"),
-        }
+        assert_eq!(header_value, EwfHeaderValue::Byte(ByteString::from("test")));
     }
 
     #[test]
@@ -76,30 +70,26 @@ mod tests {
         let test_elements: [u16; 4] = [0x0074, 0x0065, 0x0073, 0x0074];
 
         let header_value: EwfHeaderValue = EwfHeaderValue::from_utf16(&test_elements);
-
-        match header_value {
-            EwfHeaderValue::Utf16(utf16_string) => assert_eq!(
-                utf16_string.elements,
-                vec![0x0074, 0x0065, 0x0073, 0x0074]
-            ),
-            _ => panic!("Unexpected header value"),
-        }
+        assert_eq!(
+            header_value,
+            EwfHeaderValue::Utf16(Utf16String::from("test"))
+        );
     }
 
     #[test]
     fn test_display() {
-        let header_value: EwfHeaderValue = EwfHeaderValue::from_bytes(b"test");
-
-        let string: String = header_value.to_string();
-        assert_eq!(string.as_str(), "test");
-
-        let header_value: EwfHeaderValue = EwfHeaderValue::from_utf16(&[0x0074, 0x0065, 0x0073, 0x0074]);
+        let header_value: EwfHeaderValue = EwfHeaderValue::from_bytes(&[0x74, 0x65, 0x73, 0x74]);
 
         let string: String = header_value.to_string();
         assert_eq!(string.as_str(), "test");
 
         let header_value: EwfHeaderValue =
-            EwfHeaderValue::PosixTime(PosixTime32::new(1281643591));
+            EwfHeaderValue::from_utf16(&[0x0074, 0x0065, 0x0073, 0x0074]);
+
+        let string: String = header_value.to_string();
+        assert_eq!(string.as_str(), "test");
+
+        let header_value: EwfHeaderValue = EwfHeaderValue::PosixTime(PosixTime32::new(1281643591));
 
         let string: String = header_value.to_string();
         assert_eq!(string.as_str(), "2010-08-12T20:06:31");

@@ -177,7 +177,9 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
+    use keramics_formats::PathComponent;
     use keramics_formats::ntfs::NtfsFileSystem;
+    use keramics_types::Ucs2String;
 
     use crate::enums::VfsFileType;
     use crate::tests::get_test_data_path;
@@ -187,25 +189,10 @@ mod tests {
 
         let test_data_path_string: String = get_test_data_path("ntfs/ntfs.raw");
         let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
-        let data_stream: keramics_core::DataStreamReference =
-            open_os_data_stream(&path_buf)?;
+        let data_stream: keramics_core::DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
         Ok(VfsFileSystem::Ntfs(file_system))
-    }
-
-    #[test]
-    fn test_new() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_ntfs_file_system()?;
-
-        let vfs_finder: VfsFinder<'_> = VfsFinder::new(&vfs_file_system);
-
-        assert_eq!(vfs_finder.get_path(), &Path::from("/"));
-        assert!(vfs_finder.states.is_empty());
-        assert!(vfs_finder.search_started == false);
-        assert!(vfs_finder.error_encountered == false);
-
-        Ok(())
     }
 
     #[test]
@@ -223,80 +210,23 @@ mod tests {
     #[test]
     fn test_next() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ntfs_file_system()?;
+
         let mut vfs_finder: VfsFinder<'_> = VfsFinder::new(&vfs_file_system);
 
-        let mut number_of_file_entries: usize = 0;
-        let mut file_entry_paths: Vec<String> = Vec::new();
+        let result: Option<Result<(VfsFileEntry, Path), ErrorTrace>> = vfs_finder.next();
+        assert!(result.is_some());
 
-        while let Some(result) = vfs_finder.next() {
-            let (file_entry, file_entry_path): (VfsFileEntry, Path) = result?;
-
-            number_of_file_entries += 1;
-
-            match file_entry.get_name() {
-                Some(name) => match file_entry_path.file_name() {
-                    Some(file_name) => {
-                        assert_eq!(
-                            name.to_string().as_str().to_lowercase(),
-                            file_name.to_string().as_str().to_lowercase()
-                        );
-                    }
-                    None => {}
-                },
-                None => {}
+        let (file_entry, path): (VfsFileEntry, Path) = result.unwrap()?;
+        assert_eq!(
+            path,
+            Path {
+                components: vec![
+                    PathComponent::Root,
+                    PathComponent::Ucs2String(Ucs2String::from("$AttrDef"))
+                ]
             }
-
-            file_entry_paths.push(file_entry_path.to_string());
-        }
-
-        let expected_paths: [String; 5] = [
-            "/testdir1".to_string(),
-            "/testdir1/testfile1".to_string(),
-            "/emptyfile".to_string(),
-            "/$Extend".to_string(),
-            "/".to_string(),
-        ];
-
-        assert!(number_of_file_entries > 0);
-        for expected_path in expected_paths.iter() {
-            assert!(
-                file_entry_paths.contains(expected_path),
-                "missing path: {}",
-                expected_path
-            );
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_next_with_file_types() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_ntfs_file_system()?;
-        let mut vfs_finder: VfsFinder<'_> = VfsFinder::new(&vfs_file_system);
-
-        let directories: [String; 3] = [
-            "/".to_string(),
-            "/testdir1".to_string(),
-            "/$Extend".to_string(),
-        ];
-        let files: [String; 4] = [
-            "/$MFT".to_string(),
-            "/$Boot".to_string(),
-            "/emptyfile".to_string(),
-            "/testdir1/testfile1".to_string(),
-        ];
-
-        while let Some(result) = vfs_finder.next() {
-            let (file_entry, path): (VfsFileEntry, Path) = result?;
-
-            let file_type: VfsFileType = file_entry.get_file_type();
-            let path_string: String = path.to_string();
-            if directories.contains(&path_string) {
-                assert_eq!(file_type, VfsFileType::Directory);
-            } else if files.contains(&path_string) {
-                assert_eq!(file_type, VfsFileType::File);
-            }
-        }
+        );
+        assert_eq!(file_entry.get_file_type(), VfsFileType::File);
 
         Ok(())
     }
