@@ -12,6 +12,7 @@
  */
 
 mod aes;
+mod aes_key_wrap;
 mod blowfish;
 mod cbc;
 mod ccm;
@@ -24,6 +25,7 @@ mod traits;
 mod xts;
 
 pub use aes::{AesCbcContext, AesCcmContext, AesContext, AesXtsContext};
+pub use aes_key_wrap::AesKeyWrapContext;
 pub use blowfish::{BlowfishCbcContext, BlowfishContext};
 pub use des3::{Des3CbcContext, Des3Context};
 pub use hmac::{

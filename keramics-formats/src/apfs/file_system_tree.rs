@@ -30,6 +30,7 @@ use super::btree_node::ApfsBtreeNode;
 use super::constants::*;
 use super::directory_entry::ApfsDirectoryEntry;
 use super::directory_record::ApfsDirectoryRecord;
+use super::encryption_context::ApfsEncryptionContext;
 use super::extent::ApfsExtent;
 use super::extent_record::ApfsExtentRecord;
 use super::file_system_key::ApfsFileSystemKey;
@@ -43,6 +44,9 @@ use super::object_map_value::ApfsObjectMapValue;
 
 /// Apple File System (APFS) file system B-tree.
 pub struct ApfsFileSystemTree {
+    /// Encryption context.
+    encryption_context: Option<Arc<ApfsEncryptionContext>>,
+
     /// Block size.
     block_size: u32,
 
@@ -64,6 +68,7 @@ impl ApfsFileSystemTree {
     pub fn new(use_case_folding: bool) -> Self {
         Self {
             block_size: 0,
+            encryption_context: None,
             root_block_number: 0,
             node_cache: SharedLruCache::new(256),
             case_folding_mappings: Utf16CharacterMappings::from(
@@ -1254,7 +1259,11 @@ impl ApfsFileSystemTree {
 
             let mut node: ApfsBtreeNode = ApfsBtreeNode::new();
 
-            match node.read_at_position(data_stream, SeekFrom::Start(node_offset)) {
+            match node.read_at_position(
+                self.encryption_context.as_ref(),
+                data_stream,
+                SeekFrom::Start(node_offset),
+            ) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -1497,7 +1506,13 @@ impl ApfsFileSystemTree {
     }
 
     /// Initializes the file system B-tree.
-    pub fn initialize(&mut self, block_size: u32, root_block_number: u64) {
+    pub fn initialize(
+        &mut self,
+        encryption_context: Option<&Arc<ApfsEncryptionContext>>,
+        block_size: u32,
+        root_block_number: u64,
+    ) {
+        self.encryption_context = encryption_context.cloned();
         self.block_size = block_size;
         self.root_block_number = root_block_number;
     }

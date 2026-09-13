@@ -13,7 +13,8 @@
 
 use keramics_core::ErrorTrace;
 
-use super::encryption::{LuksCipherContext, LuksInitializationVectorContext};
+use super::cipher_context::LuksCipherContext;
+use super::encryption::LuksInitializationVectorContext;
 
 /// Linux Unified Key Setup (LUKS) Disk Encryption encryption context.
 #[derive(Clone)]

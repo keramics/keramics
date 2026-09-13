@@ -19,6 +19,7 @@ mod boot_record_togo;
 mod boot_record_used_disk_space;
 mod boot_record_v1;
 mod boot_record_v2;
+mod cipher_context;
 pub mod constants;
 mod credential;
 mod diffuser;

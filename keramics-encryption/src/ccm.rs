@@ -11,12 +11,15 @@
  * under the License.
  */
 
+//! CCM (Counter with Cipher Block Chaining Message Authentication Code).
+//!
+//! Provides CCM (Counter with CBC-MAC) support (RFC 3610).
+
 use keramics_core::ErrorTrace;
 
 use super::traits::CryptCcm;
 
-/// CCM (Counter with Cipher Block Chaining message authentication code (CBC-MAC)) encryption and
-/// decryption (RFC 3610).
+/// Context for CCM (Counter with CBC-MAC) encryption and decryption.
 pub struct CcmContext<T: CryptCcm> {
     /// CBC encryption and decryption context.
     context: T,

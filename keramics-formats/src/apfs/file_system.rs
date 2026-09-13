@@ -18,6 +18,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use crate::path::Path;
 
 use super::constants::*;
+use super::encryption_context::ApfsEncryptionContext;
 use super::file_entry::ApfsFileEntry;
 use super::file_system_tree::ApfsFileSystemTree;
 use super::inode::ApfsInode;
@@ -37,9 +38,11 @@ pub struct ApfsFileSystem {
     /// File system B-tree.
     file_system_tree: Arc<ApfsFileSystemTree>,
 
+    /// Encryption context.
+    encryption_context: Option<Arc<ApfsEncryptionContext>>,
+
     /// Transaction identifier.
     transaction_identifier: u64,
-    // TODO: add encryption context.
 }
 
 impl ApfsFileSystem {
@@ -47,12 +50,14 @@ impl ApfsFileSystem {
     pub(super) fn new(
         block_size: u32,
         object_map_tree: &Arc<ApfsObjectMapTree>,
+        encryption_context: Option<&Arc<ApfsEncryptionContext>>,
         use_case_folding: bool,
     ) -> Self {
         Self {
             data_stream: None,
             block_size,
             object_map_tree: object_map_tree.clone(),
+            encryption_context: encryption_context.cloned(),
             file_system_tree: Arc::new(ApfsFileSystemTree::new(use_case_folding)),
             transaction_identifier: 0,
         }
@@ -158,7 +163,11 @@ impl ApfsFileSystem {
     ) -> Result<(), ErrorTrace> {
         match Arc::get_mut(&mut self.file_system_tree) {
             Some(file_system_tree) => {
-                file_system_tree.initialize(self.block_size, root_block_number);
+                file_system_tree.initialize(
+                    self.encryption_context.as_ref(),
+                    self.block_size,
+                    root_block_number,
+                );
             }
             None => {
                 return Err(keramics_core::error_trace_new!(

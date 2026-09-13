@@ -963,7 +963,7 @@ The key bag entry header (keybag_entry_t) is 24 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 16 | | Volume identifer (ke_uuid), which contains a big-endian UUID |
+| 0 | 16 | | Volume identifier (ke_uuid), which contains a big-endian UUID |
 | 16 | 2 | | [Entry type](#key_bag_entry_types) (ke_tag) |
 | 18 | 2 | | Entry data size (ke_keylen), in number of bytes |
 | 20 | 4 | | Unknown (padding) |
@@ -976,7 +976,7 @@ The key bag entry header (keybag_entry_t) is 24 bytes in size and consists of:
 | --- | --- | --- |
 | 0x00 | KB_TAG_UNKNOWN | Unknown |
 | 0x01 | KB_TAG_WRAPPING_KEY (or KB_TAG_RESERVED_1) | Wrapping key |
-| 0x02 | KB_TAG_VOLUME_KEY | Volume master key, which contains a [Key encrypted key (KEK) packed object](#key_bag_kek_packed_object) |
+| 0x02 | KB_TAG_VOLUME_KEY | Volume master key, which contains a [Key encryption key (KEK) packed object](#key_bag_kek_packed_object) |
 | 0x03 | KB_TAG_VOLUME_UNLOCK_RECORDS | Volume [key bag extent](#key_bag_data_extent) |
 | 0x04 | KB_TAG_VOLUME_PASSPHRASE_HINT | Passphrase hint |
 | 0x05 | KB_TAG_WRAPPING_M_KEY | Key used to wrap a media key |
@@ -990,32 +990,45 @@ The volume master key is encryped with a volume key.
 
 | Value | Identifier | Description |
 | --- | --- | --- |
-| 3 | | Volume key, which contains a [Key encrypted key (KEK) packed object](#key_bag_kek_packed_object) |
+| 3 | | Volume key, which contains a [Key encryption key (KEK) packed object](#key_bag_kek_packed_object) |
 | 4 | | Password hint, which contains a string without end-of-string character |
 
 The volume key is encryped with an user key.
 
 #### Key bag packed object {#key_bag_packed_object}
 
-The packed object consist of an object packed value that embeds attribute packed values.
+The packed object consist of:
+
+* an object packed value that embeds attribute packed values.
+
+A packed value with a tag and size of 0 signifies the end of the attribute packed values.
 
 ##### Key bag packed value
 
 The key bag packed value is of variable size and consists of:
 
+<!-- rumdl-disable MD033 MD056 -->
+
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 1 | | Value tag (or value type), where the most-significant bit represents a flag |
-| 1 | 1 | | Value data size, in number of bytes, where the most-significant bit represents a flag |
+| 1 | 1 | | Value data size, in number of bytes, where the most-significant bit represents an extended size flag |
+| <td colspan="4">*If extended size flag is set*</td> |
+| 2 | ... | | Extended value data size |
+| <td colspan="4">*&nbsp;*</td> |
 | ... | ... | | Value data |
 
-A packed value with a tag and size of 0 signifies the end of the packed values.
+<!-- rumdl-enable MD033 MD056 -->
 
 > Note that the meaning of the value tags differ per packed object type.
 
-##### Key encrypted key (KEK) packed object {#key_bag_kek_packed_object}
+If the most-significant bit is set the value data size is stored in the next `(value & 0x7f)` bytes.
+E.g. if value data size is 0x82 the first 2 bytes of the extened value data size contain the value
+data size.
 
-The packed object value tag of a key encrypted key is 0x30 and contains the following attribute
+##### Key encryption key (KEK) packed object {#key_bag_kek_packed_object}
+
+The packed object value tag of a key encryption key is 0x30 and contains the following attribute
 value tags:
 
 | Value | Identifier | Description |
@@ -1028,13 +1041,13 @@ value tags:
 
 ##### Wrapped Key Encryption Key (KEK) packed object {#key_bag_wrapped_kek_packed_object}
 
-The packed object value tag of a wrapped kek encrypted key is 0xa3 and contains the following
+The packed object value tag of a wrapped kek encryption key is 0xa3 and contains the following
 attribute value tags:
 
 | Value | Identifier | Description |
 | --- | --- | --- |
 | 0x80 | | Unknown |
-| 0x81 | | Volume identifer, which contains a big-endian UUID |
+| 0x81 | | Volume identifier, which contains a big-endian UUID |
 | 0x82 | | [Wrapped Key Encryption Key (KEK) metadata](#wrapped_kek_metadata) |
 | 0x83 | | Wrapped Key Encryption Key (KEK) data |
 | 0x84 | | Number of iterations for the PBKDF2 algorithm |
@@ -1042,24 +1055,28 @@ attribute value tags:
 
 #### Wrapped Key Encryption Key (KEK) metadata {#wrapped_kek_metadata}
 
-The Wrapped Key Encryption Key (KEK) metadata is 8 bytes in size and consists of:
+The Wrapped Key Encryption Key (KEK) metadata is of variable size and consists of:
+
+<!-- rumdl-disable MD033 MD056 -->
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 4 | | [Encryption method](#encryption_methods) |
+| 0 | 4 | | [Flags](#wrapped_kek_metadata_flags) |
 | 4 | 2 | | Unknown |
-| 6 | 1 | | Unknown |
-| 7 | 1 | | Unknown |
+| <td colspan="4">*If data size is 8*</td> |
+| 6 | 2 | | Unknown (numeric identifier?) |
+| <td colspan="4">*If data size is 22*</td> |
+| 6 | 16 | | Unknown (UUID) |
 
-##### Encryption methods {#encryption_methods}
+<!-- rumdl-enable MD033 MD056 -->
+
+##### Wrapped Key Encryption Key (KEK) metadata flags {#wrapped_kek_metadata_flags}
 
 | Value | Identifier | Description |
 | --- | --- | --- |
-| 0 | | Unknown (AES-256) |
+| 0x000000002 | | AES-128 CoreStorage FileVault compatible mode if set (1), AES-256 if not set (0) |
 | | | |
-| 2 | | Unknown (AES-128 FVDE (CoreStorage FileVault) compatible) |
-| | | |
-| 16 | | Unknown (AES-256), which has been observed in combination with recovery password protected volume key |
+| 0x000000010 | | Unknown (AES-256), which has been observed in combination with recovery password protected volume key |
 
 #### Key bag data extent {#key_bag_data_extent}
 

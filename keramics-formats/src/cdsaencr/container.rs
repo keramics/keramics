@@ -310,7 +310,7 @@ impl CdsaEncrContainer {
                             }
                         }
                         for credential in credentials.iter() {
-                            match container_footer.unlock(credential) {
+                            match container_footer.unlock_with_credential(credential) {
                                 Ok(result) => {
                                     if result {
                                         let block_key_size: usize = self.encryption_type.key_size;
@@ -358,7 +358,7 @@ impl CdsaEncrContainer {
                             }
                         }
                         for credential in credentials.iter() {
-                            match wrapped_key.unlock(credential) {
+                            match wrapped_key.unlock_with_credential(credential) {
                                 Ok(result) => {
                                     if result {
                                         let block_key_size: usize = self.encryption_type.key_size;

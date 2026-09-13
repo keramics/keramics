@@ -40,4 +40,23 @@ create_file_entries "/Volumes/apfs_test"
 
 detach_image "${IMAGE_FILE}.dmg"
 
+# Create a raw image with an APFS container and single encrypted volume with a case-insensitive file system
+IMAGE_FILE="test_data/apfs/apfs_encrypted"
+IMAGE_SIZE="4M"
+
+rm -f "${IMAGE_FILE}.dmg"
+
+hdiutil create -layout GPTSPUD -size ${IMAGE_SIZE} -type UDIF "${IMAGE_FILE}"
+OUTPUT=$(hdiutil attach "${IMAGE_FILE}.dmg" -nomount -noautoopen -nobrowse)
+DISK_DEVICE=$(echo "${OUTPUT}" | awk 'END {print $1}')
+
+OUTPUT=$(diskutil apfs createContainer "${DISK_DEVICE}")
+CONTAINER_DEVICE=$(echo "${OUTPUT}" | awk -F': ' '/Disk from APFS operation/ {print $2}' | xargs)
+
+echo -n KeRaMiCs | diskutil apfs addVolume "${CONTAINER_DEVICE}" APFS apfs_test -stdinpassphrase
+
+create_file_entries "/Volumes/apfs_test"
+
+detach_image "${IMAGE_FILE}.dmg"
+
 exit ${EXIT_SUCCESS}

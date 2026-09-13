@@ -14,29 +14,9 @@
 use keramics_core::ErrorTrace;
 use keramics_encryption::{AesContext, AesXtsContext, CryptContext};
 
+use super::cipher_context::BdeCipherContext;
 use super::encryption_context::BdeEncryptionContext;
 use super::encryption_type::BdeEncryptionType;
-
-/// BitLocker Drive Encryption (BDE) cipher context.
-#[derive(Clone)]
-pub enum BdeCipherContext {
-    AesCbc(AesContext),
-    AesXts(AesXtsContext),
-}
-
-impl BdeCipherContext {
-    /// Sets the key.
-    pub fn set_key(&mut self, key: &[u8]) -> Result<(), ErrorTrace> {
-        match self {
-            BdeCipherContext::AesCbc(context) => context.set_key(key),
-            BdeCipherContext::AesXts(context) => {
-                let key_size: usize = key.len() / 2;
-
-                context.set_keys(&key[0..key_size], &key[key_size..])
-            }
-        }
-    }
-}
 
 /// BitLocker Drive Encryption (BDE) encryption.
 pub struct BdeEncryption {}

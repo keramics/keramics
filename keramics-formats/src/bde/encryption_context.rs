@@ -14,8 +14,8 @@
 use keramics_core::ErrorTrace;
 use keramics_encryption::{AesContext, CryptCbc, CryptEcb};
 
+use super::cipher_context::BdeCipherContext;
 use super::diffuser::BdeDiffuser;
-use super::encryption::BdeCipherContext;
 
 /// BitLocker Drive Encryption (BDE) block stream.
 #[derive(Clone)]
@@ -41,32 +41,6 @@ impl BdeEncryptionContext {
             bytes_per_sector,
             cipher_context,
             diffuser_context,
-        }
-    }
-
-    /// Decrypts a sector.
-    pub fn decrypt_sector_ecb(
-        &self,
-        sector_data_offset: u64,
-        encrypted_data: &[u8],
-        data: &mut [u8],
-    ) -> Result<(), ErrorTrace> {
-        let sector_number: u64 = sector_data_offset / (self.bytes_per_sector as u64);
-
-        match &self.cipher_context {
-            BdeCipherContext::AesCbc(aes_context) => {
-                match aes_context.decrypt_ecb(encrypted_data, data) {
-                    Ok(_) => Ok(()),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to decrypt sector: {}", sector_number)
-                        );
-                        Err(error)
-                    }
-                }
-            }
-            _ => todo!(),
         }
     }
 

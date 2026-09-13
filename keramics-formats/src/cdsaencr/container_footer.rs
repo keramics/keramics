@@ -241,8 +241,11 @@ impl CdsaEncrContainerFooter {
         Ok(())
     }
 
-    /// Unlocks the key.
-    pub fn unlock(&mut self, credential: &CdsaEncrCredential) -> Result<bool, ErrorTrace> {
+    /// Unlocks the key data using a credential.
+    pub fn unlock_with_credential(
+        &mut self,
+        credential: &CdsaEncrCredential,
+    ) -> Result<bool, ErrorTrace> {
         match credential {
             CdsaEncrCredential::Passphrase(passphrase) => {
                 let mut key_derivation_context: CdsaEncrKeyDerivationContext =
@@ -269,9 +272,9 @@ impl CdsaEncrContainerFooter {
                             return Err(error);
                         }
                     };
-                let mut key: Vec<u8> = vec![0; self.kek_encryption_type.key_size];
+                let mut derived_key: Vec<u8> = vec![0; self.kek_encryption_type.key_size];
 
-                match key_derivation_context.derive_key(passphrase, &mut key) {
+                match key_derivation_context.derive_key(passphrase, &mut derived_key) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -281,52 +284,60 @@ impl CdsaEncrContainerFooter {
                         return Err(error);
                     }
                 }
-                let cipher_context: CdsaEncrCipherContext =
-                    match CdsaEncrEncryption::get_cipher_context(&self.kek_encryption_type, &key) {
-                        Ok(Some(context)) => context,
-                        Ok(None) => {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Unsupported encryption type: {}",
-                                self.kek_encryption_type
-                            )));
-                        }
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to retrieve cipher context for type: {}",
-                                    self.kek_encryption_type
-                                )
-                            );
-                            return Err(error);
-                        }
-                    };
-                match self.unwrap_key(&cipher_context, &self.wrapped_block_key_data) {
-                    Ok(Some(key_data)) => self.block_key_data = key_data,
-                    Ok(None) => return Ok(false),
+                match self.unlock_with_kek(&derived_key) {
+                    Ok(result) => Ok(result),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to unwrap block key data"
+                            "Unable to unlock key data using KEK"
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
-                match self.unwrap_key(&cipher_context, &self.wrapped_hmac_key_data) {
-                    Ok(Some(key_data)) => self.hmac_key_data = key_data,
-                    Ok(None) => return Ok(false),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to unwrap HMAC key data"
-                        );
-                        return Err(error);
-                    }
-                }
-                Ok(true)
             }
             _ => Ok(false),
         }
+    }
+
+    /// Unlocks the key data using a key encrypting key (KEK).
+    pub fn unlock_with_kek(&mut self, kek: &[u8]) -> Result<bool, ErrorTrace> {
+        let cipher_context: CdsaEncrCipherContext =
+            match CdsaEncrEncryption::get_cipher_context(&self.kek_encryption_type, &kek) {
+                Ok(Some(context)) => context,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported encryption type: {}",
+                        self.kek_encryption_type
+                    )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve cipher context for type: {}",
+                            self.kek_encryption_type
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+        match self.unwrap_key(&cipher_context, &self.wrapped_block_key_data) {
+            Ok(Some(key_data)) => self.block_key_data = key_data,
+            Ok(None) => return Ok(false),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to unwrap block key data");
+                return Err(error);
+            }
+        }
+        match self.unwrap_key(&cipher_context, &self.wrapped_hmac_key_data) {
+            Ok(Some(key_data)) => self.hmac_key_data = key_data,
+            Ok(None) => return Ok(false),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to unwrap HMAC key data");
+                return Err(error);
+            }
+        }
+        Ok(true)
     }
 
     /// Unwraps a key.

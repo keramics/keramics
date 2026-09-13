@@ -146,7 +146,7 @@ create_file_entries()
         # Create a file that uses HFS+ compression (decmpfs) compression method 12
         FILE_NAME="${MOUNT_POINT}/testdir1/compressed6"
         ditto --nohfsCompression LICENSE "${FILE_NAME}"
-        ${AFSCTOOL} -c -T LZFSE "$FILE_NAME}"
+        ${AFSCTOOL} -c -T LZFSE "${FILE_NAME}"
     fi
 
     # Note that compressed UDIF images don't allow for block or character device files.
