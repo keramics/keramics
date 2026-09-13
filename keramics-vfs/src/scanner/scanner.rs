@@ -419,16 +419,18 @@ impl VfsScanner {
                 }
                 Ok(result)
             }
-            VfsType::Bde | VfsType::Luksde => match self.scan_for_file_system_format(&data_stream) {
-                Ok(scan_results) => Ok(scan_results),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to scan data stream for file system formats"
-                    );
-                    Err(error)
+            VfsType::Bde | VfsType::Luksde => {
+                match self.scan_for_file_system_format(&data_stream) {
+                    Ok(scan_results) => Ok(scan_results),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan data stream for file system formats"
+                        );
+                        Err(error)
+                    }
                 }
-            },
+            }
             VfsType::Ewf
             | VfsType::SparseBundle
             | VfsType::SparseImage

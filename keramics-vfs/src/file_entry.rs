@@ -1573,12 +1573,36 @@ mod tests {
     use keramics_formats::xfs::XfsFileSystem;
     use keramics_types::{ByteString, Utf16String};
 
+    use crate::credential::VfsCredential;
+    use crate::credential_store::VfsCredentialStore;
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
     use crate::location::VfsLocation;
     use crate::types::VfsFileSystemReference;
 
     use crate::tests::get_test_data_path;
+
+    fn register_test_passphrase() -> Result<(), ErrorTrace> {
+        let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+
+        for existing_credential in credential_store.iter() {
+            if let VfsCredential::Passphrase(ref passphrase) = existing_credential {
+                if *passphrase == "KeRaMiCs".as_bytes().to_vec() {
+                    return Ok(());
+                }
+            }
+            if let VfsCredential::RecoveryPassword(ref recovery_password) = existing_credential {
+                if *recovery_password == "KeRaMiCs".as_bytes().to_vec() {
+                    return Ok(());
+                }
+            }
+        }
+
+        let passphrase: Vec<u8> = "KeRaMiCs".as_bytes().to_vec();
+        credential_store.add_credential(VfsCredential::Passphrase(passphrase))?;
+
+        Ok(())
+    }
 
     fn get_parent_file_system() -> VfsFileSystemReference {
         VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os))
@@ -2643,7 +2667,349 @@ mod tests {
 
     // Tests with BDE.
 
-    // TODO: add
+    fn get_bde_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        register_test_passphrase()?;
+
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Bde);
+
+        let os_file_system: VfsFileSystemReference = get_parent_file_system();
+        let path_string: String = get_test_data_path("bde/bde_aes128.vhd");
+        let os_vfs_location: VfsLocation = VfsLocation::from(&path_string);
+
+        let mut vhd_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhd);
+        vhd_file_system.open(Some(&os_file_system), &os_vfs_location)?;
+        let vhd_file_system: VfsFileSystemReference = VfsFileSystemReference::new(vhd_file_system);
+        let vhd_vfs_location: VfsLocation =
+            os_vfs_location.new_with_layer(&VfsType::Vhd, Path::from("/vhd1"));
+
+        let mut mbr_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Mbr);
+        mbr_file_system.open(Some(&vhd_file_system), &vhd_vfs_location)?;
+        let mbr_file_system: VfsFileSystemReference = VfsFileSystemReference::new(mbr_file_system);
+        let mbr_vfs_location: VfsLocation =
+            vhd_vfs_location.new_with_layer(&VfsType::Mbr, Path::from("/mbr1"));
+
+        vfs_file_system.open(Some(&mbr_file_system), &mbr_vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_bde_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_bde_file_system()?;
+
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier();
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::Root));
+
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("bde1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 65994752);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target_with_bde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_data_forks_with_bde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_bde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_name_with_bde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let name: Option<PathComponent> = None;
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_some());
+
+        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_bde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_bde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_bde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extended_attributes_with_bde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/")?;
+
+        let mut extended_attributes_iterator: VfsExtendedAttributesIterator =
+            vfs_file_entry.extended_attributes();
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_bde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 1);
+
+        let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/bde1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_sub_file_entry_by_index_with_bde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+
+        let name: Option<PathComponent> = sub_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("bde1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_bde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     // Tests with EWF.
 
@@ -5635,6 +6001,339 @@ mod tests {
     #[test]
     fn test_sub_file_entries_with_mbr() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    // Tests with LUKS.
+
+    fn get_luksde_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        register_test_passphrase()?;
+
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Luksde);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let path_string: String = get_test_data_path("luksde/luks1.raw");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_luksde_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_luksde_file_system()?;
+
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier();
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::Root));
+
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("luks1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 2097152);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target_with_luksde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_data_forks_with_luksde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_luksde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let mut vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_name_with_luksde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let name: Option<PathComponent> = None;
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_some());
+
+        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_luksde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_luksde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_luksde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extended_attributes_with_luksde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/")?;
+
+        let mut extended_attributes_iterator: VfsExtendedAttributesIterator =
+            vfs_file_entry.extended_attributes();
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_luksde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 1);
+
+        let mut vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/luks1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_sub_file_entry_by_index_with_luksde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+
+        let name: Option<PathComponent> = sub_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("luks1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_luksde() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_luksde_file_entry("/")?;
 
         let mut sub_file_entries_iterator: VfsFileEntriesIterator =
             vfs_file_entry.sub_file_entries();

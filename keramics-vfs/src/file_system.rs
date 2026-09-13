@@ -30,8 +30,8 @@ use super::fake::FakeFileSystem;
 use super::file_entry::VfsFileEntry;
 use super::gpt::{GptFileEntry, GptFileSystem};
 use super::linuxlvm::{LinuxLvmFileEntry, LinuxLvmFileSystem};
-use super::luksde::{LuksFileEntry, LuksFileSystem};
 use super::location::VfsLocation;
+use super::luksde::{LuksFileEntry, LuksFileSystem};
 use super::mbr::{MbrFileEntry, MbrFileSystem};
 use super::os::OsFileSystem;
 use super::pdi::{PdiFileEntry, PdiFileSystem};
@@ -1137,10 +1137,34 @@ impl VfsFileSystem {
 mod tests {
     use super::*;
 
+    use crate::credential::VfsCredential;
+    use crate::credential_store::VfsCredentialStore;
     use crate::enums::VfsFileType;
     use crate::fake::FakeFileEntry;
 
     use crate::tests::get_test_data_path;
+
+    fn register_test_passphrase() -> Result<(), ErrorTrace> {
+        let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+
+        for existing_credential in credential_store.iter() {
+            if let VfsCredential::Passphrase(ref passphrase) = existing_credential {
+                if *passphrase == "KeRaMiCs".as_bytes().to_vec() {
+                    return Ok(());
+                }
+            }
+            if let VfsCredential::RecoveryPassword(ref recovery_password) = existing_credential {
+                if *recovery_password == "KeRaMiCs".as_bytes().to_vec() {
+                    return Ok(());
+                }
+            }
+        }
+
+        let passphrase: Vec<u8> = "KeRaMiCs".as_bytes().to_vec();
+        credential_store.add_credential(VfsCredential::Passphrase(passphrase))?;
+
+        Ok(())
+    }
 
     // Tests with APFS.
 
@@ -1412,7 +1436,83 @@ mod tests {
 
     // Tests with BDE.
 
-    // TODO: add
+    fn get_bde_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        register_test_passphrase()?;
+
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Bde);
+
+        let os_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("bde/bde_aes128.vhd");
+        let os_vfs_location: VfsLocation = VfsLocation::from(&path_string);
+
+        let mut vhd_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhd);
+        vhd_file_system.open(Some(&os_file_system), &os_vfs_location)?;
+        let vhd_file_system: VfsFileSystemReference = VfsFileSystemReference::new(vhd_file_system);
+        let vhd_vfs_location: VfsLocation =
+            os_vfs_location.new_with_layer(&VfsType::Vhd, Path::from("/vhd1"));
+
+        let mut mbr_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Mbr);
+        mbr_file_system.open(Some(&vhd_file_system), &vhd_vfs_location)?;
+        let mbr_file_system: VfsFileSystemReference = VfsFileSystemReference::new(mbr_file_system);
+        let mbr_vfs_location: VfsLocation =
+            vhd_vfs_location.new_with_layer(&VfsType::Mbr, Path::from("/mbr1"));
+
+        vfs_file_system.open(Some(&mbr_file_system), &mbr_vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_bde() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_bde_file_system()?;
+
+        let path: Path = Path::from("/bde1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
+
+        let path: Path = Path::from("/bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_bde_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_bde_file_system()?;
+
+        let path: Path = Path::from("/bogus");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_bde_volume() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_bde_file_system()?;
+
+        let path: Path = Path::from("/bde1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_bde_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_bde_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        Ok(())
+    }
 
     // Tests with exFAT.
 
@@ -1863,6 +1963,73 @@ mod tests {
     #[test]
     fn test_get_file_entry_by_path_with_linuxlvm_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_linuxlvm_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with LUKS.
+
+    fn get_luksde_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        register_test_passphrase()?;
+
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Luksde);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("luksde/luks1.raw");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_luksde() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_luksde_file_system()?;
+
+        let path: Path = Path::from("/luks1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
+
+        let path: Path = Path::from("/bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_luksde_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_luksde_file_system()?;
+
+        let path: Path = Path::from("/bogus");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_luksde_volume() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_luksde_file_system()?;
+
+        let path: Path = Path::from("/luks1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_luksde_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_luksde_file_system()?;
 
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
