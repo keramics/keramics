@@ -41,7 +41,7 @@ pub struct NtfsBlockReader {
 }
 
 impl NtfsBlockReader {
-    /// Creates a new block stream.
+    /// Creates a new block reader.
     pub(super) fn new(data_stream: &DataStreamReference, cluster_block_size: u32) -> Self {
         Self {
             data_stream: data_stream.clone(),
@@ -52,7 +52,7 @@ impl NtfsBlockReader {
         }
     }
 
-    /// Opens a block stream.
+    /// Opens a block reader.
     pub(super) fn open(&mut self, data_attribute: &NtfsMftAttribute) -> Result<(), ErrorTrace> {
         if data_attribute.is_resident() {
             return Err(keramics_core::error_trace_new!(

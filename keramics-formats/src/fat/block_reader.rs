@@ -23,7 +23,7 @@ use crate::traits::BlockReader;
 use super::block_allocation_table::FatBlockAllocationTable;
 use super::block_range::FatBlockRange;
 
-/// File Allocation Table (FAT) block stream.
+/// File Allocation Table (FAT) block reader.
 pub struct FatBlockReader {
     /// The data stream.
     data_stream: DataStreamReference,
@@ -39,7 +39,7 @@ pub struct FatBlockReader {
 }
 
 impl FatBlockReader {
-    /// Creates a new block stream.
+    /// Creates a new block reader.
     pub(super) fn new(data_stream: &DataStreamReference, block_size: u32, size: u32) -> Self {
         Self {
             data_stream: data_stream.clone(),
@@ -49,7 +49,7 @@ impl FatBlockReader {
         }
     }
 
-    /// Opens a block stream.
+    /// Opens a block reader.
     pub(super) fn open(
         &mut self,
         block_allocation_table: &Arc<FatBlockAllocationTable>,

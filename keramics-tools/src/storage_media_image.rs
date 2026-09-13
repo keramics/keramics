@@ -113,7 +113,7 @@ impl StorageMediaImage {
                 qcow_image_layer, ..
             } => qcow_image_layer.get_data_stream(),
             Self::Raw { data_stream } => Some(data_stream.clone()),
-            Self::SparseBundle { sparsebundle_image } => Some(sparsebundle_image.get_data_stream()),
+            Self::SparseBundle { sparsebundle_image } => sparsebundle_image.get_data_stream(),
             Self::SparseImage { sparseimage_file } => sparseimage_file.get_data_stream(),
             Self::SplitRaw { splitraw_image } => Some(splitraw_image.get_data_stream()),
             Self::Udif { udif_image } => udif_image.get_data_stream(),

@@ -110,8 +110,9 @@ mod tests {
             0x15, 0xbc, 0x71, 0x55, 0xa3, 0x8f, 0xa1, 0x61, 0xc7, 0x2a, 0x9e, 0xeb, 0xe1, 0x20,
             0x25, 0xe6,
         ];
-        let encryption_context: BdeEncryptionContext =
-            BdeEncryption::get_encryption_context(521, &encryption_type, &fvek_key)?.unwrap();
+        let encryption_context: Arc<BdeEncryptionContext> = Arc::new(
+            BdeEncryption::get_encryption_context(521, &encryption_type, &fvek_key)?.unwrap(),
+        );
 
         Ok(BdeBlockStream::new(BdeBlockReader::new(
             &data_stream,

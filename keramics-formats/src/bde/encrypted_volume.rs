@@ -73,7 +73,7 @@ pub struct BdeEncryptedVolume {
     block_ranges: Vec<BdeBlockRange>,
 
     /// Encryption context.
-    encryption_context: Option<BdeEncryptionContext>,
+    encryption_context: Option<Arc<BdeEncryptionContext>>,
 
     /// The volume size.
     volume_size: u64,
@@ -986,7 +986,7 @@ impl BdeEncryptedVolume {
                             };
                         // TODO: determine or check unencrypted volume size
 
-                        self.encryption_context = Some(encryption_context);
+                        self.encryption_context = Some(Arc::new(encryption_context));
                         self.is_locked = false;
                     }
                 }

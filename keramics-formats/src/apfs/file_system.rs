@@ -35,11 +35,11 @@ pub struct ApfsFileSystem {
     /// Object map B-tree.
     object_map_tree: Arc<ApfsObjectMapTree>,
 
-    /// File system B-tree.
-    file_system_tree: Arc<ApfsFileSystemTree>,
-
     /// Encryption context.
     encryption_context: Option<Arc<ApfsEncryptionContext>>,
+
+    /// File system B-tree.
+    file_system_tree: Arc<ApfsFileSystemTree>,
 
     /// Transaction identifier.
     transaction_identifier: u64,
@@ -94,6 +94,7 @@ impl ApfsFileSystem {
             data_stream,
             self.block_size,
             &self.object_map_tree,
+            self.encryption_context.as_ref(),
             &self.file_system_tree,
             identifier,
             self.transaction_identifier,

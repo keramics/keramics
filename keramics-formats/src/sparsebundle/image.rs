@@ -16,6 +16,7 @@ use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
+use crate::block_stream::BlockStream;
 use crate::cdsaencr::constants::*;
 use crate::cdsaencr::{
     CdsaEncrContainer, CdsaEncrCredential, CdsaEncrEncryptionContext, CdsaEncrEncryptionType,
@@ -26,7 +27,7 @@ use crate::path_component::PathComponent;
 use crate::plist::XmlPlist;
 
 use super::block_reader::SparseBundleBlockReader;
-use super::block_stream::SparseBundleBlockStream;
+use super::encrypted_block_reader::SparseBundleEncryptedBlockReader;
 
 /// Mac OS sparse bundle (.sparsebundle) storage media image.
 pub struct SparseBundleImage {
@@ -73,21 +74,35 @@ impl SparseBundleImage {
     }
 
     /// Retrieves a data stream.
-    pub fn get_data_stream(&self) -> DataStreamReference {
+    pub fn get_data_stream(&self) -> Option<DataStreamReference> {
         let encryption_context: Option<&CdsaEncrEncryptionContext> = match &self.encrypted_container
         {
             Some(encrypted_container) => encrypted_container.encryption_context.as_ref(),
             None => None,
         };
-        Arc::new(RwLock::new(SparseBundleBlockStream::new(
-            SparseBundleBlockReader::new(
-                &self.file_resolver,
-                self.band_size,
-                encryption_context,
-                self.encrypted_block_size,
-                self.media_size,
-            ),
-        )))
+        match &self.encrypted_container {
+            Some(encrypted_container) => match &encrypted_container.encryption_context {
+                Some(encryption_context) => Some(Arc::new(RwLock::new(BlockStream::<
+                    SparseBundleEncryptedBlockReader,
+                >::new(
+                    SparseBundleEncryptedBlockReader::new(
+                        &self.file_resolver,
+                        self.band_size,
+                        encryption_context,
+                        self.encrypted_block_size,
+                        self.media_size,
+                    ),
+                )))),
+                None => None,
+            },
+            None => Some(Arc::new(RwLock::new(
+                BlockStream::<SparseBundleBlockReader>::new(SparseBundleBlockReader::new(
+                    &self.file_resolver,
+                    self.band_size,
+                    self.media_size,
+                )),
+            ))),
+        }
     }
 
     /// Retrieves the encryption type.

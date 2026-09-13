@@ -31,6 +31,7 @@ use super::block_reader::ApfsBlockReader;
 use super::block_stream::ApfsBlockStream;
 use super::constants::*;
 use super::directory_entry::ApfsDirectoryEntry;
+use super::encryption_context::ApfsEncryptionContext;
 use super::extended_attribute::ApfsExtendedAttribute;
 use super::extended_attributes::ApfsExtendedAttributesIterator;
 use super::extent::ApfsExtent;
@@ -49,6 +50,9 @@ pub struct ApfsFileEntry {
 
     /// Object map B-tree.
     object_map_tree: Arc<ApfsObjectMapTree>,
+
+    /// Encryption context.
+    encryption_context: Option<Arc<ApfsEncryptionContext>>,
 
     /// File system B-tree.
     file_system_tree: Arc<ApfsFileSystemTree>,
@@ -90,6 +94,7 @@ impl ApfsFileEntry {
         data_stream: &DataStreamReference,
         block_size: u32,
         object_map_tree: &Arc<ApfsObjectMapTree>,
+        encryption_context: Option<&Arc<ApfsEncryptionContext>>,
         file_system_tree: &Arc<ApfsFileSystemTree>,
         identifier: u64,
         transaction_identifier: u64,
@@ -100,6 +105,7 @@ impl ApfsFileEntry {
             data_stream: data_stream.clone(),
             block_size,
             object_map_tree: object_map_tree.clone(),
+            encryption_context: encryption_context.cloned(),
             file_system_tree: file_system_tree.clone(),
             identifier,
             transaction_identifier,
@@ -119,6 +125,7 @@ impl ApfsFileEntry {
         data_stream: &DataStreamReference,
         block_size: u32,
         object_map_tree: &Arc<ApfsObjectMapTree>,
+        encryption_context: Option<&Arc<ApfsEncryptionContext>>,
         file_system_tree: &Arc<ApfsFileSystemTree>,
         identifier: u64,
         transaction_identifier: u64,
@@ -129,6 +136,7 @@ impl ApfsFileEntry {
             data_stream,
             block_size,
             object_map_tree,
+            encryption_context,
             file_system_tree,
             identifier,
             transaction_identifier,
@@ -241,17 +249,21 @@ impl ApfsFileEntry {
             Some(data_stream_descriptor) => data_stream_descriptor.size,
             None => 0,
         };
-        let mut block_reader: ApfsBlockReader =
-            ApfsBlockReader::new(&self.data_stream, self.block_size, size);
-
-        match block_reader.open(self.extents.clone()) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
-                return Err(error);
+        match &self.encryption_context {
+            Some(encryption_context) => todo!(),
+            None => {
+                let mut block_reader: ApfsBlockReader =
+                    ApfsBlockReader::new(&self.data_stream, self.block_size, size);
+                match block_reader.open(self.extents.clone()) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
+                        return Err(error);
+                    }
+                }
+                Ok(ApfsBlockStream::new(block_reader))
             }
         }
-        Ok(ApfsBlockStream::new(block_reader))
     }
 
     /// Retrieves the default data stream.
@@ -396,19 +408,27 @@ impl ApfsFileEntry {
                         return Err(error);
                     }
                 }
-                let mut block_reader: ApfsBlockReader = ApfsBlockReader::new(
-                    &self.data_stream,
-                    self.block_size,
-                    data_stream_descriptor.size,
-                );
-                match block_reader.open(extents) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
-                        return Err(error);
+                match &self.encryption_context {
+                    Some(encryption_context) => todo!(),
+                    None => {
+                        let mut block_reader: ApfsBlockReader = ApfsBlockReader::new(
+                            &self.data_stream,
+                            self.block_size,
+                            data_stream_descriptor.size,
+                        );
+                        match block_reader.open(extents) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to open block reader"
+                                );
+                                return Err(error);
+                            }
+                        }
+                        Ok(Arc::new(RwLock::new(ApfsBlockStream::new(block_reader))))
                     }
                 }
-                Ok(Arc::new(RwLock::new(ApfsBlockStream::new(block_reader))))
             }
             None => {
                 let data_stream: FakeDataStream = FakeDataStream::new(
@@ -510,6 +530,7 @@ impl ApfsFileEntry {
             &self.data_stream,
             self.block_size,
             &self.object_map_tree,
+            self.encryption_context.as_ref(),
             &self.file_system_tree,
             identifier,
             self.transaction_identifier,
@@ -740,6 +761,7 @@ impl FileEntryIterator for ApfsFileEntry {
                     &self.data_stream,
                     self.block_size,
                     &self.object_map_tree,
+                    self.encryption_context.as_ref(),
                     &self.file_system_tree,
                     identifier,
                     self.transaction_identifier,

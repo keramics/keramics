@@ -47,7 +47,7 @@ fn open_image(base_path: &PathBuf) -> Result<SparseBundleImage, ErrorTrace> {
 fn read_image() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
     let image: SparseBundleImage = open_image(&path_buf)?;
-    let data_stream: DataStreamReference = image.get_data_stream();
+    let data_stream: DataStreamReference = image.get_data_stream().unwrap();
 
     let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
 
@@ -65,7 +65,7 @@ fn read_image_encrypted() -> Result<(), ErrorTrace> {
         vec![CdsaEncrCredential::Passphrase(b"KeRaMiCs".to_vec())];
     image.unlock(&credentials)?;
 
-    let data_stream: DataStreamReference = image.get_data_stream();
+    let data_stream: DataStreamReference = image.get_data_stream().unwrap();
 
     let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
 

@@ -36,7 +36,7 @@ pub struct HfsBlockReader {
 }
 
 impl HfsBlockReader {
-    /// Creates a new block stream.
+    /// Creates a new block reader.
     pub(super) fn new(data_stream: &DataStreamReference, block_size: u32, size: u64) -> Self {
         Self {
             data_stream: data_stream.clone(),
@@ -46,7 +46,7 @@ impl HfsBlockReader {
         }
     }
 
-    /// Opens a block stream.
+    /// Opens a block reader.
     pub(super) fn open(&mut self, block_ranges: Vec<HfsBlockRange>) -> Result<(), ErrorTrace> {
         self.block_ranges = block_ranges;
 

@@ -13,7 +13,7 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::bytes_to_u16_le;
+use keramics_types::bytes_to_u16_be;
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -68,7 +68,7 @@ impl ApfsKeyBagPackedValue {
         self.data_size = match self.extended_size {
             0 => data[1] as u16,
             1 => data[2] as u16,
-            2 => bytes_to_u16_le!(data, 2),
+            2 => bytes_to_u16_be!(data, 2),
             _ => return Err(keramics_core::error_trace_new!("Unsupported extended size")),
         };
         Ok(())

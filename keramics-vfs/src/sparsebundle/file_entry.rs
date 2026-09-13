@@ -38,7 +38,7 @@ impl SparseBundleFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
-            SparseBundleFileEntry::Layer { image, .. } => Ok(Some(image.get_data_stream())),
+            SparseBundleFileEntry::Layer { image, .. } => Ok(image.get_data_stream()),
             SparseBundleFileEntry::Root { .. } => Ok(None),
         }
     }

@@ -115,6 +115,14 @@ impl ApfsWrappedKek {
                 + (packed_value.extended_size as usize)
                 + (packed_value.data_size as usize);
 
+            data_offset += 2 + (packed_value.extended_size as usize);
+
+            keramics_core::debug_trace_data!(
+                format!("ApfsKeyBagPackedValueData: {}", value_index),
+                data_offset,
+                &data[data_offset..data_end_offset],
+                packed_value.data_size,
+            );
             match packed_value.tag {
                 0x81 => {
                     if packed_value.data_size != 16 {
@@ -131,11 +139,9 @@ impl ApfsWrappedKek {
                             value_index, packed_value.tag
                         )));
                     }
-                    data_offset += 2 + (packed_value.extended_size as usize);
                     self.flags = bytes_to_u32_le!(data, data_offset);
                 }
                 0x83 => {
-                    data_offset += 2 + (packed_value.extended_size as usize);
                     self.wrapped_key_data = data[data_offset..data_end_offset].to_vec();
                 }
                 0x84 => {
@@ -145,14 +151,12 @@ impl ApfsWrappedKek {
                             value_index, packed_value.tag
                         )));
                     }
-                    data_offset += 2 + (packed_value.extended_size as usize);
                     for data_offset in data_offset..data_end_offset {
                         self.number_of_iterations =
                             (self.number_of_iterations << 8) | (data[data_offset] as u64);
                     }
                 }
                 0x85 => {
-                    data_offset += 2 + (packed_value.extended_size as usize);
                     self.salt = data[data_offset..data_end_offset].to_vec();
                 }
                 _ => {}

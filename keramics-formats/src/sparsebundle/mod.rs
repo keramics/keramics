@@ -13,6 +13,7 @@
 
 mod block_reader;
 mod block_stream;
+mod encrypted_block_reader;
 mod image;
 
 pub use image::SparseBundleImage;

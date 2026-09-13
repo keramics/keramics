@@ -13,17 +13,22 @@
 
 use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use crate::traits::BlockReader;
 
+use super::encryption_context::ApfsEncryptionContext;
 use super::extent::ApfsExtent;
 
-/// Apple File System (APFS) block reader.
-pub struct ApfsBlockReader {
+/// Apple File System (APFS) encrypted block reader.
+pub struct ApfsEncryptedBlockReader {
     /// The data stream.
     data_stream: DataStreamReference,
+
+    /// Encryption context.
+    encryption_context: Option<Arc<ApfsEncryptionContext>>,
 
     /// Block size.
     block_size: u32,
@@ -35,11 +40,17 @@ pub struct ApfsBlockReader {
     size: u64,
 }
 
-impl ApfsBlockReader {
+impl ApfsEncryptedBlockReader {
     /// Creates a new block reader.
-    pub(super) fn new(data_stream: &DataStreamReference, block_size: u32, size: u64) -> Self {
+    pub(super) fn new(
+        data_stream: &DataStreamReference,
+        encryption_context: Option<&Arc<ApfsEncryptionContext>>,
+        block_size: u32,
+        size: u64,
+    ) -> Self {
         Self {
             data_stream: data_stream.clone(),
+            encryption_context: encryption_context.cloned(),
             block_size,
             extents: Vec::new(),
             size,
@@ -54,7 +65,7 @@ impl ApfsBlockReader {
     }
 }
 
-impl BlockReader for ApfsBlockReader {
+impl BlockReader for ApfsEncryptedBlockReader {
     /// Retrieves the size of the data.
     fn get_size(&self) -> u64 {
         self.size
@@ -112,11 +123,16 @@ impl BlockReader for ApfsBlockReader {
                 let range_physical_offset: u64 =
                     (extent.physical_block_number as u64) * (self.block_size as u64);
 
-                keramics_core::data_stream_read_exact_at_position!(
-                    &self.data_stream,
-                    &mut data[data_offset..data_end_offset],
-                    SeekFrom::Start(range_physical_offset + range_relative_offset)
-                );
+                match &self.encryption_context {
+                    Some(encryption_context) => todo!(),
+                    None => {
+                        keramics_core::data_stream_read_exact_at_position!(
+                            &self.data_stream,
+                            &mut data[data_offset..data_end_offset],
+                            SeekFrom::Start(range_physical_offset + range_relative_offset)
+                        );
+                    }
+                }
             }
             data_offset = data_end_offset;
             current_offset += range_read_size as u64;
@@ -142,7 +158,7 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
-        let mut block_reader = ApfsBlockReader::new(&data_stream, 4096, 11358);
+        let mut block_reader = ApfsEncryptedBlockReader::new(&data_stream, None, 4096, 11358);
 
         let extents: Vec<ApfsExtent> = vec![ApfsExtent {
             logical_offset: 0,

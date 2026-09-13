@@ -40,7 +40,7 @@ pub struct ExFatBlockReader {
 }
 
 impl ExFatBlockReader {
-    /// Creates a new block stream.
+    /// Creates a new block reader.
     pub(super) fn new(data_stream: &DataStreamReference, block_size: u32, size: u64) -> Self {
         Self {
             data_stream: data_stream.clone(),
@@ -50,7 +50,7 @@ impl ExFatBlockReader {
         }
     }
 
-    /// Opens a block stream.
+    /// Opens a block reader.
     pub(super) fn open(
         &mut self,
         block_allocation_table: &Arc<ExFatBlockAllocationTable>,

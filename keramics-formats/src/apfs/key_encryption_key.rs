@@ -104,16 +104,31 @@ impl ApfsKeyEncryptionKey {
 
             match packed_value.tag {
                 0x81 => {
+                    data_offset += 2 + (packed_value.extended_size as usize);
+
+                    keramics_core::debug_trace_data!(
+                        format!("ApfsKeyBagPackedValueData: {}", value_index),
+                        data_offset,
+                        &data[data_offset..data_end_offset],
+                        packed_value.data_size,
+                    );
                     if packed_value.data_size != 32 {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Invalid sub packed value: {} with tag: 0x{:02x} - unsupported HMAC size",
                             value_index, packed_value.tag
                         )));
                     }
-                    data_offset += 2 + (packed_value.extended_size as usize);
                     self.hmac = data[data_offset..data_end_offset].to_vec();
                 }
                 0x82 => {
+                    data_offset += 2 + (packed_value.extended_size as usize);
+
+                    keramics_core::debug_trace_data!(
+                        format!("ApfsKeyBagPackedValueData: {}", value_index),
+                        data_offset,
+                        &data[data_offset..data_end_offset],
+                        packed_value.data_size,
+                    );
                     if packed_value.data_size != 8 {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Invalid sub packed value: {} with tag: 0x{:02x} - unsupported salt? size",
