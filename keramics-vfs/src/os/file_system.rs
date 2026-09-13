@@ -91,5 +91,60 @@ impl OsFileSystem {
 mod tests {
     use super::*;
 
-    // TODO: add tests
+    use crate::enums::VfsFileType;
+    use crate::tests::get_test_data_path;
+
+    #[test]
+    fn test_file_entry_exists() -> Result<(), ErrorTrace> {
+        let path_string: String = get_test_data_path("directory/file.txt");
+        let path: Path = Path::from(&path_string);
+
+        let result: bool = OsFileSystem::file_entry_exists(&path)?;
+        assert_eq!(result, true);
+
+        let path_string: String = get_test_data_path("directory/bogus.txt");
+        let path: Path = Path::from(&path_string);
+
+        let result: bool = OsFileSystem::file_entry_exists(&path)?;
+        assert_eq!(result, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
+        let path_string: String = get_test_data_path("directory/file.txt");
+        let path: Path = Path::from(&path_string);
+
+        let result: Option<OsFileEntry> = OsFileSystem::get_file_entry_by_path(&path)?;
+        assert!(result.is_some());
+
+        let os_file_entry: OsFileEntry = result.unwrap();
+
+        let name: Option<&std::ffi::OsStr> = os_file_entry.get_name();
+        assert_eq!(name, Some(std::ffi::OsStr::new("file.txt")));
+
+        let file_type: VfsFileType = os_file_entry.get_file_type();
+        assert_eq!(file_type, VfsFileType::File);
+
+        let path_string: String = get_test_data_path("directory/bogus.txt");
+        let path: Path = Path::from(&path_string);
+
+        let result: Option<OsFileEntry> = OsFileSystem::get_file_entry_by_path(&path)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_root_file_entry() -> Result<(), ErrorTrace> {
+        let os_file_entry: OsFileEntry = OsFileSystem::get_root_file_entry()?;
+
+        let file_type: VfsFileType = os_file_entry.get_file_type();
+        assert_eq!(file_type, VfsFileType::Directory);
+
+        assert_eq!(os_file_entry.is_root_file_entry(), true);
+
+        Ok(())
+    }
 }

@@ -174,5 +174,60 @@ impl<'a> Iterator for VfsFinder<'a> {
 mod tests {
     use super::*;
 
-    // TODO: add tests
+    use std::path::PathBuf;
+
+    use keramics_core::open_os_data_stream;
+    use keramics_formats::PathComponent;
+    use keramics_formats::ntfs::NtfsFileSystem;
+    use keramics_types::Ucs2String;
+
+    use crate::enums::VfsFileType;
+    use crate::tests::get_test_data_path;
+
+    fn get_ntfs_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
+
+        let test_data_path_string: String = get_test_data_path("ntfs/ntfs.raw");
+        let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
+        let data_stream: keramics_core::DataStreamReference = open_os_data_stream(&path_buf)?;
+        file_system.read_data_stream(&data_stream)?;
+
+        Ok(VfsFileSystem::Ntfs(file_system))
+    }
+
+    #[test]
+    fn test_get_path() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ntfs_file_system()?;
+
+        let vfs_finder: VfsFinder<'_> = VfsFinder::new(&vfs_file_system);
+
+        let path: &Path = vfs_finder.get_path();
+        assert_eq!(path, &Path::from("/"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_next() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ntfs_file_system()?;
+
+        let mut vfs_finder: VfsFinder<'_> = VfsFinder::new(&vfs_file_system);
+
+        let result: Option<Result<(VfsFileEntry, Path), ErrorTrace>> = vfs_finder.next();
+        assert!(result.is_some());
+
+        let (file_entry, path): (VfsFileEntry, Path) = result.unwrap()?;
+        assert_eq!(
+            path,
+            Path {
+                components: vec![
+                    PathComponent::Root,
+                    PathComponent::Ucs2String(Ucs2String::from("$AttrDef"))
+                ]
+            }
+        );
+        assert_eq!(file_entry.get_file_type(), VfsFileType::File);
+
+        Ok(())
+    }
 }

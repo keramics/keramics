@@ -13,7 +13,6 @@
 
 use std::collections::HashSet;
 use std::io::SeekFrom;
-use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u64_le;
