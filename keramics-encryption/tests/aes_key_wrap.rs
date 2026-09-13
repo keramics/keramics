@@ -152,7 +152,7 @@ fn test_unwrap() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn test_encrypt_ccm() -> Result<(), ErrorTrace> {
+fn test_wrap() -> Result<(), ErrorTrace> {
     for (test_number, test_vector) in AES_KEY_WRAP_TEST_VECTORS.iter().enumerate() {
         let key_bit_size: usize = test_vector.key.len() * 8;
 
