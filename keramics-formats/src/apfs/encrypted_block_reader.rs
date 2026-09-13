@@ -13,17 +13,22 @@
 
 use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use crate::traits::BlockReader;
 
+use super::encryption_context::ApfsEncryptionContext;
 use super::extent::ApfsExtent;
 
-/// Apple File System (APFS) block reader.
-pub struct ApfsBlockReader {
+/// Apple File System (APFS) encrypted block reader.
+pub struct ApfsEncryptedBlockReader {
     /// The data stream.
     data_stream: DataStreamReference,
+
+    /// Encryption context.
+    encryption_context: Option<Arc<ApfsEncryptionContext>>,
 
     /// Block size.
     block_size: u32,
@@ -35,11 +40,17 @@ pub struct ApfsBlockReader {
     size: u64,
 }
 
-impl ApfsBlockReader {
+impl ApfsEncryptedBlockReader {
     /// Creates a new block reader.
-    pub(super) fn new(data_stream: &DataStreamReference, block_size: u32, size: u64) -> Self {
+    pub(super) fn new(
+        data_stream: &DataStreamReference,
+        encryption_context: Option<&Arc<ApfsEncryptionContext>>,
+        block_size: u32,
+        size: u64,
+    ) -> Self {
         Self {
             data_stream: data_stream.clone(),
+            encryption_context: encryption_context.cloned(),
             block_size,
             extents: Vec::new(),
             size,
@@ -54,7 +65,7 @@ impl ApfsBlockReader {
     }
 }
 
-impl BlockReader for ApfsBlockReader {
+impl BlockReader for ApfsEncryptedBlockReader {
     /// Retrieves the size of the data.
     fn get_size(&self) -> u64 {
         self.size
@@ -112,11 +123,61 @@ impl BlockReader for ApfsBlockReader {
                 let range_physical_offset: u64 =
                     (extent.physical_block_number as u64) * (self.block_size as u64);
 
-                keramics_core::data_stream_read_exact_at_position!(
-                    &self.data_stream,
-                    &mut data[data_offset..data_end_offset],
-                    SeekFrom::Start(range_physical_offset + range_relative_offset)
-                );
+                match &self.encryption_context {
+                    Some(encryption_context) => {
+                        let mut block_offset: u64 = range_relative_offset;
+                        while data_offset < data_end_offset {
+                            let block_start_offset: u64 = (block_offset / (self.block_size as u64))
+                                * (self.block_size as u64);
+                            let block_data_offset: usize =
+                                (block_offset - block_start_offset) as usize;
+                            let block_physical_offset: u64 =
+                                range_physical_offset + block_start_offset;
+
+                            let mut encrypted_data: Vec<u8> = vec![0; self.block_size as usize];
+                            keramics_core::data_stream_read_exact_at_position!(
+                                &self.data_stream,
+                                &mut encrypted_data,
+                                SeekFrom::Start(block_physical_offset)
+                            );
+                            let mut block_data: Vec<u8> = vec![0; self.block_size as usize];
+                            match encryption_context.decrypt_block(
+                                block_physical_offset,
+                                &encrypted_data,
+                                &mut block_data,
+                            ) {
+                                Ok(_) => {}
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        format!(
+                                            "Unable to decrypt block: {} (0x{:08x})",
+                                            block_physical_offset, block_physical_offset
+                                        )
+                                    );
+                                    return Err(error);
+                                }
+                            }
+                            let block_read_size: usize = min(
+                                data_end_offset - data_offset,
+                                (self.block_size as usize) - block_data_offset,
+                            );
+                            let block_data_end_offset: usize = block_data_offset + block_read_size;
+                            data[data_offset..data_offset + block_read_size].copy_from_slice(
+                                &block_data[block_data_offset..block_data_end_offset],
+                            );
+                            data_offset += block_read_size;
+                            block_offset += block_read_size as u64;
+                        }
+                    }
+                    None => {
+                        keramics_core::data_stream_read_exact_at_position!(
+                            &self.data_stream,
+                            &mut data[data_offset..data_end_offset],
+                            SeekFrom::Start(range_physical_offset + range_relative_offset)
+                        );
+                    }
+                }
             }
             data_offset = data_end_offset;
             current_offset += range_read_size as u64;
@@ -124,36 +185,4 @@ impl BlockReader for ApfsBlockReader {
         }
         Ok(data_offset)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    use std::path::PathBuf;
-
-    use keramics_core::open_os_data_stream;
-
-    use crate::tests::get_test_data_path;
-
-    #[test]
-    fn test_open() -> Result<(), ErrorTrace> {
-        let path_string: String = get_test_data_path("apfs/apfs.raw");
-        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-
-        let mut block_reader = ApfsBlockReader::new(&data_stream, 4096, 11358);
-
-        let extents: Vec<ApfsExtent> = vec![ApfsExtent {
-            logical_offset: 0,
-            size: 12288,
-            physical_block_number: 95,
-            encryption_identifier: 0,
-        }];
-        block_reader.open(extents)?;
-
-        Ok(())
-    }
-
-    // TODO: add tests for read_data_from_blocks
 }

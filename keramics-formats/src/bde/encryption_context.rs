@@ -17,8 +17,7 @@ use keramics_encryption::{AesContext, CryptCbc, CryptEcb};
 use super::cipher_context::BdeCipherContext;
 use super::diffuser::BdeDiffuser;
 
-/// BitLocker Drive Encryption (BDE) block stream.
-#[derive(Clone)]
+/// BitLocker Drive Encryption (BDE) encryption context.
 pub struct BdeEncryptionContext {
     /// Bytes per sector.
     bytes_per_sector: u16,

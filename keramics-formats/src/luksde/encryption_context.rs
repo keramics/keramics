@@ -17,7 +17,6 @@ use super::cipher_context::LuksCipherContext;
 use super::encryption::LuksInitializationVectorContext;
 
 /// Linux Unified Key Setup (LUKS) Disk Encryption encryption context.
-#[derive(Clone)]
 pub struct LuksEncryptionContext {
     /// Cipher context.
     pub cipher_context: LuksCipherContext,

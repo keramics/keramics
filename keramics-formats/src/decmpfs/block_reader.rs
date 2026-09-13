@@ -78,7 +78,7 @@ impl DecmpfsBlockReader {
         }
     }
 
-    /// Opens a block stream.
+    /// Opens a block reader.
     pub(crate) fn open(&mut self, size: u64) -> Result<(), ErrorTrace> {
         self.compressed_size = match self.data_stream.write() {
             Ok(mut data_stream) => match data_stream.get_size() {

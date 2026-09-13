@@ -84,3 +84,15 @@ fn read_exfat_empty_file() -> Result<(), ErrorTrace> {
 
     Ok(())
 }
+
+#[test]
+fn read_exfat_file_regular() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/exfat/exfat.raw");
+    let file_system: ExFatFileSystem = open_file_system(&path_buf)?;
+
+    let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/TestFile2")?;
+    assert_eq!(offset, 11358);
+    assert_eq!(md5_hash.as_str(), "3b83ef96387f14655fc854ddc3c6bd57");
+
+    Ok(())
+}

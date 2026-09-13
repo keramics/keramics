@@ -68,7 +68,7 @@ pub struct LuksEncryptedVolume {
     encrypted_data_offset: u64,
 
     /// Encryption context.
-    encryption_context: Option<LuksEncryptionContext>,
+    encryption_context: Option<Arc<LuksEncryptionContext>>,
 
     /// The volume size.
     volume_size: u64,
@@ -508,9 +508,9 @@ impl LuksEncryptedVolume {
         if master_key_unlocked {
             keramics_core::debug_trace_data!("LuksMasterKey", 0, &master_key, master_key.len());
 
-            self.encryption_context =
+            let encryption_context: LuksEncryptionContext =
                 match LuksEncryption::get_encryption_context(&self.encryption_type, &master_key) {
-                    Ok(Some(context)) => Some(context),
+                    Ok(Some(context)) => context,
                     Ok(None) => {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Unsupported encryption type: {}",
@@ -528,6 +528,7 @@ impl LuksEncryptedVolume {
                         return Err(error);
                     }
                 };
+            self.encryption_context = Some(Arc::new(encryption_context));
             self.is_locked = false;
         }
         Ok(!self.is_locked)

@@ -13,6 +13,7 @@
 
 use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
@@ -34,7 +35,7 @@ pub struct BdeBlockReader {
     block_ranges: Vec<BdeBlockRange>,
 
     /// Encryption context.
-    encryption_context: BdeEncryptionContext,
+    encryption_context: Arc<BdeEncryptionContext>,
 
     /// Decrypted sector cache.
     sector_cache: LruCache<u64, Vec<u8>>,
@@ -49,7 +50,7 @@ impl BdeBlockReader {
         data_stream: &DataStreamReference,
         bytes_per_sector: u16,
         block_ranges: &[BdeBlockRange],
-        encryption_context: &BdeEncryptionContext,
+        encryption_context: &Arc<BdeEncryptionContext>,
         size: u64,
     ) -> Self {
         Self {

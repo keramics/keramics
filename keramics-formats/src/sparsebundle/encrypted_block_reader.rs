@@ -16,13 +16,14 @@ use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
+use crate::cdsaencr::CdsaEncrEncryptionContext;
 use crate::file_resolver::FileResolverReference;
 use crate::lru_cache::LruCache;
 use crate::path_component::PathComponent;
 use crate::traits::BlockReader;
 
-/// Mac OS sparse bundle (.sparsebundle) block reader.
-pub struct SparseBundleBlockReader {
+/// Mac OS sparse bundle (.sparsebundle) encrypted block reader.
+pub struct SparseBundleEncryptedBlockReader {
     /// File resolver.
     file_resolver: FileResolverReference,
 
@@ -32,23 +33,37 @@ pub struct SparseBundleBlockReader {
     /// Band file cache.
     band_file_cache: LruCache<u64, DataStreamReference>,
 
+    /// Encryption context.
+    encryption_context: CdsaEncrEncryptionContext,
+
+    /// Encrypted block size.
+    encrypted_block_size: usize,
+
     /// Size.
     size: u64,
 }
 
-impl SparseBundleBlockReader {
+impl SparseBundleEncryptedBlockReader {
     /// Creates a new block reader.
-    pub fn new(file_resolver: &FileResolverReference, band_size: u32, size: u64) -> Self {
+    pub fn new(
+        file_resolver: &FileResolverReference,
+        band_size: u32,
+        encryption_context: &CdsaEncrEncryptionContext,
+        encrypted_block_size: usize,
+        size: u64,
+    ) -> Self {
         Self {
             file_resolver: file_resolver.clone(),
             band_size,
             band_file_cache: LruCache::new(16),
+            encryption_context: encryption_context.clone(),
+            encrypted_block_size,
             size,
         }
     }
 }
 
-impl BlockReader for SparseBundleBlockReader {
+impl BlockReader for SparseBundleEncryptedBlockReader {
     /// Retrieves the size of the data.
     fn get_size(&self) -> u64 {
         self.size
@@ -107,18 +122,54 @@ impl BlockReader for SparseBundleBlockReader {
             let range_read_size: usize =
                 min(read_size - data_offset, range_remainder_size as usize);
 
-            let data_end_offset: usize = data_offset + range_read_size;
+            let range_data_end_offset: usize = data_offset + range_read_size;
 
-            let read_count: usize = keramics_core::data_stream_read_at_position!(
-                data_stream,
-                &mut data[data_offset..data_end_offset],
-                SeekFrom::Start(range_relative_offset)
-            );
-            if read_count == 0 {
-                break;
+            let mut block_number: u64 = current_offset / (self.encrypted_block_size as u64);
+            let block_logical_offset: u64 = block_number * (self.encrypted_block_size as u64);
+            let mut block_data_offset: usize = (current_offset - block_logical_offset) as usize;
+
+            let mut block_physical_offset: u64 = range_relative_offset - (block_data_offset as u64);
+            let mut block_remainder_size: usize = self.encrypted_block_size - block_data_offset;
+
+            while data_offset < range_data_end_offset {
+                // TODO: cache decrypted block.
+                let mut encrypted_data: Vec<u8> = vec![0; self.encrypted_block_size];
+
+                keramics_core::data_stream_read_exact_at_position!(
+                    data_stream,
+                    &mut encrypted_data,
+                    SeekFrom::Start(block_physical_offset)
+                );
+                let mut block_data: Vec<u8> = vec![0; self.encrypted_block_size];
+
+                match self.encryption_context.decrypt_block(
+                    block_number as u32,
+                    &encrypted_data,
+                    &mut block_data,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to decrypt block: {}", block_number)
+                        );
+                        return Err(error);
+                    }
+                }
+                let block_read_size: usize = min(read_size - data_offset, block_remainder_size);
+
+                let data_end_offset: usize = data_offset + block_read_size;
+                let block_data_end_offset: usize = block_data_offset + block_read_size;
+
+                data[data_offset..data_end_offset]
+                    .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
+                data_offset = data_end_offset;
+                current_offset += block_read_size as u64;
+                block_number += 1;
+                block_physical_offset += self.encrypted_block_size as u64;
+                block_data_offset = 0;
+                block_remainder_size = self.encrypted_block_size;
             }
-            data_offset += read_count;
-            current_offset += read_count as u64;
 
             band_number += 1;
             range_relative_offset = 0;

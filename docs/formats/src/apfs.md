@@ -1014,7 +1014,7 @@ The key bag packed value is of variable size and consists of:
 | 0 | 1 | | Value tag (or value type), where the most-significant bit represents a flag |
 | 1 | 1 | | Value data size, in number of bytes, where the most-significant bit represents an extended size flag |
 | <td colspan="4">*If extended size flag is set*</td> |
-| 2 | ... | | Extended value data size |
+| 2 | ... | | Extended value data size, in big-endian |
 | <td colspan="4">*&nbsp;*</td> |
 | ... | ... | | Value data |
 
@@ -1047,11 +1047,19 @@ attribute value tags:
 | Value | Identifier | Description |
 | --- | --- | --- |
 | 0x80 | | Unknown |
-| 0x81 | | Volume identifier, which contains a big-endian UUID |
+| 0x81 | | Identifier, which contains a big-endian UUID |
 | 0x82 | | [Wrapped Key Encryption Key (KEK) metadata](#wrapped_kek_metadata) |
 | 0x83 | | Wrapped Key Encryption Key (KEK) data |
 | 0x84 | | Number of iterations for the PBKDF2 algorithm |
 | 0x85 | | Salt for the PBKDF2 algorithm |
+| 0x86 | | Unknown (16 bytes in size) |
+| 0x87 | | Unknown (16 bytes in size) |
+| 0x88 | | Unknown |
+
+> Note that the Wrapped Key Encryption Key (KEK) packed object can represent multiple different
+> keys, e.g. in the container key bag it will contain the Volume Master Key (VMK) and in a volume
+> key bag a user key, where identifier (0x81) corresponds with the the identifier shown by:
+> `diskutil apfs listCryptoGraphicUsers /`
 
 #### Wrapped Key Encryption Key (KEK) metadata {#wrapped_kek_metadata}
 

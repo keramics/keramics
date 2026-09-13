@@ -13,6 +13,7 @@
 
 use std::cmp::min;
 use std::io::SeekFrom;
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
@@ -33,7 +34,7 @@ pub struct LuksBlockReader {
     encrypted_data_offset: u64,
 
     /// Encryption context.
-    encryption_context: LuksEncryptionContext,
+    encryption_context: Arc<LuksEncryptionContext>,
 
     /// Decrypted sector cache.
     sector_cache: LruCache<u64, Vec<u8>>,
@@ -48,7 +49,7 @@ impl LuksBlockReader {
         data_stream: &DataStreamReference,
         bytes_per_sector: u16,
         encrypted_data_offset: u64,
-        encryption_context: &LuksEncryptionContext,
+        encryption_context: &Arc<LuksEncryptionContext>,
         size: u64,
     ) -> Self {
         Self {

@@ -11,43 +11,33 @@
  * under the License.
  */
 
-use crate::block_stream::BlockStream;
-
-use super::block_reader::SparseBundleBlockReader;
-
-/// Mac OS sparse bundle (.sparsebundle) block stream.
-pub type SparseBundleBlockStream = BlockStream<SparseBundleBlockReader>;
-
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use std::io::SeekFrom;
     use std::path::PathBuf;
 
     use keramics_core::{DataStream, ErrorTrace};
 
+    use crate::block_stream::BlockStream;
     use crate::file_resolver::FileResolverReference;
     use crate::os_file_resolver::open_os_file_resolver;
+    use crate::sparsebundle::block_reader::SparseBundleBlockReader;
     use crate::tests::get_test_data_path;
 
-    fn get_block_stream() -> Result<SparseBundleBlockStream, ErrorTrace> {
+    fn get_block_stream() -> Result<BlockStream<SparseBundleBlockReader>, ErrorTrace> {
         let test_path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
         let path_buf: PathBuf = PathBuf::from(test_path_string.as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
 
-        Ok(SparseBundleBlockStream::new(SparseBundleBlockReader::new(
-            &file_resolver,
-            8388608,
-            None,
-            0,
-            4194304,
-        )))
+        let block_reader: SparseBundleBlockReader =
+            SparseBundleBlockReader::new(&file_resolver, 8388608, 4194304);
+
+        Ok(BlockStream::<SparseBundleBlockReader>::new(block_reader))
     }
 
     #[test]
     fn test_get_offset() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut block_stream: BlockStream<SparseBundleBlockReader> = get_block_stream()?;
 
         block_stream.seek(SeekFrom::Start(1024))?;
 
@@ -59,7 +49,7 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut block_stream: BlockStream<SparseBundleBlockReader> = get_block_stream()?;
 
         let size: u64 = block_stream.get_size()?;
         assert_eq!(size, 4194304);
@@ -69,7 +59,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut block_stream: BlockStream<SparseBundleBlockReader> = get_block_stream()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
@@ -79,7 +69,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut block_stream: BlockStream<SparseBundleBlockReader> = get_block_stream()?;
         let size: u64 = block_stream.get_size()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::End(-512))?;
@@ -90,7 +80,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut block_stream: BlockStream<SparseBundleBlockReader> = get_block_stream()?;
 
         let offset = block_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
@@ -103,7 +93,7 @@ mod tests {
 
     #[test]
     fn test_seek_before_zero() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut block_stream: BlockStream<SparseBundleBlockReader> = get_block_stream()?;
 
         let result: Result<u64, ErrorTrace> = block_stream.seek(SeekFrom::Current(-512));
         assert!(result.is_err());
@@ -113,7 +103,7 @@ mod tests {
 
     #[test]
     fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut block_stream: BlockStream<SparseBundleBlockReader> = get_block_stream()?;
         let size: u64 = block_stream.get_size()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::End(512))?;
@@ -124,7 +114,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut block_stream: BlockStream<SparseBundleBlockReader> = get_block_stream()?;
         block_stream.seek(SeekFrom::Start(1024))?;
 
         let mut data: Vec<u8> = vec![0; 512];
@@ -177,7 +167,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: SparseBundleBlockStream = get_block_stream()?;
+        let mut block_stream: BlockStream<SparseBundleBlockReader> = get_block_stream()?;
         block_stream.seek(SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];
