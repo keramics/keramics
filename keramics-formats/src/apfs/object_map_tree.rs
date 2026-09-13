@@ -13,6 +13,7 @@
 
 use std::collections::HashSet;
 use std::io::SeekFrom;
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u64_le;
@@ -102,7 +103,7 @@ impl ApfsObjectMapTree {
 
             let mut node: ApfsBtreeNode = ApfsBtreeNode::new();
 
-            match node.read_at_position(data_stream, SeekFrom::Start(node_offset)) {
+            match node.read_at_position(None, data_stream, SeekFrom::Start(node_offset)) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(

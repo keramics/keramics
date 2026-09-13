@@ -11,6 +11,10 @@
  * under the License.
  */
 
+//! CBC (Cipher Block Chaining).
+//!
+//! Provides CBC support.
+
 use keramics_core::ErrorTrace;
 
 use super::traits::CryptCbc;

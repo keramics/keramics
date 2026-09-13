@@ -18,8 +18,11 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{ByteString, Uuid};
 
 use super::block_range::ApfsBlockRange;
+use super::credential::ApfsCredential;
+use super::encryption_context::ApfsEncryptionContext;
 use super::file_system::ApfsFileSystem;
 use super::key_bag::ApfsKeyBag;
+use super::key_encryption_key::ApfsKeyEncryptionKey;
 use super::object_map::ApfsObjectMap;
 use super::object_map_tree::ApfsObjectMapTree;
 use super::object_map_value::ApfsObjectMapValue;
@@ -44,6 +47,12 @@ pub struct ApfsVolume {
 
     /// Object map B-tree.
     object_map_tree: Arc<ApfsObjectMapTree>,
+
+    /// Volume key bag.
+    volume_key_bag: Option<ApfsKeyBag>,
+
+    /// Encryption context.
+    encryption_context: Option<Arc<ApfsEncryptionContext>>,
 
     /// Identifier.
     identifier: Uuid,
@@ -89,6 +98,8 @@ impl ApfsVolume {
             block_size,
             container_key_bag: container_key_bag.cloned(),
             object_map_tree: Arc::new(ApfsObjectMapTree::new()),
+            volume_key_bag: None,
+            encryption_context: None,
             identifier: Uuid::new(),
             transaction_identifier: 0,
             feature_flags: 0,
@@ -147,9 +158,12 @@ impl ApfsVolume {
             };
         let use_case_folding: bool = self.incompatible_feature_flags & 0x00000000000000001 != 0;
 
-        let mut file_system: ApfsFileSystem =
-            ApfsFileSystem::new(self.block_size, &self.object_map_tree, use_case_folding);
-
+        let mut file_system: ApfsFileSystem = ApfsFileSystem::new(
+            self.block_size,
+            &self.object_map_tree,
+            self.encryption_context.as_ref(),
+            use_case_folding,
+        );
         match file_system.open(
             &self.data_stream,
             object_map_value.physical_address,
@@ -268,7 +282,9 @@ impl ApfsVolume {
             // If the container key bag is locked the volume is also locked.
             self.is_locked = container_key_bag.is_locked;
 
-            if let Some(entry_data) = container_key_bag.get_entry(&volume_identifier, 3) {
+            if let Some(entry_data) =
+                container_key_bag.get_entry_by_identifier(&volume_identifier, 3)
+            {
                 keramics_core::debug_trace_data_and_structure!(
                     "ApfsVolumeKeyBagBlockRange",
                     0,
@@ -325,6 +341,7 @@ impl ApfsVolume {
                 }
                 // The volume has a key bag and therefore is locked.
                 self.is_locked = true;
+                self.volume_key_bag = Some(key_bag);
             }
         }
         // TODO: add snapshot support
@@ -341,7 +358,134 @@ impl ApfsVolume {
         Ok(())
     }
 
-    // TODO: add unlock
+    /// Unlocks a locked volume.
+    pub fn unlock(&mut self, credentials: &[ApfsCredential]) -> Result<bool, ErrorTrace> {
+        if !self.is_locked {
+            return Ok(true);
+        }
+        let volume_key_bag: &ApfsKeyBag = match self.volume_key_bag.as_ref() {
+            Some(key_bag) => key_bag,
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing volume key bag"));
+            }
+        };
+        let mut volume_kek: Vec<u8> = Vec::new();
+        let mut volume_kek_unlocked: bool = false;
+
+        for credential in credentials.iter() {
+            if let ApfsCredential::Passphrase(_) = credential {
+                for key_bag_entry in volume_key_bag.entries.iter() {
+                    if key_bag_entry.entry_type != 3 {
+                        continue;
+                    }
+                    keramics_core::debug_trace_data!(
+                        "ApfsKeyEncryptionKey",
+                        0,
+                        &key_bag_entry.data,
+                        key_bag_entry.data_size,
+                    );
+                    let mut key_encrypted_key: ApfsKeyEncryptionKey = ApfsKeyEncryptionKey::new();
+
+                    match key_encrypted_key.read_data(&key_bag_entry.data) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read key encryption key (KEK)"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    match key_encrypted_key.unlock_with_credential(credential) {
+                        Ok(result) => {
+                            if result {
+                                volume_kek = key_encrypted_key.wrapped_kek.key_data;
+
+                                volume_kek_unlocked = true;
+                            }
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to unlock volume key encryption key (KEK)"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    if volume_kek_unlocked {
+                        break;
+                    }
+                }
+            }
+        }
+        if volume_kek_unlocked {
+            let container_key_bag: &Arc<ApfsKeyBag> = match self.container_key_bag.as_ref() {
+                Some(key_bag) => key_bag,
+                None => {
+                    return Err(keramics_core::error_trace_new!("Missing container key bag"));
+                }
+            };
+            match container_key_bag.get_entry_by_identifier(&self.identifier, 2) {
+                Some(entry_data) => {
+                    let mut key_encrypted_key: ApfsKeyEncryptionKey = ApfsKeyEncryptionKey::new();
+
+                    match key_encrypted_key.read_data(entry_data) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read key encryption key (KEK)"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    match key_encrypted_key.unlock_with_kek(&volume_kek) {
+                        Ok(result) => {
+                            if result {
+                                let key_data: Vec<u8> = key_encrypted_key.wrapped_kek.key_data;
+
+                                if key_data.len() != 32 {
+                                    return Err(keramics_core::error_trace_new!(
+                                        "Unsupported volume master key"
+                                    ));
+                                }
+                                let mut encryption_context: ApfsEncryptionContext =
+                                    ApfsEncryptionContext::new(self.bytes_per_sector);
+
+                                match encryption_context
+                                    .set_keys(&key_data[0..16], &key_data[16..32])
+                                {
+                                    Ok(_) => {}
+                                    Err(mut error) => {
+                                        keramics_core::error_trace_add_frame!(
+                                            error,
+                                            "Unable to set keys in encryption context"
+                                        );
+                                        return Err(error);
+                                    }
+                                }
+                                self.encryption_context = Some(Arc::new(encryption_context));
+                                self.is_locked = false;
+                            }
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to unlock volume master key"
+                            );
+                            return Err(error);
+                        }
+                    }
+                }
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unable to retrieve volume key from container key bag"
+                    ));
+                }
+            }
+        }
+        Ok(!self.is_locked)
+    }
 }
 
 #[cfg(test)]

@@ -11,21 +11,9 @@
  * under the License.
  */
 
-mod block_reader;
-mod block_stream;
-mod cipher_context;
-pub mod constants;
-mod credential;
-mod diffuser;
-mod encrypted_volume;
-mod encryption;
-mod encryption_context;
-mod encryption_type;
-mod key_slot;
-mod metadata;
-mod volume_header_v1;
-mod volume_header_v2;
-
-pub use credential::LuksCredential;
-pub use encrypted_volume::LuksEncryptedVolume;
-pub use encryption_type::LuksEncryptionType;
+/// Apple File System (APFS) credential.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ApfsCredential {
+    None,
+    Passphrase(Vec<u8>),
+}

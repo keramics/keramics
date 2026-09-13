@@ -135,8 +135,11 @@ impl CdsaEncrPassphraseWrappedKey {
         Ok(())
     }
 
-    /// Unlocks the key.
-    pub fn unlock(&mut self, credential: &CdsaEncrCredential) -> Result<bool, ErrorTrace> {
+    /// Unlocks the key data using a credential.
+    pub fn unlock_with_credential(
+        &mut self,
+        credential: &CdsaEncrCredential,
+    ) -> Result<bool, ErrorTrace> {
         match credential {
             CdsaEncrCredential::Passphrase(passphrase) => {
                 let mut key_derivation_context: CdsaEncrKeyDerivationContext =
@@ -163,9 +166,9 @@ impl CdsaEncrPassphraseWrappedKey {
                             return Err(error);
                         }
                     };
-                let mut key: Vec<u8> = vec![0; self.encryption_type.key_size];
+                let mut derived_key: Vec<u8> = vec![0; self.encryption_type.key_size];
 
-                match key_derivation_context.derive_key(passphrase, &mut key) {
+                match key_derivation_context.derive_key(passphrase, &mut derived_key) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -175,93 +178,106 @@ impl CdsaEncrPassphraseWrappedKey {
                         return Err(error);
                     }
                 }
-                let mut initialization_vector: Vec<u8> = self.initialization_vector.to_vec();
-
-                match CdsaEncrEncryption::add_padding(2, 16, &mut initialization_vector) {
-                    Ok(data) => data,
+                match self.unlock_with_kek(&derived_key) {
+                    Ok(result) => Ok(result),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to add padding to initialization vector"
+                            "Unable to unlock key data using KEK"
                         );
-                        return Err(error);
+                        Err(error)
                     }
-                };
-                let cipher_context: CdsaEncrCipherContext =
-                    match CdsaEncrEncryption::get_cipher_context(&self.encryption_type, &key) {
-                        Ok(Some(context)) => context,
-                        Ok(None) => {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Unsupported encryption type: {}",
-                                self.encryption_type
-                            )));
-                        }
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to retrieve encryption context for type: {}",
-                                    self.encryption_type
-                                )
-                            );
-                            return Err(error);
-                        }
-                    };
-                let mut padded_key_data: Vec<u8> = vec![0; self.wrapped_key_data.len()];
-
-                match cipher_context.decrypt(
-                    &initialization_vector,
-                    &self.wrapped_key_data,
-                    &mut padded_key_data,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to decrypt passphrase encrypted key data"
-                        );
-                        return Err(error);
-                    }
-                }
-                keramics_core::debug_trace_data!(
-                    "CdsaEncrPaddedKeyData",
-                    0,
-                    &padded_key_data,
-                    padded_key_data.len(),
-                );
-                let key_data: &[u8] = match CdsaEncrEncryption::remove_padding(
-                    self.padding_type,
-                    self.initialization_vector_size,
-                    &padded_key_data,
-                ) {
-                    Ok(data) => data,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to remove padding from key data"
-                        );
-                        return Err(error);
-                    }
-                };
-                let key_data_size: usize = key_data.len();
-
-                if key_data_size < 5 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Invalid key data size value out of bounds"
-                    ));
-                }
-                let signature_offset: usize = key_data_size - 5;
-
-                if &key_data[signature_offset..key_data_size] == CDSAENCR_WRAPPED_KEY_SIGNATURE {
-                    self.key_data = key_data[0..signature_offset].to_vec();
-
-                    Ok(true)
-                } else {
-                    Ok(false)
                 }
             }
             _ => Ok(false),
         }
+    }
+
+    /// Unlocks the key data using a key encrypting key (KEK).
+    pub fn unlock_with_kek(&mut self, kek: &[u8]) -> Result<bool, ErrorTrace> {
+        let mut initialization_vector: Vec<u8> = self.initialization_vector.to_vec();
+
+        match CdsaEncrEncryption::add_padding(2, 16, &mut initialization_vector) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to add padding to initialization vector"
+                );
+                return Err(error);
+            }
+        }
+        let cipher_context: CdsaEncrCipherContext =
+            match CdsaEncrEncryption::get_cipher_context(&self.encryption_type, &kek) {
+                Ok(Some(context)) => context,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported encryption type: {}",
+                        self.encryption_type
+                    )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve encryption context for type: {}",
+                            self.encryption_type
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+        let mut padded_key_data: Vec<u8> = vec![0; self.wrapped_key_data.len()];
+
+        match cipher_context.decrypt(
+            &initialization_vector,
+            &self.wrapped_key_data,
+            &mut padded_key_data,
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to decrypt passphrase encrypted key data"
+                );
+                return Err(error);
+            }
+        }
+        keramics_core::debug_trace_data!(
+            "CdsaEncrPaddedKeyData",
+            0,
+            &padded_key_data,
+            padded_key_data.len(),
+        );
+        let key_data: &[u8] = match CdsaEncrEncryption::remove_padding(
+            self.padding_type,
+            self.initialization_vector_size,
+            &padded_key_data,
+        ) {
+            Ok(data) => data,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to remove padding from key data"
+                );
+                return Err(error);
+            }
+        };
+        let key_data_size: usize = key_data.len();
+
+        if key_data_size < 5 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid key data size value out of bounds"
+            ));
+        }
+        let signature_offset: usize = key_data_size - 5;
+
+        if &key_data[signature_offset..key_data_size] == CDSAENCR_WRAPPED_KEY_SIGNATURE {
+            self.key_data = key_data[0..signature_offset].to_vec();
+
+            return Ok(true);
+        }
+        Ok(false)
     }
 }
 

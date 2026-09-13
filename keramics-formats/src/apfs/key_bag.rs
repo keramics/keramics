@@ -43,7 +43,7 @@ pub struct ApfsKeyBag {
     pub object_header: ApfsObjectHeader,
 
     /// Entries.
-    entries: Vec<ApfsKeyBagEntry>,
+    pub entries: Vec<ApfsKeyBagEntry>,
 }
 
 impl ApfsKeyBag {
@@ -60,7 +60,7 @@ impl ApfsKeyBag {
     }
 
     /// Retrieves a specific entry.
-    pub fn get_entry(&self, identifier: &Uuid, entry_type: u16) -> Option<&[u8]> {
+    pub fn get_entry_by_identifier(&self, identifier: &Uuid, entry_type: u16) -> Option<&[u8]> {
         for entry in self.entries.iter() {
             if &entry.identifier == identifier && entry.entry_type == entry_type {
                 return Some(&entry.data);

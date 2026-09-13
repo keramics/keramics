@@ -12,6 +12,7 @@
  */
 
 use std::io::SeekFrom;
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
@@ -20,6 +21,7 @@ use super::btree_entry_fixed_size::ApfsBtreeEntryFixedSize;
 use super::btree_entry_variable_size::ApfsBtreeEntryVariableSize;
 use super::btree_footer::ApfsBtreeFooter;
 use super::btree_node_header::ApfsBtreeNodeHeader;
+use super::encryption_context::ApfsEncryptionContext;
 use super::object_checksum::ApfsObjectChecksum;
 use super::object_header::ApfsObjectHeader;
 
@@ -280,14 +282,40 @@ impl ApfsBtreeNode {
     /// Reads the B-tree node from a specific position in a data stream.
     pub fn read_at_position(
         &mut self,
+        encryption_context: Option<&Arc<ApfsEncryptionContext>>,
         data_stream: &DataStreamReference,
         position: SeekFrom,
     ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; 4096];
 
-        let offset: u64 =
-            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
+        let offset: u64 = match encryption_context {
+            Some(encryption_context) => {
+                let mut encrypted_data: Vec<u8> = vec![0; 4096];
 
+                let offset: u64 = keramics_core::data_stream_read_exact_at_position!(
+                    data_stream,
+                    &mut encrypted_data,
+                    position
+                );
+                match encryption_context.decrypt_block(offset, &encrypted_data, &mut data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to decrypt B-tree node data at offset: {} (0x{:08x})",
+                                offset, offset
+                            )
+                        );
+                        return Err(error);
+                    }
+                }
+                offset
+            }
+            None => {
+                keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position)
+            }
+        };
         keramics_core::debug_trace_data!("ApfsBtreeNode", offset, &data, 4096);
 
         match self.read_data(&data) {
@@ -661,7 +689,7 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let mut test_struct = ApfsBtreeNode::new();
-        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
+        test_struct.read_at_position(None, &data_stream, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.object_header.checksum, 0x91e4afbe1e5919bf);
         assert_eq!(test_struct.object_header.identifier, 149);
