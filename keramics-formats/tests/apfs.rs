@@ -15,7 +15,9 @@ use std::path::PathBuf;
 
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::Path;
-use keramics_formats::apfs::{ApfsContainer, ApfsFileEntry, ApfsFileSystem, ApfsVolume};
+use keramics_formats::apfs::{
+    ApfsContainer, ApfsCredential, ApfsFileEntry, ApfsFileSystem, ApfsVolume,
+};
 
 mod util;
 
@@ -67,7 +69,7 @@ fn open_file_system(path: &PathBuf) -> Result<ApfsFileSystem, ErrorTrace> {
             return Err(error);
         }
     };
-    let volume: ApfsVolume = match container.get_volume_by_index(0) {
+    let mut volume: ApfsVolume = match container.get_volume_by_index(0) {
         Ok(volume) => volume,
         Err(mut error) => {
             keramics_core::error_trace_add_frame!(
@@ -77,6 +79,18 @@ fn open_file_system(path: &PathBuf) -> Result<ApfsFileSystem, ErrorTrace> {
             return Err(error);
         }
     };
+    if volume.is_locked() {
+        let credentials: Vec<ApfsCredential> =
+            vec![ApfsCredential::Passphrase(b"KeRaMiCs".to_vec())];
+
+        match volume.unlock(&credentials) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to unlock volume: 0");
+                return Err(error);
+            }
+        }
+    }
     let file_system: ApfsFileSystem = match volume.get_file_system() {
         Ok(file_system) => file_system,
         Err(mut error) => {
@@ -105,6 +119,30 @@ fn read_apfs_empty_file() -> Result<(), ErrorTrace> {
 #[test]
 fn read_apfs_file_regular() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs.raw");
+    let file_system: ApfsFileSystem = open_file_system(&path_buf)?;
+
+    let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/TestFile2")?;
+    assert_eq!(offset, 11358);
+    assert_eq!(md5_hash.as_str(), "3b83ef96387f14655fc854ddc3c6bd57");
+
+    Ok(())
+}
+
+#[test]
+fn read_encrypted_apfs_empty_file() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs_encrypted.raw");
+    let file_system: ApfsFileSystem = open_file_system(&path_buf)?;
+
+    let (offset, md5_hash): (u64, String) = read_path(&file_system, "/emptyfile")?;
+    assert_eq!(offset, 0);
+    assert_eq!(md5_hash.as_str(), "d41d8cd98f00b204e9800998ecf8427e");
+
+    Ok(())
+}
+
+#[test]
+fn read_encrypted_apfs_file_regular() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs_encrypted.raw");
     let file_system: ApfsFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/TestFile2")?;

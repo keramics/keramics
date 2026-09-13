@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::Path;
 use keramics_formats::fat::{FatFileEntry, FatFileSystem};
+use keramics_formats::qcow::QcowFile;
 
 mod util;
 
@@ -70,14 +71,112 @@ fn open_file_system(path: &PathBuf) -> Result<FatFileSystem, ErrorTrace> {
     Ok(file_system)
 }
 
+fn open_file_system_from_qcow_file(path: &PathBuf) -> Result<FatFileSystem, ErrorTrace> {
+    let os_data_stream: DataStreamReference = match open_os_data_stream(path) {
+        Ok(data_stream) => data_stream,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
+            return Err(error);
+        }
+    };
+    let mut qcow_file: QcowFile = QcowFile::new();
+
+    match qcow_file.read_data_stream(&os_data_stream) {
+        Ok(_) => {}
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to open QCOW file");
+            return Err(error);
+        }
+    }
+    let data_stream: DataStreamReference = match qcow_file.get_data_stream() {
+        Some(data_stream) => data_stream,
+        None => {
+            return Err(keramics_core::error_trace_new!("Missing QCOW data stream"));
+        }
+    };
+    let mut file_system: FatFileSystem = FatFileSystem::new();
+
+    match file_system.read_data_stream(&data_stream) {
+        Ok(_) => {}
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(
+                error,
+                "Unable to read FAT file system from data stream"
+            );
+            return Err(error);
+        }
+    };
+    Ok(file_system)
+}
+
 #[test]
-fn read_fat_empty_file() -> Result<(), ErrorTrace> {
+fn read_fat12_empty_file() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/fat/fat12.raw");
     let file_system: FatFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/emptyfile")?;
     assert_eq!(offset, 0);
     assert_eq!(md5_hash.as_str(), "d41d8cd98f00b204e9800998ecf8427e");
+
+    Ok(())
+}
+
+#[test]
+fn read_fat12_file_regular() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/fat/fat12.raw");
+    let file_system: FatFileSystem = open_file_system(&path_buf)?;
+
+    let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/TestFile2")?;
+    assert_eq!(offset, 11358);
+    assert_eq!(md5_hash.as_str(), "3b83ef96387f14655fc854ddc3c6bd57");
+
+    Ok(())
+}
+
+#[test]
+fn read_fat16_empty_file() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/qcow/fat16.qcow2");
+    let file_system: FatFileSystem = open_file_system_from_qcow_file(&path_buf)?;
+
+    let (offset, md5_hash): (u64, String) = read_path(&file_system, "/emptyfile")?;
+    assert_eq!(offset, 0);
+    assert_eq!(md5_hash.as_str(), "d41d8cd98f00b204e9800998ecf8427e");
+
+    Ok(())
+}
+
+#[test]
+fn read_fat16_file_regular() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/qcow/fat16.qcow2");
+    let file_system: FatFileSystem = open_file_system_from_qcow_file(&path_buf)?;
+
+    let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/TestFile2")?;
+    assert_eq!(offset, 11358);
+    assert_eq!(md5_hash.as_str(), "3b83ef96387f14655fc854ddc3c6bd57");
+
+    Ok(())
+}
+
+#[test]
+fn read_fat32_empty_file() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/qcow/fat32.qcow2");
+    let file_system: FatFileSystem = open_file_system_from_qcow_file(&path_buf)?;
+
+    let (offset, md5_hash): (u64, String) = read_path(&file_system, "/emptyfile")?;
+    assert_eq!(offset, 0);
+    assert_eq!(md5_hash.as_str(), "d41d8cd98f00b204e9800998ecf8427e");
+
+    Ok(())
+}
+
+#[test]
+fn read_fat32_file_regular() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/qcow/fat32.qcow2");
+    let file_system: FatFileSystem = open_file_system_from_qcow_file(&path_buf)?;
+
+    let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/TestFile2")?;
+    assert_eq!(offset, 11358);
+    assert_eq!(md5_hash.as_str(), "3b83ef96387f14655fc854ddc3c6bd57");
 
     Ok(())
 }

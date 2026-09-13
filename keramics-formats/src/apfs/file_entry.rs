@@ -19,6 +19,7 @@ use keramics_datetime::DateTime;
 use keramics_encodings::CharacterEncoding;
 use keramics_types::ByteString;
 
+use crate::block_stream::BlockStream;
 use crate::decmpfs::{
     DecmpfsBlockReader, DecmpfsCompressionMethod, DecmpfsDataStream, DecmpfsHeader,
 };
@@ -28,9 +29,9 @@ use crate::traits::{ExtendedAttributeIterator, FileEntryIterator};
 
 use super::attribute_record::ApfsAttributeRecord;
 use super::block_reader::ApfsBlockReader;
-use super::block_stream::ApfsBlockStream;
 use super::constants::*;
 use super::directory_entry::ApfsDirectoryEntry;
+use super::encrypted_block_reader::ApfsEncryptedBlockReader;
 use super::encryption_context::ApfsEncryptionContext;
 use super::extended_attribute::ApfsExtendedAttribute;
 use super::extended_attributes::ApfsExtendedAttributesIterator;
@@ -243,29 +244,6 @@ impl ApfsFileEntry {
         Ok(self.symbolic_link_target.as_ref())
     }
 
-    /// Retrieves the block stream.
-    fn get_block_stream(&self) -> Result<ApfsBlockStream, ErrorTrace> {
-        let size: u64 = match self.inode.data_stream_descriptor.as_ref() {
-            Some(data_stream_descriptor) => data_stream_descriptor.size,
-            None => 0,
-        };
-        match &self.encryption_context {
-            Some(encryption_context) => todo!(),
-            None => {
-                let mut block_reader: ApfsBlockReader =
-                    ApfsBlockReader::new(&self.data_stream, self.block_size, size);
-                match block_reader.open(self.extents.clone()) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
-                        return Err(error);
-                    }
-                }
-                Ok(ApfsBlockStream::new(block_reader))
-            }
-        }
-    }
-
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         if self.inode.file_mode & 0xf000 != APFS_FILE_MODE_TYPE_REGULAR_FILE {
@@ -350,13 +328,57 @@ impl ApfsFileEntry {
                     decmpfs_block_reader,
                 )))))
             }
-            None => match self.get_block_stream() {
-                Ok(block_stream) => Ok(Some(Arc::new(RwLock::new(block_stream)))),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve block stream");
-                    Err(error)
+            None => {
+                let size: u64 = match self.inode.data_stream_descriptor.as_ref() {
+                    Some(data_stream_descriptor) => data_stream_descriptor.size,
+                    None => 0,
+                };
+                match &self.encryption_context {
+                    Some(encryption_context) => {
+                        let mut encrypted_block_reader: ApfsEncryptedBlockReader =
+                            ApfsEncryptedBlockReader::new(
+                                &self.data_stream,
+                                Some(encryption_context),
+                                self.block_size,
+                                size,
+                            );
+
+                        match encrypted_block_reader.open(self.extents.clone()) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to open encrypted block reader"
+                                );
+                                return Err(error);
+                            }
+                        }
+                        Ok(Some(Arc::new(RwLock::new(BlockStream::<
+                            ApfsEncryptedBlockReader,
+                        >::new(
+                            encrypted_block_reader
+                        )))))
+                    }
+                    None => {
+                        let mut block_reader: ApfsBlockReader =
+                            ApfsBlockReader::new(&self.data_stream, self.block_size, size);
+
+                        match block_reader.open(self.extents.clone()) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to open block reader"
+                                );
+                                return Err(error);
+                            }
+                        }
+                        Ok(Some(Arc::new(RwLock::new(
+                            BlockStream::<ApfsBlockReader>::new(block_reader),
+                        ))))
+                    }
                 }
-            },
+            }
         }
     }
 
@@ -426,7 +448,9 @@ impl ApfsFileEntry {
                                 return Err(error);
                             }
                         }
-                        Ok(Arc::new(RwLock::new(ApfsBlockStream::new(block_reader))))
+                        Ok(Arc::new(RwLock::new(BlockStream::<ApfsBlockReader>::new(
+                            block_reader,
+                        ))))
                     }
                 }
             }
@@ -946,7 +970,6 @@ mod tests {
     }
 
     // TODO: add tests for get_size
-    // TODO: add tests for get_block_stream
     // TODO: add tests for get_symbolic_link_target
     // TODO: add tests for get_data_stream
     // TODO: add tests for is_directory

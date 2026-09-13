@@ -31,6 +31,7 @@ mod credential;
 mod data_stream_descriptor;
 mod directory_entry;
 mod directory_record;
+mod encrypted_block_reader;
 mod encryption_context;
 mod encryption_state;
 mod extended_attribute;
