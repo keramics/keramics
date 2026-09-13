@@ -41,6 +41,7 @@ pub enum VfsType {
     Gpt,
     Hfs,
     LinuxLvm,
+    Luksde,
     Mbr,
     Ntfs,
     Os,
@@ -73,6 +74,7 @@ impl fmt::Display for VfsType {
             VfsType::Gpt => "GPT",
             VfsType::Hfs => "HFS",
             VfsType::LinuxLvm => "LinuxLVM",
+            VfsType::Luksde => "LUKSDE",
             VfsType::Mbr => "MBR",
             VfsType::Ntfs => "NTFS",
             VfsType::Os => "OS",
@@ -145,6 +147,10 @@ mod tests {
         let vfs_type: VfsType = VfsType::LinuxLvm;
         let string: String = vfs_type.to_string();
         assert_eq!(string, "LinuxLVM");
+
+        let vfs_type: VfsType = VfsType::Luksde;
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "LUKSDE");
 
         let vfs_type: VfsType = VfsType::Mbr;
         let string: String = vfs_type.to_string();

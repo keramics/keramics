@@ -21,6 +21,7 @@ use keramics_formats::ewf::EwfImage;
 use keramics_formats::fat::FatFileSystem;
 use keramics_formats::gpt::GptVolumeSystem;
 use keramics_formats::linuxlvm::LinuxLvmVolumeSystem;
+use keramics_formats::luksde::LuksEncryptedVolume;
 use keramics_formats::mbr::MbrVolumeSystem;
 use keramics_formats::pdi::PdiImage;
 use keramics_formats::qcow::QcowImage;
@@ -43,6 +44,7 @@ use crate::ewf::EwfFileSystem;
 use crate::file_entry::VfsFileEntry;
 use crate::linuxlvm::LinuxLvmFileSystem;
 use crate::location::VfsLocation;
+use crate::luksde::LuksFileSystem;
 use crate::resolver::VfsResolver;
 use crate::sparsebundle::SparseBundleFileSystem;
 use crate::sparseimage::SparseImageFileSystem;
@@ -218,6 +220,7 @@ impl VfsScanner {
             FormatIdentifier::Gpt => Some(VfsType::Gpt),
             FormatIdentifier::Hfs => Some(VfsType::Hfs),
             FormatIdentifier::LinuxLvm => Some(VfsType::LinuxLvm),
+            FormatIdentifier::Luks => Some(VfsType::Luksde),
             FormatIdentifier::Mbr => Some(VfsType::Mbr),
             FormatIdentifier::Ntfs => Some(VfsType::Ntfs),
             FormatIdentifier::Pdi => Some(VfsType::Pdi),
@@ -416,7 +419,7 @@ impl VfsScanner {
                 }
                 Ok(result)
             }
-            VfsType::Bde => match self.scan_for_file_system_format(&data_stream) {
+            VfsType::Bde | VfsType::Luksde => match self.scan_for_file_system_format(&data_stream) {
                 Ok(scan_results) => Ok(scan_results),
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -868,6 +871,47 @@ impl VfsScanner {
                             keramics_core::error_trace_add_frame!(
                                 error,
                                 "Unable to scan BDE unlocked volume"
+                            );
+                            return Err(error);
+                        }
+                    }
+                }
+            }
+            VfsType::Luksde => {
+                let mut luks_encrypted_volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+
+                match LuksFileSystem::open_encrypted_volume(
+                    &mut luks_encrypted_volume,
+                    file_system,
+                    path,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open LUKS encrypted volume"
+                        );
+                        return Err(error);
+                    }
+                }
+
+                if luks_encrypted_volume.is_locked() {
+                    scan_node.is_locked = true;
+                } else {
+                    let number_of_partitions: usize = 1;
+
+                    match self.scan_for_volume_system_sub_nodes(
+                        scan_options,
+                        vfs_location,
+                        scan_node,
+                        LuksFileSystem::PATH_PREFIX,
+                        number_of_partitions,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to scan LUKS unlocked volume"
                             );
                             return Err(error);
                         }

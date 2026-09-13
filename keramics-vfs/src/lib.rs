@@ -38,6 +38,7 @@ mod ewf;
 mod fake;
 mod gpt;
 mod linuxlvm;
+mod luksde;
 mod mbr;
 mod os;
 mod pdi;

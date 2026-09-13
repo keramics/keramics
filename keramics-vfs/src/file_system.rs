@@ -30,6 +30,7 @@ use super::fake::FakeFileSystem;
 use super::file_entry::VfsFileEntry;
 use super::gpt::{GptFileEntry, GptFileSystem};
 use super::linuxlvm::{LinuxLvmFileEntry, LinuxLvmFileSystem};
+use super::luksde::{LuksFileEntry, LuksFileSystem};
 use super::location::VfsLocation;
 use super::mbr::{MbrFileEntry, MbrFileSystem};
 use super::os::OsFileSystem;
@@ -59,6 +60,7 @@ pub enum VfsFileSystem {
     Gpt(GptFileSystem),
     Hfs(HfsFileSystem),
     LinuxLvm(LinuxLvmFileSystem),
+    Luksde(LuksFileSystem),
     Mbr(MbrFileSystem),
     Ntfs(NtfsFileSystem),
     Os,
@@ -91,6 +93,7 @@ impl VfsFileSystem {
             VfsType::Gpt => VfsFileSystem::Gpt(GptFileSystem::new()),
             VfsType::Hfs => VfsFileSystem::Hfs(HfsFileSystem::new()),
             VfsType::LinuxLvm => VfsFileSystem::LinuxLvm(LinuxLvmFileSystem::new()),
+            VfsType::Luksde => VfsFileSystem::Luksde(LuksFileSystem::new()),
             VfsType::Mbr => VfsFileSystem::Mbr(MbrFileSystem::new()),
             VfsType::Ntfs => VfsFileSystem::Ntfs(NtfsFileSystem::new()),
             VfsType::Os => VfsFileSystem::Os,
@@ -197,6 +200,7 @@ impl VfsFileSystem {
                 }
             }
             VfsFileSystem::LinuxLvm(lvm_file_system) => Ok(lvm_file_system.file_entry_exists(path)),
+            VfsFileSystem::Luksde(luks_file_system) => Ok(luks_file_system.file_entry_exists(path)),
             VfsFileSystem::Mbr(mbr_file_system) => Ok(mbr_file_system.file_entry_exists(path)),
             VfsFileSystem::Ntfs(ntfs_file_system) => {
                 match ntfs_file_system.get_file_entry_by_path(path) {
@@ -379,6 +383,12 @@ impl VfsFileSystem {
             VfsFileSystem::LinuxLvm(lvm_file_system) => {
                 match lvm_file_system.get_file_entry_by_path(path)? {
                     Some(lvm_file_entry) => Ok(Some(VfsFileEntry::LinuxLvm(lvm_file_entry))),
+                    None => Ok(None),
+                }
+            }
+            VfsFileSystem::Luksde(luks_file_system) => {
+                match luks_file_system.get_file_entry_by_path(path)? {
+                    Some(luks_file_entry) => Ok(Some(VfsFileEntry::Luksde(luks_file_entry))),
                     None => Ok(None),
                 }
             }
@@ -582,6 +592,11 @@ impl VfsFileSystem {
 
                 Ok(Some(VfsFileEntry::LinuxLvm(lvm_file_entry)))
             }
+            VfsFileSystem::Luksde(luks_file_system) => {
+                let luks_file_entry: LuksFileEntry = luks_file_system.get_root_file_entry();
+
+                Ok(Some(VfsFileEntry::Luksde(luks_file_entry)))
+            }
             VfsFileSystem::Mbr(mbr_file_system) => {
                 let mbr_file_entry: MbrFileEntry = mbr_file_system.get_root_file_entry();
 
@@ -691,6 +706,7 @@ impl VfsFileSystem {
             VfsFileSystem::Gpt(_) => VfsType::Gpt,
             VfsFileSystem::Hfs(_) => VfsType::Hfs,
             VfsFileSystem::LinuxLvm(_) => VfsType::LinuxLvm,
+            VfsFileSystem::Luksde(_) => VfsType::Luksde,
             VfsFileSystem::Mbr(_) => VfsType::Mbr,
             VfsFileSystem::Ntfs(_) => VfsType::Ntfs,
             VfsFileSystem::Os => VfsType::Os,
@@ -762,6 +778,9 @@ impl VfsFileSystem {
             }
             VfsFileSystem::LinuxLvm(lvm_file_system) => {
                 lvm_file_system.open(parent_file_system, vfs_location)
+            }
+            VfsFileSystem::Luksde(luks_file_system) => {
+                luks_file_system.open(parent_file_system, vfs_location)
             }
             VfsFileSystem::Mbr(mbr_file_system) => {
                 mbr_file_system.open(parent_file_system, vfs_location)
