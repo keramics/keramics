@@ -1291,7 +1291,6 @@ mod tests {
     #[test]
     fn test_bitstream_get_value() {
         let test_data: Vec<u8> = get_test_data();
-
         let mut test_bitstream: LzfseBitstream = LzfseBitstream::new(&test_data, 198);
 
         let test_value: u32 = test_bitstream.get_value(0);
@@ -1305,6 +1304,9 @@ mod tests {
 
         let test_value: u32 = test_bitstream.get_value(24);
         assert_eq!(test_value, 0x00b083d3);
+
+        let test_value: u32 = test_bitstream.get_value(32);
+        assert_eq!(test_value, 0x31c557e7);
     }
 
     #[test]
@@ -1316,6 +1318,54 @@ mod tests {
         test_bitstream.skip_bits(4);
         let test_value: u32 = test_bitstream.get_value(12);
         assert_eq!(test_value, 0x00000f45);
+
+        test_bitstream.skip_bits(32);
+        assert_eq!(test_bitstream.number_of_bits, 0);
+    }
+
+    #[test]
+    fn test_block_v1_header_read_data() {
+        let mut test_header: LzfseBlockV1Header = LzfseBlockV1Header::new();
+        let mut test_decoder: LzfseDecoder = LzfseDecoder::new();
+
+        let bad_data: [u8; 41] = [0; 41];
+        assert!(test_header.read_data(&bad_data, &mut test_decoder).is_err());
+
+        let test_data: [u8; 42] = [
+            0xf2, 0x02, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x10, 0x00,
+            0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff, 0x01, 0x00, 0x02, 0x00,
+            0x03, 0x00, 0x04, 0x00, 0xfc, 0xff, 0xff, 0xff, 0x10, 0x00, 0x20, 0x00, 0x30, 0x00,
+        ];
+        assert!(test_header.read_data(&test_data, &mut test_decoder).is_ok());
+
+        assert_eq!(test_decoder.number_of_literals, 4);
+        assert_eq!(test_decoder.number_of_lmd_values, 2);
+        assert_eq!(test_decoder.literals_data_size, 16);
+        assert_eq!(test_decoder.lmd_values_data_size, 8);
+        assert_eq!(test_decoder.literal_bits, -2);
+        assert_eq!(test_decoder.literal_states, [1, 2, 3, 4]);
+        assert_eq!(test_decoder.lmd_values_bits, -4);
+        assert_eq!(test_decoder.l_value_state, 16);
+        assert_eq!(test_decoder.m_value_state, 32);
+        assert_eq!(test_decoder.d_value_state, 48);
+    }
+
+    #[test]
+    fn test_block_v2_header_read_data() {
+        let mut test_header: LzfseBlockV2Header = LzfseBlockV2Header::new();
+        let mut test_decoder: LzfseDecoder = LzfseDecoder::new();
+
+        let bad_data: [u8; 23] = [0; 23];
+        assert!(test_header.read_data(&bad_data, &mut test_decoder).is_err());
+
+        let mut test_data: [u8; 24] = [0; 24];
+        let header_size: u32 = 16;
+        test_data[16..20].copy_from_slice(&header_size.to_le_bytes());
+        assert!(
+            test_header
+                .read_data(&test_data, &mut test_decoder)
+                .is_err()
+        );
     }
 
     #[test]
