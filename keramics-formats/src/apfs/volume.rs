@@ -371,118 +371,144 @@ impl ApfsVolume {
         };
         let mut volume_kek: Vec<u8> = Vec::new();
         let mut volume_kek_unlocked: bool = false;
+        let mut master_key: Vec<u8> = Vec::new();
+        let mut master_key_unlocked: bool = false;
 
+        // Check for key data credentials first to skip key derivation if not needed.
         for credential in credentials.iter() {
-            if let ApfsCredential::Passphrase(_) = credential {
-                for key_bag_entry in volume_key_bag.entries.iter() {
-                    if key_bag_entry.entry_type != 3 {
-                        continue;
-                    }
-                    keramics_core::debug_trace_data!(
-                        "ApfsKeyEncryptionKey",
-                        0,
-                        &key_bag_entry.data,
-                        key_bag_entry.data_size,
-                    );
-                    let mut key_encrypted_key: ApfsKeyEncryptionKey = ApfsKeyEncryptionKey::new();
+            if let ApfsCredential::KeyData { identifier, data } = credential {
+                if identifier.len() != 16 {
+                    continue;
+                }
+                let volume_identifier: Uuid = Uuid::from_be_bytes(identifier);
 
-                    match key_encrypted_key.read_data(&key_bag_entry.data) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to read key encryption key (KEK)"
-                            );
-                            return Err(error);
+                if volume_identifier != self.identifier {
+                    continue;
+                }
+                if data.len() != 32 {
+                    continue;
+                }
+                master_key = data.to_vec();
+                master_key_unlocked = true;
+            }
+        }
+        if !master_key_unlocked {
+            for credential in credentials.iter() {
+                if let ApfsCredential::Passphrase(_) = credential {
+                    for key_bag_entry in volume_key_bag.entries.iter() {
+                        if key_bag_entry.entry_type != 3 {
+                            continue;
                         }
-                    }
-                    match key_encrypted_key.unlock_with_credential(credential) {
-                        Ok(result) => {
-                            if result {
-                                volume_kek = key_encrypted_key.wrapped_kek.key_data;
+                        keramics_core::debug_trace_data!(
+                            "ApfsKeyEncryptionKey",
+                            0,
+                            &key_bag_entry.data,
+                            key_bag_entry.data_size,
+                        );
+                        let mut key_encrypted_key: ApfsKeyEncryptionKey =
+                            ApfsKeyEncryptionKey::new();
 
-                                volume_kek_unlocked = true;
+                        match key_encrypted_key.read_data(&key_bag_entry.data) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read key encryption key (KEK)"
+                                );
+                                return Err(error);
                             }
                         }
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to unlock volume key encryption key (KEK)"
-                            );
-                            return Err(error);
+                        match key_encrypted_key.unlock_with_credential(credential) {
+                            Ok(result) => {
+                                if result {
+                                    volume_kek = key_encrypted_key.wrapped_kek.key_data;
+
+                                    volume_kek_unlocked = true;
+                                }
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to unlock volume key encryption key (KEK)"
+                                );
+                                return Err(error);
+                            }
+                        }
+                        if volume_kek_unlocked {
+                            break;
                         }
                     }
-                    if volume_kek_unlocked {
-                        break;
+                }
+            }
+            if volume_kek_unlocked {
+                let container_key_bag: &Arc<ApfsKeyBag> = match self.container_key_bag.as_ref() {
+                    Some(key_bag) => key_bag,
+                    None => {
+                        return Err(keramics_core::error_trace_new!("Missing container key bag"));
+                    }
+                };
+                match container_key_bag.get_entry_by_identifier(&self.identifier, 2) {
+                    Some(entry_data) => {
+                        let mut key_encrypted_key: ApfsKeyEncryptionKey =
+                            ApfsKeyEncryptionKey::new();
+
+                        match key_encrypted_key.read_data(entry_data) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read key encryption key (KEK)"
+                                );
+                                return Err(error);
+                            }
+                        }
+                        match key_encrypted_key.unlock_with_kek(&volume_kek) {
+                            Ok(result) => {
+                                if result {
+                                    let key_data: Vec<u8> = key_encrypted_key.wrapped_kek.key_data;
+
+                                    if key_data.len() != 32 {
+                                        return Err(keramics_core::error_trace_new!(
+                                            "Unsupported volume master key"
+                                        ));
+                                    }
+                                    master_key = key_data;
+                                    master_key_unlocked = true;
+                                }
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to unlock volume master key"
+                                );
+                                return Err(error);
+                            }
+                        }
+                    }
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unable to retrieve volume key from container key bag"
+                        ));
                     }
                 }
             }
         }
-        if volume_kek_unlocked {
-            let container_key_bag: &Arc<ApfsKeyBag> = match self.container_key_bag.as_ref() {
-                Some(key_bag) => key_bag,
-                None => {
-                    return Err(keramics_core::error_trace_new!("Missing container key bag"));
-                }
-            };
-            match container_key_bag.get_entry_by_identifier(&self.identifier, 2) {
-                Some(entry_data) => {
-                    let mut key_encrypted_key: ApfsKeyEncryptionKey = ApfsKeyEncryptionKey::new();
+        if master_key_unlocked {
+            let mut encryption_context: ApfsEncryptionContext =
+                ApfsEncryptionContext::new(self.bytes_per_sector);
 
-                    match key_encrypted_key.read_data(entry_data) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to read key encryption key (KEK)"
-                            );
-                            return Err(error);
-                        }
-                    }
-                    match key_encrypted_key.unlock_with_kek(&volume_kek) {
-                        Ok(result) => {
-                            if result {
-                                let key_data: Vec<u8> = key_encrypted_key.wrapped_kek.key_data;
-
-                                if key_data.len() != 32 {
-                                    return Err(keramics_core::error_trace_new!(
-                                        "Unsupported volume master key"
-                                    ));
-                                }
-                                let mut encryption_context: ApfsEncryptionContext =
-                                    ApfsEncryptionContext::new(self.bytes_per_sector);
-
-                                match encryption_context
-                                    .set_keys(&key_data[0..16], &key_data[16..32])
-                                {
-                                    Ok(_) => {}
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            "Unable to set keys in encryption context"
-                                        );
-                                        return Err(error);
-                                    }
-                                }
-                                self.encryption_context = Some(Arc::new(encryption_context));
-                                self.is_locked = false;
-                            }
-                        }
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to unlock volume master key"
-                            );
-                            return Err(error);
-                        }
-                    }
-                }
-                None => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unable to retrieve volume key from container key bag"
-                    ));
+            match encryption_context.set_keys(&master_key[0..16], &master_key[16..32]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to set keys in encryption context"
+                    );
+                    return Err(error);
                 }
             }
+            self.encryption_context = Some(Arc::new(encryption_context));
+            self.is_locked = false;
         }
         Ok(!self.is_locked)
     }
@@ -579,6 +605,37 @@ mod tests {
 
         let volume_label: Option<&ByteString> = volume.get_volume_label();
         assert_eq!(volume_label, Some(ByteString::from("apfs_test")).as_ref());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_unlock_with_key_data() -> Result<(), ErrorTrace> {
+        let mut container: ApfsContainer = ApfsContainer::new();
+
+        let path_string: String = get_test_data_path("apfs/apfs_encrypted.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        container.read_data_stream(&data_stream)?;
+
+        let mut volume: ApfsVolume = container.get_volume_by_index(0)?;
+
+        assert_eq!(volume.is_locked(), true);
+
+        let credentials: Vec<ApfsCredential> = vec![ApfsCredential::KeyData {
+            identifier: vec![
+                0x89, 0x30, 0x13, 0xc3, 0x08, 0x75, 0x47, 0x3e, 0x91, 0xfe, 0xdb, 0xd8, 0xb9, 0x43,
+                0x7b, 0x29,
+            ],
+            data: vec![
+                0x1e, 0x49, 0x0d, 0xb5, 0x92, 0xad, 0x6a, 0x19, 0x4e, 0x6e, 0xe8, 0x58, 0x64, 0x84,
+                0xe2, 0x3f, 0xf6, 0xbd, 0x08, 0x11, 0x34, 0x2c, 0x16, 0x32, 0xc1, 0x8a, 0xb4, 0x25,
+                0x2f, 0x76, 0x08, 0x16,
+            ],
+        }];
+        volume.unlock(&credentials)?;
+
+        assert_eq!(volume.is_locked(), false);
 
         Ok(())
     }
