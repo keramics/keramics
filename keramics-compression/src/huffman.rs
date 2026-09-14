@@ -15,16 +15,12 @@
 //!
 //! Provides Huffman tree support.
 
-use keramics_core::ErrorTrace;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DebugTrace, ErrorTrace};
 
 use super::traits::Bitstream;
 
 /// Huffman tree.
 pub struct HuffmanTree {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Largest code size.
     largest_code_size: usize,
 
@@ -43,7 +39,6 @@ impl HuffmanTree {
     pub fn new(number_of_symbols: usize, largest_code_size: usize) -> Self {
         let maximum_code_size: usize = largest_code_size + 1;
         Self {
-            mediator: Mediator::current(),
             largest_code_size,
             maximum_code_size,
             symbols: vec![0; number_of_symbols],
@@ -97,9 +92,6 @@ impl HuffmanTree {
             ));
         }
         */
-        if self.mediator.debug_output {
-            self.mediator.debug_print("HuffmanTree {\n");
-        }
         // Calculate the offsets to sort the symbols per code size.
         let mut symbol_offsets: Vec<isize> = Vec::new();
 
@@ -128,16 +120,15 @@ impl HuffmanTree {
 
                 self.symbols[code_offset as usize] = symbol as u16;
             }
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "    symbol: {}, code_size: {},\n",
-                    symbol, code_size
-                ));
+        }
+        DebugTrace::static_scope(|debug_trace| {
+            debug_trace.print_start("HuffmanTree");
+            for (symbol, code_size_entry) in code_sizes.iter().enumerate() {
+                debug_trace.print_field("symbol", symbol);
+                debug_trace.print_field("code_size", *code_size_entry as usize);
             }
-        }
-        if self.mediator.debug_output {
-            self.mediator.debug_print("}\n\n");
-        }
+            debug_trace.print_end();
+        });
         Ok(())
     }
 

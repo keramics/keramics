@@ -14,6 +14,15 @@
 /// Apple File System (APFS) credential.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ApfsCredential {
+    /// Key data.
+    KeyData {
+        /// Volume identifier stored as a big-endian UUID.
+        identifier: Vec<u8>,
+
+        /// Data as stored in the master key.
+        data: Vec<u8>,
+    },
+
     None,
     Passphrase(Vec<u8>),
 }

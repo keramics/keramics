@@ -166,13 +166,9 @@ impl<'a> Bitstream for DeflateBitstream<'a> {
             }
             let mut value_32bit: u32 = self.bits;
 
-            if read_size == 32 {
-                self.bits = 0;
-            } else {
-                value_32bit &= !(0xffffffff << read_size);
+            value_32bit &= !(0xffffffff << read_size);
 
-                self.bits >>= read_size;
-            }
+            self.bits >>= read_size;
             self.number_of_bits -= read_size;
 
             if bit_offset > 0 {
@@ -196,11 +192,7 @@ impl<'a> Bitstream for DeflateBitstream<'a> {
             if self.number_of_bits < read_size {
                 self.read_data(read_size);
             }
-            if read_size == 32 {
-                self.bits = 0;
-            } else {
-                self.bits >>= read_size;
-            }
+            self.bits >>= read_size;
             self.number_of_bits -= read_size;
 
             bit_offset += read_size;
@@ -1073,6 +1065,26 @@ mod tests {
     }
 
     #[test]
+    fn test_bitstream_copy_bytes_with_unsupported_bitstream() {
+        let test_data: [u8; 8] = [0x78, 0xda, 0xbd, 0x59, 0x6d, 0x8f, 0xdb, 0xb8];
+        let mut test_bitstream: DeflateBitstream = DeflateBitstream::new(&test_data, 0);
+
+        let mut output_data: [u8; 16] = [0; 16];
+        let result: Result<(), ErrorTrace> = test_bitstream.copy_bytes(16, &mut output_data, 0, 16);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bitstream_copy_bytes_with_unsupported_output_data() {
+        let test_data: [u8; 8] = [0x78, 0xda, 0xbd, 0x59, 0x6d, 0x8f, 0xdb, 0xb8];
+        let mut test_bitstream: DeflateBitstream = DeflateBitstream::new(&test_data, 0);
+
+        let mut output_data: [u8; 2] = [0; 2];
+        let result: Result<(), ErrorTrace> = test_bitstream.copy_bytes(4, &mut output_data, 0, 2);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_bitstream_get_value() {
         let test_data: [u8; 16] = [
             0x78, 0xda, 0xbd, 0x59, 0x6d, 0x8f, 0xdb, 0xb8, 0x11, 0xfe, 0x7c, 0xfa, 0x15, 0xc4,
@@ -1102,6 +1114,16 @@ mod tests {
     }
 
     #[test]
+    fn test_bitstream_get_value_beyond_size() {
+        let test_data: [u8; 8] = [0x78, 0xda, 0xbd, 0x59, 0x6d, 0x8f, 0xdb, 0xb8];
+        let mut test_bitstream: DeflateBitstream = DeflateBitstream::new(&test_data, 0);
+
+        test_bitstream.skip_bits(32);
+        let test_value: u32 = test_bitstream.get_value(8);
+        assert_eq!(test_value, 0x0000006d);
+    }
+
+    #[test]
     fn test_bitstream_skip_bits() {
         let test_data: [u8; 16] = [
             0x78, 0xda, 0xbd, 0x59, 0x6d, 0x8f, 0xdb, 0xb8, 0x11, 0xfe, 0x7c, 0xfa, 0x15, 0xc4,
@@ -1112,6 +1134,33 @@ mod tests {
         test_bitstream.skip_bits(4);
         let test_value: u32 = test_bitstream.get_value(12);
         assert_eq!(test_value, 0x00000da7);
+    }
+
+    #[test]
+    fn test_bitstream_unread_data() {
+        let test_data: [u8; 8] = [0x78, 0xda, 0xbd, 0x59, 0x6d, 0x8f, 0xdb, 0xb8];
+        let mut test_bitstream: DeflateBitstream = DeflateBitstream::new(&test_data, 4);
+
+        test_bitstream.bits = 0x12345678;
+        test_bitstream.number_of_bits = 32;
+
+        test_bitstream.unread_data();
+
+        assert_eq!(test_bitstream.number_of_bits, 8);
+        assert_eq!(test_bitstream.bits, 0x12);
+        assert_eq!(test_bitstream.data_offset, 1);
+    }
+
+    #[test]
+    fn test_block_header_fmt() {
+        let mut test_block_header: DeflateBlockHeader = DeflateBlockHeader::new();
+        test_block_header.last_block_flag = 1;
+        test_block_header.block_type = 2;
+
+        let test_string: String = format!("{}", test_block_header);
+        assert!(test_string.contains("DeflateBlockHeader {"));
+        assert!(test_string.contains("last_block_flag: 1,"));
+        assert!(test_string.contains("block_type: 2,"));
     }
 
     #[test]
