@@ -28,7 +28,7 @@ pub struct ApfsEncryptedBlockReader {
     data_stream: DataStreamReference,
 
     /// Encryption context.
-    encryption_context: Option<Arc<ApfsEncryptionContext>>,
+    encryption_context: Arc<ApfsEncryptionContext>,
 
     /// Block size.
     block_size: u32,
@@ -44,13 +44,13 @@ impl ApfsEncryptedBlockReader {
     /// Creates a new block reader.
     pub(super) fn new(
         data_stream: &DataStreamReference,
-        encryption_context: Option<&Arc<ApfsEncryptionContext>>,
+        encryption_context: &Arc<ApfsEncryptionContext>,
         block_size: u32,
         size: u64,
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
-            encryption_context: encryption_context.cloned(),
+            encryption_context: encryption_context.clone(),
             block_size,
             extents: Vec::new(),
             size,
@@ -123,60 +123,49 @@ impl BlockReader for ApfsEncryptedBlockReader {
                 let range_physical_offset: u64 =
                     (extent.physical_block_number as u64) * (self.block_size as u64);
 
-                match &self.encryption_context {
-                    Some(encryption_context) => {
-                        let mut block_offset: u64 = range_relative_offset;
-                        while data_offset < data_end_offset {
-                            let block_start_offset: u64 = (block_offset / (self.block_size as u64))
-                                * (self.block_size as u64);
-                            let block_data_offset: usize =
-                                (block_offset - block_start_offset) as usize;
-                            let block_physical_offset: u64 =
-                                range_physical_offset + block_start_offset;
+                let mut block_offset: u64 = range_relative_offset;
+                while data_offset < data_end_offset {
+                    let block_start_offset: u64 =
+                        (block_offset / (self.block_size as u64)) * (self.block_size as u64);
+                    let block_data_offset: usize = (block_offset - block_start_offset) as usize;
+                    let block_physical_offset: u64 = range_physical_offset + block_start_offset;
 
-                            let mut encrypted_data: Vec<u8> = vec![0; self.block_size as usize];
-                            keramics_core::data_stream_read_exact_at_position!(
-                                &self.data_stream,
-                                &mut encrypted_data,
-                                SeekFrom::Start(block_physical_offset)
+                    let mut encrypted_data: Vec<u8> = vec![0; self.block_size as usize];
+
+                    keramics_core::data_stream_read_exact_at_position!(
+                        &self.data_stream,
+                        &mut encrypted_data,
+                        SeekFrom::Start(block_physical_offset)
+                    );
+                    let mut block_data: Vec<u8> = vec![0; self.block_size as usize];
+
+                    match self.encryption_context.decrypt_block(
+                        block_physical_offset,
+                        &encrypted_data,
+                        &mut block_data,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to decrypt block: {} (0x{:08x})",
+                                    block_physical_offset, block_physical_offset
+                                )
                             );
-                            let mut block_data: Vec<u8> = vec![0; self.block_size as usize];
-                            match encryption_context.decrypt_block(
-                                block_physical_offset,
-                                &encrypted_data,
-                                &mut block_data,
-                            ) {
-                                Ok(_) => {}
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        format!(
-                                            "Unable to decrypt block: {} (0x{:08x})",
-                                            block_physical_offset, block_physical_offset
-                                        )
-                                    );
-                                    return Err(error);
-                                }
-                            }
-                            let block_read_size: usize = min(
-                                data_end_offset - data_offset,
-                                (self.block_size as usize) - block_data_offset,
-                            );
-                            let block_data_end_offset: usize = block_data_offset + block_read_size;
-                            data[data_offset..data_offset + block_read_size].copy_from_slice(
-                                &block_data[block_data_offset..block_data_end_offset],
-                            );
-                            data_offset += block_read_size;
-                            block_offset += block_read_size as u64;
+                            return Err(error);
                         }
                     }
-                    None => {
-                        keramics_core::data_stream_read_exact_at_position!(
-                            &self.data_stream,
-                            &mut data[data_offset..data_end_offset],
-                            SeekFrom::Start(range_physical_offset + range_relative_offset)
-                        );
-                    }
+                    let block_read_size: usize = min(
+                        data_end_offset - data_offset,
+                        (self.block_size as usize) - block_data_offset,
+                    );
+                    let block_data_end_offset: usize = block_data_offset + block_read_size;
+
+                    data[data_offset..data_offset + block_read_size]
+                        .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
+                    data_offset += block_read_size;
+                    block_offset += block_read_size as u64;
                 }
             }
             data_offset = data_end_offset;

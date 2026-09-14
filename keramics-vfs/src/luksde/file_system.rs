@@ -155,17 +155,23 @@ impl LuksFileSystem {
         }
         if encrypted_volume.is_locked() {
             let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
-            let mut credentials: Vec<LuksCredential> = Vec::new();
+            let mut luks_credentials: Vec<LuksCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                match vfs_credential {
+                let luks_credential: LuksCredential = match vfs_credential {
+                    VfsCredential::KeyData { identifier, data } => LuksCredential::KeyData {
+                        identifier: identifier.clone(),
+                        data: data.clone(),
+                    },
                     VfsCredential::Passphrase(passphrase) => {
-                        credentials.push(LuksCredential::Passphrase(passphrase))
+                        LuksCredential::Passphrase(passphrase.clone())
                     }
-                    _ => {}
-                }
+                    VfsCredential::None => LuksCredential::None,
+                    _ => continue,
+                };
+                luks_credentials.push(luks_credential);
             }
-            match encrypted_volume.unlock(&credentials) {
+            match encrypted_volume.unlock(&luks_credentials) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
