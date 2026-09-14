@@ -1582,26 +1582,28 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn register_test_passphrase() -> Result<(), ErrorTrace> {
+    fn initialize_credential_store() {
         let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
 
-        for existing_credential in credential_store.iter() {
-            if let VfsCredential::Passphrase(ref passphrase) = existing_credential {
-                if *passphrase == "KeRaMiCs".as_bytes().to_vec() {
-                    return Ok(());
-                }
-            }
-            if let VfsCredential::RecoveryPassword(ref recovery_password) = existing_credential {
-                if *recovery_password == "KeRaMiCs".as_bytes().to_vec() {
-                    return Ok(());
-                }
-            }
+        if credential_store.iter().count() == 0 {
+            // Using the key data to bypass key derivation.
+            let credential: VfsCredential = VfsCredential::KeyData {
+                // BDE volume identifier
+                identifier: vec![
+                    0x69, 0xe0, 0xdd, 0xfb, 0xb1, 0xe6, 0xf9, 0x4c, 0x80, 0x64, 0x6b, 0x68, 0xd5,
+                    0x95, 0x51, 0x71,
+                ],
+                // BDE FKEV
+                data: vec![
+                    0x15, 0xbc, 0x71, 0x55, 0xa3, 0x8f, 0xa1, 0x61, 0xc7, 0x2a, 0x9e, 0xeb, 0xe1,
+                    0x20, 0x25, 0xe6,
+                ],
+            };
+            _ = credential_store.add_credential(credential);
+
+            let credential: VfsCredential = VfsCredential::Passphrase(b"KeRaMiCs".to_vec());
+            _ = credential_store.add_credential(credential);
         }
-
-        let passphrase: Vec<u8> = "KeRaMiCs".as_bytes().to_vec();
-        credential_store.add_credential(VfsCredential::Passphrase(passphrase))?;
-
-        Ok(())
     }
 
     fn get_parent_file_system() -> VfsFileSystemReference {
@@ -2668,7 +2670,7 @@ mod tests {
     // Tests with BDE.
 
     fn get_bde_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        register_test_passphrase()?;
+        initialize_credential_store();
 
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Bde);
 
@@ -6019,7 +6021,7 @@ mod tests {
     // Tests with LUKS.
 
     fn get_luksde_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        register_test_passphrase()?;
+        initialize_credential_store();
 
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Luksde);
 

@@ -155,20 +155,25 @@ impl BdeFileSystem {
         }
         if encrypted_volume.is_locked() {
             let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
-            let mut credentials: Vec<BdeCredential> = Vec::new();
+            let mut bde_credentials: Vec<BdeCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                match vfs_credential {
+                let bde_credential: BdeCredential = match vfs_credential {
+                    VfsCredential::KeyData { identifier, data } => BdeCredential::KeyData {
+                        identifier: identifier.clone(),
+                        data: data.clone(),
+                    },
                     VfsCredential::Passphrase(passphrase) => {
-                        credentials.push(BdeCredential::Passphrase(passphrase.clone()))
+                        BdeCredential::Passphrase(passphrase.clone())
                     }
                     VfsCredential::RecoveryPassword(recovery_password) => {
-                        credentials.push(BdeCredential::RecoveryPassword(recovery_password.clone()))
+                        BdeCredential::RecoveryPassword(recovery_password.clone())
                     }
-                    _ => {}
-                }
+                    _ => continue,
+                };
+                bde_credentials.push(bde_credential);
             }
-            match encrypted_volume.unlock(&credentials) {
+            match encrypted_volume.unlock(&bde_credentials) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(

@@ -69,7 +69,7 @@ mod tests {
 
         assert_eq!(credential_store.iter().count(), 0);
 
-        let passphrase: Vec<u8> = "KeRaMiCs".as_bytes().to_vec();
+        let passphrase: Vec<u8> = b"KeRaMiCs".to_vec();
         credential_store.add_credential(VfsCredential::Passphrase(passphrase))?;
 
         assert_eq!(credential_store.iter().count(), 1);

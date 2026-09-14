@@ -14,7 +14,21 @@
 /// Virtual File System (VFS) credential.
 #[derive(Clone)]
 pub enum VfsCredential {
+    /// Key data.
+    KeyData {
+        /// Identifier.
+        identifier: Vec<u8>,
+
+        /// Data.
+        data: Vec<u8>,
+    },
+
+    /// None (empty credential).
     None,
+
+    /// Passphrase (or password).
     Passphrase(Vec<u8>),
+
+    /// Recovery password.
     RecoveryPassword(Vec<u8>),
 }

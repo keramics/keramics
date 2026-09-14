@@ -244,7 +244,23 @@ impl InfoTool {
         let mut result: Option<FormatIdentifier> = None;
 
         if scan_results.len() > 1 {
-            if scan_results.contains(&FormatIdentifier::Udif) {
+            if scan_results.contains(&FormatIdentifier::Bde) {
+                let mut scan_results_copy: HashSet<FormatIdentifier> = scan_results.clone();
+                scan_results_copy.remove(&FormatIdentifier::Bde);
+
+                if scan_results_copy.len() == 1 {
+                    result = match scan_results_copy.iter().next() {
+                        Some(format_identifier) => {
+                            if format_identifier == &FormatIdentifier::Fat {
+                                Some(FormatIdentifier::Bde)
+                            } else {
+                                None
+                            }
+                        }
+                        None => None,
+                    }
+                }
+            } else if scan_results.contains(&FormatIdentifier::Udif) {
                 // Check if UDIF footer was detected.
                 let mut scan_results_copy: HashSet<FormatIdentifier> = scan_results.clone();
                 scan_results_copy.remove(&FormatIdentifier::Udif);
