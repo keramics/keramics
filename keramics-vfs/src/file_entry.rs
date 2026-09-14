@@ -1585,10 +1585,10 @@ mod tests {
     fn initialize_credential_store() {
         let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
 
+        // Using the key data to bypass key derivation.
         if credential_store.iter().count() == 0 {
-            // Using the key data to bypass key derivation.
             let credential: VfsCredential = VfsCredential::KeyData {
-                // BDE volume identifier
+                // BDE volume identifier (little-endian GUID)
                 identifier: vec![
                     0x69, 0xe0, 0xdd, 0xfb, 0xb1, 0xe6, 0xf9, 0x4c, 0x80, 0x64, 0x6b, 0x68, 0xd5,
                     0x95, 0x51, 0x71,
@@ -1597,6 +1597,21 @@ mod tests {
                 data: vec![
                     0x15, 0xbc, 0x71, 0x55, 0xa3, 0x8f, 0xa1, 0x61, 0xc7, 0x2a, 0x9e, 0xeb, 0xe1,
                     0x20, 0x25, 0xe6,
+                ],
+            };
+            _ = credential_store.add_credential(credential);
+
+            let credential: VfsCredential = VfsCredential::KeyData {
+                // LUKS volume identifier (big-endian UUID)
+                identifier: vec![
+                    0x20, 0xbc, 0x27, 0x95, 0x63, 0xf3, 0x4d, 0xc4, 0x80, 0xd8, 0x07, 0x91, 0x19,
+                    0x13, 0xa0, 0x31,
+                ],
+                // LUKS master key
+                data: vec![
+                    0xd2, 0xc4, 0x0d, 0xbb, 0xe4, 0xba, 0x5c, 0xe7, 0xf7, 0x85, 0xa4, 0x8a, 0xfc,
+                    0x34, 0xfa, 0x40, 0xfa, 0x90, 0x86, 0x76, 0xf7, 0xa1, 0x16, 0x40, 0x2c, 0xbb,
+                    0xb3, 0x62, 0x43, 0x29, 0x54, 0xed,
                 ],
             };
             _ = credential_store.add_credential(credential);

@@ -377,14 +377,23 @@ impl StorageMediaImage {
         }
         if luks_volume.is_locked() {
             let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
-            let mut credentials: Vec<LuksCredential> = Vec::new();
+            let mut luks_credentials: Vec<LuksCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
-                    credentials.push(LuksCredential::Passphrase(passphrase.clone()))
-                }
+                let luks_credential: LuksCredential = match vfs_credential {
+                    VfsCredential::KeyData { identifier, data } => LuksCredential::KeyData {
+                        identifier: identifier.clone(),
+                        data: data.clone(),
+                    },
+                    VfsCredential::Passphrase(passphrase) => {
+                        LuksCredential::Passphrase(passphrase.clone())
+                    }
+                    VfsCredential::None => LuksCredential::None,
+                    _ => continue,
+                };
+                luks_credentials.push(luks_credential);
             }
-            match luks_volume.unlock(&credentials) {
+            match luks_volume.unlock(&luks_credentials) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(

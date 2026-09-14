@@ -338,7 +338,7 @@ impl ApfsFileEntry {
                         let mut encrypted_block_reader: ApfsEncryptedBlockReader =
                             ApfsEncryptedBlockReader::new(
                                 &self.data_stream,
-                                Some(encryption_context),
+                                encryption_context,
                                 self.block_size,
                                 size,
                             );
@@ -431,7 +431,29 @@ impl ApfsFileEntry {
                     }
                 }
                 match &self.encryption_context {
-                    Some(encryption_context) => todo!(),
+                    Some(encryption_context) => {
+                        let mut encrypted_block_reader: ApfsEncryptedBlockReader =
+                            ApfsEncryptedBlockReader::new(
+                                &self.data_stream,
+                                encryption_context,
+                                self.block_size,
+                                data_stream_descriptor.size,
+                            );
+
+                        match encrypted_block_reader.open(self.extents.clone()) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to open encrypted block reader"
+                                );
+                                return Err(error);
+                            }
+                        }
+                        Ok(Arc::new(RwLock::new(
+                            BlockStream::<ApfsEncryptedBlockReader>::new(encrypted_block_reader),
+                        )))
+                    }
                     None => {
                         let mut block_reader: ApfsBlockReader = ApfsBlockReader::new(
                             &self.data_stream,

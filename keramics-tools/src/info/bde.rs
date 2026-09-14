@@ -125,7 +125,10 @@ impl BdeInfo {
             match bde_volume.unlock(&bde_credentials) {
                 Ok(_) => {}
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to unlock volume");
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to unlock BDE encrypted volume"
+                    );
                     return Err(error);
                 }
             }

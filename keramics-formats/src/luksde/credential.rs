@@ -14,6 +14,15 @@
 /// Linux Unified Key Setup (LUKS) Disk Encryption credential.
 #[derive(Clone, Debug, PartialEq)]
 pub enum LuksCredential {
+    /// Key data.
+    KeyData {
+        /// Volume identifier stored as a big-endian UUID.
+        identifier: Vec<u8>,
+
+        /// Data as stored in the master key.
+        data: Vec<u8>,
+    },
+
     None,
     Passphrase(Vec<u8>),
 }
