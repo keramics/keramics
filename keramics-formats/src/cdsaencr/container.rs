@@ -269,159 +269,187 @@ impl CdsaEncrContainer {
         let mut hmac_key: Vec<u8> = Vec::new();
         let mut keys_unlocked: bool = false;
 
-        for (key_protector_index, key_protector) in self.key_protectors.iter().enumerate() {
-            // TODO: refactor read and unlock of key protector data into key protector?
+        // Check for key data credentials first to skip key derivation if not needed.
+        for credential in credentials.iter() {
+            if let CdsaEncrCredential::KeyData { identifier, data } = credential {
+                if identifier.len() != 16 {
+                    continue;
+                }
+                let container_identifier: Uuid = Uuid::from_be_bytes(identifier);
 
-            // Note that 65536 is an arbitrary chosen limit.
-            if key_protector.size > 65536 {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported key protector: {} size: {} value out of bounds",
-                    key_protector_index, key_protector.size
-                )));
+                if container_identifier != self.container_identifier {
+                    continue;
+                }
+                let block_key_size: usize = self.encryption_type.key_size;
+                let hmac_key_size: usize = self.hmac_key_size;
+
+                if data.len() != block_key_size + hmac_key_size {
+                    continue;
+                }
+                block_key = data[0..block_key_size].to_vec();
+                hmac_key = data[block_key_size..].to_vec();
+                keys_unlocked = true;
             }
-            let mut data: Vec<u8> = vec![0; key_protector.size as usize];
+        }
+        if !keys_unlocked {
+            for (key_protector_index, key_protector) in self.key_protectors.iter().enumerate() {
+                // TODO: refactor read and unlock of key protector data into key protector?
 
-            keramics_core::data_stream_read_exact_at_position!(
-                data_stream,
-                &mut data,
-                SeekFrom::Start(key_protector.offset)
-            );
-            match key_protector.protector_type {
-                CdsaEncrKeyProtectorType::PassphraseWrappedKey => {
-                    if self.format_version == 1 {
-                        keramics_core::debug_trace_data_and_structure!(
-                            "CdsaEncrContainerFooter",
-                            key_protector.offset,
-                            &data,
-                            key_protector.size,
-                            CdsaEncrContainerFooter::debug_read_data(&data)
-                        );
-                        let mut container_footer: CdsaEncrContainerFooter =
-                            CdsaEncrContainerFooter::new();
+                // Note that 65536 is an arbitrary chosen limit.
+                if key_protector.size > 65536 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported key protector: {} size: {} value out of bounds",
+                        key_protector_index, key_protector.size
+                    )));
+                }
+                let mut data: Vec<u8> = vec![0; key_protector.size as usize];
 
-                        match container_footer.read_data(&data) {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to read container footer"
-                                );
-                                return Err(error);
-                            }
-                        }
-                        for credential in credentials.iter() {
-                            match container_footer.unlock_with_credential(credential) {
-                                Ok(result) => {
-                                    if result {
-                                        let block_key_size: usize = self.encryption_type.key_size;
-                                        block_key = container_footer.block_key_data
-                                            [0..block_key_size]
-                                            .to_vec();
+                keramics_core::data_stream_read_exact_at_position!(
+                    data_stream,
+                    &mut data,
+                    SeekFrom::Start(key_protector.offset)
+                );
+                match key_protector.protector_type {
+                    CdsaEncrKeyProtectorType::PassphraseWrappedKey => {
+                        if self.format_version == 1 {
+                            keramics_core::debug_trace_data_and_structure!(
+                                "CdsaEncrContainerFooter",
+                                key_protector.offset,
+                                &data,
+                                key_protector.size,
+                                CdsaEncrContainerFooter::debug_read_data(&data)
+                            );
+                            let mut container_footer: CdsaEncrContainerFooter =
+                                CdsaEncrContainerFooter::new();
 
-                                        let hmac_key_size: usize = self.hmac_key_size;
-                                        hmac_key = container_footer.hmac_key_data[0..hmac_key_size]
-                                            .to_vec();
-
-                                        keys_unlocked = true;
-
-                                        break;
-                                    }
-                                }
+                            match container_footer.read_data(&data) {
+                                Ok(_) => {}
                                 Err(mut error) => {
                                     keramics_core::error_trace_add_frame!(
                                         error,
-                                        "Unable to unlock container footer"
+                                        "Unable to read container footer"
+                                    );
+                                    return Err(error);
+                                }
+                            }
+                            for credential in credentials.iter() {
+                                match container_footer.unlock_with_credential(credential) {
+                                    Ok(result) => {
+                                        if result {
+                                            let block_key_size: usize =
+                                                self.encryption_type.key_size;
+                                            block_key = container_footer.block_key_data
+                                                [0..block_key_size]
+                                                .to_vec();
+
+                                            let hmac_key_size: usize = self.hmac_key_size;
+                                            hmac_key = container_footer.hmac_key_data
+                                                [0..hmac_key_size]
+                                                .to_vec();
+
+                                            keys_unlocked = true;
+
+                                            break;
+                                        }
+                                    }
+                                    Err(mut error) => {
+                                        keramics_core::error_trace_add_frame!(
+                                            error,
+                                            "Unable to unlock container footer"
+                                        );
+                                        return Err(error);
+                                    }
+                                }
+                            }
+                        } else if self.format_version == 2 {
+                            keramics_core::debug_trace_data_and_structure!(
+                                "CdsaEncrPassphraseWrappedKey",
+                                key_protector.offset,
+                                &data,
+                                key_protector.size,
+                                CdsaEncrPassphraseWrappedKey::debug_read_data(&data)
+                            );
+                            let mut wrapped_key: CdsaEncrPassphraseWrappedKey =
+                                CdsaEncrPassphraseWrappedKey::new();
+
+                            match wrapped_key.read_data(&data) {
+                                Ok(_) => {}
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to read passphrase wrapped key"
+                                    );
+                                    return Err(error);
+                                }
+                            }
+                            for credential in credentials.iter() {
+                                match wrapped_key.unlock_with_credential(credential) {
+                                    Ok(result) => {
+                                        if result {
+                                            let block_key_size: usize =
+                                                self.encryption_type.key_size;
+                                            block_key =
+                                                wrapped_key.key_data[0..block_key_size].to_vec();
+
+                                            let hmac_key_size: usize = self.hmac_key_size;
+                                            let data_end_offset: usize =
+                                                block_key_size + hmac_key_size;
+                                            hmac_key = wrapped_key.key_data
+                                                [block_key_size..data_end_offset]
+                                                .to_vec();
+
+                                            keys_unlocked = true;
+
+                                            break;
+                                        }
+                                    }
+                                    Err(mut error) => {
+                                        keramics_core::error_trace_add_frame!(
+                                            error,
+                                            "Unable to unlock passphrase wrapped key"
+                                        );
+                                        return Err(error);
+                                    }
+                                }
+                            }
+                        }
+                        if keys_unlocked {
+                            break;
+                        }
+                    }
+                    CdsaEncrKeyProtectorType::PublicKeyWrappedKey => {
+                        if self.format_version == 2 {
+                            keramics_core::debug_trace_data_and_structure!(
+                                "CdsaEncrPublicKeyWrappedKey",
+                                key_protector.offset,
+                                &data,
+                                key_protector.size,
+                                CdsaEncrPublicKeyWrappedKey::debug_read_data(&data)
+                            );
+                            let mut wrapped_key: CdsaEncrPublicKeyWrappedKey =
+                                CdsaEncrPublicKeyWrappedKey::new();
+
+                            match wrapped_key.read_data(&data) {
+                                Ok(_) => {}
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to read public key wrapped key"
                                     );
                                     return Err(error);
                                 }
                             }
                         }
-                    } else if self.format_version == 2 {
-                        keramics_core::debug_trace_data_and_structure!(
-                            "CdsaEncrPassphraseWrappedKey",
-                            key_protector.offset,
-                            &data,
-                            key_protector.size,
-                            CdsaEncrPassphraseWrappedKey::debug_read_data(&data)
-                        );
-                        let mut wrapped_key: CdsaEncrPassphraseWrappedKey =
-                            CdsaEncrPassphraseWrappedKey::new();
-
-                        match wrapped_key.read_data(&data) {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to read passphrase wrapped key"
-                                );
-                                return Err(error);
-                            }
-                        }
-                        for credential in credentials.iter() {
-                            match wrapped_key.unlock_with_credential(credential) {
-                                Ok(result) => {
-                                    if result {
-                                        let block_key_size: usize = self.encryption_type.key_size;
-                                        block_key =
-                                            wrapped_key.key_data[0..block_key_size].to_vec();
-
-                                        let hmac_key_size: usize = self.hmac_key_size;
-                                        let data_end_offset: usize = block_key_size + hmac_key_size;
-                                        hmac_key = wrapped_key.key_data
-                                            [block_key_size..data_end_offset]
-                                            .to_vec();
-
-                                        keys_unlocked = true;
-
-                                        break;
-                                    }
-                                }
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to unlock passphrase wrapped key"
-                                    );
-                                    return Err(error);
-                                }
-                            }
-                        }
                     }
-                    if keys_unlocked {
-                        break;
-                    }
-                }
-                CdsaEncrKeyProtectorType::PublicKeyWrappedKey => {
-                    if self.format_version == 2 {
-                        keramics_core::debug_trace_data_and_structure!(
-                            "CdsaEncrPublicKeyWrappedKey",
-                            key_protector.offset,
-                            &data,
-                            key_protector.size,
-                            CdsaEncrPublicKeyWrappedKey::debug_read_data(&data)
-                        );
-                        let mut wrapped_key: CdsaEncrPublicKeyWrappedKey =
-                            CdsaEncrPublicKeyWrappedKey::new();
-
-                        match wrapped_key.read_data(&data) {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to read public key wrapped key"
-                                );
-                                return Err(error);
-                            }
+                    _ => {
+                        if self.format_version == 2 {
+                            keramics_core::debug_trace_data!(
+                                "CdsaEncrEncryptedKeyProtector",
+                                key_protector.offset,
+                                &data,
+                                key_protector.size,
+                            );
                         }
-                    }
-                }
-                _ => {
-                    if self.format_version == 2 {
-                        keramics_core::debug_trace_data!(
-                            "CdsaEncrEncryptedKeyProtector",
-                            key_protector.offset,
-                            &data,
-                            key_protector.size,
-                        );
                     }
                 }
             }
@@ -575,7 +603,37 @@ mod tests {
     }
 
     #[test]
-    fn test_unlock() -> Result<(), ErrorTrace> {
+    fn test_unlock_with_key_data() -> Result<(), ErrorTrace> {
+        let mut container: CdsaEncrContainer = CdsaEncrContainer::new();
+
+        let path_string: String = get_test_data_path("udif/hfsplus_aes256.dmg");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        container.read_data_stream(&data_stream)?;
+
+        assert_eq!(container.is_locked, true);
+
+        let credentials: Vec<CdsaEncrCredential> = vec![CdsaEncrCredential::KeyData {
+            identifier: vec![
+                0x6d, 0xde, 0x70, 0x6c, 0x61, 0xd2, 0x45, 0xff, 0x90, 0x46, 0xc8, 0x6b, 0x39, 0x12,
+                0xbf, 0xeb,
+            ],
+            data: vec![
+                0x76, 0x7e, 0xbc, 0xb0, 0x25, 0xb9, 0x31, 0xed, 0xf9, 0x53, 0xa7, 0xcd, 0x50, 0xc3,
+                0xb2, 0xbb, 0x3a, 0xd4, 0x51, 0x6a, 0x83, 0xf4, 0x82, 0x13, 0x2b, 0xfc, 0x3d, 0x99,
+                0x4b, 0x4f, 0x51, 0x36, 0x28, 0x68, 0xbd, 0x1c, 0x71, 0xcf, 0x29, 0x36, 0x8d, 0xe2,
+                0xc7, 0xfc, 0x50, 0x2a, 0xd7, 0x1e, 0x6e, 0xee, 0xdd, 0x24,
+            ],
+        }];
+        container.unlock(&credentials)?;
+
+        assert_eq!(container.is_locked, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_unlock_with_passphrase() -> Result<(), ErrorTrace> {
         let mut container: CdsaEncrContainer = CdsaEncrContainer::new();
 
         let path_string: String = get_test_data_path("udif/hfsplus_aes256.dmg");

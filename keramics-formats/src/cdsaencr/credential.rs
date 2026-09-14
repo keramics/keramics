@@ -14,6 +14,18 @@
 /// Mac OS Encrypted Encoding (cdsaencr) credential.
 #[derive(Clone, Debug, PartialEq)]
 pub enum CdsaEncrCredential {
+    /// Key data.
+    KeyData {
+        /// Container identifier stored as a big-endian UUID.
+        identifier: Vec<u8>,
+
+        /// Data as the block key followed by the HMAC key.
+        data: Vec<u8>,
+    },
+
+    /// None (empty credential).
     None,
+
+    /// Passphrase (or password).
     Passphrase(Vec<u8>),
 }
