@@ -14,7 +14,21 @@
 /// BitLocker Drive Encryption (BDE) credential.
 #[derive(Clone, Debug, PartialEq)]
 pub enum BdeCredential {
+    /// Key data.
+    KeyData {
+        /// Volume identifier stored as a little-endian GUID.
+        identifier: Vec<u8>,
+
+        /// Data as stored in the FVEK.
+        data: Vec<u8>,
+    },
+
+    /// None (empty credential).
     None,
+
+    /// Passphrase (or password).
     Passphrase(Vec<u8>),
+
+    /// Recovery password.
     RecoveryPassword(Vec<u8>),
 }
