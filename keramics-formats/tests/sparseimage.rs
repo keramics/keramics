@@ -62,9 +62,21 @@ fn read_file() -> Result<(), ErrorTrace> {
 fn read_file_encrypted() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/sparseimage/hfsplus_aes128.sparseimage");
     let mut file: SparseImageFile = open_file(&path_buf)?;
-    let credentials: Vec<CdsaEncrCredential> =
-        vec![CdsaEncrCredential::Passphrase(b"KeRaMiCs".to_vec())];
+
+    // Using the key data to bypass key derivation.
+    let credentials: Vec<CdsaEncrCredential> = vec![CdsaEncrCredential::KeyData {
+        identifier: vec![
+            0x21, 0xd5, 0x5b, 0x47, 0x4b, 0x3b, 0x41, 0x2f, 0xb4, 0xaf, 0xb9, 0xde, 0xb6, 0x46,
+            0x54, 0x2c,
+        ],
+        data: vec![
+            0xb7, 0x26, 0x12, 0x70, 0xb5, 0xb2, 0x0a, 0x0b, 0xa7, 0xd9, 0x2f, 0xd0, 0x39, 0xc6,
+            0xe7, 0x71, 0xb7, 0x26, 0x12, 0x70, 0xb5, 0xb2, 0x0a, 0x0b, 0xa7, 0xd9, 0x2f, 0xd0,
+            0x39, 0xc6, 0xe7, 0x71, 0x00, 0x00, 0x00, 0x00,
+        ],
+    }];
     file.unlock(&credentials)?;
+
     let data_stream: DataStreamReference = file.get_data_stream().unwrap();
 
     let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
