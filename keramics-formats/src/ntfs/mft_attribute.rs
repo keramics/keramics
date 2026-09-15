@@ -353,9 +353,8 @@ impl NtfsMftAttribute {
         cluster_block_size: u32,
         flags: u32,
     ) -> Result<DataStreamReference, ErrorTrace> {
-        let ignore_vdl: bool = (flags & NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE) != 0;
-
         if self.is_resident() {
+            let ignore_vdl: bool = (flags & NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE) != 0;
             let size: u64 = if ignore_vdl && self.allocated_data_size > 0 {
                 self.allocated_data_size
             } else {
@@ -364,20 +363,19 @@ impl NtfsMftAttribute {
             let stream: FakeDataStream = FakeDataStream::new(&self.resident_data, size);
             Ok(Arc::new(RwLock::new(stream)))
         } else if self.is_compressed() {
-            let compressed_stream: NtfsCompressedStream = NtfsCompressedStream::open_with_flags(
-                data_stream,
-                self,
-                cluster_block_size,
-                ignore_vdl,
-            )
-            .map_err(|mut err| {
-                keramics_core::error_trace_add_frame!(err, "Unable to open compressed stream");
-                err
-            })?;
+            let compressed_stream: NtfsCompressedStream =
+                NtfsCompressedStream::open_with_flags(data_stream, self, cluster_block_size, flags)
+                    .map_err(|mut err| {
+                        keramics_core::error_trace_add_frame!(
+                            err,
+                            "Unable to open compressed stream"
+                        );
+                        err
+                    })?;
             Ok(Arc::new(RwLock::new(compressed_stream)))
         } else {
             let block_stream: NtfsBlockStream =
-                NtfsBlockStream::open_with_flags(data_stream, self, cluster_block_size, ignore_vdl)
+                NtfsBlockStream::open_with_flags(data_stream, self, cluster_block_size, flags)
                     .map_err(|mut err| {
                         keramics_core::error_trace_add_frame!(err, "Unable to open block stream");
                         err
@@ -400,6 +398,8 @@ impl NtfsMftAttribute {
 mod tests {
     use super::*;
 
+    use keramics_core::open_fake_data_stream;
+
     fn get_test_data() -> Vec<u8> {
         vec![
             0x90, 0x00, 0x00, 0x00, 0x58, 0x00, 0x00, 0x00, 0x00, 0x04, 0x18, 0x00, 0x00, 0x00,
@@ -412,6 +412,17 @@ mod tests {
         ]
     }
 
+    fn get_test_compressed_mft_attribute_data() -> Vec<u8> {
+        vec![
+            0x80, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x48, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5e, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x5e, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x11, 0x02, 0x00, 0x01, 0x0e, 0x00, 0x00, 0x00,
+        ]
+    }
+
     // TODO: add tests for is_compressed
     // TODO: add tests for is_resident
     // TODO: add tests for is_sparse
@@ -421,7 +432,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = NtfsMftAttribute::new();
+        let mut test_struct: NtfsMftAttribute = NtfsMftAttribute::new();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.attribute_type, 0x00000090);
@@ -433,6 +444,83 @@ mod tests {
         assert_eq!(test_struct.data_flags, 0x0000);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_resident() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let mut test_struct: NtfsMftAttribute = NtfsMftAttribute::new();
+        test_struct.read_data(&test_data)?;
+
+        let fake_stream: DataStreamReference = open_fake_data_stream(&[]);
+        let stream: DataStreamReference = test_struct.get_data_stream(&fake_stream, 4096)?;
+        let size: u64 = match stream.write() {
+            Ok(mut stream_guard) => stream_guard.get_size()?,
+            Err(_) => return Err(keramics_core::error_trace_new!("Failed to acquire lock")),
+        };
+        assert_eq!(size, 56);
+
+        test_struct.allocated_data_size = 64;
+        let stream_ignore_vdl: DataStreamReference = test_struct.get_data_stream_with_flags(
+            &fake_stream,
+            4096,
+            NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE,
+        )?;
+        let size_ignore_vdl: u64 = match stream_ignore_vdl.write() {
+            Ok(mut stream_guard) => stream_guard.get_size()?,
+            Err(_) => return Err(keramics_core::error_trace_new!("Failed to acquire lock")),
+        };
+        assert_eq!(size_ignore_vdl, 64);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_compressed() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_compressed_mft_attribute_data();
+        let mut test_struct: NtfsMftAttribute = NtfsMftAttribute::new();
+        test_struct.read_data(&test_data)?;
+
+        let fake_data: Vec<u8> = vec![0; 65536];
+        let fake_stream: DataStreamReference = open_fake_data_stream(&fake_data);
+        let stream: DataStreamReference =
+            test_struct.get_data_stream_with_flags(&fake_stream, 4096, 0)?;
+        let size: u64 = match stream.write() {
+            Ok(mut stream_guard) => stream_guard.get_size()?,
+            Err(_) => return Err(keramics_core::error_trace_new!("Failed to acquire lock")),
+        };
+        assert_eq!(size, 11358);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_compressed_error() {
+        let mut test_struct: NtfsMftAttribute = NtfsMftAttribute::new();
+        test_struct.non_resident_flag = 1;
+        test_struct.data_flags = 0x0001;
+        test_struct.compression_unit_size = 0;
+
+        let fake_stream: DataStreamReference = open_fake_data_stream(&[]);
+        let result: Result<DataStreamReference, ErrorTrace> =
+            test_struct.get_data_stream_with_flags(&fake_stream, 4096, 0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_data_stream_block_stream_error() {
+        let mut test_struct: NtfsMftAttribute = NtfsMftAttribute::new();
+        test_struct.non_resident_flag = 1;
+        test_struct.data_flags = 0;
+        test_struct.allocated_data_size = 4096;
+        test_struct
+            .data_cluster_groups
+            .push(NtfsClusterGroup::new(1, 1));
+
+        let fake_stream: DataStreamReference = open_fake_data_stream(&[]);
+        let result: Result<DataStreamReference, ErrorTrace> =
+            test_struct.get_data_stream_with_flags(&fake_stream, 4096, 0);
+        assert!(result.is_err());
     }
 
     // TODO: add tests for read_name

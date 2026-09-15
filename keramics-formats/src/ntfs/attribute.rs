@@ -95,3 +95,132 @@ impl<'a> NtfsAttribute<'a> {
 
     // TODO: add methods to retrieve extents
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::open_fake_data_stream;
+
+    #[test]
+    fn test_get_attribute_type() {
+        let attribute: NtfsAttribute = NtfsAttribute::AttributeList {
+            attribute_list: NtfsAttributeList::new(),
+        };
+        assert_eq!(
+            attribute.get_attribute_type(),
+            NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST
+        );
+
+        let attribute: NtfsAttribute = NtfsAttribute::FileName {
+            file_name: NtfsFileName::new(),
+        };
+        assert_eq!(
+            attribute.get_attribute_type(),
+            NTFS_ATTRIBUTE_TYPE_FILE_NAME
+        );
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&[]);
+        let mut mft_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        mft_attribute.attribute_type = NTFS_ATTRIBUTE_TYPE_DATA;
+        let attribute: NtfsAttribute = NtfsAttribute::Generic {
+            data_stream: &data_stream,
+            cluster_block_size: 4096,
+            mft_attribute: &mft_attribute,
+        };
+        assert_eq!(attribute.get_attribute_type(), NTFS_ATTRIBUTE_TYPE_DATA);
+
+        let attribute: NtfsAttribute = NtfsAttribute::ReparsePoint {
+            reparse_point: NtfsReparsePoint::new(0),
+        };
+        assert_eq!(
+            attribute.get_attribute_type(),
+            NTFS_ATTRIBUTE_TYPE_REPARSE_POINT
+        );
+
+        let attribute: NtfsAttribute = NtfsAttribute::StandardInformation {
+            standard_information: NtfsStandardInformation::new(),
+        };
+        assert_eq!(
+            attribute.get_attribute_type(),
+            NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION
+        );
+
+        let attribute: NtfsAttribute = NtfsAttribute::VolumeInformation {
+            volume_information: NtfsVolumeInformation::new(),
+        };
+        assert_eq!(
+            attribute.get_attribute_type(),
+            NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION
+        );
+
+        let attribute: NtfsAttribute = NtfsAttribute::VolumeName {
+            volume_name: Ucs2String::from("test"),
+        };
+        assert_eq!(
+            attribute.get_attribute_type(),
+            NTFS_ATTRIBUTE_TYPE_VOLUME_NAME
+        );
+    }
+
+    #[test]
+    fn test_get_name() {
+        let data_stream: DataStreamReference = open_fake_data_stream(&[]);
+        let mut mft_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        mft_attribute.name = Some(Ucs2String::from("test"));
+        let attribute: NtfsAttribute = NtfsAttribute::Generic {
+            data_stream: &data_stream,
+            cluster_block_size: 4096,
+            mft_attribute: &mft_attribute,
+        };
+        let expected_name: Ucs2String = Ucs2String::from("test");
+        assert_eq!(attribute.get_name(), Some(&expected_name));
+
+        let mut mft_attribute_unnamed: NtfsMftAttribute = NtfsMftAttribute::new();
+        mft_attribute_unnamed.name = None;
+        let attribute: NtfsAttribute = NtfsAttribute::Generic {
+            data_stream: &data_stream,
+            cluster_block_size: 4096,
+            mft_attribute: &mft_attribute_unnamed,
+        };
+        assert_eq!(attribute.get_name(), None);
+
+        let attribute: NtfsAttribute = NtfsAttribute::StandardInformation {
+            standard_information: NtfsStandardInformation::new(),
+        };
+        assert_eq!(attribute.get_name(), None);
+    }
+
+    #[test]
+    fn test_get_data_stream() -> Result<(), ErrorTrace> {
+        let data_stream: DataStreamReference = open_fake_data_stream(&[]);
+        let mut mft_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        mft_attribute.non_resident_flag = 0;
+        mft_attribute.resident_data = vec![1, 2, 3, 4];
+        mft_attribute.data_size = 4;
+        let attribute: NtfsAttribute = NtfsAttribute::Generic {
+            data_stream: &data_stream,
+            cluster_block_size: 4096,
+            mft_attribute: &mft_attribute,
+        };
+        let stream: DataStreamReference = attribute.get_data_stream()?;
+        let size: u64 = match stream.write() {
+            Ok(mut stream_guard) => stream_guard.get_size()?,
+            Err(_) => return Err(keramics_core::error_trace_new!("Failed to acquire lock")),
+        };
+        assert_eq!(size, 4);
+
+        let attribute_non_generic: NtfsAttribute = NtfsAttribute::StandardInformation {
+            standard_information: NtfsStandardInformation::new(),
+        };
+        let result: Result<DataStreamReference, ErrorTrace> =
+            attribute_non_generic.get_data_stream();
+        assert!(result.is_err());
+
+        let result_flags: Result<DataStreamReference, ErrorTrace> =
+            attribute_non_generic.get_data_stream_with_flags(0);
+        assert!(result_flags.is_err());
+
+        Ok(())
+    }
+}

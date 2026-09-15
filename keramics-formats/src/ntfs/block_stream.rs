@@ -29,7 +29,7 @@ impl NtfsBlockStream {
         data_attribute: &NtfsMftAttribute,
         cluster_block_size: u32,
     ) -> Result<Self, ErrorTrace> {
-        Self::open_with_flags(data_stream, data_attribute, cluster_block_size, false)
+        Self::open_with_flags(data_stream, data_attribute, cluster_block_size, 0)
     }
 
     /// Opens a block stream with flags.
@@ -37,11 +37,11 @@ impl NtfsBlockStream {
         data_stream: &DataStreamReference,
         data_attribute: &NtfsMftAttribute,
         cluster_block_size: u32,
-        ignore_valid_data_size: bool,
+        flags: u32,
     ) -> Result<Self, ErrorTrace> {
         let mut block_reader: NtfsBlockReader =
             NtfsBlockReader::new(data_stream, cluster_block_size);
-        match block_reader.open_with_flags(data_attribute, ignore_valid_data_size) {
+        match block_reader.open_with_flags(data_attribute, flags) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
@@ -61,6 +61,7 @@ mod tests {
 
     use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
 
+    use crate::ntfs::constants::*;
     use crate::ntfs::mft_attribute::NtfsMftAttribute;
     use crate::tests::get_test_data_path;
 
@@ -229,11 +230,15 @@ mod tests {
         data_attribute.read_data(&test_mft_attribute_data)?;
 
         let mut block_stream_default: NtfsBlockStream =
-            NtfsBlockStream::open_with_flags(&data_stream, &data_attribute, 4096, false)?;
+            NtfsBlockStream::open_with_flags(&data_stream, &data_attribute, 4096, 0)?;
         assert_eq!(block_stream_default.get_size()?, 11358);
 
-        let mut block_stream_ignore_vdl: NtfsBlockStream =
-            NtfsBlockStream::open_with_flags(&data_stream, &data_attribute, 4096, true)?;
+        let mut block_stream_ignore_vdl: NtfsBlockStream = NtfsBlockStream::open_with_flags(
+            &data_stream,
+            &data_attribute,
+            4096,
+            NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE,
+        )?;
         assert_eq!(block_stream_ignore_vdl.get_size()?, 12288);
 
         block_stream_ignore_vdl.seek(SeekFrom::Start(11358))?;
@@ -272,21 +277,39 @@ mod tests {
         mock_attribute.data_cluster_groups.push(cluster_group);
 
         let mut stream_normal: NtfsBlockStream =
-            NtfsBlockStream::open_with_flags(&fake_data_stream, &mock_attribute, 4096, false)?;
+            NtfsBlockStream::open_with_flags(&fake_data_stream, &mock_attribute, 4096, 0)?;
         assert_eq!(stream_normal.get_size()?, 11358);
         stream_normal.seek(SeekFrom::Start(11358))?;
         let mut read_buf: Vec<u8> = vec![0xff; 512];
         let bytes_read: usize = stream_normal.read(&mut read_buf)?;
         assert_eq!(bytes_read, 0);
 
-        let mut stream_ignore: NtfsBlockStream =
-            NtfsBlockStream::open_with_flags(&fake_data_stream, &mock_attribute, 4096, true)?;
+        let mut stream_ignore: NtfsBlockStream = NtfsBlockStream::open_with_flags(
+            &fake_data_stream,
+            &mock_attribute,
+            4096,
+            NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE,
+        )?;
         assert_eq!(stream_ignore.get_size()?, 12288);
         stream_ignore.seek(SeekFrom::Start(11358))?;
         let mut slack_buf: Vec<u8> = vec![0; 930];
         let slack_read: usize = stream_ignore.read(&mut slack_buf)?;
         assert_eq!(slack_read, 930);
         assert_eq!(slack_buf, vec![0x5a; 930]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_with_flags_failure() -> Result<(), ErrorTrace> {
+        let path_string: String = get_test_data_path("ntfs/ntfs.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+
+        let data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        let result: Result<NtfsBlockStream, ErrorTrace> =
+            NtfsBlockStream::open_with_flags(&data_stream, &data_attribute, 4096, 0);
+        assert!(result.is_err());
 
         Ok(())
     }

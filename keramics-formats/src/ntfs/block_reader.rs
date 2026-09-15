@@ -19,6 +19,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use crate::traits::BlockReader;
 
 use super::block_range::{NtfsBlockRange, NtfsBlockRangeType};
+use super::constants::*;
 use super::data_run::NtfsDataRunType;
 use super::mft_attribute::NtfsMftAttribute;
 
@@ -54,14 +55,14 @@ impl NtfsBlockReader {
 
     /// Opens a block reader.
     pub(super) fn open(&mut self, data_attribute: &NtfsMftAttribute) -> Result<(), ErrorTrace> {
-        self.open_with_flags(data_attribute, false)
+        self.open_with_flags(data_attribute, 0)
     }
 
     /// Opens a block reader with flags.
     pub(super) fn open_with_flags(
         &mut self,
         data_attribute: &NtfsMftAttribute,
-        ignore_valid_data_size: bool,
+        flags: u32,
     ) -> Result<(), ErrorTrace> {
         if data_attribute.is_resident() {
             return Err(keramics_core::error_trace_new!(
@@ -113,6 +114,8 @@ impl NtfsBlockReader {
                 }
             }
         }
+        let ignore_valid_data_size: bool = (flags & NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE) != 0;
+
         if data_attribute.is_compressed() || ignore_valid_data_size {
             self.size = data_attribute.allocated_data_size;
             self.valid_data_size = data_attribute.allocated_data_size;

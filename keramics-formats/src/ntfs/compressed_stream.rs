@@ -29,7 +29,7 @@ impl NtfsCompressedStream {
         data_attribute: &NtfsMftAttribute,
         cluster_block_size: u32,
     ) -> Result<Self, ErrorTrace> {
-        Self::open_with_flags(data_stream, data_attribute, cluster_block_size, false)
+        Self::open_with_flags(data_stream, data_attribute, cluster_block_size, 0)
     }
 
     /// Opens a compressed block stream with flags.
@@ -37,11 +37,11 @@ impl NtfsCompressedStream {
         data_stream: &DataStreamReference,
         data_attribute: &NtfsMftAttribute,
         cluster_block_size: u32,
-        ignore_valid_data_size: bool,
+        flags: u32,
     ) -> Result<Self, ErrorTrace> {
         let mut block_reader: NtfsCompressedBlockReader =
             NtfsCompressedBlockReader::new(data_stream, cluster_block_size);
-        match block_reader.open_with_flags(data_attribute, ignore_valid_data_size) {
+        match block_reader.open_with_flags(data_attribute, flags) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open compressed reader");
@@ -61,6 +61,7 @@ mod tests {
 
     use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_fake_data_stream};
 
+    use crate::ntfs::constants::*;
     use crate::ntfs::mft_attribute::NtfsMftAttribute;
 
     fn get_test_data() -> Vec<u8> {
@@ -773,6 +774,41 @@ mod tests {
         let mut data: Vec<u8> = vec![0; 512];
         let read_size: usize = block_stream.read(&mut data)?;
         assert_eq!(read_size, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_with_flags_ignore_valid_data_size() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
+        let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        data_attribute.read_data(&test_mft_attribute_data)?;
+
+        let mut block_stream: NtfsCompressedStream = NtfsCompressedStream::open_with_flags(
+            &data_stream,
+            &data_attribute,
+            4096,
+            NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE,
+        )?;
+
+        let size: u64 = block_stream.get_size()?;
+        assert_eq!(size, data_attribute.allocated_data_size);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_with_flags_failure() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        let result: Result<NtfsCompressedStream, ErrorTrace> =
+            NtfsCompressedStream::open_with_flags(&data_stream, &data_attribute, 4096, 0);
+        assert!(result.is_err());
 
         Ok(())
     }
