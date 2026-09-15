@@ -36,6 +36,8 @@
   * [X File System (XFS)](xfs.md)
 * [Hybrid volume and file system formats](hybrid.md)
   * [Apple File System (APFS)](apfs.md)
+* [Archive formats](archive.md)
+  * [Copy in and out (CPIO) archive format](cpio.md)
 * [Assorted formats](assorted.md)
   * [Apple Data Compression (ADC)](adc.md)
   * [LZFSE compressed data](lzfse.md)

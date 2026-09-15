@@ -69,6 +69,9 @@ pub mod hfs;
 pub mod ntfs;
 pub mod xfs;
 
+// Archive formats
+pub mod cpio;
+
 pub use enums::FormatIdentifier;
 pub use file_resolver::{FileResolver, FileResolverReference};
 pub use iterators::{ExtendedAttributesIterator, FileEntriesIterator, PartitionsIterator};

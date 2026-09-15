@@ -83,7 +83,7 @@ fn read_ntfs_empty_file() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_hfsplus_file_regular() -> Result<(), ErrorTrace> {
+fn read_ntfs_file_regular() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
     let file_system: NtfsFileSystem = open_file_system(&path_buf)?;
 
