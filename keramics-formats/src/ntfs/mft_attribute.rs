@@ -364,29 +364,24 @@ impl NtfsMftAttribute {
             let stream: FakeDataStream = FakeDataStream::new(&self.resident_data, size);
             Ok(Arc::new(RwLock::new(stream)))
         } else if self.is_compressed() {
-            let compressed_stream: NtfsCompressedStream =
-                NtfsCompressedStream::open_with_flags(
-                    data_stream,
-                    self,
-                    cluster_block_size,
-                    ignore_vdl,
-                )
-                .map_err(|mut err| {
-                    keramics_core::error_trace_add_frame!(err, "Unable to open compressed stream");
-                    err
-                })?;
-            Ok(Arc::new(RwLock::new(compressed_stream)))
-        } else {
-            let block_stream: NtfsBlockStream = NtfsBlockStream::open_with_flags(
+            let compressed_stream: NtfsCompressedStream = NtfsCompressedStream::open_with_flags(
                 data_stream,
                 self,
                 cluster_block_size,
                 ignore_vdl,
             )
             .map_err(|mut err| {
-                keramics_core::error_trace_add_frame!(err, "Unable to open block stream");
+                keramics_core::error_trace_add_frame!(err, "Unable to open compressed stream");
                 err
             })?;
+            Ok(Arc::new(RwLock::new(compressed_stream)))
+        } else {
+            let block_stream: NtfsBlockStream =
+                NtfsBlockStream::open_with_flags(data_stream, self, cluster_block_size, ignore_vdl)
+                    .map_err(|mut err| {
+                        keramics_core::error_trace_add_frame!(err, "Unable to open block stream");
+                        err
+                    })?;
             Ok(Arc::new(RwLock::new(block_stream)))
         }
     }

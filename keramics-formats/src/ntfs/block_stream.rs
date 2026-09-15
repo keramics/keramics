@@ -262,11 +262,13 @@ mod tests {
         mock_attribute.valid_data_size = 11358;
         let mut cluster_group: crate::ntfs::cluster_group::NtfsClusterGroup =
             crate::ntfs::cluster_group::NtfsClusterGroup::new(0, 2);
-        cluster_group.data_runs.push(crate::ntfs::data_run::NtfsDataRun {
-            number_of_blocks: 3,
-            block_number: 0,
-            run_type: crate::ntfs::data_run::NtfsDataRunType::InFile,
-        });
+        cluster_group
+            .data_runs
+            .push(crate::ntfs::data_run::NtfsDataRun {
+                number_of_blocks: 3,
+                block_number: 0,
+                run_type: crate::ntfs::data_run::NtfsDataRunType::InFile,
+            });
         mock_attribute.data_cluster_groups.push(cluster_group);
 
         let mut stream_normal: NtfsBlockStream =
