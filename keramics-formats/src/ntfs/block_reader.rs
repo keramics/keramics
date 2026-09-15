@@ -54,6 +54,15 @@ impl NtfsBlockReader {
 
     /// Opens a block reader.
     pub(super) fn open(&mut self, data_attribute: &NtfsMftAttribute) -> Result<(), ErrorTrace> {
+        self.open_with_flags(data_attribute, false)
+    }
+
+    /// Opens a block reader with flags.
+    pub(super) fn open_with_flags(
+        &mut self,
+        data_attribute: &NtfsMftAttribute,
+        ignore_valid_data_size: bool,
+    ) -> Result<(), ErrorTrace> {
         if data_attribute.is_resident() {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported resident $DATA attribute"
@@ -104,7 +113,7 @@ impl NtfsBlockReader {
                 }
             }
         }
-        if data_attribute.is_compressed() {
+        if data_attribute.is_compressed() || ignore_valid_data_size {
             self.size = data_attribute.allocated_data_size;
             self.valid_data_size = data_attribute.allocated_data_size;
         } else {

@@ -67,6 +67,15 @@ impl NtfsCompressedBlockReader {
 
     /// Opens a block reader.
     pub(super) fn open(&mut self, data_attribute: &NtfsMftAttribute) -> Result<(), ErrorTrace> {
+        self.open_with_flags(data_attribute, false)
+    }
+
+    /// Opens a block reader with flags.
+    pub(super) fn open_with_flags(
+        &mut self,
+        data_attribute: &NtfsMftAttribute,
+        ignore_valid_data_size: bool,
+    ) -> Result<(), ErrorTrace> {
         if !data_attribute.is_compressed() {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported uncompressed $DATA attribute"
@@ -170,8 +179,13 @@ impl NtfsCompressedBlockReader {
                 self.compression_ranges.push(compression_range);
             }
         }
-        self.size = data_attribute.data_size;
-        self.valid_data_size = data_attribute.valid_data_size;
+        if ignore_valid_data_size {
+            self.size = data_attribute.allocated_data_size;
+            self.valid_data_size = data_attribute.allocated_data_size;
+        } else {
+            self.size = data_attribute.data_size;
+            self.valid_data_size = data_attribute.valid_data_size;
+        }
 
         Ok(())
     }

@@ -719,7 +719,7 @@ impl NtfsInfo {
                 print!("{}", attribute_information);
             }
             // TODO: add support for $BITMAP, $DATA, $INDEX_ALLOCATION, $INDEX_ROOT
-            NtfsAttribute::Generic { mft_attribute } => {
+            NtfsAttribute::Generic { mft_attribute, .. } => {
                 // TODO: refactor into AttributeInfo
                 if let Some(name) = &mft_attribute.name {
                     println!("    Attribute name\t\t\t\t: {}", name)

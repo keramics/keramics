@@ -11,13 +11,18 @@
  * under the License.
  */
 
-use keramics_core::ErrorTrace;
+use std::sync::{Arc, RwLock};
+
+use keramics_core::{DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_types::Ucs2String;
 
 #[cfg(feature = "debug-trace")]
 use keramics_core::DebugTrace;
 
+use super::block_stream::NtfsBlockStream;
 use super::cluster_group::NtfsClusterGroup;
+use super::compressed_stream::NtfsCompressedStream;
+use super::constants::NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE;
 use super::data_run::NtfsDataRun;
 use super::mft_attribute_header::NtfsMftAttributeHeader;
 use super::mft_attribute_non_resident::NtfsMftAttributeNonResident;
@@ -339,6 +344,60 @@ impl NtfsMftAttribute {
         self.name = Some(name);
 
         Ok(())
+    }
+
+    /// Retrieves the data stream for this attribute with optional flags.
+    pub fn get_data_stream_with_flags(
+        &self,
+        data_stream: &DataStreamReference,
+        cluster_block_size: u32,
+        flags: u32,
+    ) -> Result<DataStreamReference, ErrorTrace> {
+        let ignore_vdl: bool = (flags & NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE) != 0;
+
+        if self.is_resident() {
+            let size: u64 = if ignore_vdl && self.allocated_data_size > 0 {
+                self.allocated_data_size
+            } else {
+                self.data_size
+            };
+            let stream: FakeDataStream = FakeDataStream::new(&self.resident_data, size);
+            Ok(Arc::new(RwLock::new(stream)))
+        } else if self.is_compressed() {
+            let compressed_stream: NtfsCompressedStream =
+                NtfsCompressedStream::open_with_flags(
+                    data_stream,
+                    self,
+                    cluster_block_size,
+                    ignore_vdl,
+                )
+                .map_err(|mut err| {
+                    keramics_core::error_trace_add_frame!(err, "Unable to open compressed stream");
+                    err
+                })?;
+            Ok(Arc::new(RwLock::new(compressed_stream)))
+        } else {
+            let block_stream: NtfsBlockStream = NtfsBlockStream::open_with_flags(
+                data_stream,
+                self,
+                cluster_block_size,
+                ignore_vdl,
+            )
+            .map_err(|mut err| {
+                keramics_core::error_trace_add_frame!(err, "Unable to open block stream");
+                err
+            })?;
+            Ok(Arc::new(RwLock::new(block_stream)))
+        }
+    }
+
+    /// Retrieves the data stream for this attribute.
+    pub fn get_data_stream(
+        &self,
+        data_stream: &DataStreamReference,
+        cluster_block_size: u32,
+    ) -> Result<DataStreamReference, ErrorTrace> {
+        self.get_data_stream_with_flags(data_stream, cluster_block_size, 0)
     }
 }
 

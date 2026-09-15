@@ -418,7 +418,11 @@ impl NtfsFileEntry {
                     };
                 NtfsAttribute::ReparsePoint { reparse_point }
             }
-            _ => NtfsAttribute::Generic { mft_attribute },
+            _ => NtfsAttribute::Generic {
+                data_stream: &self.data_stream,
+                cluster_block_size: self.mft.cluster_block_size,
+                mft_attribute,
+            },
         };
         Ok(attribute)
     }

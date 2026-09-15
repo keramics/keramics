@@ -97,3 +97,6 @@ pub const NTFS_REPARSE_POINT_TAG_SYMBOLIC_LINK: u32 = 0xa000000c;
 
 /// NTFS Windows Overlay Filter (WOF) reparse point tag.
 pub const NTFS_REPARSE_POINT_TAG_WOF: u32 = 0x80000017;
+
+/// Flag to ignore Valid Data Length (VDL) and read raw cluster allocations to allocated_data_size.
+pub const NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE: u32 = 0x00000001;

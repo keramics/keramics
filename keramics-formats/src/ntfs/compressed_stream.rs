@@ -11,12 +11,46 @@
  * under the License.
  */
 
+use keramics_core::{DataStreamReference, ErrorTrace};
+
 use crate::block_stream::BlockStream;
 
 use super::compressed_block_reader::NtfsCompressedBlockReader;
+use super::mft_attribute::NtfsMftAttribute;
 
 /// New Technologies File System (NTFS) compressed (block) stream.
 pub type NtfsCompressedStream = BlockStream<NtfsCompressedBlockReader>;
+
+impl NtfsCompressedStream {
+    /// Opens a compressed block stream.
+    #[allow(dead_code)]
+    pub(super) fn open(
+        data_stream: &DataStreamReference,
+        data_attribute: &NtfsMftAttribute,
+        cluster_block_size: u32,
+    ) -> Result<Self, ErrorTrace> {
+        Self::open_with_flags(data_stream, data_attribute, cluster_block_size, false)
+    }
+
+    /// Opens a compressed block stream with flags.
+    pub(super) fn open_with_flags(
+        data_stream: &DataStreamReference,
+        data_attribute: &NtfsMftAttribute,
+        cluster_block_size: u32,
+        ignore_valid_data_size: bool,
+    ) -> Result<Self, ErrorTrace> {
+        let mut block_reader: NtfsCompressedBlockReader =
+            NtfsCompressedBlockReader::new(data_stream, cluster_block_size);
+        match block_reader.open_with_flags(data_attribute, ignore_valid_data_size) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open compressed reader");
+                return Err(error);
+            }
+        }
+        Ok(Self::new(block_reader))
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -639,11 +673,7 @@ mod tests {
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
         data_attribute.read_data(&test_mft_attribute_data)?;
 
-        let mut block_reader: NtfsCompressedBlockReader =
-            NtfsCompressedBlockReader::new(&data_stream, 4096);
-        block_reader.open(&data_attribute)?;
-
-        Ok(NtfsCompressedStream::new(block_reader))
+        NtfsCompressedStream::open(&data_stream, &data_attribute, 4096)
     }
 
     // TODO: add tests for get_offset.
