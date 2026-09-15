@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::cmp::{Ordering, min};
+use std::cmp::{Ordering, max, min};
 use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -19,7 +19,6 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use crate::traits::BlockReader;
 
 use super::block_range::{NtfsBlockRange, NtfsBlockRangeType};
-use super::constants::*;
 use super::data_run::NtfsDataRunType;
 use super::mft_attribute::NtfsMftAttribute;
 
@@ -55,14 +54,14 @@ impl NtfsBlockReader {
 
     /// Opens a block reader.
     pub(super) fn open(&mut self, data_attribute: &NtfsMftAttribute) -> Result<(), ErrorTrace> {
-        self.open_with_flags(data_attribute, 0)
+        self.open_with_valid_data_size(data_attribute, data_attribute.valid_data_size)
     }
 
-    /// Opens a block reader with flags.
-    pub(super) fn open_with_flags(
+    /// Opens a block reader with a specific valid data size.
+    pub(super) fn open_with_valid_data_size(
         &mut self,
         data_attribute: &NtfsMftAttribute,
-        flags: u32,
+        valid_data_size: u64,
     ) -> Result<(), ErrorTrace> {
         if data_attribute.is_resident() {
             return Err(keramics_core::error_trace_new!(
@@ -114,14 +113,15 @@ impl NtfsBlockReader {
                 }
             }
         }
-        let ignore_valid_data_size: bool = (flags & NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE) != 0;
-
-        if data_attribute.is_compressed() || ignore_valid_data_size {
+        if data_attribute.is_compressed() {
             self.size = data_attribute.allocated_data_size;
             self.valid_data_size = data_attribute.allocated_data_size;
         } else {
-            self.size = data_attribute.data_size;
-            self.valid_data_size = data_attribute.valid_data_size;
+            self.size = max(
+                data_attribute.data_size,
+                min(valid_data_size, data_attribute.allocated_data_size),
+            );
+            self.valid_data_size = valid_data_size;
         }
         Ok(())
     }
@@ -266,5 +266,47 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for read_data_from_blocks
+    #[test]
+    fn test_read_data_from_blocks() -> Result<(), ErrorTrace> {
+        let cluster_size: usize = 4096;
+        let total_clusters: usize = 3;
+        let mut raw_cluster_data: Vec<u8> = vec![0xaa; cluster_size * total_clusters];
+        for byte in raw_cluster_data[8192..11358].iter_mut() {
+            *byte = 0x5a;
+        }
+        let fake_data_stream: DataStreamReference =
+            keramics_core::open_fake_data_stream(&raw_cluster_data);
+
+        let mut mock_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        mock_attribute.non_resident_flag = 0x01;
+        mock_attribute.allocated_data_size = 12288;
+        mock_attribute.data_size = 11358;
+        mock_attribute.valid_data_size = 8192;
+        let mut cluster_group: crate::ntfs::cluster_group::NtfsClusterGroup =
+            crate::ntfs::cluster_group::NtfsClusterGroup::new(0, 2);
+        cluster_group
+            .data_runs
+            .push(crate::ntfs::data_run::NtfsDataRun {
+                number_of_blocks: 3,
+                block_number: 0,
+                run_type: crate::ntfs::data_run::NtfsDataRunType::InFile,
+            });
+        mock_attribute.data_cluster_groups.push(cluster_group);
+
+        let mut reader_normal: NtfsBlockReader = NtfsBlockReader::new(&fake_data_stream, 4096);
+        reader_normal.open(&mock_attribute)?;
+        let mut read_buf: Vec<u8> = vec![0xff; 512];
+        let bytes_read: usize = reader_normal.read_data_from_blocks(&mut read_buf, 8192)?;
+        assert_eq!(bytes_read, 512);
+        assert_eq!(read_buf, vec![0x00; 512]);
+
+        let mut reader_ignore_vdl: NtfsBlockReader = NtfsBlockReader::new(&fake_data_stream, 4096);
+        reader_ignore_vdl.open_with_valid_data_size(&mock_attribute, mock_attribute.data_size)?;
+        let mut raw_buf: Vec<u8> = vec![0x00; 512];
+        let raw_read: usize = reader_ignore_vdl.read_data_from_blocks(&mut raw_buf, 8192)?;
+        assert_eq!(raw_read, 512);
+        assert_eq!(raw_buf, vec![0x5a; 512]);
+
+        Ok(())
+    }
 }

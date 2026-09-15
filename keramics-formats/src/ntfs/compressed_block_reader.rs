@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::cmp::{Ordering, min};
+use std::cmp::{Ordering, max, min};
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
@@ -24,7 +24,6 @@ use crate::traits::BlockReader;
 use super::block_reader::NtfsBlockReader;
 use super::block_stream::NtfsBlockStream;
 use super::compression_range::{NtfsCompressionRange, NtfsCompressionRangeType};
-use super::constants::*;
 use super::data_run::NtfsDataRunType;
 use super::mft_attribute::NtfsMftAttribute;
 
@@ -68,14 +67,14 @@ impl NtfsCompressedBlockReader {
 
     /// Opens a block reader.
     pub(super) fn open(&mut self, data_attribute: &NtfsMftAttribute) -> Result<(), ErrorTrace> {
-        self.open_with_flags(data_attribute, 0)
+        self.open_with_valid_data_size(data_attribute, data_attribute.valid_data_size)
     }
 
-    /// Opens a block reader with flags.
-    pub(super) fn open_with_flags(
+    /// Opens a block reader with a specific valid data size.
+    pub(super) fn open_with_valid_data_size(
         &mut self,
         data_attribute: &NtfsMftAttribute,
-        flags: u32,
+        valid_data_size: u64,
     ) -> Result<(), ErrorTrace> {
         if !data_attribute.is_compressed() {
             return Err(keramics_core::error_trace_new!(
@@ -180,15 +179,11 @@ impl NtfsCompressedBlockReader {
                 self.compression_ranges.push(compression_range);
             }
         }
-        let ignore_valid_data_size: bool = (flags & NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE) != 0;
-
-        if ignore_valid_data_size {
-            self.size = data_attribute.allocated_data_size;
-            self.valid_data_size = data_attribute.allocated_data_size;
-        } else {
-            self.size = data_attribute.data_size;
-            self.valid_data_size = data_attribute.valid_data_size;
-        }
+        self.size = max(
+            data_attribute.data_size,
+            min(valid_data_size, data_attribute.allocated_data_size),
+        );
+        self.valid_data_size = valid_data_size;
 
         Ok(())
     }
@@ -967,6 +962,14 @@ mod tests {
         let mut block_reader: NtfsCompressedBlockReader =
             NtfsCompressedBlockReader::new(&data_stream, 4096);
         block_reader.open(&data_attribute)?;
+        assert_eq!(block_reader.size, 11358);
+        assert_eq!(block_reader.valid_data_size, 11358);
+
+        let mut block_reader_custom: NtfsCompressedBlockReader =
+            NtfsCompressedBlockReader::new(&data_stream, 4096);
+        block_reader_custom.open_with_valid_data_size(&data_attribute, 8192)?;
+        assert_eq!(block_reader_custom.size, 11358);
+        assert_eq!(block_reader_custom.valid_data_size, 8192);
 
         Ok(())
     }

@@ -11,46 +11,12 @@
  * under the License.
  */
 
-use keramics_core::{DataStreamReference, ErrorTrace};
-
 use crate::block_stream::BlockStream;
 
 use super::block_reader::NtfsBlockReader;
-use super::mft_attribute::NtfsMftAttribute;
 
 /// New Technologies File System (NTFS) (cluster) block stream.
 pub type NtfsBlockStream = BlockStream<NtfsBlockReader>;
-
-impl NtfsBlockStream {
-    /// Opens a block stream.
-    #[allow(dead_code)]
-    pub(super) fn open(
-        data_stream: &DataStreamReference,
-        data_attribute: &NtfsMftAttribute,
-        cluster_block_size: u32,
-    ) -> Result<Self, ErrorTrace> {
-        Self::open_with_flags(data_stream, data_attribute, cluster_block_size, 0)
-    }
-
-    /// Opens a block stream with flags.
-    pub(super) fn open_with_flags(
-        data_stream: &DataStreamReference,
-        data_attribute: &NtfsMftAttribute,
-        cluster_block_size: u32,
-        flags: u32,
-    ) -> Result<Self, ErrorTrace> {
-        let mut block_reader: NtfsBlockReader =
-            NtfsBlockReader::new(data_stream, cluster_block_size);
-        match block_reader.open_with_flags(data_attribute, flags) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
-                return Err(error);
-            }
-        }
-        Ok(Self::new(block_reader))
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -61,7 +27,6 @@ mod tests {
 
     use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
 
-    use crate::ntfs::constants::*;
     use crate::ntfs::mft_attribute::NtfsMftAttribute;
     use crate::tests::get_test_data_path;
 
@@ -85,7 +50,10 @@ mod tests {
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
         data_attribute.read_data(&test_mft_attribute_data)?;
 
-        NtfsBlockStream::open(&data_stream, &data_attribute, 4096)
+        let mut block_reader: NtfsBlockReader = NtfsBlockReader::new(&data_stream, 4096);
+        block_reader.open(&data_attribute)?;
+
+        Ok(NtfsBlockStream::new(block_reader))
     }
 
     // TODO: add tests for get_offset.
@@ -215,101 +183,6 @@ mod tests {
         let mut data: Vec<u8> = vec![0; 512];
         let read_size: usize = block_stream.read(&mut data)?;
         assert_eq!(read_size, 0);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_with_flags_ignore_valid_data_size() -> Result<(), ErrorTrace> {
-        let path_string: String = get_test_data_path("ntfs/ntfs.raw");
-        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-
-        let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
-        let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
-        data_attribute.read_data(&test_mft_attribute_data)?;
-
-        let mut block_stream_default: NtfsBlockStream =
-            NtfsBlockStream::open_with_flags(&data_stream, &data_attribute, 4096, 0)?;
-        assert_eq!(block_stream_default.get_size()?, 11358);
-
-        let mut block_stream_ignore_vdl: NtfsBlockStream = NtfsBlockStream::open_with_flags(
-            &data_stream,
-            &data_attribute,
-            4096,
-            NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE,
-        )?;
-        assert_eq!(block_stream_ignore_vdl.get_size()?, 12288);
-
-        block_stream_ignore_vdl.seek(SeekFrom::Start(11358))?;
-        let mut slack_data: Vec<u8> = vec![0; 930];
-        let read_size: usize = block_stream_ignore_vdl.read(&mut slack_data)?;
-        assert_eq!(read_size, 930);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_with_flags_does_not_zero_fill_beyond_valid_data_size() -> Result<(), ErrorTrace> {
-        let cluster_size: usize = 4096;
-        let total_clusters: usize = 3;
-        let mut raw_cluster_data: Vec<u8> = vec![0xaa; cluster_size * total_clusters];
-        for byte in raw_cluster_data[11358..12288].iter_mut() {
-            *byte = 0x5a;
-        }
-        let fake_data_stream: DataStreamReference =
-            keramics_core::open_fake_data_stream(&raw_cluster_data);
-
-        let mut mock_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
-        mock_attribute.non_resident_flag = 0x01;
-        mock_attribute.allocated_data_size = 12288;
-        mock_attribute.data_size = 11358;
-        mock_attribute.valid_data_size = 11358;
-        let mut cluster_group: crate::ntfs::cluster_group::NtfsClusterGroup =
-            crate::ntfs::cluster_group::NtfsClusterGroup::new(0, 2);
-        cluster_group
-            .data_runs
-            .push(crate::ntfs::data_run::NtfsDataRun {
-                number_of_blocks: 3,
-                block_number: 0,
-                run_type: crate::ntfs::data_run::NtfsDataRunType::InFile,
-            });
-        mock_attribute.data_cluster_groups.push(cluster_group);
-
-        let mut stream_normal: NtfsBlockStream =
-            NtfsBlockStream::open_with_flags(&fake_data_stream, &mock_attribute, 4096, 0)?;
-        assert_eq!(stream_normal.get_size()?, 11358);
-        stream_normal.seek(SeekFrom::Start(11358))?;
-        let mut read_buf: Vec<u8> = vec![0xff; 512];
-        let bytes_read: usize = stream_normal.read(&mut read_buf)?;
-        assert_eq!(bytes_read, 0);
-
-        let mut stream_ignore: NtfsBlockStream = NtfsBlockStream::open_with_flags(
-            &fake_data_stream,
-            &mock_attribute,
-            4096,
-            NTFS_STREAM_FLAG_IGNORE_VALID_DATA_SIZE,
-        )?;
-        assert_eq!(stream_ignore.get_size()?, 12288);
-        stream_ignore.seek(SeekFrom::Start(11358))?;
-        let mut slack_buf: Vec<u8> = vec![0; 930];
-        let slack_read: usize = stream_ignore.read(&mut slack_buf)?;
-        assert_eq!(slack_read, 930);
-        assert_eq!(slack_buf, vec![0x5a; 930]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_with_flags_failure() -> Result<(), ErrorTrace> {
-        let path_string: String = get_test_data_path("ntfs/ntfs.raw");
-        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-
-        let data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
-        let result: Result<NtfsBlockStream, ErrorTrace> =
-            NtfsBlockStream::open_with_flags(&data_stream, &data_attribute, 4096, 0);
-        assert!(result.is_err());
 
         Ok(())
     }
