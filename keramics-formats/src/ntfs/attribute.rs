@@ -95,6 +95,20 @@ impl<'a> NtfsAttribute<'a> {
         }
     }
 
+    /// Retrieves the allocated data stream for this attribute.
+    pub fn get_allocated_data_stream(&self) -> Result<DataStreamReference, ErrorTrace> {
+        match self {
+            NtfsAttribute::Generic {
+                data_stream,
+                cluster_block_size,
+                mft_attribute,
+            } => mft_attribute.get_allocated_data_stream(data_stream, *cluster_block_size),
+            _ => Err(keramics_core::error_trace_new!(
+                "Unsupported attribute type without data stream"
+            )),
+        }
+    }
+
     /// Retrieves the data stream for this attribute.
     pub fn get_data_stream(&self) -> Result<DataStreamReference, ErrorTrace> {
         match self {
@@ -103,27 +117,6 @@ impl<'a> NtfsAttribute<'a> {
                 cluster_block_size,
                 mft_attribute,
             } => mft_attribute.get_data_stream(data_stream, *cluster_block_size),
-            _ => Err(keramics_core::error_trace_new!(
-                "Unsupported attribute type without data stream"
-            )),
-        }
-    }
-
-    /// Retrieves the data stream for this attribute with a specific valid data size.
-    pub fn get_data_stream_with_valid_data_size(
-        &self,
-        valid_data_size: u64,
-    ) -> Result<DataStreamReference, ErrorTrace> {
-        match self {
-            NtfsAttribute::Generic {
-                data_stream,
-                cluster_block_size,
-                mft_attribute,
-            } => mft_attribute.get_data_stream_with_valid_data_size(
-                data_stream,
-                *cluster_block_size,
-                valid_data_size,
-            ),
             _ => Err(keramics_core::error_trace_new!(
                 "Unsupported attribute type without data stream"
             )),
@@ -258,6 +251,7 @@ mod tests {
         let mut mft_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
         mft_attribute.non_resident_flag = 0;
         mft_attribute.resident_data = vec![1, 2, 3, 4];
+        mft_attribute.allocated_data_size = 8;
         mft_attribute.data_size = 4;
         let attribute: NtfsAttribute = NtfsAttribute::Generic {
             data_stream: &data_stream,
@@ -271,13 +265,12 @@ mod tests {
         };
         assert_eq!(size, 4);
 
-        let stream_custom: DataStreamReference =
-            attribute.get_data_stream_with_valid_data_size(4)?;
-        let size_custom: u64 = match stream_custom.write() {
+        let stream_allocated: DataStreamReference = attribute.get_allocated_data_stream()?;
+        let size_allocated: u64 = match stream_allocated.write() {
             Ok(mut stream_guard) => stream_guard.get_size()?,
             Err(_) => return Err(keramics_core::error_trace_new!("Failed to acquire lock")),
         };
-        assert_eq!(size_custom, 4);
+        assert_eq!(size_allocated, 8);
 
         let attribute_non_generic: NtfsAttribute = NtfsAttribute::StandardInformation {
             standard_information: NtfsStandardInformation::new(),
@@ -286,9 +279,9 @@ mod tests {
             attribute_non_generic.get_data_stream();
         assert!(result.is_err());
 
-        let result_custom: Result<DataStreamReference, ErrorTrace> =
-            attribute_non_generic.get_data_stream_with_valid_data_size(0);
-        assert!(result_custom.is_err());
+        let result_allocated: Result<DataStreamReference, ErrorTrace> =
+            attribute_non_generic.get_allocated_data_stream();
+        assert!(result_allocated.is_err());
 
         Ok(())
     }

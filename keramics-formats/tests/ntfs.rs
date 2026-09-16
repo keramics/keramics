@@ -169,7 +169,7 @@ fn test_read_attribute_index_root() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn test_read_attribute_with_valid_data_size() -> Result<(), ErrorTrace> {
+fn test_read_attribute_allocated_data_stream() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
     let file_system: NtfsFileSystem = open_file_system(&path_buf)?;
 
@@ -179,9 +179,8 @@ fn test_read_attribute_with_valid_data_size() -> Result<(), ErrorTrace> {
         .expect("Missing file entry");
 
     let number_of_attributes: usize = file_entry.get_number_of_attributes();
-    let mut data_stream_full: Option<DataStreamReference> = None;
-    let mut data_stream_slack: Option<DataStreamReference> = None;
-    let mut data_stream_truncated_vdl: Option<DataStreamReference> = None;
+    let mut data_stream_logical: Option<DataStreamReference> = None;
+    let mut data_stream_allocated: Option<DataStreamReference> = None;
 
     for index in 0..number_of_attributes {
         let attribute: NtfsAttribute = file_entry.get_attribute_by_index(index)?;
@@ -192,37 +191,25 @@ fn test_read_attribute_with_valid_data_size() -> Result<(), ErrorTrace> {
             assert_eq!(attribute.get_data_size(), 11358);
             assert_eq!(attribute.get_valid_data_size(), 11358);
 
-            let stream_full: DataStreamReference =
-                attribute.get_data_stream_with_valid_data_size(attribute.get_data_size())?;
-            data_stream_full = Some(stream_full);
+            let stream_logical: DataStreamReference = attribute.get_data_stream()?;
+            data_stream_logical = Some(stream_logical);
 
-            let stream_slack: DataStreamReference = attribute
-                .get_data_stream_with_valid_data_size(attribute.get_allocated_data_size())?;
-            data_stream_slack = Some(stream_slack);
-
-            let stream_truncated: DataStreamReference =
-                attribute.get_data_stream_with_valid_data_size(8192)?;
-            data_stream_truncated_vdl = Some(stream_truncated);
+            let stream_allocated: DataStreamReference = attribute.get_allocated_data_stream()?;
+            data_stream_allocated = Some(stream_allocated);
             break;
         }
     }
 
-    let stream_full: DataStreamReference =
-        data_stream_full.expect("Missing $DATA attribute on file entry");
-    let (read_size, md5): (u64, String) = read_data_stream(&stream_full)?;
+    let stream_logical: DataStreamReference =
+        data_stream_logical.expect("Missing $DATA attribute on file entry");
+    let (read_size, md5): (u64, String) = read_data_stream(&stream_logical)?;
     assert_eq!(read_size, 11358);
     assert_eq!(md5.as_str(), "3b83ef96387f14655fc854ddc3c6bd57");
 
-    let stream_slack: DataStreamReference =
-        data_stream_slack.expect("Missing $DATA attribute on file entry");
-    let (read_size_slack, _): (u64, String) = read_data_stream(&stream_slack)?;
-    assert_eq!(read_size_slack, 12288);
-
-    let stream_truncated: DataStreamReference =
-        data_stream_truncated_vdl.expect("Missing $DATA attribute on file entry");
-    let (read_size_trunc, md5_trunc): (u64, String) = read_data_stream(&stream_truncated)?;
-    assert_eq!(read_size_trunc, 11358);
-    assert_ne!(md5_trunc.as_str(), "3b83ef96387f14655fc854ddc3c6bd57");
+    let stream_allocated: DataStreamReference =
+        data_stream_allocated.expect("Missing $DATA attribute on file entry");
+    let (read_size_allocated, _): (u64, String) = read_data_stream(&stream_allocated)?;
+    assert_eq!(read_size_allocated, 12288);
 
     Ok(())
 }

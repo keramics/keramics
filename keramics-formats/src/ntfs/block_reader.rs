@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::cmp::{Ordering, max, min};
+use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -54,15 +54,33 @@ impl NtfsBlockReader {
 
     /// Opens a block reader.
     pub(super) fn open(&mut self, data_attribute: &NtfsMftAttribute) -> Result<(), ErrorTrace> {
-        self.open_with_valid_data_size(data_attribute, data_attribute.valid_data_size)
+        self.read_block_ranges(data_attribute)?;
+
+        if data_attribute.is_compressed() {
+            self.size = data_attribute.allocated_data_size;
+            self.valid_data_size = data_attribute.allocated_data_size;
+        } else {
+            self.size = data_attribute.data_size;
+            self.valid_data_size = data_attribute.valid_data_size;
+        }
+        Ok(())
     }
 
-    /// Opens a block reader with a specific valid data size.
-    pub(super) fn open_with_valid_data_size(
+    /// Opens a block reader for the allocated data size.
+    pub(super) fn open_allocated(
         &mut self,
         data_attribute: &NtfsMftAttribute,
-        valid_data_size: u64,
     ) -> Result<(), ErrorTrace> {
+        self.read_block_ranges(data_attribute)?;
+
+        self.size = data_attribute.allocated_data_size;
+        self.valid_data_size = data_attribute.allocated_data_size;
+
+        Ok(())
+    }
+
+    /// Reads the block ranges from a $DATA attribute.
+    fn read_block_ranges(&mut self, data_attribute: &NtfsMftAttribute) -> Result<(), ErrorTrace> {
         if data_attribute.is_resident() {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported resident $DATA attribute"
@@ -112,16 +130,6 @@ impl NtfsBlockReader {
                     )));
                 }
             }
-        }
-        if data_attribute.is_compressed() {
-            self.size = data_attribute.allocated_data_size;
-            self.valid_data_size = data_attribute.allocated_data_size;
-        } else {
-            self.size = max(
-                data_attribute.data_size,
-                min(valid_data_size, data_attribute.allocated_data_size),
-            );
-            self.valid_data_size = valid_data_size;
         }
         Ok(())
     }
@@ -295,15 +303,17 @@ mod tests {
 
         let mut reader_normal: NtfsBlockReader = NtfsBlockReader::new(&fake_data_stream, 4096);
         reader_normal.open(&mock_attribute)?;
+        assert_eq!(reader_normal.get_size(), 11358);
         let mut read_buf: Vec<u8> = vec![0xff; 512];
         let bytes_read: usize = reader_normal.read_data_from_blocks(&mut read_buf, 8192)?;
         assert_eq!(bytes_read, 512);
         assert_eq!(read_buf, vec![0x00; 512]);
 
-        let mut reader_ignore_vdl: NtfsBlockReader = NtfsBlockReader::new(&fake_data_stream, 4096);
-        reader_ignore_vdl.open_with_valid_data_size(&mock_attribute, mock_attribute.data_size)?;
+        let mut reader_allocated: NtfsBlockReader = NtfsBlockReader::new(&fake_data_stream, 4096);
+        reader_allocated.open_allocated(&mock_attribute)?;
+        assert_eq!(reader_allocated.get_size(), 12288);
         let mut raw_buf: Vec<u8> = vec![0x00; 512];
-        let raw_read: usize = reader_ignore_vdl.read_data_from_blocks(&mut raw_buf, 8192)?;
+        let raw_read: usize = reader_allocated.read_data_from_blocks(&mut raw_buf, 8192)?;
         assert_eq!(raw_read, 512);
         assert_eq!(raw_buf, vec![0x5a; 512]);
 
