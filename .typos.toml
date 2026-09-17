@@ -19,6 +19,12 @@ extend-ignore-re = [
     # Ignore text between <!-- typos:disable --> and <!-- typos:enable -->
     "(?s)<!--\\s*typos:disable\\s*-->.*?<!--\\s*typos:enable\\s*-->",
 
+    # Ignore "DT_WHT"
+    "\\bDT_WHT\\b",
+
+    # Ignore "kMDItemWhereFroms"
+    "\\bkMDItemWhereFroms\\b",
+
     # Ignore "mke2fs"
     "\\bmke2fs\\b",
 
@@ -28,4 +34,6 @@ extend-ignore-re = [
 extend-words = {
     "conectix" = "conectix",
     "EDE" = "EDE",
+    "GOST" = "GOST",
+    "INDX" = "INDX",
 }

@@ -13,6 +13,10 @@
 
 use std::fmt;
 
+use keramics_datetime::DateTime;
+
+use super::constants::*;
+
 /// Windows file attribute flags information.
 pub struct WindowsFileAttributeFlagsInfo {
     /// Flags.
@@ -76,9 +80,37 @@ impl fmt::Display for WindowsFileAttributeFlagsInfo {
     }
 }
 
+/// Filetime date and time information.
+pub struct FiletimeDateTimeInfo<'a> {
+    /// Flags.
+    date_time: &'a DateTime,
+}
+
+impl<'a> FiletimeDateTimeInfo<'a> {
+    /// Creates new date and time information.
+    pub fn new(date_time: &'a DateTime) -> Self {
+        Self { date_time }
+    }
+}
+
+impl<'a> fmt::Display for FiletimeDateTimeInfo<'a> {
+    /// Formats date and time information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        match self.date_time {
+            DateTime::Filetime(filetime) => {
+                write!(formatter, "{}+00:00", filetime.to_iso8601_string())
+            }
+            DateTime::NotSet => write!(formatter, "{}", NOT_SET_VALUE),
+            _ => write!(formatter, "Unsupported date time"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use keramics_datetime::Filetime;
 
     use crate::assert_lines_eq;
 
@@ -90,5 +122,18 @@ mod tests {
 
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
+    }
+
+    #[test]
+    fn test_filetime_date_time_information_fmt() {
+        let date_time: DateTime = DateTime::Filetime(Filetime::new(0x01cb3a623d0a17ce));
+        let test_struct: FiletimeDateTimeInfo = FiletimeDateTimeInfo::new(&date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "2010-08-12T21:06:31.5468750+00:00");
+
+        let date_time: DateTime = DateTime::NotSet;
+        let test_struct: FiletimeDateTimeInfo = FiletimeDateTimeInfo::new(&date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, NOT_SET_VALUE);
     }
 }

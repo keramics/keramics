@@ -268,7 +268,7 @@ TODO: complete section
 | 36 | CSSM_ALGID_KHUFU | KHUFU |
 | 37 | CSSM_ALGID_KHAFRE | KHAFRE |
 | 38 | CSSM_ALGID_MMB | MMB |
-| 39 | <!-- typos:disable -->CSSM_ALGID_GOST<!-- typos:enable --> | <!-- typos:disable -->GOST<!-- typos:enable --> |
+| 39 | CSSM_ALGID_GOST | GOST |
 | 40 | CSSM_ALGID_SAFER | SAFER (K-40, K-64, K-128) |
 | 41 | CSSM_ALGID_CRAB | CRAB |
 | 42 | CSSM_ALGID_RSA | RSA |

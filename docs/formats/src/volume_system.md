@@ -6,12 +6,13 @@ file system. A volume system is used to manage the storage of one or more volume
 A partition is a part of (typically) storage media. A partition is different conceptually, but
 its usage is comparable to a volume.
 
-This documentation uses the term volume systems in a broad sense to describe:
+This documentation uses the term volume systems in a broad sense to describe a format that
+contains other volumes, e.g.
 
-* encrypted volumes;
-* logical volume managers;
-* partitioning schemes;
-* and volume snapshots.
+* encrypted volumes, such as BDE and LUKS;
+* logical volume managers, such as Linux LVM;
+* partitioning schemes, such as APM, GPT and MBR;
+* and volume snapshots, such as volsnap.
 
 ## Formats
 
@@ -24,5 +25,6 @@ This documentation uses the term volume systems in a broad sense to describe:
 * [Linux Unified Key Setup (LUKS) Disk Encryption](luksde.md)
 * [Master Boot Record (MBR)](mbr.md)
 * [SGI disklabel (sgilabel)](sgilabel.md)
+* [Volume Shadow Snapshot (volsnap)](volsnap.md)
 
 Also see: [hybrid volume and file system formats](hybrid.md)

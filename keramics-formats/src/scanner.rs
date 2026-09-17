@@ -37,6 +37,7 @@ use super::udif::constants::*;
 use super::vhd::constants::*;
 use super::vhdx::constants::*;
 use super::vmdk::constants::*;
+use super::volsnap::constants::*;
 use super::xfs::constants::*;
 
 /// Format scanner.
@@ -410,6 +411,16 @@ impl FormatScanner {
         ));
     }
 
+    /// Adds Volume Shadow Snapshot (volsnap) signatures.
+    pub fn add_volsnap_signatures(&mut self) {
+        self.signature_scanner.add_signature(Signature::new(
+            "volsnap1",
+            PatternType::BoundToStart,
+            0x00001e00,
+            VOLSNAP_IDENTIFIER,
+        ));
+    }
+
     /// Adds X File System (XFS) signatures.
     pub fn add_xfs_signatures(&mut self) {
         self.signature_scanner.add_signature(Signature::new(
@@ -511,6 +522,7 @@ impl FormatScanner {
                 "vhd1" => FormatIdentifier::Vhd,
                 "vhdx1" => FormatIdentifier::Vhdx,
                 "vmdk1" | "vmdk2" => FormatIdentifier::Vmdk,
+                "volsnap1" => FormatIdentifier::Volsnap,
                 "xfs1" => FormatIdentifier::Xfs,
                 _ => FormatIdentifier::Unknown,
             };

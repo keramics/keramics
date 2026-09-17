@@ -1520,7 +1520,7 @@ The extended attribute value data (j_xattr_val_t) is of variable size and consis
 | com.apple.metadata:_kMDItemUserTags | |
 | com.apple.metadata:com_apple_backup_excludeItem | |
 | com.apple.metadata:kMDItemDownloadedDate | |
-| <!-- typos:disable -->com.apple.metadata:kMDItemWhereFroms<!-- typos:enable --> | |
+| com.apple.metadata:kMDItemWhereFroms | |
 | com.apple.metadata:kMDLabel_fwlfb7nbt2o7degof3q2o2btjy | |
 | com.apple.quarantine | |
 | com.apple.ResourceFork | Resource fork |
@@ -1713,7 +1713,7 @@ The directory record value data (j_drec_val_t) is of variable size and consists 
 | | | |
 | 0x000c | DT_SOCK | Socket |
 | | | |
-| 0x000e | <!-- typos:disable -->DT_WHT<!-- typos:enable --> | Whiteout |
+| 0x000e | DT_WHT | Whiteout |
 | | | |
 | 0x000f | DREC_TYPE_MASK | Directory type bitmask |
 | 0x0010 | RESERVED_10 | Unknown (reserved) |

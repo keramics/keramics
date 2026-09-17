@@ -12,6 +12,7 @@
  */
 
 use std::collections::HashMap;
+use std::collections::hash_map::IterMut;
 use std::hash::Hash;
 
 /// Generic indexed hash map.
@@ -72,6 +73,11 @@ where
     /// Retrieves a specific value by key.
     pub fn get_value_by_key_mut(&mut self, key: &K) -> Option<&mut V> {
         self.hashmap.get_mut(key)
+    }
+
+    /// Retrieves a mutable iterator of the values.
+    pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
+        self.hashmap.iter_mut()
     }
 
     /// Inserts a key value pair.

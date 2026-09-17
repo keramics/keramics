@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use keramics_core::ErrorTrace;
 use keramics_datetime::DateTime;
 
 /// Copy in and out (CPIO) file record

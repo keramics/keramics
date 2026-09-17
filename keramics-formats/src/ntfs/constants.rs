@@ -21,7 +21,6 @@ pub(super) const NTFS_MFT_ENTRY_SIGNATURE: &[u8] = b"FILE";
 pub(super) const NTFS_BAD_MFT_ENTRY_SIGNATURE: &[u8] = b"BAAD";
 
 /// NTFS index entry signature.
-// typos:ignore
 pub(super) const NTFS_INDEX_ENTRY_SIGNATURE: &[u8] = b"INDX";
 
 /// NTFS $STANDARD_INFORMATION attribute type.

@@ -33,7 +33,6 @@ path = "src/info_tool.rs"
 [[bin]]
 name = "keramicsutil"
 path = "src/util_tool.rs"
-install = false
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }

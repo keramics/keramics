@@ -1,27 +1,27 @@
 # Volume Shadow Snapshot (volsnap) format
 
 As of Windows Vista the Volume Shadow Snapshot (VSS) stores persistent shadow copies on the local
-NTFS volume.
+NTFS volume. According to "Shadow Copies and Shadow Copy Sets" a shadow copy is a snapshot of a
+volume. A shadow copy can be part of a set which contains a collection of shadow copies of various
+volumes, taken at the same time.
+
+Volume Shadow Snapshot (VSS) can use different providers to store shadow copies, this document
+focuses on the "Microsoft Software Shadow Copy provider 1.0" (b5946137-7b9f-4925-af80-51abd60b20d5)
+which relies on volsnap.sys.
+
+The volsnap driver manages the metadata and copies of 16 KiB blocks of volume data.
 
 ## Overview
 
-According to "Shadow Copies and Shadow Copy Sets" a shadow copy is a snapshot of a volume. A shadow
-copy can be part of a set which contains a collection of shadow copies of various volumes, taken at
-the same time.
+A volsnap backing volume consists of:
 
-Volume Shadow Snapshot (VSS) can use different providers to store shadow copies, this document
-focuses on the "Microsoft Software Shadow Copy provider 1.0" (GUID:
-b5946137-7b9f-4925-af80-51abd60b20d5) and will refer to it as volsnap. The volsnap provider stores
-the copies on the local volume using 16 KiB blocks.
+* [Backing volume header](#backing_volume_header)
+* [Catalog](#catalog)
+* Optional [store](#store)
 
-Volsnap uses the GUID 3808876b-c176-4e48-b7ae-04046e6cc752 to identify its data or metadata files.
-It leverages several metadata files in "\\System Volume Information" directory:
+> Note that a volsnap backing volume can be a snapshot and/or storage volume.
 
-* Volsnap catalog; stored in the metadata file named {%VOLSNAPGUID%}
-* Volsnap store; stored in the metadata file named {%GUID%}{%VOLSNAPGUID%}
-
-Where %VOLSNAPGUID% (\_VSP_DIFF_AREA_FILE_GUID) contains the volsnap identifier and
-%GUID% contains a time/MAC based GUID.
+### Characteristics
 
 | Characteristics | Description |
 | --- | --- |
@@ -29,35 +29,49 @@ Where %VOLSNAPGUID% (\_VSP_DIFF_AREA_FILE_GUID) contains the volsnap identifier 
 | Date and time values | FILETIME in UTC |
 | Character strings | UCS-2 little-endian, which allows for unpaired Unicode surrogates such as "U+d800" and "U+dc00" |
 
-## Volume header
+### Identifiers
 
-The volsnap volume header is part of the NTFS volume header (or $Boot metadata file). The volsnap
-volume header data is stored at offset 7680 (0x1e00) of the volume and is at least 100 bytes in
-size, but presumably 512 bytes, and consists of:
+Volsnap is known to use the following identifiers:
+
+* 3808876b-c176-4e48-b7ae-04046e6cc752, which this document refers to as {%VOLSNAPGUID%}
+
+## Metadata files
+
+Volsnap exposes various files in the "\System Volume Information" directory:
+
+* Volsnap catalog; stored in the metadata file named {%VOLSNAPGUID%}
+* Volsnap store; stored in the metadata file named {%GUID%}{%VOLSNAPGUID%}
+
+Where %VOLSNAPGUID% (\_VSP_DIFF_AREA_FILE_GUID) contains the volsnap identifier and %GUID% contains
+a time/MAC based GUID.
+
+## Backing volume header {#backing_volume_header}
+
+The volsnap volume header is part of the NTFS $Boot metadata file. The volsnap volume header is
+stored at offset 7680 (0x1e00) of the volume and is at least 100 bytes in size, but presumably 512
+bytes, and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 16 | | volsnap identifier, which contains a GUID |
-| 16 | 4 | | Format version |
-| 20 | 4 | 0x01 | Record type |
-| 24 | 8 | 0x1e00 | Current offset, which is relative to the start of the volume |
-| 32 | 8 | 0x1e00 | Unknown (Next offset?), which is relative to the start of the volume |
+| 0 | 16 | | Signature (or format identifier), which contains a volsnap GUID |
+| 16 | 4 | | Unknown (Format version?, seen 1 and 2) |
+| 20 | 4 | 1 | [Block type](#block_types) |
+| 24 | 8 | 0x1e00 | Unknown (offset?) |
+| 32 | 8 | 0x1e00 | Unknown (offset?) |
 | 40 | 8 | | Unknown (empty value) |
 | 48 | 8 | | Catalog offset, which is relative to the start of the volume or contains 0 if there is no catalog |
 | 56 | 8 | | Maximum size, in number of bytes or contains 0 if unbounded |
-| 64 | 16 | | Volume identifierwhich contains a GUID |
-| 80 | 16 | | Shadow copy storage volume identifier, which contains a GUID |
+| 64 | 16 | | (Snapshot backing) volume identifier, which contains a GUID |
+| 80 | 16 | | Storage (backing) volume identifier, which contains a GUID |
 | 96 | 4 | | Unknown |
 | 100 | 412 | | Unknown (empty values) |
 
-### Version
+> Note that the storage volume identifier can be different from the (snapshot) volume identifier,
+> which means that the volsnap (block) store is stored on a different volsnap volume. In such a
+> case the source volume will contain the catalog type 2 entries and the storage volume the catalog
+> type 3 entries.
 
-| Value | Identifier | Description |
-| --- | --- | --- |
-| 1 | | Windows Vista, Windows 7 |
-| 2 | | Windows 8 |
-
-## Catalog
+## Catalog {#catalog}
 
 The catalog contains information about the individual stores. The catalog consists of one or more
 catalog blocks. Each catalog block is 16384 (0x4000) bytes in size and consists of:
@@ -76,9 +90,9 @@ The catalog block header is 128 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 16 | | volsnap identifier, which contains a GUID |
-| 16 | 4 | 0x01 | Version |
-| 20 | 4 | 0x02 | Record type |
+| 0 | 16 | | Signature (or format identifier), which contains a volsnap GUID |
+| 16 | 4 | | Unknown (Format version?, seen 1) |
+| 20 | 4 | 2 | [Block type](#block_types) |
 | 24 | 8 | | Relative (catalog block) offset, which is relative to the start of the first catalog block |
 | 32 | 8 | | Current (catalog block) offset, which is relative to the start of the volume |
 | 40 | 8 | | Next (catalog block) offset, which is relative to the start of the volume or contains 0 if this is the last block |
@@ -86,38 +100,34 @@ The catalog block header is 128 bytes in size and consists of:
 
 ### Catalog entry
 
-Each catalog entry consists of a catalog entry type 0x02. A corresponding type 0x03 is required if
+Each catalog entry consists of a catalog type 2 entry. A corresponding type 3 entry is required if
 the shadow copy is stored in a store, which is the case as of Windows Vista.
 
-> Note that a Windows 2003 R2 catalog does not contain catalog entry type 0x03.
-
-TODO: Determine how Windows 2003 R2 volumes store the snapshot data
-
-The type 0x02 and type 0x03 entries are not necessarily stored directly after one-and-other and can
-be scattered over the catalog. For now it is assumed that entry type 0x02 must be defined before
-entry type 0x03.
+The type 2 and type 3 entries are not necessarily stored directly after one-and-other and can be
+scattered over the catalog. For now it is assumed that entry type 2 must be defined before entry
+type 3.
 
 Also these entries are not necessarily stored in order of age.
 
-There can be unused catalog entries (of type 0x01) as well. Empty catalog entries seem to consist
+There can be unused catalog entries (of type 1) as well. Empty catalog entries seem to consist
 entirely of 0-bytes.
 
-#### Unused catalog entry (type 0x01)
+#### Unused catalog entry (type 1)
 
-An unused catalog entry (type 0x01) is 128 bytes in size and consists of:
+An unused catalog entry (type 1) is 128 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 8 | 0x01 | Catalog entry type |
 | 8 | 120 | | Unknown (empty values) |
 
-#### Catalog entry type 0x02
+#### Catalog entry type 2
 
-A catalog entry type 0x02 is 128 bytes in size and consists of:
+A catalog entry type 2 is 128 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 8 | 0x02 | Catalog entry type |
+| 0 | 8 | 2 | Catalog entry type |
 | 8 | 8 | | Volume size |
 | 16 | 16 | | Store identifier, which contains a GUID that is used in the store filename |
 | 32 | 8 | | Unknown (Sequence number) |
@@ -125,16 +135,16 @@ A catalog entry type 0x02 is 128 bytes in size and consists of:
 | 48 | 8 | | Shadow copy creation time, which contains a FILETIME |
 | 56 | 72 | | Unknown (empty values) |
 
-#### Catalog entry type 0x03
+#### Catalog entry type 3
 
-A catalog entry type 0x03 is 128 bytes in size and consists of:
+A catalog entry type 3 is 128 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 8 | 0x03 | Catalog entry type |
+| 0 | 8 | 3 | Catalog entry type |
 | 8 | 8 | | Store block list offset, which is relative to the start of the volume |
 | 16 | 16 | | Store identifier, which contains a GUID, that is used in the store filename |
-| 32 | 8 | | Store header offset, which is relative to the start of the volume |
+| 32 | 8 | | Store metadata offset, which is relative to the start of the volume |
 | 40 | 8 | | Store block range list offset, which is relative to the start of the volume |
 | 48 | 8 | | Store (current) bitmap offset, which is relative to the start of the volume |
 | 56 | 8 | | NTFS (metadata) file reference |
@@ -143,19 +153,19 @@ A catalog entry type 0x03 is 128 bytes in size and consists of:
 | 80 | 8 | | Unknown (store index?) |
 | 88 | 40 | | Unknown (empty) |
 
-## Store
+## Store {#store}
 
-The store contains information about the shadow volume; it actually contains copies of previous
-versions of data blocks on the volume.
+The store contains information about the volume snapshot; it contains copies of previous versions
+of data blocks of the snapshot volume.
 
 The stores must be applied starting with the most recent on top of the current volume. E.g. if
-there are 3 stores and we want to access the state of the oldest (number 1) we must first apply the
-changes in store 3 over the current volume, the changes in store 2 over the resulting volume, and
-finally the changes in store 1 over the resulting volume.
+there are 3 stores and we want to access the snapshot of the oldest (number 1) we must first apply
+the changes in store 3 over the current volume, the changes in store 2 over the resulting volume,
+and finally the changes in store 1 over the resulting volume.
 
 The store consists of:
 
-* store header
+* store metadata
 * store block list
 * store block range list
 * store bitmaps
@@ -167,32 +177,32 @@ The store block header is 128 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 16 | | volsnap identifier, which contains a GUID |
-| 16 | 4 | 0x01 | Version |
-| 20 | 4 | | Record type |
+| 0 | 16 | | Signature (or format identifier), which contains a volsnap GUID |
+| 16 | 4 | | Unknown (Format version?, seen 1) |
+| 20 | 4 | | [Block type](#block_types) |
 | 24 | 8 | | Relative (block) offset, which is relative to the start of the store |
 | 32 | 8 | | Current (block) offset, which is relative to the start of the volume |
 | 40 | 8 | | Next (block) offset, which is relative to the start of the volume or contains 0 if this is the last block |
-| 48 | 8 | | Size of store information, whichis only used in first block header and should be 0 in successive block headers |
+| 48 | 8 | | Size of store metadata, which is only used in first block header and should be 0 in successive block headers |
 | 56 | 72 | | Unknown (empty value) |
 
-#### Store block record types
+#### Store block types {#block_types}
 
 | Value | Identifier | Description |
 | --- | --- | --- |
-| 0x0000 | | Unknown |
-| 0x0001 | | Volume header |
-| 0x0002 | | Catalog block header |
-| 0x0003 | | Block descriptor list (Diff area table) |
-| 0x0004 | | Store header |
-| 0x0005 | | Unknown (Store block ranges list) |
-| 0x0006 | | Store bitmap |
+| 0 | | Unknown |
+| 1 | | Volume header |
+| 2 | | Catalog block header |
+| 3 | | Block descriptor list (Diff area table) |
+| 4 | | Store metadata |
+| 5 | | Unknown (Store block ranges list) |
+| 6 | | Store bitmap |
 
-### Store information
+### Store metadata
 
-The store information is stored directly after the store header.
+The store metadata is stored directly after the store block header.
 
-The store information is of variable size and consists of:
+The store metadata is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |

@@ -285,6 +285,9 @@ pub enum FormatType {
     /// VMware Virtual Disk (VMDK)
     Vmdk,
 
+    /// Volume Shadow Snapshot (volsnap)
+    Volsnap,
+
     /// X File System (XFS)
     Xfs,
 }

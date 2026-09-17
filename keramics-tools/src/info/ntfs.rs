@@ -15,7 +15,6 @@ use std::collections::HashMap;
 use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_datetime::DateTime;
 use keramics_formats::Path;
 use keramics_formats::ntfs::constants::*;
 use keramics_formats::ntfs::{
@@ -25,32 +24,7 @@ use keramics_formats::ntfs::{
 use crate::formatters::ByteSize;
 
 use super::constants::*;
-
-/// New Technologies File System (NTFS) date and time information.
-struct NtfsDateTimeInfo<'a> {
-    /// Flags.
-    date_time: &'a DateTime,
-}
-
-impl<'a> NtfsDateTimeInfo<'a> {
-    /// Creates new date and time information.
-    fn new(date_time: &'a DateTime) -> Self {
-        Self { date_time }
-    }
-}
-
-impl<'a> fmt::Display for NtfsDateTimeInfo<'a> {
-    /// Formats date and time information for display.
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        match self.date_time {
-            DateTime::Filetime(filetime) => {
-                write!(formatter, "{}+00:00", filetime.to_iso8601_string())
-            }
-            DateTime::NotSet => write!(formatter, "{}", NOT_SET_VALUE),
-            _ => write!(formatter, "Unsupported date time"),
-        }
-    }
-}
+use super::windows::FiletimeDateTimeInfo;
 
 /// New Technologies File System (NTFS) file attribute flags information.
 pub struct NtfsFileAttributeFlagsInfo {
@@ -219,24 +193,24 @@ impl<'a> fmt::Display for NtfsFileNameAttributeInfo<'a> {
                     parent_file_reference >> 48
                 )?;
             }
-            let date_time_info: NtfsDateTimeInfo =
-                NtfsDateTimeInfo::new(file_name.get_creation_time());
+            let date_time_info: FiletimeDateTimeInfo =
+                FiletimeDateTimeInfo::new(file_name.get_creation_time());
             writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
 
-            let date_time_info: NtfsDateTimeInfo =
-                NtfsDateTimeInfo::new(file_name.get_modification_time());
+            let date_time_info: FiletimeDateTimeInfo =
+                FiletimeDateTimeInfo::new(file_name.get_modification_time());
             writeln!(
                 formatter,
                 "    Modification time\t\t\t\t: {}",
                 date_time_info
             )?;
 
-            let date_time_info: NtfsDateTimeInfo =
-                NtfsDateTimeInfo::new(file_name.get_access_time());
+            let date_time_info: FiletimeDateTimeInfo =
+                FiletimeDateTimeInfo::new(file_name.get_access_time());
             writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_info)?;
 
-            let date_time_info: NtfsDateTimeInfo =
-                NtfsDateTimeInfo::new(file_name.get_entry_modification_time());
+            let date_time_info: FiletimeDateTimeInfo =
+                FiletimeDateTimeInfo::new(file_name.get_entry_modification_time());
             writeln!(
                 formatter,
                 "    Entry modification time\t\t\t: {}",
@@ -289,11 +263,11 @@ impl<'a> fmt::Display for NtfsFileEntryInfo<'a> {
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
         if let Some(date_time) = self.file_entry.get_creation_time() {
-            let date_time_info: NtfsDateTimeInfo = NtfsDateTimeInfo::new(date_time);
+            let date_time_info: FiletimeDateTimeInfo = FiletimeDateTimeInfo::new(date_time);
             writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
         };
         if let Some(date_time) = self.file_entry.get_modification_time() {
-            let date_time_info: NtfsDateTimeInfo = NtfsDateTimeInfo::new(date_time);
+            let date_time_info: FiletimeDateTimeInfo = FiletimeDateTimeInfo::new(date_time);
             writeln!(
                 formatter,
                 "    Modification time\t\t\t\t: {}",
@@ -301,11 +275,11 @@ impl<'a> fmt::Display for NtfsFileEntryInfo<'a> {
             )?;
         };
         if let Some(date_time) = self.file_entry.get_access_time() {
-            let date_time_info: NtfsDateTimeInfo = NtfsDateTimeInfo::new(date_time);
+            let date_time_info: FiletimeDateTimeInfo = FiletimeDateTimeInfo::new(date_time);
             writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_info)?;
         };
         if let Some(date_time) = self.file_entry.get_entry_modification_time() {
-            let date_time_info: NtfsDateTimeInfo = NtfsDateTimeInfo::new(date_time);
+            let date_time_info: FiletimeDateTimeInfo = FiletimeDateTimeInfo::new(date_time);
             writeln!(
                 formatter,
                 "    Entry modification time\t\t\t: {}",
@@ -411,23 +385,23 @@ impl<'a> fmt::Display for NtfsStandardInformationAttributeInfo<'a> {
             standard_information,
         } = self.attribute
         {
-            let date_time_info: NtfsDateTimeInfo =
-                NtfsDateTimeInfo::new(standard_information.get_creation_time());
+            let date_time_info: FiletimeDateTimeInfo =
+                FiletimeDateTimeInfo::new(standard_information.get_creation_time());
             writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
 
-            let date_time_info: NtfsDateTimeInfo =
-                NtfsDateTimeInfo::new(standard_information.get_modification_time());
+            let date_time_info: FiletimeDateTimeInfo =
+                FiletimeDateTimeInfo::new(standard_information.get_modification_time());
             writeln!(
                 formatter,
                 "    Modification time\t\t\t\t: {}",
                 date_time_info
             )?;
-            let date_time_info: NtfsDateTimeInfo =
-                NtfsDateTimeInfo::new(standard_information.get_access_time());
+            let date_time_info: FiletimeDateTimeInfo =
+                FiletimeDateTimeInfo::new(standard_information.get_access_time());
             writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_info)?;
 
-            let date_time_info: NtfsDateTimeInfo =
-                NtfsDateTimeInfo::new(standard_information.get_entry_modification_time());
+            let date_time_info: FiletimeDateTimeInfo =
+                FiletimeDateTimeInfo::new(standard_information.get_entry_modification_time());
             writeln!(
                 formatter,
                 "    Entry modification time\t\t\t: {}",
@@ -1090,22 +1064,8 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
-    use keramics_datetime::Filetime;
 
     use crate::assert_lines_eq;
-
-    #[test]
-    fn test_date_time_information_fmt() {
-        let date_time: DateTime = DateTime::Filetime(Filetime::new(0x01cb3a623d0a17ce));
-        let test_struct: NtfsDateTimeInfo = NtfsDateTimeInfo::new(&date_time);
-        let string: String = test_struct.to_string();
-        assert_eq!(string, "2010-08-12T21:06:31.5468750+00:00");
-
-        let date_time: DateTime = DateTime::NotSet;
-        let test_struct: NtfsDateTimeInfo = NtfsDateTimeInfo::new(&date_time);
-        let string: String = test_struct.to_string();
-        assert_eq!(string, NOT_SET_VALUE);
-    }
 
     #[test]
     fn test_file_attribute_flags_information_fmt() {

@@ -111,7 +111,10 @@ jobs:
     - name: Generate test data
       run: |
         .\scripts\generate_bde_test_data_windows.ps1
+        .\scripts\generate_volsnap_test_data_windows.bat
     - uses: actions/upload-artifact@v7
       with:
         name: test-data-windows
-        path: specimens/*/*.vhd
+        path: |
+          test_data/bde/*.vhd
+          test_data/volsnap/*.vhd
