@@ -136,6 +136,14 @@ find scripts/ -name "*.sh" -exec shellcheck {} +
 rumdl check
 ```
 
+### Other
+
+**Check for typos.**
+
+```bash
+typos
+```
+
 ## Adding support for a data format
 
 **Start with test data.**
