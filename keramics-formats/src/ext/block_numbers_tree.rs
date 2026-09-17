@@ -106,7 +106,7 @@ impl ExtBlockNumbersTree {
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    "Unable to read tripple indirect block numbers"
+                    "Unable to read triple indirect block numbers"
                 );
                 return Err(error);
             }

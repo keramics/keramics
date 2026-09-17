@@ -1,6 +1,6 @@
 # keramics
 
-Keramics is a project that focusses on the analysis of data formats.
+Keramics is a project that focuses on the analysis of data formats.
 
 Project information:
 

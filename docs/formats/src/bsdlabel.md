@@ -98,7 +98,7 @@ The checksum is calculated as following:
 | --- | --- | --- |
 | 0x00000001 | D_REMOVABLE | Removable media |
 | 0x00000002 | D_ECC | Media supports error-correction codes (ECC) |
-| 0x00000004 | D_BADSECT | Media suppors bad sectro forwarding |
+| 0x00000004 | D_BADSECT | Media supports bad sectro forwarding |
 | 0x00000008 | D_RAMDISK | Emulated media using RAM |
 | 0x00000010 | D_CHAIN | Media can do back-to-back transfers |
 
@@ -115,7 +115,7 @@ The partition entry is 16 bytes in size and consists of:
 | 13 | 1 | | File system fragments per block |
 | 14 | 2 | | Unknown (File system specific value) |
 
-> Note that an emtpy partition entry consists of 0-byte values.
+> Note that an empty partition entry consists of 0-byte values.
 
 #### File system types {#file_system_types}
 

@@ -106,7 +106,7 @@ impl fmt::Display for ApmPartitionStatusFlagsInfo {
             writeln!(formatter, "        0x00000010: Is readable")?;
         }
         if self.flags & 0x00000020 != 0 {
-            writeln!(formatter, "        0x00000020: Is writeable")?;
+            writeln!(formatter, "        0x00000020: Is writable")?;
         }
         if self.flags & 0x00000040 != 0 {
             writeln!(
@@ -253,7 +253,7 @@ mod tests {
             "        0x00000001: Is valid\n",
             "        0x00000002: Is allocated\n",
             "        0x00000010: Is readable\n",
-            "        0x00000020: Is writeable\n",
+            "        0x00000020: Is writable\n",
             "        0x40000000: Automatic mount at startup\n",
             "\n"
         );
@@ -273,7 +273,7 @@ mod tests {
             "        0x00000004: Is in use\n",
             "        0x00000008: Contains boot information\n",
             "        0x00000010: Is readable\n",
-            "        0x00000020: Is writeable\n",
+            "        0x00000020: Is writable\n",
             "        0x00000040: Boot code is position independent\n",
             "        0x00000100: Contains a chain-compatible driver\n",
             "        0x00000200: Contains a real driver\n",

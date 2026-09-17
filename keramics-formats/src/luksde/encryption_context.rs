@@ -22,7 +22,7 @@ pub struct LuksEncryptionContext {
     pub cipher_context: LuksCipherContext,
 
     /// Initialization vector context.
-    pub intialization_vector_context: LuksInitializationVectorContext,
+    pub initialization_vector_context: LuksInitializationVectorContext,
 }
 
 impl LuksEncryptionContext {
@@ -36,7 +36,7 @@ impl LuksEncryptionContext {
         let mut initialization_vector: [u8; 16] = [0; 16];
 
         match self
-            .intialization_vector_context
+            .initialization_vector_context
             .derive_initialization_vector(sector_number, &mut initialization_vector)
         {
             Ok(_) => {}

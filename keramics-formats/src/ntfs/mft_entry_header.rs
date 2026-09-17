@@ -49,7 +49,7 @@ pub struct NtfsMftEntryHeader {
     /// Journal sequence number.
     pub journal_sequence_number: u64,
 
-    /// Sequnce number.
+    /// Sequence number.
     pub sequence_number: u16,
 
     /// Attributes offset.

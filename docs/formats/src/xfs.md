@@ -66,7 +66,7 @@ The XFS superblock (xfs_sb_t) is (at least) 512 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | "XFSB" | Signature |
-| 4 | 4 | | Block size, which is typicaly 4096 bytes (4 KiB) and can range from 512 to 65536 bytes |
+| 4 | 4 | | Block size, which is typically 4096 bytes (4 KiB) and can range from 512 to 65536 bytes |
 | 8 | 8 | | Total number of blocks |
 | 16 | 8 | | Number of real-time (device) blocks |
 | 24 | 8 | | Number of real-time (device) extents |
@@ -690,8 +690,8 @@ The inode version 3 (xfs_dinode_core_t) is 176 bytes in size and consist of:
 | 0x0100 | S_IRUSR | R-access for owner (or user) |
 | <td colspan="3">*Other*</td> |
 | 0x0200 | S_ISTXT | Sticky bit |
-| 0x0400 | S_ISGID | Set group identifer (GID) on execution |
-| 0x0800 | S_ISUID | Set owner (or user) identifer (UID) on execution |
+| 0x0400 | S_ISGID | Set group identifier (GID) on execution |
+| 0x0800 | S_ISUID | Set owner (or user) identifier (UID) on execution |
 | <td colspan="3">*Type of file, bitmask: 0xf000 (S_IFMT)*</td> |
 | 0x1000 | S_IFIFO | Named pipe (FIFO) |
 | 0x2000 | S_IFCHR | Character device |
@@ -709,10 +709,10 @@ The inode version 3 (xfs_dinode_core_t) is 176 bytes in size and consist of:
 | --- | --- | --- |
 | 0 | XFS_DINODE_FMT_DEV | Device identifier is stored inline (in the inode) |
 | 1 | XFS_DINODE_FMT_LOCAL | Data is stored inline (in the inode) |
-| 2 | XFS_DINODE_FMT_EXTENTS | Data is referrenced by extents stored in [an extents list](#extents_list) |
-| 3 | XFS_DINODE_FMT_BTREE | Data is referrence by extents stored in [an extents tree](#extents_tree) |
+| 2 | XFS_DINODE_FMT_EXTENTS | Data is referenced by extents stored in [an extents list](#extents_list) |
+| 3 | XFS_DINODE_FMT_BTREE | Data is reference by extents stored in [an extents tree](#extents_tree) |
 | 4 | XFS_DINODE_FMT_UUID | Unknown (currently not used) |
-| 5 | XFS_DINODE_FMT_RMAP | Data is referrence by a reverse mapping |
+| 5 | XFS_DINODE_FMT_RMAP | Data is reference by a reverse mapping |
 
 ### Inode flags {#inode_flags}
 
@@ -1238,7 +1238,7 @@ The start of the attributes fork can be determined using the attributes fork des
 ### Short-form attributes table
 
 If the inode attributes fork type is XFS_DINODE_FMT_LOCAL the extended attributes are stored in a
-short-form attributes table (xfs_attr_shortform) inline in the attribtes fork. The short-form
+short-form attributes table (xfs_attr_shortform) inline in the attributes fork. The short-form
 attributes table consist of:
 
 * a short-form attributes table header

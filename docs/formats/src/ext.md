@@ -74,7 +74,7 @@ group of a meta block group and backups in the second and last block groups of t
 
 ### Blocks
 
-The volume is devided in blocks:
+The volume is divided in blocks:
 
 ```python
 block offset = block number * block size
@@ -116,7 +116,7 @@ The ext2 superblock is 208 bytes in size and consists of:
 | 64 | 4 | | Last consistency check time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
 | 68 | 4 | | Consistency check interval, which which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
 | 72 | 4 | | [Creator operating system](#creator_operating_system) |
-| 76 | 4 | | [Format revision](#format_revisision) |
+| 76 | 4 | | [Format revision](#format_revision) |
 | 80 | 2 | | Reserved block owner (or user) identifier (UID) |
 | 82 | 2 | | Reserved block group identifier (GID) |
 | <td colspan="4">*Dynamic inode information, if major version is EXT2_DYNAMIC_REV*</td> |
@@ -167,7 +167,7 @@ The ext3 superblock is 336 bytes in size and consists of:
 | 64 | 4 | | Last consistency check time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
 | 68 | 4 | | Consistency check interval, which which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
 | 72 | 4 | | [Creator operating system](#creator_operating_system) |
-| 76 | 4 | | [Format revision](#format_revisision) |
+| 76 | 4 | | [Format revision](#format_revision) |
 | 80 | 2 | | Reserved block owner (or user) identifier (UID) |
 | 82 | 2 | | Reserved block group identifier (GID) |
 | <td colspan="4">*Dynamic inode information, if major version is EXT2_DYNAMIC_REV*</td> |
@@ -231,7 +231,7 @@ The superblock is 1024 bytes in size and consists of:
 | 64 | 4 | | Last consistency check time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
 | 68 | 4 | | Consistency check interval, which which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
 | 72 | 4 | | [Creator operating system](#creator_operating_system) |
-| 76 | 4 | | [Format revision](#format_revisision) |
+| 76 | 4 | | [Format revision](#format_revision) |
 | 80 | 2 | | Reserved block owner (or user) identifier (UID) |
 | 82 | 2 | | Reserved block group identifier (GID) |
 | <td colspan="4">*Dynamic inode information, if major version is EXT2_DYNAMIC_REV*</td> |
@@ -377,7 +377,7 @@ If checksum type is CRC-32C, the metadata checksum seed is stored as:
 | 3 | | FreeBSD |
 | 4 | | Lites |
 
-### Format revision {#format_revisision}
+### Format revision {#format_revision}
 
 | Value | Identifier | Description |
 | --- | --- | --- |
@@ -595,7 +595,7 @@ The ext4 extents header (ext4_extent_header) is 12 bytes in size and consists of
 | 0 | 2 | "\x0a\xf3" | Signature |
 | 2 | 2 | | Number of entries |
 | 4 | 2 | | Maximum number of entries |
-| 6 | 2 | | Depth, where 0 reprensents a leaf node and 1 to 5 different levels of branch nodes |
+| 6 | 2 | | Depth, where 0 represents a leaf node and 1 to 5 different levels of branch nodes |
 | 8 | 4 | | Generation, which is used by Lustre, but not by standard ext4 |
 
 ### The ext4 extent descriptor {#ext4_extent_descriptor}
@@ -664,7 +664,7 @@ The ext2 inode is 128 bytes in size and consists of:
 | 20 | 4 | | Deletion time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
 | 24 | 2 | | Lower 16-bits of group identifier (GID) |
 | 26 | 2 | | Number of (hard) links |
-| 28 | 4 | | Numer of blocks |
+| 28 | 4 | | Number of blocks |
 | 32 | 4 | | [Flags](#inode_flags) |
 | 36 | 4 | | Unknown (reserved) |
 | 40 | 12 x 4 | | Array of direct block numbers. A block number is relative from the start of the volume |
@@ -705,7 +705,7 @@ The ext3 inode is 132 bytes in size and consists of:
 | 20 | 4 | | Deletion time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
 | 24 | 2 | | Lower 16-bits of group identifier (GID) |
 | 26 | 2 | | Number of (hard) links |
-| 28 | 4 | | Numer of blocks |
+| 28 | 4 | | Number of blocks |
 | 32 | 4 | | [Flags](#inode_flags) |
 | 36 | 4 | | Unknown (reserved) |
 | 40 | 12 x 4 | | Array of direct block numbers. A block number is relative from the start of the volume |
@@ -866,8 +866,8 @@ According to [The Linux Kernel documentation](https://docs.kernel.org/filesystem
 | 0x0100 | S_IRUSR | R-access for owner (or user) |
 | <td colspan="3">*Other*</td> |
 | 0x0200 | S_ISTXT | Sticky bit |
-| 0x0400 | S_ISGID | Set group identifer (GID) on execution |
-| 0x0800 | S_ISUID | Set owner (or user) identifer (UID) on execution |
+| 0x0400 | S_ISGID | Set group identifier (GID) on execution |
+| 0x0800 | S_ISUID | Set owner (or user) identifier (UID) on execution |
 | <td colspan="3">*Type of file, Bitmask: 0xf000 (S_IFMT)*</td> |
 | 0x1000 | S_IFIFO | Named pipe (FIFO) |
 | 0x2000 | S_IFCHR | Character device |

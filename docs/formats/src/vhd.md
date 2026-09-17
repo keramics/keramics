@@ -1,6 +1,6 @@
 # Virtual Hard Disk (VHD) image format
 
-The Virtual Hard Disk (VHD) format is used by Microsoft vitualization products as one of its image
+The Virtual Hard Disk (VHD) format is used by Microsoft visualization products as one of its image
 formats. It is both used the store hard disk images and snapshots.
 
 ## Overview
@@ -143,7 +143,7 @@ The dynamic disk header is 1024 bytes in size and consists of:
 | --- | --- | --- | --- |
 | 0 | 8 | "cxsparse" | Signature (Cookie) |
 | 8 | 8 | | Next offset, which contains the offset to the next (metadata) structure. The offset is relative from the start of the file. Currently this is unused and should be set to 0xffffffffffffffff (-1) |
-| 16 | 8 | | Block allocation table offset, whic contains the offset to the block allocation table structure. The offset is relative from the start of the file |
+| 16 | 8 | | Block allocation table offset, which contains the offset to the block allocation table structure. The offset is relative from the start of the file |
 | 24 | 4 | 0x00010000 | Format version, where the upper 16-bit are the major version and the lower 16-bit the minor version |
 | 28 | 4 | | Number of blocks, which is equivalent to the number of block allocation table entries |
 | 32 | 4 | | Block size. The block size must be a power-of-two multitude of the sector size and does not include the size of the sector bitmap. The default block size is 4096 x 512-byte sectors (2 MiB) |

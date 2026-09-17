@@ -492,7 +492,7 @@ impl HfsFileSystem {
                         keramics_core::error_trace_add_frame!(
                             error,
                             format!(
-                                "Unable to read volume heade at offset: {} (0x{:08x}",
+                                "Unable to read volume header at offset: {} (0x{:08x}",
                                 offset, offset
                             ),
                         );

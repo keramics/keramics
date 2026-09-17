@@ -286,7 +286,7 @@ impl VfsFileSystem {
         }
     }
 
-    /// Retrieves a file entry with the specified loctions.
+    /// Retrieves a file entry with the specified location.
     #[inline(always)]
     pub(crate) fn get_file_entry_by_location(
         &self,

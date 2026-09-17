@@ -59,7 +59,7 @@ pub trait PartitionIterator {
     /// Retrieves the number of partitions.
     fn get_number_of_partitions(&self) -> usize;
 
-    /// Retrieves a specific paritition.
+    /// Retrieves a specific partition.
     fn get_partition_by_index(
         &self,
         partition_index: usize,

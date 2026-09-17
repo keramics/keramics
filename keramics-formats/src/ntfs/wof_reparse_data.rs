@@ -19,7 +19,7 @@ use keramics_types::bytes_to_u32_le;
 #[layout_map(
     structure(
         byte_order = "little",
-        field(name = "verion", data_type = "u32"),
+        field(name = "format_version", data_type = "u32"),
         field(name = "provider", data_type = "u32"),
         field(name = "unknown1", data_type = "[u8; 4]"),
         field(name = "compression_method", data_type = "u32"),

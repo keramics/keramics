@@ -1,6 +1,6 @@
 # Virtual Hard Disk version 2 (VHDX) image format
 
-The Virtual Hard Disk version 2 (VHDX) format is used by Microsoft vitualization products as one of
+The Virtual Hard Disk version 2 (VHDX) format is used by Microsoft visualization products as one of
 its image formats. It is both used the store hard disk images and snapshots.
 
 ## Overview
@@ -63,7 +63,7 @@ The CRC32-C algorithm with the Castagnoli polynomial (0x1edc6f41) and initial va
 calculate the checksum.
 
 The checksum is calculated over the 4 KiB bytes of data of the image header, where the image header
-checkum value is considered to be 0 during calculation.
+checksum value is considered to be 0 during calculation.
 
 ## Region table
 
@@ -90,7 +90,7 @@ The CRC32-C algorithm with the Castagnoli polynomial (0x1edc6f41) and initial va
 calculate the checksum.
 
 The checksum is calculated over the 64 KiB bytes of data of the region table where the image header
-checkum value is considered to be 0 during calculation.
+checksum value is considered to be 0 during calculation.
 
 ### Region table entry
 
@@ -140,11 +140,11 @@ The metadata table header is 32 bytes in size and consists of:
 
 #### Metadata table entry
 
-The metdata table entry is 32 bytes in size and consists of:
+The metadata table entry is 32 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 16 | | [Metadata item identifier](#metdata_item_identifiers), which contains a GUID |
+| 0 | 16 | | [Metadata item identifier](#metadata_item_identifiers), which contains a GUID |
 | 16 | 4 | | Metadata item offset, which contains an offset relative to the start of the metadata region. According to MS-VHDX this value must be greater than 64 KiB |
 | 20 | 4 | | Metadata item size |
 | 24 | 8 | | Unknown |
@@ -159,7 +159,7 @@ TODO: describe last 8 bytes
 
 ### Metadata items
 
-#### Metadata item identifiers {#metdata_item_identifiers}
+#### Metadata item identifiers {#metadata_item_identifiers}
 
 | Value | Identifier | Description |
 | --- | --- | --- |
@@ -191,7 +191,7 @@ The logical sector size metadata item is 4 bytes in size and consists of:
 
 #### Parent locator metadata item
 
-The parent locator metadata item is of variable size and consits of:
+The parent locator metadata item is of variable size and consists of:
 
 * parent locator header
 * 0 or more parent locator entry

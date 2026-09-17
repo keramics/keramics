@@ -483,13 +483,13 @@ Current no read-only compatible feature flags are defined.
 | 0x0000000000000100 | NX_INCOMPAT_FUSION | Supports Fusion Drives |
 
 > Note that according to the Apple File System Reference documentation the pre-release version 1
-> and release version 2 are incompatble.
+> and release version 2 are incompatible.
 
 #### Container counters {#container_counters}
 
 | Value | Identifier | Description |
 | --- | --- | --- |
-| 0 | NX_CNTR_OBJ_CKSUM_SET| Number of times a checksum has been calculated when wrting to disk |
+| 0 | NX_CNTR_OBJ_CKSUM_SET| Number of times a checksum has been calculated when writing to disk |
 | 1 | NX_CNTR_OBJ_CKSUM_FAIL| Number of checksum errors when reading from disk |
 
 > Note that the other 30 counters are presumed to be unused at this point.
@@ -984,7 +984,7 @@ The key bag entry header (keybag_entry_t) is 24 bytes in size and consists of:
 | | | |
 | 0xf8 | KB_TAG_USER_PAYLOAD (or KB_TAG_RESERVED_F8) | Unknown (user payload) |
 
-The volume master key is encryped with a volume key.
+The volume master key is encrypted with a volume key.
 
 ##### Volume key bag entry types
 
@@ -993,7 +993,7 @@ The volume master key is encryped with a volume key.
 | 3 | | Volume key, which contains a [Key encryption key (KEK) packed object](#key_bag_kek_packed_object) |
 | 4 | | Password hint, which contains a string without end-of-string character |
 
-The volume key is encryped with an user key.
+The volume key is encrypted with an user key.
 
 #### Key bag packed object {#key_bag_packed_object}
 
@@ -1023,7 +1023,7 @@ The key bag packed value is of variable size and consists of:
 > Note that the meaning of the value tags differ per packed object type.
 
 If the most-significant bit is set the value data size is stored in the next `(value & 0x7f)` bytes.
-E.g. if value data size is 0x82 the first 2 bytes of the extened value data size contain the value
+E.g. if value data size is 0x82 the first 2 bytes of the extended value data size contain the value
 data size.
 
 ##### Key encryption key (KEK) packed object {#key_bag_kek_packed_object}
@@ -1161,7 +1161,7 @@ The volume superblock (apfs_superblock_t) is 4096 bytes in size and consists of:
 | 976 | 8 | | Encryption progress state (apfs_er_state_oid) |
 | 984 | 8 | | Largest clone object identifier (apfs_cloneinfo_id_epoch) |
 | 992 | 8 | | Largest clone transaction identifier (apfs_cloneinfo_xid) |
-| 1000 | 8 | | Extended snapsnot metadata (virtual) object identifier (apfs_snap_meta_ext_oid) |
+| 1000 | 8 | | Extended snapshot metadata (virtual) object identifier (apfs_snap_meta_ext_oid) |
 | 1008 | 16 | | Volume group identifier (apfs_volume_group_id), which contains a big-endian UUID |
 | 1024 | 8 | | Integrity metadata (virtual) object identifier (apfs_integrity_meta_oid) |
 | 1032 | 8 | | Extent tree (virtual) object identifier (apfs_fext_tree_oid) |
@@ -1482,7 +1482,7 @@ The extended attribute key data (j_xattr_key_t) is of variable size and consists
 | 8 | 2 | | Name string size (name_len), in number of bytes, which includes the size of the end-of-string character |
 | 10 | ... | | [Name string](#extended_attribute_names) (name), which contains an UTF-8 encoded string with an end-of-string character |
 
-> Note that the name of an extended attribute appears to be case senstive even on a case
+> Note that the name of an extended attribute appears to be case sensitive even on a case
 > insensitive file system.
 
 #### Extended attribute value data
@@ -1520,7 +1520,7 @@ The extended attribute value data (j_xattr_val_t) is of variable size and consis
 | com.apple.metadata:_kMDItemUserTags | |
 | com.apple.metadata:com_apple_backup_excludeItem | |
 | com.apple.metadata:kMDItemDownloadedDate | |
-| com.apple.metadata:kMDItemWhereFroms | |
+| <!-- typos:disable -->com.apple.metadata:kMDItemWhereFroms<!-- typos:enable --> | |
 | com.apple.metadata:kMDLabel_fwlfb7nbt2o7degof3q2o2btjy | |
 | com.apple.quarantine | |
 | com.apple.ResourceFork | Resource fork |
@@ -1638,7 +1638,7 @@ The directory record can have 2 different types of keys:
 
 <!-- rumdl-disable MD028 -->
 
-> Note that apprears that current APFS file system use a key with name and hash. Apple File System
+> Note that appears that current APFS file system use a key with name and hash. Apple File System
 > Reference documentation does not indicate how to distinguish between the two, but one method is
 > to compare calculated and stored size of the key data.
 
@@ -1713,7 +1713,7 @@ The directory record value data (j_drec_val_t) is of variable size and consists 
 | | | |
 | 0x000c | DT_SOCK | Socket |
 | | | |
-| 0x000e | DT_WHT | Whiteout |
+| 0x000e | <!-- typos:disable -->DT_WHT<!-- typos:enable --> | Whiteout |
 | | | |
 | 0x000f | DREC_TYPE_MASK | Directory type bitmask |
 | 0x0010 | RESERVED_10 | Unknown (reserved) |
@@ -1763,7 +1763,7 @@ The snapshot name (j_snap_name_val_t) is 8 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 60 bits | | Snapshot metdata object identifier |
+| 0 | 60 bits | | Snapshot metadata object identifier |
 | 7.4 | 4 bits | 0x1 | [File system data type](#file_system_data_types) |
 
 ### Sibling map {#sibling_map}

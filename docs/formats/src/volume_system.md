@@ -1,6 +1,6 @@
 # Volume system formats
 
-A volume (or logical drive) is a single continous accessible storage area, typically containing a
+A volume (or logical drive) is a single continuous accessible storage area, typically containing a
 file system. A volume system is used to manage the storage of one or more volumes.
 
 A partition is a part of (typically) storage media. A partition is different conceptually, but

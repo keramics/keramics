@@ -24,7 +24,7 @@ use crate::formatters::ByteSize;
 
 /// Information about BitLocker Drive Encryption (BDE) encrypted volume.
 struct BdeEncryptedVolumeInfo<'a> {
-    /// Encrypte volume.
+    /// Encrypted volume.
     encrypted_volume: &'a BdeEncryptedVolume,
 }
 

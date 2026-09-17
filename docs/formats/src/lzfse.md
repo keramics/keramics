@@ -19,7 +19,7 @@ LZFSE compressed data stream consist of:
 
 ## LZFSE block {#lzfse_block}
 
-A LZFSE block is of variable size and consits of:
+A LZFSE block is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -40,7 +40,7 @@ A LZFSE block is of variable size and consits of:
 
 ### End-of-stream block
 
-An end-of-stream block is 4 bytes in size and consits of:
+An end-of-stream block is 4 bytes in size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -53,7 +53,7 @@ An end-of-stream block is 4 bytes in size and consits of:
 
 ### Uncompressed block
 
-An uncompressed block is of variable size and consits of:
+An uncompressed block is of variable size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -70,7 +70,7 @@ An uncompressed block is of variable size and consits of:
 ### LZFSE compressed block with uncompressed tables
 
 A LZFSE compressed block with uncompressed tables (lzfse_compressed_block_header_v1) is of variable
-size and consits of:
+size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -103,7 +103,7 @@ size and consits of:
 ### LZFSE compressed block with compressed tables
 
 A LZFSE compressed block with compressed tables (lzfse_compressed_block_header_v2)
-is of variable size and consits of:
+is of variable size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -142,7 +142,7 @@ is of variable size and consits of:
 
 ### LZVN compressed block
 
-A LZVN compressed block is of variable size and consits of:
+A LZVN compressed block is of variable size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 

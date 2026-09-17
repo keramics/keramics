@@ -36,7 +36,7 @@ The number of bytes per sector is 512.
 ## Descriptor file
 
 The DiskDescriptor.xml and its backup (DiskDescriptor.xml.Backup) contain the
-"Parallels_disk_image" XML element tha consists of the following values:
+"Parallels_disk_image" XML element that consists of the following values:
 
 | Identifier | Description |
 | --- | --- |
@@ -223,7 +223,7 @@ The sparse storage data file header is 64 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 16 | "WithoutFreeSpace" or "WithouFreSpacExt" | Signature |
+| 0 | 16 | "WithoutFreeSpace" or <!-- typos:disable -->"WithouFreSpacExt"<!-- typos:enable --> | Signature |
 | 16 | 4 | 2 | Format version |
 | 20 | 4 | | Number of heads |
 | 24 | 4 | | Number of cylinders |

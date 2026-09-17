@@ -388,7 +388,7 @@ impl DisplayPath {
             DisplayPathType::Identifier => self.get_identifier_display_path(vfs_location),
             DisplayPathType::Index => self.get_index_display_path(vfs_location),
         }
-        // TODO: santize path (control characters, etc.)
+        // TODO: sanitize path (control characters, etc.)
     }
 
     /// Sets the volume path type.

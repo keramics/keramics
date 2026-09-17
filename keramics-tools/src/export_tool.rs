@@ -49,7 +49,7 @@ struct CommandLineArguments {
     /// Offset within the storage media
     offset: u64,
 
-    /// Comma seperated list of partitions to include
+    /// Comma separated list of partitions to include
     #[arg(long)]
     partitions: Option<String>,
 
@@ -61,7 +61,7 @@ struct CommandLineArguments {
     /// be written
     target: Option<PathBuf>,
 
-    /// Comma seperated list of volumes to include
+    /// Comma separated list of volumes to include
     #[arg(long)]
     volumes: Option<String>,
 
@@ -260,7 +260,7 @@ fn main() -> ExitCode {
         Some(os_str) => match os_str.to_str() {
             Some(value) => value,
             None => {
-                println!("Unsuppported source file name");
+                println!("Unsupported source file name");
                 return ExitCode::FAILURE;
             }
         },

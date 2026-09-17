@@ -54,7 +54,7 @@ impl Ext4InodeExtension {
         (extra_precision_timestamp, extra_precision)
     }
 
-    /// Reads the inode exension from a buffer.
+    /// Reads the inode extension from a buffer.
     pub fn read_data(inode: &mut ExtInode, data: &[u8]) -> Result<(), ErrorTrace> {
         let extra_size: u16 = bytes_to_u16_le!(data, 0);
 

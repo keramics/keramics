@@ -154,7 +154,7 @@ impl NtfsMftAttributes {
                     }
                     _ => {}
                 };
-                // A MFT entry can have mutliple $FILE_NAME attributes.
+                // A MFT entry can have multiple $FILE_NAME attributes.
                 if attribute_type != NTFS_ATTRIBUTE_TYPE_FILE_NAME {
                     attribute_group.add_attribute_index(attribute_type, attribute_index);
                 }

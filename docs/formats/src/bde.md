@@ -303,7 +303,7 @@ These are sectors to store:
 
 #### BitLocker Version 1.0
 
-In BitLocker version 1.0 the first sector of the unencrypted boot recored sector is reconstructed
+In BitLocker version 1.0 the first sector of the unencrypted boot record sector is reconstructed
 by replacing values in the BitLocker boot record, namely:
 
 * replacing the "File system signature" with "NTFS\x20\x20\x20\x20"
@@ -320,7 +320,7 @@ location. This location is defined in the [metadata area descriptors](#metadata_
 
 The encrypted boot record is commonly 8192 bytes an size, entailing the first 16 sectors.
 
-The sectors that contain the encrypted boot recored and the BDE metadata are shown as empty sectors;
+The sectors that contain the encrypted boot record and the BDE metadata are shown as empty sectors;
 containing 0-byte values.
 
 > Note that in later versions of Bitlocker Windows 10 the metadata area descriptors are not always
@@ -936,7 +936,7 @@ The identifier of the VMK should match the identifier in the BEK file header.
 
 ## Encrypt-on-Write (EOW)
 
-Checksums use a CRC-32 with the polynominal 0xedb88320 and initial value 0.
+Checksums use a CRC-32 with the polynomial 0xedb88320 and initial value 0.
 
 ### Encrypt-on-Write (FVE-EOW) descriptor {#encrypt_on_write_descriptor}
 
@@ -976,7 +976,7 @@ The Encrypt-on-Write block map area is variable of size and consists of:
 * One or more Encrypt-on-Write block (map) records
 
 > Note that "FVE2.{09cf57b8-9e6c-43d4-ae1f-0408882a397d}.[1-6]" masks the Encrypt-on-Write block
-> map area, with a 4096 aligment size.
+> map area, with a 4096 alignment size.
 
 #### Encrypt-on-Write block map (FVE-EOWBM)
 
@@ -1050,7 +1050,7 @@ The Encrypt-on-Write relocation log area is variable of size and consists of:
 * Unknown (empty values)
 
 > Note that "FVE2.{c9ca54a3-6983-46b7-8684-a7e5e23499e3}.[1-6]" masks the Encrypt-on-Write
-> relocation log area, with a 4096 aligment size.
+> relocation log area, with a 4096 alignment size.
 
 #### Encrypt-on-Write relocation log area (OLRDHEVF2) header
 

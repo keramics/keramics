@@ -55,7 +55,7 @@ impl<'a> EwfByteObjectStorage<'a> {
             }
             // Break at newline (\n)
             if byte == b'\n' {
-                // Ignore cariage return (\r)
+                // Ignore carriage return (\r)
                 if last_byte == b'\r' {
                     end_offset -= 1;
                 }
@@ -115,7 +115,7 @@ impl<'a> EwfUtf16ObjectStorage<'a> {
             }
             // Break at newline (\n)
             if value_16bit == 0x000a {
-                // Ignore cariage return (\r)
+                // Ignore carriage return (\r)
                 if last_value_16bit == 0x000d {
                     line.pop();
                 }

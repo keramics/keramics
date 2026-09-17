@@ -14,6 +14,6 @@ Unsupported features:
 
 | Category | Feature(s) |
 | --- | --- |
-| Configurations | Multiple physical volumes, Mulitiple segments |
+| Configurations | Multiple physical volumes, Multiple segments |
 | Segment types | cache, error, integrity, linear, mirror, raid0, raid1, raid4, raid5, raid6, raid10, snapshot, thin, vdo, zero |
 | | Snapshots |

@@ -72,11 +72,11 @@ backup GPT partition entries.
 
 ### Checksum calculation
 
-The [CRC-32 algorithm](https://www.ietf.org/rfc/rfc1952.txt) with polynominal 0x04c11db7 and
+The [CRC-32 algorithm](https://www.ietf.org/rfc/rfc1952.txt) with polynomial 0x04c11db7 and
 initial value of 0 is used to calculate the checksums.
 
 The checksum is calculated over the 92 bytes of the table header data, where the header data
-checkum value is considered to be 0 during calculation.
+checksum value is considered to be 0 during calculation.
 
 ## GPT partition entries
 

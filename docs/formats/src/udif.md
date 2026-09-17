@@ -4,7 +4,7 @@ The Universal Disk Image Format (UDIF) (.dmg) is one of the disk image formats s
 by Mac OS. UDIF supersedes the New Disk Image Format (NDIF) format and was introduced in Max OS
 X 10.0 (Cheetah).
 
-Mac OS referers to the UDIF image format as CUDIFEncoding.
+Mac OS refers to the UDIF image format as CUDIFEncoding.
 
 ## Overview
 
@@ -73,19 +73,19 @@ A compressed UDIF segment file consist of:
 
 #### Encrypted Encoding version 1 encrypted UDIF segment file
 
-An Encrypted Encoding version 1 encryped UDIF segment file consists of:
+An Encrypted Encoding version 1 encrypted UDIF segment file consists of:
 
 * Data fork, containing encrypted UDIF data
-* [Encrypted Encoding container footer](cdsaencr.md#encypted_container_footer) at the end of the
+* [Encrypted Encoding container footer](cdsaencr.md#encrypted_container_footer) at the end of the
   file
 
 > Note that the encrypted UDIF data can contain an uncompressed UDIF image without file footer.
 
 #### Encrypted Encoding version 2 encrypted UDIF segment file
 
-An Encrypted Encoding version 2 encryped UDIF segment file consists of:
+An Encrypted Encoding version 2 encrypted UDIF segment file consists of:
 
-* [Encrypted Encoding container header](cdsaencr.md#encypted_container_header) at the start of the
+* [Encrypted Encoding container header](cdsaencr.md#encrypted_container_header) at the start of the
   file
 * Key protectors
 * Unknown (empty values), probably reserved for the key protectors
@@ -169,7 +169,7 @@ In an encrypted image file the offsets are relative from the start of the unencr
 | Value | Identifier | Description |
 | --- | --- | --- |
 | 1 | kUDIFDeviceImageType | Device image |
-| 2 | kUDIFPartitionImageType | Paritition image |
+| 2 | kUDIFPartitionImageType | Partition image |
 
 ## Resource fork
 

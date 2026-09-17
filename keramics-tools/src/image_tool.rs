@@ -97,7 +97,7 @@ struct BodyfileCommandArguments {
     /// all layers.
     image_layer: usize,
 
-    /// Comma seperated list of partitions to include
+    /// Comma separated list of partitions to include
     #[arg(long)]
     partitions: Option<String>,
 
@@ -107,7 +107,7 @@ struct BodyfileCommandArguments {
     #[arg(long, default_value_t = DisplayPathType::Index, value_enum)]
     volume_path_type: DisplayPathType,
 
-    /// Comma seperated list of volumes to include
+    /// Comma separated list of volumes to include
     #[arg(long)]
     volumes: Option<String>,
 }
@@ -409,7 +409,7 @@ impl ImageTool {
                 format!("{}", hfs_file_entry.get_identifier())
             }
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
-                // Note that the directory entry file reference can be differrent
+                // Note that the directory entry file reference can be different
                 // from the values in the MFT entry.
                 let file_reference: u64 = ntfs_file_entry.get_file_reference();
 
@@ -1034,7 +1034,7 @@ fn main() -> ExitCode {
                         VfsCredential::RecoveryPassword(recovery_password)
                     }
                     _ => {
-                        println!("Unsuported type prefix: {} in credential", credential_type);
+                        println!("Unsupported type prefix: {} in credential", credential_type);
                         return ExitCode::FAILURE;
                     }
                 };
@@ -1050,7 +1050,7 @@ fn main() -> ExitCode {
                 }
             }
             None => {
-                println!("Unsuported credential - missing type prefix");
+                println!("Unsupported credential - missing type prefix");
                 return ExitCode::FAILURE;
             }
         }

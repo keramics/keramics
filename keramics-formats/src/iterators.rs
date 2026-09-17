@@ -131,7 +131,7 @@ pub struct PartitionsIterator<'a, T: PartitionIterator> {
     /// Number of partitions.
     number_of_partitions: usize,
 
-    /// Partititon index.
+    /// Partition index.
     partition_index: usize,
 }
 

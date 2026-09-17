@@ -26,7 +26,7 @@ use super::object_header::ApfsObjectHeader;
         field(name = "flags", data_type = "u32", format = "hex"),
         field(name = "number_of_snapshots", data_type = "u32"),
         field(name = "btree_type", data_type = "u32", format = "hex"),
-        field(name = "snaphots_btree_type", data_type = "u32", format = "hex"),
+        field(name = "snapshots_btree_type", data_type = "u32", format = "hex"),
         field(name = "btree_block_number", data_type = "u64"),
         field(name = "snapshots_btree_block_number", data_type = "u64"),
         field(name = "most_recent_snapshot_identifier", data_type = "u64"),
@@ -44,7 +44,7 @@ pub struct ApfsObjectMap {
     /// Flags.
     pub flags: u32,
 
-    /// Number of snaphots.
+    /// Number of snapshots.
     pub number_of_snapshots: u32,
 
     /// B-tree block number.

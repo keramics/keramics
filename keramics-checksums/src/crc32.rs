@@ -30,7 +30,7 @@ pub struct Crc32Context {
     table: [u32; 256],
 
     /// Value to indicate the lookup table has been initialized.
-    table_initilized: bool,
+    table_initialized: bool,
 }
 
 impl Crc32Context {
@@ -41,7 +41,7 @@ impl Crc32Context {
             initial_value,
             checksum: initial_value ^ 0xffffffff,
             table: [0; 256],
-            table_initilized: false,
+            table_initialized: false,
         }
     }
 
@@ -59,7 +59,7 @@ impl Crc32Context {
             }
             self.table[table_index] = checksum;
         }
-        self.table_initilized = true
+        self.table_initialized = true
     }
 
     /// Finalizes the checksum calculation.
@@ -73,7 +73,7 @@ impl Crc32Context {
 
     /// Calculates the checksum of the data.
     pub fn update(&mut self, data: &[u8]) {
-        if !self.table_initilized {
+        if !self.table_initialized {
             self.initialize_table(self.polynomial);
         }
         let mut checksum: u32 = self.checksum;
@@ -102,7 +102,7 @@ pub struct ReversedCrc32Context {
     table: [u32; 256],
 
     /// Value to indicate the lookup table has been initialized.
-    table_initilized: bool,
+    table_initialized: bool,
 }
 
 impl ReversedCrc32Context {
@@ -113,7 +113,7 @@ impl ReversedCrc32Context {
             initial_value,
             checksum: initial_value ^ 0xffffffff,
             table: [0; 256],
-            table_initilized: false,
+            table_initialized: false,
         }
     }
 
@@ -131,7 +131,7 @@ impl ReversedCrc32Context {
             }
             self.table[table_index] = checksum;
         }
-        self.table_initilized = true
+        self.table_initialized = true
     }
 
     /// Finalizes the checksum calculation.
@@ -145,7 +145,7 @@ impl ReversedCrc32Context {
 
     /// Calculates the checksum of the data.
     pub fn update(&mut self, data: &[u8]) {
-        if !self.table_initilized {
+        if !self.table_initialized {
             self.initialize_table(self.polynomial);
         }
         let mut checksum: u32 = self.checksum;

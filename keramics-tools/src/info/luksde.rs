@@ -21,7 +21,7 @@ use crate::formatters::ByteSize;
 
 /// Information about Linux Unified Key Setup (LUKS) Disk Encryption encrypted volume.
 struct LuksEncryptedVolumeInfo<'a> {
-    /// Encrypte volume.
+    /// Encrypted volume.
     encrypted_volume: &'a LuksEncryptedVolume,
 }
 

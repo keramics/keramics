@@ -20,11 +20,11 @@ An exFAT file system consists of:
   * Reserved sector; can contain a sector signature ("\x55\xaa")
   * boot checksum sector
 * File Allocation Table region
-  * Aligment padding
+  * Alignment padding
   * First cluster block allocation tables
   * Zero or more backup block allocation tables
 * Data region
-  * Aligment padding
+  * Alignment padding
   * Cluster heap
   * File and directory data
 

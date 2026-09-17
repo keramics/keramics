@@ -168,7 +168,7 @@ impl<'a> XfsFileSystemInfo<'a> {
 }
 
 impl<'a> fmt::Display for XfsFileSystemInfo<'a> {
-    /// Formats file sytem information for display.
+    /// Formats file system information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "X File System (XFS) information:")?;
 

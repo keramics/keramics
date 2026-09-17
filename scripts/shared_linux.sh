@@ -115,12 +115,12 @@ create_test_file_entries_with_extended_attributes()
     mkdir "${FILE_NAME}"
     setfattr -n "user.myxattr2" -v "My 2nd extended attribute" "${FILE_NAME}"
 
-    # Create a file with an initial (implict) sparse extent
+    # Create a file with an initial (implicit) sparse extent
     FILE_NAME="${MOUNT_POINT}/testdir1/initial_sparse1"
     truncate -s $(( 1 * 1024 * 1024 )) "${FILE_NAME}"
     echo "File with an initial sparse extent" >> "${FILE_NAME}"
 
-    # Create a file with a trailing (implict) sparse extent
+    # Create a file with a trailing (implicit) sparse extent
     FILE_NAME="${MOUNT_POINT}/testdir1/trailing_sparse1"
     echo "File with a trailing sparse extent" > "${FILE_NAME}"
     truncate -s $(( 1 * 1024 * 1024 )) "${FILE_NAME}"
