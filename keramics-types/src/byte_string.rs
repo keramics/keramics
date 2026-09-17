@@ -247,7 +247,7 @@ impl From<&String> for ByteString {
 }
 
 impl PartialEq<&[u8]> for ByteString {
-    /// Detemines if a [`ByteString`] is equal to a [`&[u8]`]
+    /// Determines if a [`ByteString`] is equal to a [`&[u8]`]
     #[inline(always)]
     fn eq(&self, slice: &&[u8]) -> bool {
         self.elements == *slice
@@ -255,7 +255,7 @@ impl PartialEq<&[u8]> for ByteString {
 }
 
 impl PartialEq<str> for ByteString {
-    /// Detemines if a [`ByteString`] is equal to a [`str`]
+    /// Determines if a [`ByteString`] is equal to a [`str`]
     #[inline(always)]
     fn eq(&self, string: &str) -> bool {
         // TODO: handle encoding
@@ -264,7 +264,7 @@ impl PartialEq<str> for ByteString {
 }
 
 impl PartialEq<&str> for ByteString {
-    /// Detemines if a [`ByteString`] is equal to a [`&str`]
+    /// Determines if a [`ByteString`] is equal to a [`&str`]
     #[inline(always)]
     fn eq(&self, string: &&str) -> bool {
         Self::eq(self, *string)

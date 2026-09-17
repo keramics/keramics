@@ -253,7 +253,7 @@ The volume header - format version 2 (or binary header) is 4096 bytes in size an
 ## JSON area {#json_area}
 
 The JSON area is stored directly after the volume header and must be 4096-byte aligned. The JSON
-area is of variable size and constists of:
+area is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |

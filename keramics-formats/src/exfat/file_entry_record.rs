@@ -52,7 +52,7 @@ pub struct ExFatFileEntryRecord {
     /// Access date and time.
     pub access_time: DateTime,
 
-    /// Modifiation date and time.
+    /// Modification date and time.
     pub modification_time: DateTime,
 }
 

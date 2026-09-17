@@ -43,7 +43,7 @@ impl HfsAttributesFile {
         }
     }
 
-    /// Retieves attributes.
+    /// Retrieves attributes.
     pub fn get_attributes_by_identifier(
         &self,
         data_stream: &DataStreamReference,

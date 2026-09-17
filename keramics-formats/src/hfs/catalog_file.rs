@@ -383,7 +383,7 @@ impl HfsCatalogFile {
         thread_record.parent_identifier = parent_identifier;
 
         // TODO: convert name to Unicode NFD.
-        if self.btree_file.key_comparion_method == HfsKeyComparisonMethod::Binary {
+        if self.btree_file.key_comparison_method == HfsKeyComparisonMethod::Binary {
             thread_record.name = name_string;
         } else {
             thread_record.name =
@@ -536,7 +536,7 @@ impl HfsCatalogFile {
                                 return Err(error);
                             }
                         };
-                        let result: Ordering = if self.btree_file.key_comparion_method
+                        let result: Ordering = if self.btree_file.key_comparison_method
                             == HfsKeyComparisonMethod::Binary
                         {
                             name.cmp(&thread_record.name)
@@ -964,7 +964,7 @@ impl HfsCatalogFile {
                 return Err(error);
             }
         };
-        if self.btree_file.key_comparion_method == HfsKeyComparisonMethod::Binary {
+        if self.btree_file.key_comparison_method == HfsKeyComparisonMethod::Binary {
             thread_record.name = name;
         } else {
             thread_record.name = match name.new_with_case_folding(&self.case_folding_mappings) {

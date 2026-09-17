@@ -136,7 +136,7 @@ fn test_unwrap() -> Result<(), ErrorTrace> {
         assert_eq!(
             &data[0..8],
             &[0xa6; 8],
-            "intialization vector mismatch with {} bits test vector: {}",
+            "initialization vector mismatch with {} bits test vector: {}",
             key_bit_size,
             test_number + 1
         );

@@ -11,6 +11,7 @@
  * under the License.
  */
 
-/// PDI sparse file header signature.
+/// PDI sparse file header signatures.
 pub(super) const PDI_SPARSE_FILE_HEADER_SIGNATURE1: &[u8] = b"WithoutFreeSpace";
+// typos:ignore
 pub(super) const PDI_SPARSE_FILE_HEADER_SIGNATURE2: &[u8] = b"WithouFreSpacExt";

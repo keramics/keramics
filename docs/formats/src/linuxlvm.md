@@ -21,7 +21,7 @@ A Linux LVM consist of:
 According to "RHEL 5 - Logical Volume Manager Administration" the number of bytes per sector is 512.
 
 Checksums use a "weak" CRC-32, which is a CRC-32 without the initial and final XOR with 0xffffffff,
-using the polynominal 0xedb88320 and initial value 0xf597a6cf.
+using the polynomial 0xedb88320 and initial value 0xf597a6cf.
 
 ### Terminology
 
@@ -254,7 +254,7 @@ The # character is used for comments. A comment continues to the end-of-line.
 | --- | --- |
 | "contents" | The contents of the metadata area, which contains the string "Text Format Volume Group" |
 | "creation_host" | The hostname of the system on which metadata area was created, which can contain a trailing comment that contains the output equivalent to "uname -a" |
-| "creation_time" | The creation time of the metadata area, which contains an interger containing the number of seconds since January 1, 1970 00:00:00 UTC and can contain a trailing comment that contains the creation time as a ctime (function) string in UTC |
+| "creation_time" | The creation time of the metadata area, which contains an integer containing the number of seconds since January 1, 1970 00:00:00 UTC and can contain a trailing comment that contains the creation time as a ctime (function) string in UTC |
 | "description" | Unknown (Description of the metadata area?) |
 | [&lt;volume group name&gt;](#metadata_names) | [Volume group object](#metadata_volume_group_object) |
 | "version" | The metadata area version, which contains an integer value of 1 |
@@ -263,10 +263,10 @@ The # character is used for comments. A comment continues to the end-of-line.
 
 ### Volume group and logical volume names {#metadata_names}
 
-* Allowed characters: "a-z", "A-Z", "0-9", "\_", "+", ".", and "-" (hypen)
-* A volume group name should not start with a hypen
-* A logical volume name can start with a hypen, but it is reserved for logical volumes that have
-  been removed but are stil being tracked by the format
+* Allowed characters: "a-z", "A-Z", "0-9", "\_", "+", ".", and "-" (hyphen)
+* A volume group name should not start with a hyphen
+* A logical volume name can start with a hyphen, but it is reserved for logical volumes that have
+  been removed but are still being tracked by the format
 
 > Note that some implementations use lv_ as the prefix for a logical volume, however this is not
 > enforced by the format.
@@ -328,7 +328,7 @@ Each logical volume object contains the following properties:
 | Value | Description |
 | --- | --- |
 | "creation_host" | The hostname of the system on which the logical volume was created |
-| "creation_time" | The creation time of the metadata area, which contains an interger containing the number of seconds since January 1, 1970 00:00:00 UTC and can contain a trailing comment that contains the creation time as a ctime (function) string in UTC |
+| "creation_time" | The creation time of the metadata area, which contains an integer containing the number of seconds since January 1, 1970 00:00:00 UTC and can contain a trailing comment that contains the creation time as a ctime (function) string in UTC |
 | "flags" | [Flags](#flags) |
 | "id | Physical volume identifier (PV UUID), which contains an ASCII string in the following format: 9LBcEB-7PQT-GIlL-I0Kx-rtzr-ynju-SL983W |
 | "segment_count" | The number of segments |

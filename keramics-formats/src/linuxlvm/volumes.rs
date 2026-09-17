@@ -24,7 +24,7 @@ pub struct LinuxLvmVolumesIterator<'a> {
     /// Number of volumes.
     number_of_volumes: usize,
 
-    /// Partititon index.
+    /// Partition index.
     volume_index: usize,
 }
 

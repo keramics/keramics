@@ -57,7 +57,7 @@ impl<'a> VmdkDescriptorStorage<'a> {
             }
             // Break at newline (\n)
             if byte == b'\n' {
-                // Ignore cariage return (\r)
+                // Ignore carriage return (\r)
                 if last_byte == b'\r' {
                     end_offset -= 1;
                 }

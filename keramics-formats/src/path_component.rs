@@ -131,9 +131,9 @@ impl PathComponent {
         match string[1..].chars().rev().position(|value| value == '.') {
             Some(value_index) => {
                 // Note that value_index is relative to end of the string.
-                let extention_index: usize = string.len() - value_index;
+                let extension_index: usize = string.len() - value_index;
 
-                let extension_string: String = string[extention_index..].to_string();
+                let extension_string: String = string[extension_index..].to_string();
 
                 Some(Self::String(extension_string))
             }
@@ -589,7 +589,7 @@ impl From<&Utf16String> for PathComponent {
 }
 
 impl PartialEq<str> for PathComponent {
-    /// Detemines if a [`PathComponent`] is equal to a [`str`]
+    /// Determines if a [`PathComponent`] is equal to a [`str`]
     #[inline(always)]
     fn eq(&self, other: &str) -> bool {
         Self::eq(self, &other)
@@ -597,7 +597,7 @@ impl PartialEq<str> for PathComponent {
 }
 
 impl PartialEq<&str> for PathComponent {
-    /// Detemines if a [`PathComponent`] is equal to a [`&str`]
+    /// Determines if a [`PathComponent`] is equal to a [`&str`]
     #[inline(always)]
     fn eq(&self, other: &&str) -> bool {
         match self {

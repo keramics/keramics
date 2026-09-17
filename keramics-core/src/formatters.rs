@@ -354,6 +354,7 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
+        // typos:disable
         let expected_string = [
             "00000000  63 6f 6e 65 63 74 69 78  00 00 00 02 00 01 00 00  conectix........",
             "00000010  00 00 00 00 00 00 02 00  28 8c 38 27 71 65 6d 75  ........(.8'qemu",
@@ -368,6 +369,7 @@ mod tests {
             "",
         ]
         .join("\n");
+        // typos:enable
 
         let string: String = format_as_hexdump(&test_data, true);
         assert_eq!(string, expected_string);

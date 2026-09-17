@@ -272,7 +272,7 @@ impl<'a> NtfsFileEntryInfo<'a> {
 impl<'a> fmt::Display for NtfsFileEntryInfo<'a> {
     /// Formats file entry information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        // Note that the directory entry file reference can be differrent from the values in the
+        // Note that the directory entry file reference can be different from the values in the
         // MFT entry.
         let file_reference: u64 = self.file_entry.get_file_reference();
         writeln!(
@@ -338,7 +338,7 @@ impl<'a> NtfsFileSystemInfo<'a> {
 }
 
 impl<'a> fmt::Display for NtfsFileSystemInfo<'a> {
-    /// Formats file sytem information for display.
+    /// Formats file system information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(
             formatter,

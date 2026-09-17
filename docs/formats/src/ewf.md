@@ -243,7 +243,7 @@ separated by an end of line character(s).
 
 The first 2 bytes of the UTF16 string are the byte order mark (BOM):
 
-* 0xff 0xfe for UTF-16 litte-endian
+* 0xff 0xfe for UTF-16 little-endian
 * 0xfe 0xff for UTF-16 big-endian
 
 In the next paragraphs the various variants of the header2 section are described.
@@ -350,7 +350,7 @@ Also see [header2 values](#header2_values)
 
 <!-- rumdl-enable MD064 -->
 
-> Note that in a Logicube Dossier generated header2 section an additional emtpy value in the 4th
+> Note that in a Logicube Dossier generated header2 section an additional empty value in the 4th
 > line was observed. The number of values in the 3rd and 4th can differ.
 
 <!-- rumdl-enable MD028 -->
@@ -1892,7 +1892,7 @@ A file entry name ("n" value):
 
 * can contain path segment separator characters like "\\" and "/"
 * uses the "MIDDLE DOT" Unicode character (U+00b7) as a (NTFS) alternative data stream (ADS) name
-  seperator
+  separator
 
 > Note that a regular "MIDDLE DOT" Unicode character will be encoded in the same way so no real way
 > to reliably tell the difference.
@@ -2341,7 +2341,7 @@ TODO: add description
 
 Seen in combination with some firmware versions of Tableau TD3 forensic imager.
 
-In this corruption scenarion the copy of uncompressed data size value of the
+In this corruption scenario the copy of uncompressed data size value of the
 [DEFLATE uncompressed block data](zlib.md) is set to 0 instead of the 1s complement of the
 uncompressed data size.
 

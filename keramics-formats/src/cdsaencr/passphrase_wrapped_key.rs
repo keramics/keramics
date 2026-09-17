@@ -36,7 +36,7 @@ use super::encryption_type::CdsaEncrEncryptionType;
         field(name = "encryption_mode", data_type = "u32"),
         field(name = "wrapped_key_data_size", data_type = "u32"),
         field(name = "wrapped_key_data", data_type = "[u8; 64]", format = "hex"),
-        field(name = "uknown1", data_type = "[u8; 448]", format = "hex"),
+        field(name = "unknown1", data_type = "[u8; 448]", format = "hex"),
     ),
     methods("debug_read_data")
 )]

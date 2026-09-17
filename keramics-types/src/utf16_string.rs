@@ -349,7 +349,7 @@ impl From<&String> for Utf16String {
 }
 
 impl PartialEq<&[u16]> for Utf16String {
-    /// Detemines if a [`Utf16String`] is equal to a [`&[u16]`]
+    /// Determines if a [`Utf16String`] is equal to a [`&[u16]`]
     #[inline(always)]
     fn eq(&self, slice: &&[u16]) -> bool {
         self.elements == *slice
@@ -357,7 +357,7 @@ impl PartialEq<&[u16]> for Utf16String {
 }
 
 impl PartialEq<str> for Utf16String {
-    /// Detemines if a [`Utf16String`] is equal to a [`str`]
+    /// Determines if a [`Utf16String`] is equal to a [`str`]
     #[inline(always)]
     fn eq(&self, string: &str) -> bool {
         self.elements == string.encode_utf16().collect::<Vec<u16>>()
@@ -365,7 +365,7 @@ impl PartialEq<str> for Utf16String {
 }
 
 impl PartialEq<&str> for Utf16String {
-    /// Detemines if a [`Utf16String`] is equal to a [`&str`]
+    /// Determines if a [`Utf16String`] is equal to a [`&str`]
     #[inline(always)]
     fn eq(&self, string: &&str) -> bool {
         Self::eq(self, *string)

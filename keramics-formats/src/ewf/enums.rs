@@ -39,7 +39,7 @@ pub enum EwfMediaType {
     LogicalEvidence,
     Memory,
     OpticalDisk,
-    RemoveableDisk,
+    RemovableDisk,
     Unknown,
 }
 

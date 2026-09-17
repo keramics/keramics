@@ -47,8 +47,8 @@ pub struct HfsBtreeFile {
     /// Block ranges.
     block_ranges: Vec<HfsBlockRange>,
 
-    /// Key comparision method.
-    pub key_comparion_method: HfsKeyComparisonMethod,
+    /// Key comparison method.
+    pub key_comparison_method: HfsKeyComparisonMethod,
 }
 
 impl HfsBtreeFile {
@@ -62,7 +62,7 @@ impl HfsBtreeFile {
             node_cache: SharedLruCache::new(256),
             size: 0,
             block_ranges: Vec::new(),
-            key_comparion_method: HfsKeyComparisonMethod::CaseFold,
+            key_comparison_method: HfsKeyComparisonMethod::CaseFold,
         }
     }
 
@@ -245,12 +245,12 @@ impl HfsBtreeFile {
         self.root_node_number = header_record.root_node_number;
 
         if self.format == HfsFormat::HfsX {
-            self.key_comparion_method = match header_record.key_comparion_method {
+            self.key_comparison_method = match header_record.key_comparison_method {
                 0x00 | 0xbc => HfsKeyComparisonMethod::Binary,
                 0xcf => HfsKeyComparisonMethod::CaseFold,
                 _ => {
                     return Err(keramics_core::error_trace_new!(
-                        "Unsupported key comparision method"
+                        "Unsupported key comparison method"
                     ));
                 }
             };

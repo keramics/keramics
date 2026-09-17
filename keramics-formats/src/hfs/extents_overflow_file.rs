@@ -39,7 +39,7 @@ impl HfsExtentsOverflowFile {
         }
     }
 
-    /// Retieves extents.
+    /// Retrieves extents.
     pub fn get_extents_by_identifier(
         &self,
         data_stream: &DataStreamReference,

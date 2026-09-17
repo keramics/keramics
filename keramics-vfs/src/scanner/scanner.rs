@@ -313,7 +313,7 @@ impl VfsScanner {
                             keramics_core::error_trace_add_frame!(
                                 error,
                                 format!(
-                                    "Unable to retrieve extention of file entry: {}",
+                                    "Unable to retrieve extension of file entry: {}",
                                     vfs_location
                                 )
                             );

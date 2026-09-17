@@ -3,7 +3,7 @@
 The Mac OS sparse bundle (.sparsebundle) format is one of the disk image formats supported natively
 by Mac OS.
 
-Mac OS referers to the sparse image format as CSparseBundleDiskImage and was introduced in Mac OS X
+Mac OS refers to the sparse image format as CSparseBundleDiskImage and was introduced in Mac OS X
 Leopard (10.5).
 
 ## Overview
@@ -66,9 +66,9 @@ the following key-value pairs.
 
 The token file of an unencrypted sparse bundle is empty.
 
-The token file of an encryped spase bundle contains either an
-[Encrypted Encoding container footer](cdsaencr.md#encypted_container_footer) or an
-[Encrypted Encoding container header](cdsaencr.md#encypted_container_header).
+The token file of an encrypted spase bundle contains either an
+[Encrypted Encoding container footer](cdsaencr.md#encrypted_container_footer) or an
+[Encrypted Encoding container header](cdsaencr.md#encrypted_container_header).
 
 ## Bands directory
 

@@ -491,7 +491,7 @@ fn main() -> ExitCode {
                         VfsCredential::RecoveryPassword(recovery_password)
                     }
                     _ => {
-                        println!("Unsuported type prefix: {} in credential", credential_type);
+                        println!("Unsupported type prefix: {} in credential", credential_type);
                         return ExitCode::FAILURE;
                     }
                 };
@@ -507,7 +507,7 @@ fn main() -> ExitCode {
                 }
             }
             None => {
-                println!("Unsuported credential - missing type prefix");
+                println!("Unsupported credential - missing type prefix");
                 return ExitCode::FAILURE;
             }
         }
@@ -649,7 +649,7 @@ fn main() -> ExitCode {
             ))),
         },
         Some(Commands::Path(command_arguments)) => {
-            // TODO: detect leading partion path component and suggest/check path exists without it.
+            // TODO: detect leading partition path component and suggest/check path exists without it.
             let path: Path = Path::from(&command_arguments.path);
 
             match &format_identifier {

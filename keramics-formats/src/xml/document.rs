@@ -69,7 +69,7 @@ impl XmlDocument {
                 }
                 Rule::EOI | Rule::miscellaneous => {}
                 Rule::prolog => {
-                    // TODO: extact version, encoding and doctype from prolog
+                    // TODO: exact version, encoding and doctype from prolog
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(

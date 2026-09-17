@@ -748,7 +748,7 @@ impl EwfImage {
         }
         if self.chunk_size != 0 || self.media_size != 0 {
             return Err(keramics_core::error_trace_new!(format!(
-                "Multipe disk or volume sections found in segment file: {}",
+                "Multiple disk or volume sections found in segment file: {}",
                 segment_file_name
             )));
         }
@@ -779,7 +779,7 @@ impl EwfImage {
                     }
                 }
                 self.media_type = match volume.media_type {
-                    0x00 => EwfMediaType::RemoveableDisk,
+                    0x00 => EwfMediaType::RemovableDisk,
                     0x01 => EwfMediaType::FixedDisk,
                     0x03 => EwfMediaType::OpticalDisk,
                     0x0e => EwfMediaType::LogicalEvidence,

@@ -31,7 +31,7 @@ use keramics_types::{bytes_to_u16_be, bytes_to_u32_be};
         field(name = "unknown1", data_type = "[u8; 2]"),
         field(name = "clump_size", data_type = "u32"),
         field(name = "file_type", data_type = "u8"),
-        field(name = "key_comparion_method", data_type = "u8"),
+        field(name = "key_comparison_method", data_type = "u8"),
         field(name = "flags", data_type = "u32", format = "hex"),
         field(name = "unknown2", data_type = "[u8; 64]"),
     ),
@@ -51,8 +51,8 @@ pub struct HfsBtreeHeaderRecord {
     /// Node size.
     pub node_size: u16,
 
-    /// Key comparision method.
-    pub key_comparion_method: u8,
+    /// Key comparison method.
+    pub key_comparison_method: u8,
 }
 
 impl HfsBtreeHeaderRecord {
@@ -65,7 +65,7 @@ impl HfsBtreeHeaderRecord {
             first_leaf_node_number: 0,
             last_leaf_node_number: 0,
             node_size: 0,
-            key_comparion_method: 0,
+            key_comparison_method: 0,
         }
     }
 
@@ -85,7 +85,7 @@ impl HfsBtreeHeaderRecord {
                 self.node_size
             )));
         }
-        self.key_comparion_method = data[37];
+        self.key_comparison_method = data[37];
 
         Ok(())
     }
@@ -119,7 +119,7 @@ mod tests {
         assert_eq!(test_struct.first_leaf_node_number, 8);
         assert_eq!(test_struct.last_leaf_node_number, 1);
         assert_eq!(test_struct.node_size, 4096);
-        assert_eq!(test_struct.key_comparion_method, 0xcf);
+        assert_eq!(test_struct.key_comparison_method, 0xcf);
 
         Ok(())
     }

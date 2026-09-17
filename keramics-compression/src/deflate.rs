@@ -23,7 +23,7 @@ use super::huffman::HuffmanTree;
 use super::traits::Bitstream;
 
 /// Uncompressed DEFLATE block type.
-const DEFLATE_BLOCK_TYPE_UNCOMPRESED: u32 = 0;
+const DEFLATE_BLOCK_TYPE_UNCOMPRESSED: u32 = 0;
 
 /// Fixed Huffmann trees encoded DEFLATE block type.
 const DEFLATE_BLOCK_TYPE_HUFFMAN_FIXED: u32 = 1;
@@ -528,7 +528,7 @@ impl DeflateContext {
         debug_trace.print(&block_header);
 
         match block_header.block_type {
-            DEFLATE_BLOCK_TYPE_UNCOMPRESED => {
+            DEFLATE_BLOCK_TYPE_UNCOMPRESSED => {
                 // Ignore the bits in the buffer upto the next byte.
                 let skip_bits: usize = bitstream.number_of_bits & 0x07;
 

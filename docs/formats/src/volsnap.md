@@ -456,7 +456,7 @@ not corresponds with the volume size defined by the rest of the catalog entries.
 
 ### Scope snapshots
 
-Technically scoped snaphots are a feature of volsnapa as of of Windows 8 or Windws Server 2012 and
+Technically scoped snapshots are a feature of volsnapa as of of Windows 8 or Windows Server 2012 and
 not a corruption scenario. It has been captured as a corruption scenario since it leads to some
 interesting side effects within file content of the snapshot.
 

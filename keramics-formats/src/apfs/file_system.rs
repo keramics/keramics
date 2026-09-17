@@ -172,7 +172,7 @@ impl ApfsFileSystem {
             }
             None => {
                 return Err(keramics_core::error_trace_new!(
-                    "Unable to obtain mutable reference to file sytem tree"
+                    "Unable to obtain mutable reference to file system tree"
                 ));
             }
         }

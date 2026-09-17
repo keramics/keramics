@@ -673,7 +673,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decompress_with_mising_uncompressed_data() {
+    fn test_decompress_with_missing_uncompressed_data() {
         let mut test_context: ZlibContext = ZlibContext::new();
 
         let test_data: [u8; 19] = [

@@ -551,7 +551,7 @@ Compressed data streams also define sparse data runs without setting the ATTRIBU
 > Note that $BadClus:$Bad also defines a data run with a cluster block number value size of 0,
 > without setting the ATTRIBUTE_FLAG_SPARSE flag.
 
-##### Compresssed data runs
+##### Compressed data runs
 
 The MFT attribute data flags (0x00ff) indicate if the data stream is compressed or not.
 
@@ -655,7 +655,7 @@ of:
 > Note that MFT entries have been observed without a $STANDARD_INFORMATION attribute, but with
 > other attributes such as $FILE_NAME and an $I30 index.
 
-Recent version of NTFS support case-sentive file names. If a directory is case-sensitive the
+Recent version of NTFS support case-sensitive file names. If a directory is case-sensitive the
 corresponding $STANDARD_INFORMATION attribute will have a maximum number of versions of 0 and a
 version number of 1.
 
@@ -910,7 +910,7 @@ the attribute is of variable size.
 The reparse point attribute ($REPARSE_POINT) contains information about a file system-level link.
 It is stored as a resident MFT attribute.
 
-Als see [the reparse point](#reparse_point).
+Also see [the reparse point](#reparse_point).
 
 ### The (HPFS) extended attribute information
 
@@ -1080,7 +1080,7 @@ The index entry header is 24 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 4 | "INDX" | Signature |
+| 0 | 4 | <!-- typos:disable -->"INDX"<!-- typos:enable --> | Signature |
 | 4 | 2 | | The fix-up values offset, which contains an offset relative from the start of the index entry header |
 | 6 | 2 | | The number of fix-up values |
 | 8 | 8 | | Metadata transaction journal sequence number, which contains a $LogFile Sequence Number (LSN) |
@@ -2234,7 +2234,7 @@ signature value                           : 0
 is compressed flag                        : 0
 ```
 
-It was observed in 2 differnt NTFS implementations that the entire block is filled with 0-byte
+It was observed in 2 different NTFS implementations that the entire block is filled with 0-byte
 values.
 
 TODO: verify behavior of Windows NTFS implementation.
@@ -2281,7 +2281,7 @@ compressed data offset                    : 16384 (0x00004000)
 compression flag byte                     : 0x00
 ```
 
-Different behavior was observed in 2 differnt NTFS implementations:
+Different behavior was observed in 2 different NTFS implementations:
 
 * one implementation fills the compressed block with the uncompressed data it could read and the
   rest with with 0-byte values

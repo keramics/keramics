@@ -11,7 +11,7 @@
  * under the License.
  */
 
-//! Tripple Data Encryption Standard (DES3) encryption.
+//! Triple Data Encryption Standard (DES3) encryption.
 //!
 //! Provides DES3 encryption and decryption support.
 

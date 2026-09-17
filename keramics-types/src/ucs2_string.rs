@@ -329,7 +329,7 @@ impl From<&String> for Ucs2String {
 }
 
 impl PartialEq<&[u16]> for Ucs2String {
-    /// Detemines if a [`Ucs2String`] is equal to a [`&[u16]`]
+    /// Determines if a [`Ucs2String`] is equal to a [`&[u16]`]
     #[inline(always)]
     fn eq(&self, slice: &&[u16]) -> bool {
         self.elements == *slice
@@ -337,7 +337,7 @@ impl PartialEq<&[u16]> for Ucs2String {
 }
 
 impl PartialEq<str> for Ucs2String {
-    /// Detemines if a [`Ucs2String`] is equal to a [`str`]
+    /// Determines if a [`Ucs2String`] is equal to a [`str`]
     #[inline(always)]
     fn eq(&self, string: &str) -> bool {
         self.elements == string.encode_utf16().collect::<Vec<u16>>()
@@ -345,7 +345,7 @@ impl PartialEq<str> for Ucs2String {
 }
 
 impl PartialEq<&str> for Ucs2String {
-    /// Detemines if a [`Ucs2String`] is equal to a [`&str`]
+    /// Determines if a [`Ucs2String`] is equal to a [`&str`]
     #[inline(always)]
     fn eq(&self, string: &&str) -> bool {
         Self::eq(self, *string)

@@ -6,4 +6,4 @@ This document is intended as a working document of specifications of data format
 Keramics project. These specifications are based on available documentation and analysis of data
 samples.
 
-> Note that these might differ from authorative format specifications and are works in progress.
+> Note that these might differ from authoritative format specifications and are works in progress.

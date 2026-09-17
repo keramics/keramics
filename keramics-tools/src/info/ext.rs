@@ -256,7 +256,7 @@ impl<'a> ExtFileSystemInfo<'a> {
 }
 
 impl<'a> fmt::Display for ExtFileSystemInfo<'a> {
-    /// Formats file sytem information for display.
+    /// Formats file system information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Extended File System (ext) information:")?;
 

@@ -60,7 +60,7 @@ struct CommandLineArguments {
     /// all layers.
     image_layer: usize,
 
-    /// Comma seperated list of partitions to include
+    /// Comma separated list of partitions to include
     #[arg(long)]
     partitions: Option<String>,
 
@@ -75,7 +75,7 @@ struct CommandLineArguments {
     #[arg(long, default_value_t = DisplayPathType::Index, value_enum)]
     volume_path_type: DisplayPathType,
 
-    /// Comma seperated list of volumes to include
+    /// Comma separated list of volumes to include
     #[arg(long)]
     volumes: Option<String>,
 

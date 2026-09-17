@@ -283,7 +283,7 @@ The B-tree header record (BTHeaderRec) is 106 bytes in size and consists of:
 | 30 | 2 | | Unknown (Reserved) |
 | 32 | 4 | | Clump size, in bytes |
 | 36 | 1 | | [B-tree file type](#btree_header_record_file_types) |
-| 37 | 1 | | [Key comparision method](#btree_header_record_key_comparion_method) |
+| 37 | 1 | | [Key comparison method](#btree_header_record_key_comparison_method) |
 | 38 | 4 | | [Flags](#btree_header_record_flags) (or attributes) |
 | 42 | 16 x 4 = 64 | | Unknown (Reserved) |
 
@@ -299,7 +299,7 @@ TODO: does the number of data records equal the number of leaf nodes?
 | 0x80 | | First user B-tree type |
 | 0xff | | Reserved B-tree type |
 
-##### Key comparision methodtype {#btree_header_record_key_comparion_method}
+##### Key comparison methodtype {#btree_header_record_key_comparison_method}
 
 | Value | Identifier | Description |
 | --- | --- | --- |
@@ -388,7 +388,7 @@ The MDB is 162 bytes in size and consists of:
 | 14 | 2 | | Volume bitmap block number, contains a block number relative from the start of the volume, where 0 is the first block number, typically 3 |
 | 16 | 2 | | [Next allocation search](#next_allocation_search) block number |
 | 18 | 2 | | Number of blocks, where a volume can contain at most 65535 blocks |
-| 20 | 4 | | Block size (drAlBlkSiz), in bytes, must be a multitude of 512 |
+| 20 | 4 | | Block size (<!-- typos:disable -->drAlBlkSiz<!-- typos:enable -->), in bytes, must be a multitude of 512 |
 | 24 | 4 | | Clump size, in bytes |
 | 28 | 2 | | Data area start sector (drAlBlSt), contains a sector number relative from the start of the volume, where 0 is the first sector number and bytes per sector is 512 |
 | 30 | 4 | | Next available catalog node identifier (CNID), which can be a directory or file record identifier |
@@ -771,7 +771,7 @@ The HFS+ and HFSX catalog key is of variable size and consists of:
 <!-- rumdl-enable MD033 MD056 -->
 
 > Note that the characters ':' and U+2400 are stored as '/' and U+0 respectively and must be
-> converted before comparision.
+> converted before comparison.
 
 ### The catalog data
 
@@ -1254,7 +1254,7 @@ An unused extent descriptor should have both the block number and number of bloc
 
 ### Bad Block File
 
-The extents overflow file is also used to hold information about the bad blocks; refered to as the
+The extents overflow file is also used to hold information about the bad blocks; referred to as the
 bad block file. The bad block file is used to mark areas on the disk as bad, unable to be used for
 storing data; typically to map out bad sectors on the storage medium.
 
@@ -1322,8 +1322,8 @@ An attributes file key (HFSPlusAttrKey) is of variable size and consists of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-> Note that the name of an extended attribute appears to be case senstive even on a case insensitive
-> file system.
+> Note that the name of an extended attribute appears to be case sensitive even on a case
+> insensitive file system.
 
 ### The attributes file data
 
@@ -1407,7 +1407,7 @@ when allocating space for a file.
 
 ## Metadata zone and hot files
 
-In Mac OS X 10.3 a metadata zone was instroduced to store certain file system metadata, such as
+In Mac OS X 10.3 a metadata zone was introduced to store certain file system metadata, such as
 allocation bitmap file, extents overflow file, and the catalog file, the journal file and
 frequently used small files (also referred to as "hot files") near each other to reduces seek time
 for typical accesses.
@@ -1427,7 +1427,7 @@ and metadata; it does not protect the contents of a fork.
 
 The volume header specifies if journalling is activated.
 
-The journal data stuctures consist of:
+The journal data structures consist of:
 
 * a journal information block, contains the location and size of the journal header and journal
   buffer;

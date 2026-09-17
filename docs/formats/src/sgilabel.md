@@ -6,7 +6,7 @@ The SGI disklabel format is a partitioning schema mainly used by the SGI Irix op
 
 A SGI disklabel consists of one or more partition entries.
 
-Certain paritions have a predefined meaning, such as:
+Certain partitions have a predefined meaning, such as:
 
 * entry 9 the volume header (partition type 0);
 * entry 11 the entire volume (partition type 6).

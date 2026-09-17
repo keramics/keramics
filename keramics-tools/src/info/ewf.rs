@@ -33,7 +33,7 @@ impl<'a> EwfImageInfo<'a> {
         (EwfMediaType::FixedDisk, "fixed disk"),
         (EwfMediaType::LogicalEvidence, "logical evidence"),
         (EwfMediaType::OpticalDisk, "optical disk (CD/DVD/BD)"),
-        (EwfMediaType::RemoveableDisk, "removable disk"),
+        (EwfMediaType::RemovableDisk, "removable disk"),
     ];
 
     /// Create new image information.

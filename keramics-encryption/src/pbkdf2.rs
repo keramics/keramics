@@ -288,6 +288,7 @@ mod tests {
                 },
         */
         TestVector {
+            // typos:ignore
             password: b"passwordPASSWORDpassword",
             salt: b"saltSALTsaltSALTsaltSALTsaltSALTsalt",
             number_of_iterations: 4096,

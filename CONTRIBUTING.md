@@ -136,12 +136,20 @@ find scripts/ -name "*.sh" -exec shellcheck {} +
 rumdl check
 ```
 
+### Other
+
+**Check for typos.**
+
+```bash
+typos
+```
+
 ## Adding support for a data format
 
 **Start with test data.**
 
-One of the focusses of this project is reproducibility and hence test data that can be generated
-deterministically is prefered. Scripts to generated test data can be found in the "scripts"
+One of the focuses of this project is reproducibility and hence test data that can be generated
+deterministically is preferred. Scripts to generated test data can be found in the "scripts"
 directory.
 
 If the test data cannot be created by means of script, make sure:
@@ -150,12 +158,12 @@ If the test data cannot be created by means of script, make sure:
 * the test data has a project compatible license.
 
 If the test data was not authored by you (as the contributor), make sure you have permission to use
-it and mention its orginal source in "ACKNOWLEDGEMENTS.md". **Do not include test data that cannot
+it and mention its original source in "ACKNOWLEDGEMENTS.md". **Do not include test data that cannot
 be redistributed.**
 
 **Document the data format.**
 
-Data formats change over time, hence documentating its structures is important. Data format
+Data formats change over time, hence documenting their structures is important. Data format
 documentation can be found in the "docs/formats" directory and is hosted on:
 [keramics.github.io](https://keramics.github.io)
 

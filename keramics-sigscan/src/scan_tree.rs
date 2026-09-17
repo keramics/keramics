@@ -124,6 +124,7 @@ mod tests {
         assert_eq!(scan_tree.root_node.scan_objects.len(), 0);
 
         let mut signatures: Vec<Arc<Signature>> = Vec::new();
+
         signatures.push(Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,

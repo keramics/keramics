@@ -1,6 +1,6 @@
 # File Allocation Table (FAT) file system format
 
-The File Allocation Table (FAT) is widely used a file sytem and is the default file system for DOS
+The File Allocation Table (FAT) is widely used a file system and is the default file system for DOS
 and Windows.
 
 There are multiple known variants or derivatives of FAT, such as:
@@ -17,7 +17,7 @@ A FAT file system consists of:
 
 * One or more reserved sectors
   * a boot record (or boot sector)
-  * file system informartion for FAT-32
+  * file system information for FAT-32
 * One or more cluster block allocation tables
 * Root directory data for FAT-12 and FAT-16
 * File and directory data
@@ -38,7 +38,7 @@ A FAT file system consists of:
 | --- | --- |
 | Hidden sectors | The sectors stored before the FAT volume, such as those used to store a partition table |
 
-### Determing the FAT format version
+### Determining the FAT format version
 
 To distinguish between FAT-12, FAT-16 and FAT-32, compute the number of clusters in the data area:
 

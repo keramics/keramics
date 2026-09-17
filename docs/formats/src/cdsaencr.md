@@ -15,7 +15,7 @@ There are 2 known versions of Encrypted Encoding.
 A version 1 encrypted container consist of:
 
 * Encrypted data
-* [Encrypted container footer](#encypted_container_footer) at the end of the file
+* [Encrypted container footer](#encrypted_container_footer) at the end of the file
 
 Format version 1 supports the following key protectors:
 
@@ -25,7 +25,7 @@ Format version 1 supports the following key protectors:
 
 A version 2 encrypted container consist of:
 
-* [Encrypted container header](#encypted_container_header) at the start of the file
+* [Encrypted container header](#encrypted_container_header) at the start of the file
 * Key protectors
 * Unknown (empty values), probably reserved for the key protectors
 * Encrypted data, typically at offset 122368
@@ -46,7 +46,7 @@ Version 2 supports the following key protectors:
 
 ## Encrypted container
 
-### Encrypted container footer {#encypted_container_footer}
+### Encrypted container footer {#encrypted_container_footer}
 
 The encrypted container footer is 1276 bytes in size and consists of:
 
@@ -97,7 +97,7 @@ on RFC 3537):
 * Use the specified key derivation method, e.g. PDBKDF2, with salt and number of iterations to
   determine the key encryption key (KEK) based on a passphrase.
 * Pad the initialization vector [0x4a, 0xdd, 0xa2, 0x2c, 0x79, 0xe8, 0x21, 0x05] with 0-byte values
-  if necessesary, e.g. if initialization vector is 8 bytes but the encryption method (AES) requires
+  if necessary, e.g. if initialization vector is 8 bytes but the encryption method (AES) requires
   an initialization vector of 16 bytes.
 * Decrypt the wrapped key data using the encryption method and mode, e.g. DES3-CBC, with the number
   of bits of the KEK (defined by encryption key size) and the initialization vector if applicable.
@@ -111,20 +111,20 @@ The intermediate key data is of variable size and consists of:
 | 0 | 8 | | Initialization vector |
 | 8 | ... | | Wrapped key data |
 
-* Pad the initialization vector of the intermediate key data with 0-byte values if necessesary.
+* Pad the initialization vector of the intermediate key data with 0-byte values if necessary.
 * Decrypt the wrapped key data (of the intermediate key data) using the encryption method and mode,
   e.g. DES3-CBC, with the number of bits of the KEK (defined by encryption key size) and the
   initialization vector (of the intermediate key data) if applicable.
 * Remove the padding, specified by the padding type.
 
-The decypted key data is of variable size and consists of:
+The decrypted key data is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | 0 | Signature |
 | 4 | ... | | Key data |
 
-### Encrypted container header {#encypted_container_header}
+### Encrypted container header {#encrypted_container_header}
 
 The encrypted container header is of variable size and consists of:
 
@@ -187,13 +187,13 @@ Key data can be obtained from the wrapped key data using the following approach:
 
 * Use the specified key derivation method, e.g. PDBKDF2, with salt and number of iterations to
   determine the key encryption key (KEK) based on a passphrase.
-* Pad the initialization vector with 0-byte values if necessesary, e.g. if initialization vector
+* Pad the initialization vector with 0-byte values if necessary, e.g. if initialization vector
   is 8 bytes but the encryption method (AES) requires an initialization vector of 16 bytes.
 * Decrypt the wrapped key data using the encryption method and mode, e.g. DES3-CBC, with the number
   of bits of the KEK (defined by encryption key size) and the initialization vector if applicable.
 * Remove the padding, specified by the padding type.
 
-The decypted key data is of variable size and consists of:
+The decrypted key data is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -268,7 +268,7 @@ TODO: complete section
 | 36 | CSSM_ALGID_KHUFU | KHUFU |
 | 37 | CSSM_ALGID_KHAFRE | KHAFRE |
 | 38 | CSSM_ALGID_MMB | MMB |
-| 39 | CSSM_ALGID_GOST | GOST |
+| 39 | <!-- typos:disable -->CSSM_ALGID_GOST<!-- typos:enable --> | <!-- typos:disable -->GOST<!-- typos:enable --> |
 | 40 | CSSM_ALGID_SAFER | SAFER (K-40, K-64, K-128) |
 | 41 | CSSM_ALGID_CRAB | CRAB |
 | 42 | CSSM_ALGID_RSA | RSA |

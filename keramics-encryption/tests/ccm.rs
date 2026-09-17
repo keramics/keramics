@@ -550,7 +550,7 @@ fn test_decrypt_ccm() -> Result<(), ErrorTrace> {
         assert_eq!(
             validation_check,
             0,
-            "validation failture for {} bits test vector: {}",
+            "validation failure for {} bits test vector: {}",
             key_bit_size,
             test_number + 1
         );

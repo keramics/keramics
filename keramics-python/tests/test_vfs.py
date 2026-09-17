@@ -50,8 +50,8 @@ class TestDataStream(TestClass):
 
         offset = data_stream.seek(8, whence=os.SEEK_SET)
 
-        ofset = data_stream.get_offset()
-        assert ofset == 8
+        offset = data_stream.get_offset()
+        assert offset == 8
 
     def test_get_size(self):
         data_stream = self.get_data_stream("/testdir1/testfile1")

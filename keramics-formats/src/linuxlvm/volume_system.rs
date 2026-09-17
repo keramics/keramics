@@ -309,7 +309,7 @@ impl LinuxLvmVolumeSystem {
                                 let data_area_offset: u64 =
                                     (stripe.start_extent as u64) * extent_size;
 
-                                let data_area_decriptor_index: usize = match physical_volume_label
+                                let data_area_descriptor_index: usize = match physical_volume_label
                                     .data_area_descriptors
                                     .binary_search_by(|data_area_descriptor| {
                                         let area_end_offset: u64 = data_area_descriptor
@@ -326,7 +326,7 @@ impl LinuxLvmVolumeSystem {
                                             Ordering::Equal
                                         }
                                     }) {
-                                    Ok(data_area_decriptor_index) => data_area_decriptor_index,
+                                    Ok(data_area_descriptor_index) => data_area_descriptor_index,
                                     Err(_) => {
                                         return Err(keramics_core::error_trace_new!(format!(
                                             "Missing data area descriptor for offset: {} (0x{:08x})",
@@ -337,13 +337,13 @@ impl LinuxLvmVolumeSystem {
                                 let data_area_descriptor: &LinuxLvmDataAreaDescriptor =
                                     match physical_volume_label
                                         .data_area_descriptors
-                                        .get(data_area_decriptor_index)
+                                        .get(data_area_descriptor_index)
                                     {
                                         Some(data_area_descriptor) => data_area_descriptor,
                                         None => {
                                             return Err(keramics_core::error_trace_new!(format!(
                                                 "Missing data area descriptor: {}",
-                                                data_area_decriptor_index
+                                                data_area_descriptor_index
                                             )));
                                         }
                                     };

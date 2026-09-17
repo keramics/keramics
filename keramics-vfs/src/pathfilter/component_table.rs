@@ -22,7 +22,7 @@ use super::enums::ScanTreeType;
 use super::groups::ComponentGroup;
 use super::signature::PathFilterSignature;
 
-/// Compontents table.
+/// Components table.
 pub(super) struct ComponentTable {
     /// Scan tree type.
     pub scan_tree_type: ScanTreeType,
@@ -146,12 +146,12 @@ impl ComponentTable {
             Some(index_group) => {
                 let mut largest_value_weight: isize = 0;
                 let mut component_index: usize = 0;
-                for (group_index, occurence_index) in index_group.indexes.iter().enumerate() {
-                    let value_weight: isize = self.value_weights.get_weight(occurence_index);
+                for (group_index, occurrence_index) in index_group.indexes.iter().enumerate() {
+                    let value_weight: isize = self.value_weights.get_weight(occurrence_index);
 
                     if group_index == 0 || value_weight > largest_value_weight {
                         largest_value_weight = value_weight;
-                        component_index = *occurence_index;
+                        component_index = *occurrence_index;
                     }
                 }
                 Some(component_index)

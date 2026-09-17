@@ -65,7 +65,7 @@ impl FormatScanner {
 
     /// Adds Apple Partition Map (APM) signatures.
     pub fn add_apm_signatures(&mut self) {
-        // Note that technically "PM" is the Apple Partion Map signature but using the partition
+        // Note that technically "PM" is the Apple Partition Map signature but using the partition
         // type is less false-positive prone.
 
         // Signature for 512 bytes per sector.

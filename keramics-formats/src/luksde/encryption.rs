@@ -199,7 +199,7 @@ impl LuksEncryption {
                 return Err(error);
             }
         }
-        let intialization_vector_context: LuksInitializationVectorContext =
+        let initialization_vector_context: LuksInitializationVectorContext =
             match Self::get_initialization_vector_context(encryption_type, key) {
                 Ok(Some(context)) => context,
                 Ok(None) => return Ok(None),
@@ -213,7 +213,7 @@ impl LuksEncryption {
             };
         Ok(Some(LuksEncryptionContext {
             cipher_context,
-            intialization_vector_context,
+            initialization_vector_context,
         }))
     }
 

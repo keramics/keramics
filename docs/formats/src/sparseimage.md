@@ -3,7 +3,7 @@
 The Mac OS sparse image (.sparseimage) format is one of the disk image formats supported natively
 by Mac OS.
 
-Mac OS referers to the sparse image format as CSparseDiskImage.
+Mac OS refers to the sparse image format as CSparseDiskImage.
 
 ## Overview
 
@@ -36,17 +36,17 @@ A sparse image file consists of:
 
 #### Encrypted Encoding version 1 encrypted sparse image file
 
-An Encrypted Encoding version 1 encryped sparse image file consists of:
+An Encrypted Encoding version 1 encrypted sparse image file consists of:
 
 * Data fork, containing encrypted sparse image data
-* [Encrypted Encoding container footer](cdsaencr.md#encypted_container_footer) at the end of the
+* [Encrypted Encoding container footer](cdsaencr.md#encrypted_container_footer) at the end of the
   file
 
 #### Encrypted image format version 2 encrypted sparse image file
 
-An Encrypted Encoding version 2 encryped sparse image file consists of:
+An Encrypted Encoding version 2 encrypted sparse image file consists of:
 
-* [Encrypted Encoding container header](cdsaencr.md#encypted_container_header) at the start of the
+* [Encrypted Encoding container header](cdsaencr.md#encrypted_container_header) at the start of the
   file
 * Key protectors
 * Unknown (empty values), probably reserved for the key protectors
