@@ -38,7 +38,7 @@ use crate::info::{
     ApfsInfo, ApmInfo, BdeInfo, BsdDiskLabelInfo, CdsaEncrInfo, EwfInfo, ExFatInfo, ExtInfo,
     FatInfo, GptInfo, HfsInfo, LinuxLvmInfo, LuksInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo,
     SgiDiskLabelInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
-    XfsInfo,
+    VolsnapInfo, XfsInfo,
 };
 use crate::storage_media_image::StorageMediaImage;
 
@@ -298,6 +298,22 @@ impl InfoTool {
                         None => None,
                     }
                 }
+            } else if scan_results.contains(&FormatIdentifier::Volsnap) {
+                let mut scan_results_copy: HashSet<FormatIdentifier> = scan_results.clone();
+                scan_results_copy.remove(&FormatIdentifier::Volsnap);
+
+                if scan_results_copy.len() == 1 {
+                    result = match scan_results_copy.iter().next() {
+                        Some(format_identifier) => {
+                            if format_identifier == &FormatIdentifier::Ntfs {
+                                Some(FormatIdentifier::Volsnap)
+                            } else {
+                                None
+                            }
+                        }
+                        None => None,
+                    }
+                }
             }
             if result.is_none() {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -345,6 +361,7 @@ impl InfoTool {
         format_scanner.add_luksde_signatures();
         format_scanner.add_ntfs_signatures();
         format_scanner.add_sgilabel_signatures();
+        format_scanner.add_volsnap_signatures();
         format_scanner.add_xfs_signatures();
 
         match format_scanner.build() {
@@ -548,6 +565,7 @@ fn main() -> ExitCode {
         Some(FormatType::Vhd) => FormatIdentifier::Vhd,
         Some(FormatType::Vhdx) => FormatIdentifier::Vhdx,
         Some(FormatType::Vmdk) => FormatIdentifier::Vmdk,
+        Some(FormatType::Volsnap) => FormatIdentifier::Volsnap,
         Some(FormatType::Xfs) => FormatIdentifier::Xfs,
         None => {
             if !arguments.contents
@@ -712,6 +730,7 @@ fn main() -> ExitCode {
             FormatIdentifier::Vhdx => VhdxInfo::print_file(&data_stream),
             // TODO: add support for individual VMDK file.
             FormatIdentifier::Vmdk => VmdkInfo::print_image(&arguments.source),
+            FormatIdentifier::Volsnap => VolsnapInfo::print_backing_volume(&data_stream),
             FormatIdentifier::Xfs => {
                 XfsInfo::print_file_system(&data_stream, info_tool.character_encoding.as_ref())
             }

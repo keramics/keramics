@@ -57,6 +57,7 @@ pub mod linuxlvm;
 pub mod luksde;
 pub mod mbr;
 pub mod sgilabel;
+pub mod volsnap;
 
 // Hybrid volume and file system formats
 pub mod apfs;

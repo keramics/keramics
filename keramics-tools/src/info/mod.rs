@@ -37,6 +37,7 @@ mod udif;
 mod vhd;
 mod vhdx;
 mod vmdk;
+mod volsnap;
 mod windows;
 mod xfs;
 
@@ -64,6 +65,7 @@ pub use udif::UdifInfo;
 pub use vhd::VhdInfo;
 pub use vhdx::VhdxInfo;
 pub use vmdk::VmdkInfo;
+pub use volsnap::VolsnapInfo;
 pub use xfs::XfsInfo;
 
 #[cfg(test)]

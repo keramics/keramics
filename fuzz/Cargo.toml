@@ -283,6 +283,13 @@ doc = false
 required-features = ["fuzzing"]
 
 [[bin]]
+name = "volsnap"
+path = "fuzz_targets/volsnap.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
 name = "xfs"
 path = "fuzz_targets/xfs.rs"
 test = false

@@ -1080,7 +1080,7 @@ The index entry header is 24 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 4 | <!-- typos:disable -->"INDX"<!-- typos:enable --> | Signature |
+| 0 | 4 | "INDX" | Signature |
 | 4 | 2 | | The fix-up values offset, which contains an offset relative from the start of the index entry header |
 | 6 | 2 | | The number of fix-up values |
 | 8 | 8 | | Metadata transaction journal sequence number, which contains a $LogFile Sequence Number (LSN) |
