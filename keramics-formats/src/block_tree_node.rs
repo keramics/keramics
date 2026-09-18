@@ -93,8 +93,33 @@ impl<T> BlockTreeNode<T> {
         }
     }
 
+    /// Retrieves a (leaf) value.
+    pub(super) fn get_value(&self, offset: u64) -> Result<Option<&T>, ErrorTrace> {
+        let mut node: &BlockTreeNode<T> = self;
+
+        while let BlockTreeNodeElements::Branch(sub_nodes) = &node.elements {
+            let sub_node_index: u64 = (offset - node.offset) / node.element_size;
+
+            node = match sub_nodes.get(sub_node_index as usize) {
+                Some(Some(node)) => node,
+                _ => return Ok(None),
+            };
+        }
+        match &node.elements {
+            BlockTreeNodeElements::Leaf(values) => {
+                let value_index: usize = ((offset - node.offset) / node.element_size) as usize;
+
+                match values.get(value_index) {
+                    Some(Some(result)) => Ok(Some(result.as_ref())),
+                    _ => Ok(None),
+                }
+            }
+            _ => Err(keramics_core::error_trace_new!("Missing leaf node")),
+        }
+    }
+
     /// Inserts a (leaf) value.
-    pub fn insert_value(
+    pub(super) fn insert_value(
         &mut self,
         elements_per_node: u64,
         leaf_value_size: u64,
@@ -172,13 +197,86 @@ impl<T> BlockTreeNode<T> {
                 let last_value_index: u64 = first_value_index + number_of_values;
 
                 for value_index in first_value_index..last_value_index {
-                    if values[value_index as usize].is_some() {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Leaf value: {} already set",
-                            value_index
-                        )));
-                    }
                     values[value_index as usize] = Some(value.clone());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Removes a (leaf) value.
+    pub(super) fn remove_value(
+        &mut self,
+        elements_per_node: u64,
+        leaf_value_size: u64,
+        offset: u64,
+        size: u64,
+    ) -> Result<(), ErrorTrace> {
+        match &mut self.elements {
+            BlockTreeNodeElements::Branch(sub_nodes) => {
+                let number_of_sub_nodex: u64 = size.div_ceil(self.element_size);
+                let first_sub_node_index: u64 = (offset - self.offset) / self.element_size;
+                let last_sub_node_index: u64 = first_sub_node_index + number_of_sub_nodex;
+
+                let mut sub_node_element_size: u64 = leaf_value_size;
+
+                while self.element_size / sub_node_element_size > elements_per_node {
+                    sub_node_element_size *= elements_per_node;
+                }
+                let sub_node_type: BlockTreeNodeType = if sub_node_element_size <= leaf_value_size {
+                    BlockTreeNodeType::Leaf
+                } else {
+                    BlockTreeNodeType::Branch
+                };
+                let mut sub_node_offset: u64 =
+                    self.offset + (first_sub_node_index * self.element_size);
+
+                for sub_node_index in first_sub_node_index..last_sub_node_index {
+                    if sub_nodes[sub_node_index as usize].is_none() {
+                        let sub_node: BlockTreeNode<T> = BlockTreeNode::new(
+                            &sub_node_type,
+                            sub_node_offset,
+                            sub_node_element_size,
+                            elements_per_node,
+                        );
+                        sub_nodes[sub_node_index as usize] = Some(sub_node);
+                    }
+                    let sub_node: &mut BlockTreeNode<T> =
+                        match sub_nodes[sub_node_index as usize].as_mut() {
+                            Some(node) => node,
+                            None => {
+                                return Err(keramics_core::error_trace_new!(format!(
+                                    "Unable to obtain mutable reference to sub node: {}",
+                                    sub_node_index
+                                )));
+                            }
+                        };
+                    match sub_node.remove_value(elements_per_node, leaf_value_size, offset, size) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to remove value from sub node: {}", sub_node_index),
+                            );
+                            return Err(error);
+                        }
+                    }
+                    sub_node_offset += self.element_size;
+                }
+            }
+            BlockTreeNodeElements::Leaf(values) => {
+                if !size.is_multiple_of(self.element_size) {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Size: {} not a multitude of node element size: {}",
+                        size, self.element_size
+                    )));
+                }
+                let number_of_values: u64 = size / self.element_size;
+                let first_value_index: u64 = (offset - self.offset) / self.element_size;
+                let last_value_index: u64 = first_value_index + number_of_values;
+
+                for value_index in first_value_index..last_value_index {
+                    values[value_index as usize] = None;
                 }
             }
         }
@@ -191,13 +289,45 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_get_value() -> Result<(), ErrorTrace> {
+        let test_node: BlockTreeNode<u32> =
+            BlockTreeNode::<u32>::new(&BlockTreeNodeType::Leaf, 0, 512, 256);
+
+        let result: Option<&u32> = test_node.get_value(0)?;
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_insert_value_with_leaf_size() -> Result<(), ErrorTrace> {
         let mut test_node: BlockTreeNode<u32> =
             BlockTreeNode::<u32>::new(&BlockTreeNodeType::Leaf, 0, 512, 256);
 
         test_node.insert_value(256, 512, 0, 512, Arc::new(42))?;
-
         assert_eq!(test_node.elements.len(), 256);
+
+        let result: Option<&u32> = test_node.get_value(0)?;
+        assert_eq!(result, Some(&42));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove_value() -> Result<(), ErrorTrace> {
+        let mut test_node: BlockTreeNode<u32> =
+            BlockTreeNode::<u32>::new(&BlockTreeNodeType::Leaf, 0, 512, 256);
+
+        test_node.insert_value(256, 512, 0, 512, Arc::new(42))?;
+        assert_eq!(test_node.elements.len(), 256);
+
+        let result: Option<&u32> = test_node.get_value(0)?;
+        assert_eq!(result, Some(&42));
+
+        test_node.remove_value(256, 512, 0, 512)?;
+
+        let result: Option<&u32> = test_node.get_value(0)?;
+        assert_eq!(result, None);
 
         Ok(())
     }

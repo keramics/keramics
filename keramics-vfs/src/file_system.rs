@@ -1176,6 +1176,8 @@ mod tests {
                     0xb3, 0x62, 0x43, 0x29, 0x54, 0xed,
                 ],
             };
+            _ = credential_store.add_credential(credential);
+
             let credential: VfsCredential = VfsCredential::Passphrase(b"KeRaMiCs".to_vec());
             _ = credential_store.add_credential(credential);
         }

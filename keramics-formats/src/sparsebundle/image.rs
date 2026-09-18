@@ -18,9 +18,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 
 use crate::block_stream::BlockStream;
 use crate::cdsaencr::constants::*;
-use crate::cdsaencr::{
-    CdsaEncrContainer, CdsaEncrCredential, CdsaEncrEncryptionContext, CdsaEncrEncryptionType,
-};
+use crate::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential, CdsaEncrEncryptionType};
 use crate::fake_file_resolver::FakeFileResolver;
 use crate::file_resolver::FileResolverReference;
 use crate::path_component::PathComponent;
@@ -75,11 +73,6 @@ impl SparseBundleImage {
 
     /// Retrieves a data stream.
     pub fn get_data_stream(&self) -> Option<DataStreamReference> {
-        let encryption_context: Option<&CdsaEncrEncryptionContext> = match &self.encrypted_container
-        {
-            Some(encrypted_container) => encrypted_container.encryption_context.as_ref(),
-            None => None,
-        };
         match &self.encrypted_container {
             Some(encrypted_container) => match &encrypted_container.encryption_context {
                 Some(encryption_context) => Some(Arc::new(RwLock::new(BlockStream::<

@@ -11,8 +11,14 @@
  * under the License.
  */
 
+use std::io::SeekFrom;
+
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_types::Uuid;
+
+use super::store_block::VolsnapStoreBlock;
+use super::store_metadata::VolsnapStoreMetadata;
 
 /// Volume Shadow Snapshot (volsnap) shadow copy.
 pub struct VolsnapShadowCopy {
@@ -31,8 +37,8 @@ pub struct VolsnapShadowCopy {
     /// Store block list offset.
     pub store_block_list_offset: u64,
 
-    /// Store block range list offset.
-    pub store_block_range_list_offset: u64,
+    /// Store range list offset.
+    pub store_range_list_offset: u64,
 
     /// Store bitmap offset.
     pub store_bitmap_offset: u64,
@@ -65,7 +71,7 @@ impl VolsnapShadowCopy {
             type2_entry_read: false,
             store_metadata_offset: 0,
             store_block_list_offset: 0,
-            store_block_range_list_offset: 0,
+            store_range_list_offset: 0,
             store_bitmap_offset: 0,
             store_previous_bitmap_offset: 0,
             type3_entry_read: false,
@@ -74,5 +80,75 @@ impl VolsnapShadowCopy {
             attribute_flags: 0,
             store_metadata_read: false,
         }
+    }
+
+    /// Reads store metadata
+    pub fn read_store_metadata(
+        &mut self,
+        data_stream: &DataStreamReference,
+        offset: u64,
+    ) -> Result<(), ErrorTrace> {
+        let mut store_block: VolsnapStoreBlock = VolsnapStoreBlock::new();
+
+        match store_block.read_at_position(data_stream, SeekFrom::Start(offset)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read store metadata block at offset: {} (0x{:08x})",
+                        offset, offset
+                    ),
+                );
+                return Err(error);
+            }
+        }
+        if store_block.block_type != 4 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported store metadata block - unsupported block type",
+            ));
+        }
+        if store_block.current_block_offset != 0 && store_block.current_block_offset != offset {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported store metadata block - current block offset value out of bounds",
+            ));
+        }
+        if store_block.next_block_offset != 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported store metadata block - unsupported next block offset",
+            ));
+        }
+        let data_end_offset: usize = 128 + (store_block.store_metadata_size as usize);
+
+        if store_block.store_metadata_size < 64 || data_end_offset > store_block.data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported store metadata block - invalid store metadata size value out of bounds",
+            ));
+        }
+        keramics_core::debug_trace_data_and_structure!(
+            "VolsnapStoreMetadata",
+            offset + 128,
+            &store_block.data[128..data_end_offset],
+            store_block.store_metadata_size,
+            VolsnapStoreMetadata::debug_read_data(&store_block.data[128..])
+        );
+        let mut store_metadata: VolsnapStoreMetadata = VolsnapStoreMetadata::new();
+
+        match store_metadata.read_data(&store_block.data[128..]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read store metadata");
+                return Err(error);
+            }
+        }
+        self.copy_identifier = store_metadata.copy_identifier;
+        self.copy_set_identifier = store_metadata.copy_set_identifier;
+        self.attribute_flags = store_metadata.attribute_flags;
+        self.store_metadata_read = true;
+
+        // TODO: read operating machine string
+        // TODO: read service machine string
+
+        Ok(())
     }
 }

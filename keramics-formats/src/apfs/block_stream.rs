@@ -13,8 +13,6 @@
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use std::io::SeekFrom;
     use std::path::PathBuf;
 

@@ -135,6 +135,20 @@ mod tests {
     }
 
     #[test]
+    fn test_read_data() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = VhdxSectorBitmap::new(32, 512);
+        test_struct.read_data(&test_data)?;
+
+        assert_eq!(test_struct.ranges.len(), 4);
+        assert_eq!(test_struct.ranges[2].size, 32768);
+        assert_eq!(test_struct.ranges[2].is_set, true);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);

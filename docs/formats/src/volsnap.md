@@ -183,7 +183,7 @@ The store block header is 128 bytes in size and consists of:
 | 24 | 8 | | Relative (block) offset, which is relative to the start of the store |
 | 32 | 8 | | Current (block) offset, which is relative to the start of the volume |
 | 40 | 8 | | Next (block) offset, which is relative to the start of the volume or contains 0 if this is the last block |
-| 48 | 8 | | Size of store metadata, which is only used in first block header and should be 0 in successive block headers |
+| 48 | 8 | | Size of store metadata, which appears to be only used in block type 4 and contains 0 for block types 3, 5 and 6 |
 | 56 | 72 | | Unknown (empty value) |
 
 #### Store block types {#block_types}
@@ -191,14 +191,14 @@ The store block header is 128 bytes in size and consists of:
 | Value | Identifier | Description |
 | --- | --- | --- |
 | 0 | | Unknown |
-| 1 | | Volume header |
-| 2 | | Catalog block header |
-| 3 | | Block descriptor list (Diff area table) |
-| 4 | | Store metadata |
-| 5 | | Unknown (Store block ranges list) |
+| 1 | | Backing volume header |
+| 2 | | Catalog |
+| 3 | | [Store block list](#store_block_list) (or diff area table) |
+| 4 | | [Store metadata](#store_metadata) |
+| 5 | | Store range list |
 | 6 | | Store bitmap |
 
-### Store metadata
+### Store metadata {#store_metadata}
 
 The store metadata is stored directly after the store block header.
 
@@ -270,7 +270,7 @@ The store metadata is of variable size and consists of:
 | 0x01000000 | VSS_VOLSNAP_ATTR_DELAYED_POSTSNAPSHOT | Delayed post snapshot, which is reserved for system use and appears to not be shown by vssadmin |
 | 0x02000000 | VSS_VOLSNAP_ATTR_TXF_RECOVERY | Indicates that Transactional NTFS (TxF) recovery should be enforced during shadow copy creation, which appears to be not shown by vssadmin |
 
-### Store block list
+### Store block list {#store_block_list}
 
 The store block list contains information about the data block ranges used by the snapshot.
 
@@ -278,17 +278,17 @@ The store block list is stored in blocks of 16384 (0x4000) bytes. Each store blo
 consists of:
 
 * a store block header of type 3
-* an array of store block descriptors
+* an array of [block descriptors](#block_descriptor)
 
-#### Block descriptor
+#### Block descriptor {#block_descriptor}
 
 The block descriptor is 32 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 8 | | Original data block offset, which is relative to the start of the volume |
+| 0 | 8 | | Logical data block offset, which contains the offset of the original location of the data relative to the start of the volume |
 | 8 | 8 | | Relative store data block offset, which is relative to the start of the store. TODO: determine if the lower bits are used for different purpose |
-| 16 | 8 | | Store data block offset, which is relative to the start of the volume |
+| 16 | 8 | | Physical data block offset, which is relative to the start of the volume |
 | 24 | 4 | | Flags |
 | 28 | 4 | | Allocation bitmap, which is used if flag 0x02 is set, otherwise is should contain a value of 0 |
 
@@ -319,38 +319,34 @@ For the new block descriptor:
     * Ignore the new block descriptor
 
 * If the overlay flag (0x02) is not set:
-    * If there is a corresponding block descriptor in the reverse block list:
-      Meaning that the original offset (of the new block descriptor) matches
-      the relative offset of a forwarder block descriptor in the reverse block
-      list.
-        * Replace the original offset with that of the forwarder block
-          descriptor in the reverse block list.
+    * If there is a corresponding block descriptor in the reverse block list: Meaning that the
+      original offset (of the new block descriptor) matches the relative offset of a forwarder
+      block descriptor in the reverse block list.
+        * Replace the original offset with that of the forwarder block descriptor in the reverse
+          block list.
         * Remove the forwarder block descriptor from the reverse block list.
         * If the forwarder flag (0x01) (of the new block descriptor) is set:
-            * If the original offset (of the new block descriptor) is the same
-              as the relative offset:
+            * If the original offset (of the new block descriptor) is the same as the relative
+              offset:
                 * Ignore the new block descriptor
 
 * If no previous block descriptor was found:
     * Add the new block descriptor to the block list.
 * Else:
     * If the overlay flag (0x02) is set:
-      The new block descriptor contains an overlay. The allocation bitmap
-      contains information about which part of the block is used. Every bit
-      in the allocation bitmap signifies a block of 512 bytes. The LSB in
-      the allocation bitmap represent the first 512 bytes in the block.
-      Normally the relative offset is should not be 1, but this seems to be
-      ignored if it is.
+      The new block descriptor contains an overlay. The allocation bitmap contains information
+      about which part of the block is used. Every bit in the allocation bitmap signifies a block
+      of 512 bytes. The LSB in the allocation bitmap represent the first 512 bytes in the block.
+      Normally the relative offset should not be 1, but this seems to be ignored if it is.
 
         * If an existing overlay block descriptor was defined:
             * Extended the existing overlay.
-              Normally the relative offset should be 1 and the original offset
-              should match that of the existing overlay block descriptor. If
-              not these values seem to be ignored and the existing overlay
-              is extended with the allocation bitmap in the new block descriptor.
+              Normally the relative offset should be 1 and the original offset should match that of
+              the existing overlay block descriptor. If not these values seem to be ignored and the
+              existing overlay is extended with the allocation bitmap in the new block descriptor.
         * Else:
-            * Replace the existing block descriptor. Existing overlay block
-              descriptors are applied to the new block descriptor.
+            * Replace the existing block descriptor. Existing overlay block descriptors are applied
+              to the new block descriptor.
 
 * If the forwarder flag (0x01) is set:
     * If no previous reverse block descriptor was found:
@@ -369,17 +365,17 @@ The store block range list is stored in blocks of 16384 (0x4000) bytes. Each sto
 block consists of:
 
 * a store block header of type 5
-* an array of store block range list entries
+* an array of [range descriptors](#range_descriptor)
 
-#### Store block range entry
+#### Range descriptor {#range_descriptor}
 
-The store block range entry is 24 bytes in size and consists of:
+The range descriptor is 24 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 8 | | Store (block range start) offset, which is relative to the start of the volume |
+| 0 | 8 | | Range offset, which is relative to the start of the volume |
 | 8 | 8 | | Relative (block range start) offset, which is relative to the start of the store |
-| 16 | 8 | | Block range size |
+| 16 | 8 | | Range size |
 
 ### Store bitmap
 

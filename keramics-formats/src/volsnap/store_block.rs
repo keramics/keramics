@@ -49,8 +49,6 @@ impl VolsnapStoreBlock {
 
     /// Reads the store block from a buffer.
     fn read_data(&mut self, data: &[u8], offset: u64) -> Result<(), ErrorTrace> {
-        let data_size: usize = data.len();
-
         keramics_core::debug_trace_data_and_structure!(
             "VolsnapStoreBlockHeader",
             offset,

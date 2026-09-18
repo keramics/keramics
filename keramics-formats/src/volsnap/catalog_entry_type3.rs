@@ -23,11 +23,7 @@ use keramics_types::{Uuid, bytes_to_u64_le};
         field(name = "store_block_list_offset", data_type = "u64", format = "hex"),
         field(name = "store_identifier", data_type = "Uuid"),
         field(name = "store_metadata_offset", data_type = "u64", format = "hex"),
-        field(
-            name = "store_block_range_list_offset",
-            data_type = "u64",
-            format = "hex"
-        ),
+        field(name = "store_range_list_offset", data_type = "u64", format = "hex"),
         field(name = "store_bitmap_offset", data_type = "u64", format = "hex"),
         field(name = "ntfs_file_reference", data_type = "u64", format = "hex"),
         field(name = "allocated_size", data_type = "u64"),
@@ -49,8 +45,8 @@ pub struct VolsnapCatalogEntryType3 {
     /// Store metadata offset.
     pub store_metadata_offset: u64,
 
-    /// Store block range list offset.
-    pub store_block_range_list_offset: u64,
+    /// Store range list offset.
+    pub store_range_list_offset: u64,
 
     /// Store identifier.
     pub store_identifier: Uuid,
@@ -68,7 +64,7 @@ impl VolsnapCatalogEntryType3 {
         Self {
             store_block_list_offset: 0,
             store_metadata_offset: 0,
-            store_block_range_list_offset: 0,
+            store_range_list_offset: 0,
             store_identifier: Uuid::new(),
             store_bitmap_offset: 0,
             store_previous_bitmap_offset: 0,
@@ -88,7 +84,7 @@ impl VolsnapCatalogEntryType3 {
         self.store_block_list_offset = bytes_to_u64_le!(data, 8);
         self.store_identifier = Uuid::from_le_bytes(&data[16..32]);
         self.store_metadata_offset = bytes_to_u64_le!(data, 32);
-        self.store_block_range_list_offset = bytes_to_u64_le!(data, 40);
+        self.store_range_list_offset = bytes_to_u64_le!(data, 40);
         self.store_bitmap_offset = bytes_to_u64_le!(data, 48);
         self.store_previous_bitmap_offset = bytes_to_u64_le!(data, 72);
 
@@ -128,9 +124,9 @@ mod tests {
             "9f17819b-b0f9-11f1-90dc-7ced8d4e4e79"
         );
         assert_eq!(test_struct.store_metadata_offset, 0x02a90000);
-        assert_eq!(test_struct.store_block_range_list_offset, 0x02a98000);
+        assert_eq!(test_struct.store_range_list_offset, 0x02a98000);
         assert_eq!(test_struct.store_bitmap_offset, 0x02aa0000);
-        assert_eq!(test_struct.store_block_range_list_offset, 0x02a98000);
+        assert_eq!(test_struct.store_previous_bitmap_offset, 0x00000000);
 
         Ok(())
     }

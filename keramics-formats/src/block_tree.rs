@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
 
-use super::block_tree_node::{BlockTreeNode, BlockTreeNodeElements, BlockTreeNodeType};
+use super::block_tree_node::{BlockTreeNode, BlockTreeNodeType};
 
 /// Block tree.
 pub(crate) struct BlockTree<T> {
@@ -77,30 +77,18 @@ impl<T> BlockTree<T> {
         if self.root_node.is_none() {
             return Ok(None);
         }
-        let mut node: &BlockTreeNode<T> = match self.root_node.as_ref() {
-            Some(node) => node,
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing root node"));
-            }
-        };
-        while let BlockTreeNodeElements::Branch(sub_nodes) = &node.elements {
-            let sub_node_index: u64 = (offset - node.offset) / node.element_size;
-
-            node = match &sub_nodes.get(sub_node_index as usize) {
-                Some(Some(node)) => node,
-                _ => return Ok(None),
-            };
-        }
-        match &node.elements {
-            BlockTreeNodeElements::Leaf(values) => {
-                let value_index: usize = ((offset - node.offset) / node.element_size) as usize;
-
-                match &values.get(value_index) {
-                    Some(Some(value)) => Ok(Some(value.as_ref())),
-                    _ => Ok(None),
+        match self.root_node.as_ref() {
+            Some(node) => match node.get_value(offset) {
+                Ok(result) => Ok(result),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve value from root node"
+                    );
+                    Err(error)
                 }
-            }
-            _ => Err(keramics_core::error_trace_new!("Missing leaf node")),
+            },
+            None => Err(keramics_core::error_trace_new!("Missing root node")),
         }
     }
 
@@ -153,6 +141,51 @@ impl<T> BlockTree<T> {
             )),
         }
     }
+
+    /// Removes a (leaf) value.
+    pub fn remove_value(&mut self, offset: u64, size: u64) -> Result<(), ErrorTrace> {
+        if offset + size > self.data_size {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Range: {} - {} exceeds data size: {}",
+                offset,
+                offset + size,
+                self.data_size
+            )));
+        }
+        if !offset.is_multiple_of(self.leaf_value_size) {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Offset: {} not a multitude of leaf value size: {}",
+                offset, self.leaf_value_size
+            )));
+        }
+        if self.root_node.is_some() {
+            match self.root_node.as_mut() {
+                Some(root_node) => {
+                    match root_node.remove_value(
+                        self.elements_per_node,
+                        self.leaf_value_size,
+                        offset,
+                        size,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to remove value from root node"
+                            );
+                            return Err(error);
+                        }
+                    }
+                }
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unable to obtain mutable reference to root node"
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -190,6 +223,9 @@ mod tests {
         assert_eq!(test_node.element_size, 512);
         assert_eq!(test_node.elements.len(), 256);
 
+        let value: Option<&u32> = test_tree.get_value(131328)?;
+        assert_eq!(value, Some(&0x12345678));
+
         Ok(())
     }
 
@@ -204,6 +240,9 @@ mod tests {
         assert_eq!(test_node.offset, 0);
         assert_eq!(test_node.element_size, 131072);
         assert_eq!(test_node.elements.len(), 8);
+
+        let value: Option<&u32> = test_tree.get_value(131328)?;
+        assert_eq!(value, Some(&0x12345678));
 
         Ok(())
     }
@@ -233,5 +272,32 @@ mod tests {
         let test_leaf_value: u32 = 0x12345678;
         let result = test_tree.insert_value(131072, 500, test_leaf_value);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_remove_value() -> Result<(), ErrorTrace> {
+        let mut test_tree: BlockTree<u32> = BlockTree::new(1048576, 256, 512);
+
+        test_tree.insert_value(131072, 512, 0x12345678)?;
+
+        let test_node: &BlockTreeNode<u32> = test_tree.root_node.as_ref().unwrap();
+        assert_eq!(test_node.offset, 0);
+        assert_eq!(test_node.element_size, 131072);
+        assert_eq!(test_node.elements.len(), 8);
+
+        let test_node: &BlockTreeNode<u32> = &test_node.get_sub_node(1).unwrap();
+        assert_eq!(test_node.offset, 131072);
+        assert_eq!(test_node.element_size, 512);
+        assert_eq!(test_node.elements.len(), 256);
+
+        let value: Option<&u32> = test_tree.get_value(131328)?;
+        assert_eq!(value, Some(&0x12345678));
+
+        test_tree.remove_value(131072, 512)?;
+
+        let value: Option<&u32> = test_tree.get_value(131328)?;
+        assert_eq!(value, None);
+
+        Ok(())
     }
 }
