@@ -12,17 +12,22 @@
  */
 
 mod backing_volume;
+mod block_descriptor;
 mod catalog_block;
 mod catalog_block_header;
 mod catalog_entry_type2;
 mod catalog_entry_type3;
 pub mod constants;
+mod range_descriptor;
 mod shadow_copy;
 mod snapshot;
 mod snapshots;
+mod store_bitmap;
 mod store_block;
 mod store_block_header;
+mod store_block_list;
 mod store_metadata;
+mod store_range_list;
 mod volume_header;
 
 pub use backing_volume::VolsnapBackingVolume;

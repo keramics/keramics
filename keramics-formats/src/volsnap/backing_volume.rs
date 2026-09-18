@@ -23,14 +23,15 @@ use super::catalog_block::VolsnapCatalogBlock;
 use super::shadow_copy::VolsnapShadowCopy;
 use super::snapshot::VolsnapSnapshot;
 use super::snapshots::VolsnapSnapshotsIterator;
-use super::store_block::VolsnapStoreBlock;
-use super::store_metadata::VolsnapStoreMetadata;
 use super::volume_header::VolsnapVolumeHeader;
 
 /// Volume Shadow Snapshot (volsnap) backing volume.
 pub struct VolsnapBackingVolume {
     /// Data stream.
     data_stream: Option<DataStreamReference>,
+
+    /// Bytes per sector.
+    bytes_per_sector: u16,
 
     /// Volume identifier.
     volume_identifier: Uuid,
@@ -47,6 +48,7 @@ impl VolsnapBackingVolume {
     pub fn new() -> Self {
         Self {
             data_stream: None,
+            bytes_per_sector: 0,
             volume_identifier: Uuid::new(),
             storage_volume_identifier: Uuid::new(),
             shadow_copies: IndexedHashMap::new(),
@@ -84,7 +86,22 @@ impl VolsnapBackingVolume {
     ) -> Result<VolsnapSnapshot, ErrorTrace> {
         match self.shadow_copies.get_key_value_by_index(snapshot_index) {
             Some((identifier, shadow_copy)) => match self.data_stream.as_ref() {
-                Some(data_stream) => Ok(VolsnapSnapshot::new(data_stream, identifier, shadow_copy)),
+                Some(data_stream) => {
+                    let mut snapshot: VolsnapSnapshot = VolsnapSnapshot::new(
+                        data_stream,
+                        self.bytes_per_sector,
+                        identifier,
+                        shadow_copy,
+                    );
+                    match snapshot.open() {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(error, "Unable to open snapshot");
+                            return Err(error);
+                        }
+                    }
+                    Ok(snapshot)
+                }
                 None => Err(keramics_core::error_trace_new!("Missing data stream")),
             },
             None => Err(keramics_core::error_trace_new!(format!(
@@ -134,6 +151,9 @@ impl VolsnapBackingVolume {
         self.volume_identifier = volume_header.volume_identifier;
         self.storage_volume_identifier = volume_header.storage_volume_identifier;
 
+        // TODO: read NTFS boot record to determine bytes per sector?
+        self.bytes_per_sector = 512;
+
         let mut catalog_block_offset: u64 = volume_header.catalog_offset;
         let mut read_catalog_blocks: HashSet<u64> = HashSet::new();
 
@@ -182,66 +202,18 @@ impl VolsnapBackingVolume {
         }
         for (_, shadow_copy) in self.shadow_copies.iter_mut() {
             if shadow_copy.type3_entry_read && shadow_copy.store_metadata_offset != 0 {
-                let mut store_block: VolsnapStoreBlock = VolsnapStoreBlock::new();
-
-                match store_block.read_at_position(
-                    data_stream,
-                    SeekFrom::Start(shadow_copy.store_metadata_offset),
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to read store metadata block at offset: {} (0x{:08x})",
-                                shadow_copy.store_metadata_offset,
-                                shadow_copy.store_metadata_offset
-                            ),
-                        );
-                        return Err(error);
-                    }
-                }
-                if store_block.block_type != 4 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unsupported store metadata block - unsupported block type",
-                    ));
-                }
-                if store_block.next_block_offset != 0 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unsupported store metadata block - unsupported next block offset",
-                    ));
-                }
-                let data_end_offset: usize = 128 + (store_block.store_metadata_size as usize);
-
-                if store_block.store_metadata_size < 64 || data_end_offset > store_block.data.len()
+                match shadow_copy
+                    .read_store_metadata(data_stream, shadow_copy.store_metadata_offset)
                 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unsupported store metadata block - invalid store metadata size value out of bounds",
-                    ));
-                }
-                keramics_core::debug_trace_data_and_structure!(
-                    "VolsnapStoreMetadata",
-                    shadow_copy.store_metadata_offset + 128,
-                    &store_block.data[128..data_end_offset],
-                    store_block.store_metadata_size,
-                    VolsnapStoreMetadata::debug_read_data(&store_block.data[128..])
-                );
-                let mut store_metadata: VolsnapStoreMetadata = VolsnapStoreMetadata::new();
-
-                match store_metadata.read_data(&store_block.data[128..]) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read store metadata"
+                            "Unable to read store metadata",
                         );
                         return Err(error);
                     }
                 }
-                shadow_copy.copy_identifier = store_metadata.copy_identifier;
-                shadow_copy.copy_set_identifier = store_metadata.copy_set_identifier;
-                shadow_copy.attribute_flags = store_metadata.attribute_flags;
-                shadow_copy.store_metadata_read = true;
             }
         }
         self.data_stream = Some(data_stream.clone());
@@ -342,8 +314,14 @@ mod tests {
         )));
         backing_volume.read_data_stream(&data_stream)?;
 
-        // assert_eq!(backing_volume.is_locked, true);
-
+        assert_eq!(
+            backing_volume.volume_identifier.to_string(),
+            "9f178190-b0f9-11f1-90dc-7ced8d4e4e79"
+        );
+        assert_eq!(
+            backing_volume.storage_volume_identifier.to_string(),
+            "9f178190-b0f9-11f1-90dc-7ced8d4e4e79"
+        );
         Ok(())
     }
 }

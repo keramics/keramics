@@ -11,16 +11,25 @@
  * under the License.
  */
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_types::Uuid;
 
+use crate::block_tree::BlockTree;
+
+use super::block_descriptor::VolsnapBlockDescriptor;
 use super::shadow_copy::VolsnapShadowCopy;
+use super::store_bitmap::VolsnapStoreBitmap;
+use super::store_block_list::VolsnapStoreBlockList;
+use super::store_range_list::VolsnapStoreRangeList;
 
 /// Volume Shadow Snapshot (volsnap) snapshot.
 pub struct VolsnapSnapshot {
     /// The data stream.
     data_stream: DataStreamReference,
+
+    /// Bytes per sector.
+    bytes_per_sector: u16,
 
     /// Store identifier.
     store_identifier: Uuid,
@@ -40,8 +49,8 @@ pub struct VolsnapSnapshot {
     /// Store block list offset.
     store_block_list_offset: Option<u64>,
 
-    /// Store block range list offset.
-    store_block_range_list_offset: Option<u64>,
+    /// Store range list offset.
+    store_range_list_offset: Option<u64>,
 
     /// Store bitmap offset.
     store_bitmap_offset: Option<u64>,
@@ -60,11 +69,13 @@ impl VolsnapSnapshot {
     /// Creates a new partition.
     pub(super) fn new(
         data_stream: &DataStreamReference,
+        bytes_per_sector: u16,
         store_identifier: &Uuid,
         shadow_copy: &VolsnapShadowCopy,
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
+            bytes_per_sector,
             store_identifier: store_identifier.clone(),
             copy_identifier: if shadow_copy.store_metadata_read {
                 Some(shadow_copy.copy_identifier.clone())
@@ -91,8 +102,8 @@ impl VolsnapSnapshot {
             } else {
                 None
             },
-            store_block_range_list_offset: if shadow_copy.type3_entry_read {
-                Some(shadow_copy.store_block_range_list_offset)
+            store_range_list_offset: if shadow_copy.type3_entry_read {
+                Some(shadow_copy.store_range_list_offset)
             } else {
                 None
             },
@@ -141,6 +152,208 @@ impl VolsnapSnapshot {
     pub fn get_store_identifier(&self) -> &Uuid {
         &self.store_identifier
     }
+
+    /// Opens the snapshot.
+    pub(super) fn open(&mut self) -> Result<(), ErrorTrace> {
+        let store_bitmap_offset: u64 = match self.store_bitmap_offset {
+            Some(store_bitmap_offset) => store_bitmap_offset,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Missing store bitmap offset"
+                ));
+            }
+        };
+        let store_block_list_offset: u64 = match self.store_block_list_offset {
+            Some(store_block_list_offset) => store_block_list_offset,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Missing store block list offset"
+                ));
+            }
+        };
+        let size: u64 = match self.size {
+            Some(size) => size,
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing size"));
+            }
+        };
+        let mut store_bitmap: VolsnapStoreBitmap = VolsnapStoreBitmap::new(self.bytes_per_sector);
+
+        match store_bitmap.read_at_offset(&self.data_stream, store_bitmap_offset) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read store bitmap");
+                return Err(error);
+            }
+        }
+        let mut store_block_list: VolsnapStoreBlockList = VolsnapStoreBlockList::new();
+
+        match store_block_list.read_at_offset(&self.data_stream, store_block_list_offset) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read store block list");
+                return Err(error);
+            }
+        }
+        #[cfg(feature = "debug-trace")]
+        {
+            let store_range_list_offset: u64 = match self.store_range_list_offset {
+                Some(store_range_list_offset) => store_range_list_offset,
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Missing store range list offset"
+                    ));
+                }
+            };
+            let mut store_range_list: VolsnapStoreRangeList = VolsnapStoreRangeList::new();
+
+            match store_range_list.read_at_offset(&self.data_stream, store_range_list_offset) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read store range list");
+                    return Err(error);
+                }
+            }
+        }
+        let mut forward_block_tree: BlockTree<VolsnapBlockDescriptor> =
+            BlockTree::<VolsnapBlockDescriptor>::new(size, 0, 16384);
+        let mut reverse_block_tree: BlockTree<VolsnapBlockDescriptor> =
+            BlockTree::<VolsnapBlockDescriptor>::new(size, 0, 16384);
+
+        for block_descriptor in store_block_list.block_descriptors.iter() {
+            if block_descriptor.is_unused() {
+                continue;
+            }
+            let mut logical_data_offset: u64 = block_descriptor.logical_data_offset;
+
+            if !block_descriptor.is_overlay() {
+                let mut relative_block_offset: u64 = 0;
+
+                let found_reverse_block_descriptor: bool = match reverse_block_tree
+                    .get_value(logical_data_offset)
+                {
+                    Ok(Some(reverse_block_descriptor)) => {
+                        logical_data_offset = reverse_block_descriptor.logical_data_offset;
+                        relative_block_offset = reverse_block_descriptor.relative_block_offset;
+
+                        true
+                    }
+                    Ok(None) => false,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve block descriptor: {} (0x{:08x}) from reverse block tree",
+                                logical_data_offset, logical_data_offset
+                            )
+                        );
+                        return Err(error);
+                    }
+                };
+                if found_reverse_block_descriptor {
+                    match reverse_block_tree.remove_value(relative_block_offset, 16384) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to remove block descriptor: {} (0x{:08x}) from reverse block tree",
+                                    relative_block_offset, relative_block_offset
+                                )
+                            );
+                            return Err(error);
+                        }
+                    }
+                }
+            }
+            if block_descriptor.is_forwarder() {
+                if logical_data_offset == block_descriptor.relative_block_offset {
+                    continue;
+                }
+            }
+            let mut forward_block_descriptor: VolsnapBlockDescriptor = block_descriptor.clone();
+            forward_block_descriptor.logical_data_offset = logical_data_offset;
+
+            match forward_block_tree.get_value(logical_data_offset) {
+                Ok(Some(existing_block_descriptor)) => {
+                    if forward_block_descriptor.is_overlay() {
+                        if existing_block_descriptor.is_overlay() {
+                            forward_block_descriptor.bitmap |= existing_block_descriptor.bitmap;
+                        } else if let Some(overlay_block_descriptor) =
+                            &existing_block_descriptor.overlay
+                        {
+                            forward_block_descriptor.bitmap |= overlay_block_descriptor.bitmap;
+                        } else {
+                            let overlay: Option<Box<VolsnapBlockDescriptor>> =
+                                Some(Box::new(forward_block_descriptor));
+
+                            forward_block_descriptor = existing_block_descriptor.clone();
+                            forward_block_descriptor.overlay = overlay;
+                        }
+                    } else {
+                        if existing_block_descriptor.is_overlay() {
+                            forward_block_descriptor.overlay =
+                                Some(Box::new(existing_block_descriptor.clone()));
+                        } else {
+                            forward_block_descriptor.overlay =
+                                existing_block_descriptor.overlay.clone();
+                        }
+                    }
+                }
+                Ok(None) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve block descriptor: {} (0x{:08x}) from forward block tree",
+                            logical_data_offset, logical_data_offset
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+            match forward_block_tree.insert_value(
+                logical_data_offset,
+                16384,
+                forward_block_descriptor,
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to insert block descriptor: {} (0x{:08x}) into forward block tree",
+                            logical_data_offset, logical_data_offset
+                        )
+                    );
+                    return Err(error);
+                }
+            }
+            if block_descriptor.is_forwarder() {
+                let relative_block_offset: u64 = block_descriptor.relative_block_offset;
+                let reverse_block_descriptor: VolsnapBlockDescriptor = block_descriptor.clone();
+
+                match reverse_block_tree.insert_value(
+                    relative_block_offset,
+                    16384,
+                    reverse_block_descriptor,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to insert block descriptor: {} (0x{:08x}) into reverse block tree",
+                                relative_block_offset, relative_block_offset
+                            )
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -181,7 +394,12 @@ mod tests {
             .get_value_by_key(&identifier)
             .unwrap();
 
-        Ok(VolsnapSnapshot::new(&data_stream, &identifier, shadow_copy))
+        Ok(VolsnapSnapshot::new(
+            &data_stream,
+            512,
+            &identifier,
+            shadow_copy,
+        ))
     }
 
     #[test]

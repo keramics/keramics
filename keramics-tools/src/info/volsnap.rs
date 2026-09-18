@@ -238,8 +238,7 @@ mod tests {
         )));
         let volsnap_backing_volume: VolsnapBackingVolume =
             VolsnapInfo::open_backing_volume(&data_stream)?;
-        let volsnap_snapshot: VolsnapSnapshot =
-            volsnap_backing_volume.get_snapshot_by_index(0).unwrap();
+        let volsnap_snapshot: VolsnapSnapshot = volsnap_backing_volume.get_snapshot_by_index(0)?;
 
         let test_struct: VolsnapSnapshotInfo = VolsnapSnapshotInfo::new(0, &volsnap_snapshot);
 

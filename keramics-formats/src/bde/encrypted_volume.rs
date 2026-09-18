@@ -1189,7 +1189,6 @@ mod tests {
 
         assert_eq!(encrypted_volume.is_locked, true);
 
-        let fvek_key_data: Vec<u8> = vec![];
         let credentials: Vec<BdeCredential> = vec![BdeCredential::KeyData {
             identifier: vec![
                 0x69, 0xe0, 0xdd, 0xfb, 0xb1, 0xe6, 0xf9, 0x4c, 0x80, 0x64, 0x6b, 0x68, 0xd5, 0x95,
