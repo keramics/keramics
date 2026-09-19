@@ -234,11 +234,15 @@ mod tests {
 
     use crate::assert_lines_eq;
 
-    #[test]
-    fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
+    fn get_volume_system() -> Result<ApmVolumeSystem, ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let apm_volume_system: ApmVolumeSystem = ApmInfo::open_volume_system(&data_stream)?;
+        ApmInfo::open_volume_system(&data_stream)
+    }
+
+    #[test]
+    fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
+        let apm_volume_system: ApmVolumeSystem = get_volume_system()?;
 
         let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
         let test_struct: ApmPartitionInfo = ApmPartitionInfo::new(0, &apm_partition);
@@ -289,9 +293,7 @@ mod tests {
 
     #[test]
     fn test_volume_system_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let apm_volume_system: ApmVolumeSystem = ApmInfo::open_volume_system(&data_stream)?;
+        let apm_volume_system: ApmVolumeSystem = get_volume_system()?;
 
         let test_struct: ApmVolumeSystemInfo = ApmVolumeSystemInfo::new(&apm_volume_system);
 

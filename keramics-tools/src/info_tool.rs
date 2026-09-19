@@ -730,7 +730,7 @@ fn main() -> ExitCode {
             FormatIdentifier::Vhdx => VhdxInfo::print_file(&data_stream),
             // TODO: add support for individual VMDK file.
             FormatIdentifier::Vmdk => VmdkInfo::print_image(&arguments.source),
-            FormatIdentifier::Volsnap => VolsnapInfo::print_backing_volume(&data_stream),
+            FormatIdentifier::Volsnap => VolsnapInfo::print_shadow_storage(&arguments.source),
             FormatIdentifier::Xfs => {
                 XfsInfo::print_file_system(&data_stream, info_tool.character_encoding.as_ref())
             }

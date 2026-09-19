@@ -132,11 +132,16 @@ mod tests {
 
     use crate::assert_lines_eq;
 
-    #[test]
-    fn test_file_information_fmt() -> Result<(), ErrorTrace> {
+    fn get_file() -> Result<VhdFile, ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ext2.vhd");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let vhd_file: VhdFile = VhdInfo::open_file(&data_stream)?;
+        VhdInfo::open_file(&data_stream)
+    }
+
+    #[test]
+    fn test_file_information_fmt() -> Result<(), ErrorTrace> {
+        let vhd_file: VhdFile = get_file()?;
+
         let test_struct: VhdFileInfo = VhdFileInfo::new(&vhd_file);
 
         let expected_string: &str = concat!(

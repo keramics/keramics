@@ -160,12 +160,15 @@ mod tests {
 
     use crate::assert_lines_eq;
 
-    #[test]
-    fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
+    fn get_volume_system() -> Result<BsdDiskLabelVolumeSystem, ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/bsdlabel/bsdlabel.raw");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let bsdlabel_volume_system: BsdDiskLabelVolumeSystem =
-            BsdDiskLabelInfo::open_volume_system(&data_stream)?;
+        BsdDiskLabelInfo::open_volume_system(&data_stream)
+    }
+
+    #[test]
+    fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
+        let bsdlabel_volume_system: BsdDiskLabelVolumeSystem = get_volume_system()?;
 
         let bsdlabel_partition: BsdDiskLabelPartition =
             bsdlabel_volume_system.get_partition_by_index(0)?;
@@ -187,10 +190,7 @@ mod tests {
 
     #[test]
     fn test_volume_system_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/bsdlabel/bsdlabel.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let bsdlabel_volume_system: BsdDiskLabelVolumeSystem =
-            BsdDiskLabelInfo::open_volume_system(&data_stream)?;
+        let bsdlabel_volume_system: BsdDiskLabelVolumeSystem = get_volume_system()?;
 
         let test_struct: BsdDiskLabelVolumeSystemInfo =
             BsdDiskLabelVolumeSystemInfo::new(&bsdlabel_volume_system);

@@ -163,12 +163,15 @@ mod tests {
 
     use crate::assert_lines_eq;
 
-    #[test]
-    fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
+    fn get_volume_system() -> Result<SgiDiskLabelVolumeSystem, ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/sgilabel/sgilabel.raw");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let sgilabel_volume_system: SgiDiskLabelVolumeSystem =
-            SgiDiskLabelInfo::open_volume_system(&data_stream)?;
+        SgiDiskLabelInfo::open_volume_system(&data_stream)
+    }
+
+    #[test]
+    fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
+        let sgilabel_volume_system: SgiDiskLabelVolumeSystem = get_volume_system()?;
 
         let sgilabel_partition: SgiDiskLabelPartition =
             sgilabel_volume_system.get_partition_by_index(0)?;
@@ -190,10 +193,7 @@ mod tests {
 
     #[test]
     fn test_volume_system_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/sgilabel/sgilabel.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let sgilabel_volume_system: SgiDiskLabelVolumeSystem =
-            SgiDiskLabelInfo::open_volume_system(&data_stream)?;
+        let sgilabel_volume_system: SgiDiskLabelVolumeSystem = get_volume_system()?;
 
         let test_struct: SgiDiskLabelVolumeSystemInfo =
             SgiDiskLabelVolumeSystemInfo::new(&sgilabel_volume_system);

@@ -196,11 +196,15 @@ mod tests {
 
     use crate::assert_lines_eq;
 
-    #[test]
-    fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
+    fn get_volume_system() -> Result<MbrVolumeSystem, ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/mbr/mbr.raw");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let mbr_volume_system: MbrVolumeSystem = MbrInfo::open_volume_system(&data_stream)?;
+        MbrInfo::open_volume_system(&data_stream)
+    }
+
+    #[test]
+    fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
+        let mbr_volume_system: MbrVolumeSystem = get_volume_system()?;
 
         let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
         let test_struct: MbrPartitionInfo = MbrPartitionInfo::new(&mbr_partition);
@@ -221,9 +225,7 @@ mod tests {
 
     #[test]
     fn test_volume_system_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/mbr/mbr.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let mbr_volume_system: MbrVolumeSystem = MbrInfo::open_volume_system(&data_stream)?;
+        let mbr_volume_system: MbrVolumeSystem = get_volume_system()?;
 
         let test_struct: MbrVolumeSystemInfo = MbrVolumeSystemInfo::new(&mbr_volume_system);
 

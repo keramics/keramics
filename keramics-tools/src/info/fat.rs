@@ -380,6 +380,12 @@ mod tests {
 
     use crate::assert_lines_eq;
 
+    fn get_file_system() -> Result<FatFileSystem, ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/fat/fat12.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        FatInfo::open_file_system(&data_stream)
+    }
+
     #[test]
     fn test_date_time_information_fmt() {
         let date_time: DateTime = DateTime::FatDate(FatDate::new(0x3d0c));
@@ -406,9 +412,7 @@ mod tests {
 
     #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/fat/fat12.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let fat_file_system: FatFileSystem = FatInfo::open_file_system(&data_stream)?;
+        let fat_file_system: FatFileSystem = get_file_system()?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -434,9 +438,7 @@ mod tests {
 
     #[test]
     fn test_file_system_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/fat/fat12.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let fat_file_system: FatFileSystem = FatInfo::open_file_system(&data_stream)?;
+        let fat_file_system: FatFileSystem = get_file_system()?;
 
         let test_struct: FatFileSystemInfo = FatFileSystemInfo::new(&fat_file_system);
 

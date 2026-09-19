@@ -56,6 +56,9 @@ pub struct VolsnapCatalogEntryType3 {
 
     /// Store previous bitmap offset.
     pub store_previous_bitmap_offset: u64,
+
+    /// Store index.
+    pub store_index: u64,
 }
 
 impl VolsnapCatalogEntryType3 {
@@ -68,6 +71,7 @@ impl VolsnapCatalogEntryType3 {
             store_identifier: Uuid::new(),
             store_bitmap_offset: 0,
             store_previous_bitmap_offset: 0,
+            store_index: 0,
         }
     }
 
@@ -87,6 +91,7 @@ impl VolsnapCatalogEntryType3 {
         self.store_range_list_offset = bytes_to_u64_le!(data, 40);
         self.store_bitmap_offset = bytes_to_u64_le!(data, 48);
         self.store_previous_bitmap_offset = bytes_to_u64_le!(data, 72);
+        self.store_index = bytes_to_u64_le!(data, 80);
 
         Ok(())
     }
@@ -127,6 +132,7 @@ mod tests {
         assert_eq!(test_struct.store_range_list_offset, 0x02a98000);
         assert_eq!(test_struct.store_bitmap_offset, 0x02aa0000);
         assert_eq!(test_struct.store_previous_bitmap_offset, 0x00000000);
+        assert_eq!(test_struct.store_index, 0);
 
         Ok(())
     }

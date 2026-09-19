@@ -30,14 +30,9 @@ impl OsFileResolver {
     pub fn new(base_path: PathBuf) -> Self {
         Self { base_path }
     }
-}
 
-impl FileResolver for OsFileResolver {
-    /// Retrieves a data stream with the specified path.
-    fn get_data_stream(
-        &self,
-        path_components: &[PathComponent],
-    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+    /// Retrieves a path based on the base path and path components.
+    fn get_path(&self, path_components: &[PathComponent]) -> PathBuf {
         let mut path_buf: PathBuf = self.base_path.clone();
 
         for path_component in path_components.iter() {
@@ -58,6 +53,18 @@ impl FileResolver for OsFileResolver {
                 }
             }
         }
+        path_buf
+    }
+}
+
+impl FileResolver for OsFileResolver {
+    /// Retrieves a data stream with the specified path.
+    fn get_data_stream(
+        &self,
+        path_components: &[PathComponent],
+    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+        let path_buf: PathBuf = self.get_path(path_components);
+
         // Note that symlink_metadata() is used to prevent traversing symbolic links.
         match symlink_metadata(&path_buf) {
             Ok(_) => match open_os_data_stream(&path_buf) {
@@ -101,7 +108,6 @@ mod tests {
             PathComponent::from("directory"),
             PathComponent::from("file.txt"),
         ];
-
         let data_stream: Option<DataStreamReference> =
             file_resolver.get_data_stream(&path_components)?;
         assert!(data_stream.is_some());
@@ -113,7 +119,8 @@ mod tests {
     fn test_open_os_file_resolver() -> Result<(), ErrorTrace> {
         let path_string: String = get_test_data_path("");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let _ = open_os_file_resolver(&path_buf)?;
+
+        _ = open_os_file_resolver(&path_buf)?;
 
         Ok(())
     }

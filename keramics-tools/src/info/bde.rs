@@ -191,8 +191,7 @@ mod tests {
 
     use crate::assert_lines_eq;
 
-    #[test]
-    fn test_encrypted_volume_information_fmt() -> Result<(), ErrorTrace> {
+    fn get_encrypted_volume() -> Result<BdeEncryptedVolume, ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/bde/bde_aes128.vhd");
         let os_data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let mut vhd_file: VhdFile = VhdFile::new();
@@ -204,7 +203,12 @@ mod tests {
             65536,
             65994752,
         )));
-        let bde_volume: BdeEncryptedVolume = BdeInfo::open_encrypted_volume(&data_stream)?;
+        BdeInfo::open_encrypted_volume(&data_stream)
+    }
+
+    #[test]
+    fn test_encrypted_volume_information_fmt() -> Result<(), ErrorTrace> {
+        let bde_volume: BdeEncryptedVolume = get_encrypted_volume()?;
 
         let test_struct: BdeEncryptedVolumeInfo = BdeEncryptedVolumeInfo::new(&bde_volume);
 

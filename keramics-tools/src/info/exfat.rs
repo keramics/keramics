@@ -370,6 +370,12 @@ mod tests {
 
     use crate::assert_lines_eq;
 
+    fn get_file_system() -> Result<ExFatFileSystem, ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/exfat/exfat.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        ExFatInfo::open_file_system(&data_stream)
+    }
+
     #[test]
     fn test_date_time_information_fmt() {
         let mut fat_date_time: FatTimeDate = FatTimeDate::new(0x3d0c, 0xa8d0);
@@ -396,9 +402,7 @@ mod tests {
 
     #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/exfat/exfat.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let exfat_file_system: ExFatFileSystem = ExFatInfo::open_file_system(&data_stream)?;
+        let exfat_file_system: ExFatFileSystem = get_file_system()?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let exfat_file_entry: ExFatFileEntry =
@@ -425,9 +429,7 @@ mod tests {
 
     #[test]
     fn test_file_system_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/exfat/exfat.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let exfat_file_system: ExFatFileSystem = ExFatInfo::open_file_system(&data_stream)?;
+        let exfat_file_system: ExFatFileSystem = get_file_system()?;
 
         let test_struct: ExFatFileSystemInfo = ExFatFileSystemInfo::new(&exfat_file_system);
 

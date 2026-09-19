@@ -154,11 +154,15 @@ mod tests {
 
     use crate::assert_lines_eq;
 
-    #[test]
-    fn test_encrypted_volume_information_fmt() -> Result<(), ErrorTrace> {
+    fn get_encrypted_volume() -> Result<LuksEncryptedVolume, ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/luksde/luks1.raw");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let luks_volume: LuksEncryptedVolume = LuksInfo::open_encrypted_volume(&data_stream)?;
+        LuksInfo::open_encrypted_volume(&data_stream)
+    }
+
+    #[test]
+    fn test_encrypted_volume_information_fmt() -> Result<(), ErrorTrace> {
+        let luks_volume: LuksEncryptedVolume = get_encrypted_volume()?;
 
         let test_struct: LuksEncryptedVolumeInfo = LuksEncryptedVolumeInfo::new(&luks_volume);
 

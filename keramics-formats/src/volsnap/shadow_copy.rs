@@ -46,6 +46,9 @@ pub struct VolsnapShadowCopy {
     /// Store previous bitmap offset.
     pub store_previous_bitmap_offset: u64,
 
+    /// Store index.
+    pub store_index: u64,
+
     /// Value to indicate type 3 catalog entry was read.
     pub type3_entry_read: bool,
 
@@ -74,6 +77,7 @@ impl VolsnapShadowCopy {
             store_range_list_offset: 0,
             store_bitmap_offset: 0,
             store_previous_bitmap_offset: 0,
+            store_index: 0,
             type3_entry_read: false,
             copy_identifier: Uuid::new(),
             copy_set_identifier: Uuid::new(),

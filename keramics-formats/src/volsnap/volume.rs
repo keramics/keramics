@@ -21,102 +21,35 @@ use crate::indexed_hash_map::IndexedHashMap;
 
 use super::catalog_block::VolsnapCatalogBlock;
 use super::shadow_copy::VolsnapShadowCopy;
-use super::snapshot::VolsnapSnapshot;
-use super::snapshots::VolsnapSnapshotsIterator;
 use super::volume_header::VolsnapVolumeHeader;
 
-/// Volume Shadow Snapshot (volsnap) backing volume.
-pub struct VolsnapBackingVolume {
+/// Volume Shadow Snapshot (volsnap) volume.
+pub struct VolsnapVolume {
     /// Data stream.
-    data_stream: Option<DataStreamReference>,
-
-    /// Bytes per sector.
-    bytes_per_sector: u16,
+    pub(super) data_stream: Option<DataStreamReference>,
 
     /// Volume identifier.
-    volume_identifier: Uuid,
+    pub(super) volume_identifier: Uuid,
 
     /// Storage volume identifier.
-    storage_volume_identifier: Uuid,
+    pub(super) storage_volume_identifier: Uuid,
 
     /// Shadow copies.
     pub(super) shadow_copies: IndexedHashMap<Uuid, VolsnapShadowCopy>,
 }
 
-impl VolsnapBackingVolume {
-    /// Creates a new backing volume.
+impl VolsnapVolume {
+    /// Creates a new volume.
     pub fn new() -> Self {
         Self {
             data_stream: None,
-            bytes_per_sector: 0,
             volume_identifier: Uuid::new(),
             storage_volume_identifier: Uuid::new(),
             shadow_copies: IndexedHashMap::new(),
         }
     }
 
-    /// Retrieves a data stream.
-    pub fn get_data_stream(&self) -> Option<DataStreamReference> {
-        if self.volume_identifier != self.storage_volume_identifier {
-            None
-        } else {
-            todo!()
-        }
-    }
-
-    /// Retrieves the storage volume identifier.
-    pub fn get_storage_volume_identifier(&self) -> &Uuid {
-        &self.storage_volume_identifier
-    }
-
-    /// Retrieves the volume identifier.
-    pub fn get_volume_identifier(&self) -> &Uuid {
-        &self.volume_identifier
-    }
-
-    /// Retrieves the number of snapshots.
-    pub fn get_number_of_snapshots(&self) -> usize {
-        self.shadow_copies.len()
-    }
-
-    /// Retrieves a snapshot by index.
-    pub fn get_snapshot_by_index(
-        &self,
-        snapshot_index: usize,
-    ) -> Result<VolsnapSnapshot, ErrorTrace> {
-        match self.shadow_copies.get_key_value_by_index(snapshot_index) {
-            Some((identifier, shadow_copy)) => match self.data_stream.as_ref() {
-                Some(data_stream) => {
-                    let mut snapshot: VolsnapSnapshot = VolsnapSnapshot::new(
-                        data_stream,
-                        self.bytes_per_sector,
-                        identifier,
-                        shadow_copy,
-                    );
-                    match snapshot.open() {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(error, "Unable to open snapshot");
-                            return Err(error);
-                        }
-                    }
-                    Ok(snapshot)
-                }
-                None => Err(keramics_core::error_trace_new!("Missing data stream")),
-            },
-            None => Err(keramics_core::error_trace_new!(format!(
-                "No snapshot with index: {}",
-                snapshot_index
-            ))),
-        }
-    }
-
-    /// Retrieves a snapshots iterator.
-    pub fn snapshots(&self) -> VolsnapSnapshotsIterator<'_> {
-        VolsnapSnapshotsIterator::new(self, self.shadow_copies.len())
-    }
-
-    /// Reads the backing volume from a data stream.
+    /// Reads the volume from a data stream.
     pub fn read_data_stream(
         &mut self,
         data_stream: &DataStreamReference,
@@ -150,9 +83,6 @@ impl VolsnapBackingVolume {
         }
         self.volume_identifier = volume_header.volume_identifier;
         self.storage_volume_identifier = volume_header.storage_volume_identifier;
-
-        // TODO: read NTFS boot record to determine bytes per sector?
-        self.bytes_per_sector = 512;
 
         let mut catalog_block_offset: u64 = volume_header.catalog_offset;
         let mut read_catalog_blocks: HashSet<u64> = HashSet::new();
@@ -235,8 +165,8 @@ mod tests {
     use crate::tests::get_test_data_path;
     use crate::vhd::VhdFile;
 
-    fn get_backing_volume() -> Result<VolsnapBackingVolume, ErrorTrace> {
-        let mut backing_volume: VolsnapBackingVolume = VolsnapBackingVolume::new();
+    fn get_volume() -> Result<VolsnapVolume, ErrorTrace> {
+        let mut volume: VolsnapVolume = VolsnapVolume::new();
 
         let path_string: String = get_test_data_path("volsnap/volsnap.vhd");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
@@ -250,55 +180,14 @@ mod tests {
             65536,
             133103616,
         )));
-        backing_volume.read_data_stream(&data_stream)?;
+        volume.read_data_stream(&data_stream)?;
 
-        Ok(backing_volume)
+        Ok(volume)
     }
-
-    // TODO: add tests for get_data_stream
-
-    #[test]
-    fn test_get_storage_volume_identifier() -> Result<(), ErrorTrace> {
-        let backing_volume: VolsnapBackingVolume = get_backing_volume()?;
-
-        let identifier: &Uuid = backing_volume.get_storage_volume_identifier();
-        assert_eq!(
-            identifier.to_string(),
-            "9f178190-b0f9-11f1-90dc-7ced8d4e4e79"
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_volume_identifier() -> Result<(), ErrorTrace> {
-        let backing_volume: VolsnapBackingVolume = get_backing_volume()?;
-
-        let identifier: &Uuid = backing_volume.get_volume_identifier();
-        assert_eq!(
-            identifier.to_string(),
-            "9f178190-b0f9-11f1-90dc-7ced8d4e4e79"
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_number_of_snapshots() -> Result<(), ErrorTrace> {
-        let backing_volume: VolsnapBackingVolume = get_backing_volume()?;
-
-        let number_of_snapshots: usize = backing_volume.get_number_of_snapshots();
-        assert_eq!(number_of_snapshots, 2);
-
-        Ok(())
-    }
-
-    // TODO: add tests for get_snapshot_by_index
-    // TODO: add tests for snapshots
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
-        keramics_core::mediator::Mediator { debug_output: true }.make_current();
-
-        let mut backing_volume: VolsnapBackingVolume = VolsnapBackingVolume::new();
+        let mut volume: VolsnapVolume = VolsnapVolume::new();
 
         let path_string: String = get_test_data_path("volsnap/volsnap.vhd");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
@@ -312,14 +201,14 @@ mod tests {
             65536,
             133103616,
         )));
-        backing_volume.read_data_stream(&data_stream)?;
+        volume.read_data_stream(&data_stream)?;
 
         assert_eq!(
-            backing_volume.volume_identifier.to_string(),
+            volume.volume_identifier.to_string(),
             "9f178190-b0f9-11f1-90dc-7ced8d4e4e79"
         );
         assert_eq!(
-            backing_volume.storage_volume_identifier.to_string(),
+            volume.storage_volume_identifier.to_string(),
             "9f178190-b0f9-11f1-90dc-7ced8d4e4e79"
         );
         Ok(())

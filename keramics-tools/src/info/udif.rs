@@ -199,10 +199,15 @@ mod tests {
 
     use crate::assert_lines_eq;
 
+    fn get_image() -> Result<UdifImage, ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
+        UdifInfo::open_image(&path_buf)
+    }
+
     #[test]
     fn test_image_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
-        let udif_image: UdifImage = UdifInfo::open_image(&path_buf)?;
+        let udif_image: UdifImage = get_image()?;
+
         let test_struct: UdifImageInfo = UdifImageInfo::new(&udif_image);
 
         let expected_string: &str = concat!(

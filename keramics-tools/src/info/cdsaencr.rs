@@ -110,11 +110,15 @@ mod tests {
 
     use crate::assert_lines_eq;
 
-    #[test]
-    fn test_container_information_fmt() -> Result<(), ErrorTrace> {
+    fn get_container() -> Result<CdsaEncrContainer, ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_aes256.dmg");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let cdsaencr_container: CdsaEncrContainer = CdsaEncrInfo::open_container(&data_stream)?;
+        CdsaEncrInfo::open_container(&data_stream)
+    }
+
+    #[test]
+    fn test_container_information_fmt() -> Result<(), ErrorTrace> {
+        let cdsaencr_container: CdsaEncrContainer = get_container()?;
 
         let test_struct: CdsaEncrContainerInfo = CdsaEncrContainerInfo::new(&cdsaencr_container);
 

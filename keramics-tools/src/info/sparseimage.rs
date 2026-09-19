@@ -128,11 +128,16 @@ mod tests {
 
     use crate::assert_lines_eq;
 
-    #[test]
-    fn test_file_information_fmt() -> Result<(), ErrorTrace> {
+    fn get_file() -> Result<SparseImageFile, ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/sparseimage/hfsplus.sparseimage");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let sparseimage_file: SparseImageFile = SparseImageInfo::open_file(&data_stream)?;
+        SparseImageInfo::open_file(&data_stream)
+    }
+
+    #[test]
+    fn test_file_information_fmt() -> Result<(), ErrorTrace> {
+        let sparseimage_file: SparseImageFile = get_file()?;
+
         let test_struct: SparseImageFileInfo = SparseImageFileInfo::new(&sparseimage_file);
 
         let expected_string: &str = concat!(

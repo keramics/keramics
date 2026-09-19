@@ -11,26 +11,24 @@
  * under the License.
  */
 
-mod block_descriptor;
-mod block_reader;
-mod catalog_block;
-mod catalog_block_header;
-mod catalog_entry_type2;
-mod catalog_entry_type3;
-pub mod constants;
-mod range_descriptor;
-mod shadow_copy;
-mod shadow_storage;
-mod snapshot;
-mod snapshots;
-mod store_bitmap;
-mod store_block;
-mod store_block_header;
-mod store_block_list;
-mod store_metadata;
-mod store_range_list;
-mod volume;
-mod volume_header;
+use crate::path_component::PathComponent;
 
-pub use shadow_storage::VolsnapShadowStorage;
-pub use snapshot::VolsnapSnapshot;
+/// Volume Shadow Snapshot (volsnap) data file descriptor.
+#[derive(Clone)]
+pub struct VolsnapDataFileDescriptor {
+    /// File name.
+    pub(super) file_name: PathComponent,
+
+    /// Start offset.
+    pub(super) start_offset: u64,
+}
+
+impl VolsnapDataFileDescriptor {
+    /// Creates a new data file descriptor.
+    pub fn new(file_name: PathComponent, start_offset: u64) -> Self {
+        Self {
+            file_name,
+            start_offset,
+        }
+    }
+}
