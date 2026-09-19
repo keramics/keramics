@@ -693,7 +693,7 @@ impl NtfsInfo {
                 print!("{}", attribute_information);
             }
             // TODO: add support for $BITMAP, $DATA, $INDEX_ALLOCATION, $INDEX_ROOT
-            NtfsAttribute::Generic { mft_attribute } => {
+            NtfsAttribute::Generic { mft_attribute, .. } => {
                 // TODO: refactor into AttributeInfo
                 if let Some(name) = &mft_attribute.name {
                     println!("    Attribute name\t\t\t\t: {}", name)
@@ -1154,9 +1154,41 @@ mod tests {
     // TODO: add tests for NtfsVolumeInformationAttributeInfo
 
     // TODO: add tests for open_file_system
-    // TODO: add tests for print_attribute
+
+    #[test]
+    fn test_print_attribute() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let ntfs_file_system: NtfsFileSystem = NtfsInfo::open_file_system(&data_stream)?;
+
+        let path: Path = Path::from("/$UpCase");
+        let ntfs_file_entry: NtfsFileEntry = match ntfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => file_entry,
+            None => return Err(keramics_core::error_trace_new!("Missing file entry")),
+        };
+
+        for attribute_index in 0..ntfs_file_entry.get_number_of_attributes() {
+            let attribute: NtfsAttribute =
+                ntfs_file_entry.get_attribute_by_index(attribute_index)?;
+            NtfsInfo::print_attribute(&attribute)?;
+        }
+
+        Ok(())
+    }
+
     // TODO: add tests for print_file_entry_by_identifier
-    // TODO: add tests for print_file_entry_by_path
+
+    #[test]
+    fn test_print_file_entry_by_path() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        NtfsInfo::print_file_entry_by_path(&data_stream, &path)?;
+
+        Ok(())
+    }
+
     // TODO: add tests for print_file_system
     // TODO: add tests for print_hierarchy
     // TODO: add tests for print_hierarchy_file_entry

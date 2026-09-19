@@ -54,6 +54,33 @@ impl NtfsBlockReader {
 
     /// Opens a block reader.
     pub(super) fn open(&mut self, data_attribute: &NtfsMftAttribute) -> Result<(), ErrorTrace> {
+        self.read_block_ranges(data_attribute)?;
+
+        if data_attribute.is_compressed() {
+            self.size = data_attribute.allocated_data_size;
+            self.valid_data_size = data_attribute.allocated_data_size;
+        } else {
+            self.size = data_attribute.data_size;
+            self.valid_data_size = data_attribute.valid_data_size;
+        }
+        Ok(())
+    }
+
+    /// Opens a block reader for the allocated data size.
+    pub(super) fn open_allocated(
+        &mut self,
+        data_attribute: &NtfsMftAttribute,
+    ) -> Result<(), ErrorTrace> {
+        self.read_block_ranges(data_attribute)?;
+
+        self.size = data_attribute.allocated_data_size;
+        self.valid_data_size = data_attribute.allocated_data_size;
+
+        Ok(())
+    }
+
+    /// Reads the block ranges from a $DATA attribute.
+    fn read_block_ranges(&mut self, data_attribute: &NtfsMftAttribute) -> Result<(), ErrorTrace> {
         if data_attribute.is_resident() {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported resident $DATA attribute"
@@ -103,13 +130,6 @@ impl NtfsBlockReader {
                     )));
                 }
             }
-        }
-        if data_attribute.is_compressed() {
-            self.size = data_attribute.allocated_data_size;
-            self.valid_data_size = data_attribute.allocated_data_size;
-        } else {
-            self.size = data_attribute.data_size;
-            self.valid_data_size = data_attribute.valid_data_size;
         }
         Ok(())
     }
@@ -254,5 +274,49 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for read_data_from_blocks
+    #[test]
+    fn test_read_data_from_blocks() -> Result<(), ErrorTrace> {
+        let cluster_size: usize = 4096;
+        let total_clusters: usize = 3;
+        let mut raw_cluster_data: Vec<u8> = vec![0xaa; cluster_size * total_clusters];
+        for byte in raw_cluster_data[8192..11358].iter_mut() {
+            *byte = 0x5a;
+        }
+        let fake_data_stream: DataStreamReference =
+            keramics_core::open_fake_data_stream(&raw_cluster_data);
+
+        let mut mock_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        mock_attribute.non_resident_flag = 0x01;
+        mock_attribute.allocated_data_size = 12288;
+        mock_attribute.data_size = 11358;
+        mock_attribute.valid_data_size = 8192;
+        let mut cluster_group: crate::ntfs::cluster_group::NtfsClusterGroup =
+            crate::ntfs::cluster_group::NtfsClusterGroup::new(0, 2);
+        cluster_group
+            .data_runs
+            .push(crate::ntfs::data_run::NtfsDataRun {
+                number_of_blocks: 3,
+                block_number: 0,
+                run_type: crate::ntfs::data_run::NtfsDataRunType::InFile,
+            });
+        mock_attribute.data_cluster_groups.push(cluster_group);
+
+        let mut reader_normal: NtfsBlockReader = NtfsBlockReader::new(&fake_data_stream, 4096);
+        reader_normal.open(&mock_attribute)?;
+        assert_eq!(reader_normal.get_size(), 11358);
+        let mut read_buf: Vec<u8> = vec![0xff; 512];
+        let bytes_read: usize = reader_normal.read_data_from_blocks(&mut read_buf, 8192)?;
+        assert_eq!(bytes_read, 512);
+        assert_eq!(read_buf, vec![0x00; 512]);
+
+        let mut reader_allocated: NtfsBlockReader = NtfsBlockReader::new(&fake_data_stream, 4096);
+        reader_allocated.open_allocated(&mock_attribute)?;
+        assert_eq!(reader_allocated.get_size(), 12288);
+        let mut raw_buf: Vec<u8> = vec![0x00; 512];
+        let raw_read: usize = reader_allocated.read_data_from_blocks(&mut raw_buf, 8192)?;
+        assert_eq!(raw_read, 512);
+        assert_eq!(raw_buf, vec![0x5a; 512]);
+
+        Ok(())
+    }
 }
