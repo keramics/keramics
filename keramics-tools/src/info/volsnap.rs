@@ -208,7 +208,7 @@ mod tests {
     use std::path::{MAIN_SEPARATOR_STR, PathBuf};
     use std::sync::{Arc, RwLock};
 
-    use keramics_core::open_os_data_stream;
+    use keramics_core::{DataStreamReference, open_os_data_stream};
     use keramics_formats::vhd::VhdFile;
     use keramics_formats::{FileResolver, RangeStream};
 
