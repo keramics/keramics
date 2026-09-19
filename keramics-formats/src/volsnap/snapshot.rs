@@ -369,10 +369,10 @@ mod tests {
     use crate::RangeStream;
     use crate::tests::get_test_data_path;
     use crate::vhd::VhdFile;
-    use crate::volsnap::backing_volume::VolsnapBackingVolume;
+    use crate::volsnap::volume::VolsnapVolume;
 
     fn get_snapshot() -> Result<VolsnapSnapshot, ErrorTrace> {
-        let mut backing_volume: VolsnapBackingVolume = VolsnapBackingVolume::new();
+        let mut volume: VolsnapVolume = VolsnapVolume::new();
 
         let path_string: String = get_test_data_path("volsnap/volsnap.vhd");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
@@ -386,13 +386,11 @@ mod tests {
             65536,
             133103616,
         )));
-        backing_volume.read_data_stream(&data_stream)?;
+        volume.read_data_stream(&data_stream)?;
 
         let identifier: Uuid = Uuid::from_string("9f17819b-b0f9-11f1-90dc-7ced8d4e4e79")?;
-        let shadow_copy: &VolsnapShadowCopy = backing_volume
-            .shadow_copies
-            .get_value_by_key(&identifier)
-            .unwrap();
+        let shadow_copy: &VolsnapShadowCopy =
+            volume.shadow_copies.get_value_by_key(&identifier).unwrap();
 
         Ok(VolsnapSnapshot::new(
             &data_stream,

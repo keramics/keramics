@@ -257,11 +257,16 @@ mod tests {
 
     use crate::assert_lines_eq;
 
-    #[test]
-    fn test_file_information_fmt() -> Result<(), ErrorTrace> {
+    fn get_file() -> Result<QcowFile, ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let qcow_file: QcowFile = QcowInfo::open_file(&data_stream)?;
+        QcowInfo::open_file(&data_stream)
+    }
+
+    #[test]
+    fn test_file_information_fmt() -> Result<(), ErrorTrace> {
+        let qcow_file: QcowFile = get_file()?;
+
         let test_struct: QcowFileInfo = QcowFileInfo::new(&qcow_file);
 
         let expected_string: &str = concat!(

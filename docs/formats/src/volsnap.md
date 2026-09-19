@@ -130,7 +130,7 @@ A catalog entry type 2 is 128 bytes in size and consists of:
 | 0 | 8 | 2 | Catalog entry type |
 | 8 | 8 | | Volume size |
 | 16 | 16 | | Store identifier, which contains a GUID that is used in the store filename |
-| 32 | 8 | | Unknown (Sequence number) |
+| 32 | 8 | | Unknown (Sequence number?) |
 | 40 | 8 | | Unknown (Flags?), seen 0x40 in Windows in Vista and 7 and 0x440 in Windows 8 (file backup?) |
 | 48 | 8 | | Shadow copy creation time, which contains a FILETIME |
 | 56 | 72 | | Unknown (empty values) |
@@ -462,9 +462,9 @@ not corresponds with the volume size defined by the rest of the catalog entries.
 
 ### Scope snapshots
 
-Technically scoped snapshots are a feature of volsnapa as of of Windows 8 or Windows Server 2012 and
-not a corruption scenario. It has been captured as a corruption scenario since it leads to some
-interesting side effects within file content of the snapshot.
+Scoped snapshots are a feature of volsnap as of of Windows 8 or Windows Server 2012 and not a
+corruption scenario. The feature leads to some interesting side effects within file content of a
+snapshot.
 
 Scope snapshots functionality can be controlled via the Windows Registry value:
 

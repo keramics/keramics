@@ -223,11 +223,16 @@ mod tests {
 
     use crate::assert_lines_eq;
 
+    fn get_image() -> Result<VmdkImage, ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/vmdk/ext2.vmdk");
+        VmdkInfo::open_image(&path_buf)
+    }
+
     #[test]
     fn test_image_layer_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/vmdk/ext2.vmdk");
-        let vmdk_image: VmdkImage = VmdkInfo::open_image(&path_buf)?;
+        let vmdk_image: VmdkImage = get_image()?;
         let vmdk_image_layer: Arc<VmdkImageLayer> = vmdk_image.get_layer_by_index(0)?;
+
         let test_struct: VmdkImageLayerInfo = VmdkImageLayerInfo::new(&vmdk_image_layer);
 
         let expected_string: &str = concat!(

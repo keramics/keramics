@@ -12,46 +12,48 @@
  */
 
 use std::fmt;
+use std::path::PathBuf;
 
-use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::volsnap::{VolsnapBackingVolume, VolsnapSnapshot};
+use keramics_core::ErrorTrace;
+use keramics_formats::volsnap::{VolsnapShadowStorage, VolsnapSnapshot};
+use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
 use crate::formatters::ByteSize;
 
 use super::windows::FiletimeDateTimeInfo;
 
-/// Volume Shadow Snapshot (volsnap) backing volume information.
-struct VolsnapBackingVolumeInfo<'a> {
-    /// Backing volume.
-    backing_volume: &'a VolsnapBackingVolume,
+/// Volume Shadow Snapshot (volsnap) shadow storage information.
+struct VolsnapShadowStorageInfo<'a> {
+    /// Shadow storage.
+    shadow_storage: &'a VolsnapShadowStorage,
 }
 
-impl<'a> VolsnapBackingVolumeInfo<'a> {
-    /// Creates new backing volume information.
-    fn new(backing_volume: &'a VolsnapBackingVolume) -> Self {
-        Self { backing_volume }
+impl<'a> VolsnapShadowStorageInfo<'a> {
+    /// Creates new shadow storage information.
+    fn new(shadow_storage: &'a VolsnapShadowStorage) -> Self {
+        Self { shadow_storage }
     }
 }
 
-impl<'a> fmt::Display for VolsnapBackingVolumeInfo<'a> {
-    /// Formats backing volume information for display.
+impl<'a> fmt::Display for VolsnapShadowStorageInfo<'a> {
+    /// Formats shadow storage information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Volume Shadow Snapshot (volsnap) information:")?;
 
         writeln!(
             formatter,
             "    Volume identifier\t\t\t\t: {}",
-            self.backing_volume.get_volume_identifier()
+            self.shadow_storage.get_volume_identifier()
         )?;
         writeln!(
             formatter,
-            "    Storage volume identifier\t\t: {}",
-            self.backing_volume.get_storage_volume_identifier()
+            "    Storage volume identifier\t\t\t: {}",
+            self.shadow_storage.get_storage_volume_identifier()
         )?;
         writeln!(
             formatter,
             "    Number of shadow copies\t\t\t: {}",
-            self.backing_volume.get_number_of_snapshots(),
+            self.shadow_storage.get_number_of_snapshots(),
         )?;
         writeln!(formatter)
     }
@@ -124,41 +126,62 @@ impl<'a> fmt::Display for VolsnapSnapshotInfo<'a> {
 pub struct VolsnapInfo {}
 
 impl VolsnapInfo {
-    /// Opens a backing volume.
-    pub fn open_backing_volume(
-        data_stream: &DataStreamReference,
-    ) -> Result<VolsnapBackingVolume, ErrorTrace> {
-        let mut volsnap_backing_volume: VolsnapBackingVolume = VolsnapBackingVolume::new();
+    /// Opens a shadow storage.
+    pub fn open_shadow_storage(path_buf: &PathBuf) -> Result<VolsnapShadowStorage, ErrorTrace> {
+        let mut base_path: PathBuf = path_buf.clone();
+        base_path.pop();
 
-        match volsnap_backing_volume.read_data_stream(data_stream) {
+        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
+            Ok(file_resolver) => file_resolver,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to create file resolver");
+                return Err(error);
+            }
+        };
+        let file_name: PathComponent = match path_buf.file_name() {
+            Some(file_name) => match file_name.to_str() {
+                Some(file_name) => PathComponent::from(file_name),
+                None => {
+                    return Err(keramics_core::error_trace_new!("Unsupported file name"));
+                }
+            },
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing file name"));
+            }
+        };
+        let file_names: [PathComponent; 1] = [file_name];
+
+        let mut volsnap_shadow_storage: VolsnapShadowStorage = VolsnapShadowStorage::new();
+
+        match volsnap_shadow_storage.open(&file_resolver, &file_names) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    "Unable to open volsnap backing volume."
+                    "Unable to open volsnap shadow storage."
                 );
                 return Err(error);
             }
         }
-        Ok(volsnap_backing_volume)
+        Ok(volsnap_shadow_storage)
     }
 
-    /// Prints information about a backing volume.
-    pub fn print_backing_volume(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
-        let volsnap_backing_volume: VolsnapBackingVolume =
-            match Self::open_backing_volume(data_stream) {
-                Ok(volsnap_backing_volume) => volsnap_backing_volume,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to open backing volume");
-                    return Err(error);
-                }
-            };
-        let backing_volume_info: VolsnapBackingVolumeInfo =
-            VolsnapBackingVolumeInfo::new(&volsnap_backing_volume);
+    /// Prints information about a shadow storage.
+    pub fn print_shadow_storage(path_buf: &PathBuf) -> Result<(), ErrorTrace> {
+        let volsnap_shadow_storage: VolsnapShadowStorage = match Self::open_shadow_storage(path_buf)
+        {
+            Ok(volsnap_shadow_storage) => volsnap_shadow_storage,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open shadow storage");
+                return Err(error);
+            }
+        };
+        let shadow_storage_info: VolsnapShadowStorageInfo =
+            VolsnapShadowStorageInfo::new(&volsnap_shadow_storage);
 
-        print!("{}", backing_volume_info);
+        print!("{}", shadow_storage_info);
 
-        for (snapshot_index, result) in volsnap_backing_volume.snapshots().enumerate() {
+        for (snapshot_index, result) in volsnap_shadow_storage.snapshots().enumerate() {
             let volsnap_snapshot: VolsnapSnapshot = match result {
                 Ok(volsnap_snapshot) => volsnap_snapshot,
                 Err(mut error) => {
@@ -182,38 +205,117 @@ impl VolsnapInfo {
 mod tests {
     use super::*;
 
-    use std::path::PathBuf;
+    use std::path::{MAIN_SEPARATOR_STR, PathBuf};
     use std::sync::{Arc, RwLock};
 
-    use keramics_core::open_os_data_stream;
-    use keramics_formats::RangeStream;
+    use keramics_core::{DataStreamReference, open_os_data_stream};
     use keramics_formats::vhd::VhdFile;
+    use keramics_formats::{FileResolver, RangeStream};
 
     use crate::assert_lines_eq;
 
+    struct TestFileResolver {
+        /// Base path.
+        base_path: PathBuf,
+    }
+
+    impl TestFileResolver {
+        /// Creates a new file resolver.
+        pub fn new(base_path: PathBuf) -> Self {
+            Self { base_path }
+        }
+
+        /// Retrieves a path based on the base path and path components.
+        fn get_path(&self, path_components: &[PathComponent]) -> PathBuf {
+            let mut path_buf: PathBuf = self.base_path.clone();
+
+            for path_component in path_components.iter() {
+                match path_component {
+                    PathComponent::ByteString(byte_string) => {
+                        path_buf.push(byte_string.to_string());
+                    }
+                    PathComponent::Current => path_buf.push("."),
+                    PathComponent::OsString(os_string) => path_buf.push(os_string),
+                    PathComponent::Parent => path_buf.push(".."),
+                    PathComponent::Root => path_buf.push(MAIN_SEPARATOR_STR),
+                    PathComponent::String(string) => path_buf.push(string),
+                    PathComponent::Ucs2String(ucs2_string) => {
+                        path_buf.push(ucs2_string.to_string());
+                    }
+                    PathComponent::Utf16String(utf16_string) => {
+                        path_buf.push(utf16_string.to_string());
+                    }
+                }
+            }
+            path_buf
+        }
+    }
+
+    impl FileResolver for TestFileResolver {
+        /// Retrieves a data stream with the specified path.
+        fn get_data_stream(
+            &self,
+            path_components: &[PathComponent],
+        ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+            let path_buf: PathBuf = self.get_path(path_components);
+
+            let os_data_stream: DataStreamReference = match open_os_data_stream(&path_buf) {
+                Ok(data_stream) => data_stream,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to open file: {}", path_buf.display())
+                    );
+                    return Err(error);
+                }
+            };
+            let mut vhd_file: VhdFile = VhdFile::new();
+
+            match vhd_file.read_data_stream(&os_data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open VHD file");
+                    return Err(error);
+                }
+            }
+            let vhd_data_stream: DataStreamReference = match vhd_file.get_data_stream() {
+                Some(data_stream) => data_stream,
+                None => {
+                    return Err(keramics_core::error_trace_new!("Missing data stream"));
+                }
+            };
+            Ok(Some(Arc::new(RwLock::new(RangeStream::new(
+                &vhd_data_stream,
+                65536,
+                133103616,
+            )))))
+        }
+    }
+
+    fn get_shadow_storage() -> Result<VolsnapShadowStorage, ErrorTrace> {
+        let mut shadow_storage: VolsnapShadowStorage = VolsnapShadowStorage::new();
+
+        let path_buf: PathBuf = PathBuf::from("../test_data/volsnap");
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(TestFileResolver::new(path_buf)));
+
+        let file_names: [PathComponent; 1] = [PathComponent::from("volsnap.vhd")];
+        shadow_storage.open(&file_resolver, &file_names)?;
+
+        Ok(shadow_storage)
+    }
+
     #[test]
-    fn test_backing_volume_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/volsnap/volsnap.vhd");
-        let os_data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let mut vhd_file: VhdFile = VhdFile::new();
-        vhd_file.read_data_stream(&os_data_stream)?;
+    fn test_shadow_storage_information_fmt() -> Result<(), ErrorTrace> {
+        let volsnap_shadow_storage: VolsnapShadowStorage = get_shadow_storage()?;
 
-        let vhd_data_stream: DataStreamReference = vhd_file.get_data_stream().unwrap();
-        let data_stream: DataStreamReference = Arc::new(RwLock::new(RangeStream::new(
-            &vhd_data_stream,
-            65536,
-            133103616,
-        )));
-        let volsnap_backing_volume: VolsnapBackingVolume =
-            VolsnapInfo::open_backing_volume(&data_stream)?;
-
-        let test_struct: VolsnapBackingVolumeInfo =
-            VolsnapBackingVolumeInfo::new(&volsnap_backing_volume);
+        let test_struct: VolsnapShadowStorageInfo =
+            VolsnapShadowStorageInfo::new(&volsnap_shadow_storage);
 
         let expected_string: &str = concat!(
             "Volume Shadow Snapshot (volsnap) information:\n",
             "    Volume identifier\t\t\t\t: 9f178190-b0f9-11f1-90dc-7ced8d4e4e79\n",
-            "    Storage volume identifier\t\t: 9f178190-b0f9-11f1-90dc-7ced8d4e4e79\n",
+            "    Storage volume identifier\t\t\t: 9f178190-b0f9-11f1-90dc-7ced8d4e4e79\n",
             "    Number of shadow copies\t\t\t: 2\n",
             "\n"
         );
@@ -225,20 +327,8 @@ mod tests {
 
     #[test]
     fn test_snapshot_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/volsnap/volsnap.vhd");
-        let os_data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let mut vhd_file: VhdFile = VhdFile::new();
-        vhd_file.read_data_stream(&os_data_stream)?;
-
-        let vhd_data_stream: DataStreamReference = vhd_file.get_data_stream().unwrap();
-        let data_stream: DataStreamReference = Arc::new(RwLock::new(RangeStream::new(
-            &vhd_data_stream,
-            65536,
-            133103616,
-        )));
-        let volsnap_backing_volume: VolsnapBackingVolume =
-            VolsnapInfo::open_backing_volume(&data_stream)?;
-        let volsnap_snapshot: VolsnapSnapshot = volsnap_backing_volume.get_snapshot_by_index(0)?;
+        let volsnap_shadow_storage: VolsnapShadowStorage = get_shadow_storage()?;
+        let volsnap_snapshot: VolsnapSnapshot = volsnap_shadow_storage.get_snapshot_by_index(0)?;
 
         let test_struct: VolsnapSnapshotInfo = VolsnapSnapshotInfo::new(0, &volsnap_snapshot);
 
@@ -257,6 +347,6 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_backing_volume
-    // TODO: add tests for print_backing_volume
+    // TODO: add tests for open_shadow_storage
+    // TODO: add tests for print_shadow_storage
 }

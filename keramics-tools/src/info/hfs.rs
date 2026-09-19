@@ -519,6 +519,12 @@ mod tests {
 
     use crate::assert_lines_eq;
 
+    fn get_file_system() -> Result<HfsFileSystem, ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/hfs/hfsplus.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        HfsInfo::open_file_system(&data_stream)
+    }
+
     #[test]
     fn test_date_time_information_fmt() {
         let date_time: DateTime = DateTime::HfsTime(HfsTime::new(3458215528));
@@ -539,9 +545,7 @@ mod tests {
 
     #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/hfs/hfsplus.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let hfs_file_system: HfsFileSystem = HfsInfo::open_file_system(&data_stream)?;
+        let hfs_file_system: HfsFileSystem = get_file_system()?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -572,9 +576,7 @@ mod tests {
 
     #[test]
     fn test_file_system_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/hfs/hfsplus.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let hfs_file_system: HfsFileSystem = HfsInfo::open_file_system(&data_stream)?;
+        let hfs_file_system: HfsFileSystem = get_file_system()?;
 
         let test_struct: HfsFileSystemInfo = HfsFileSystemInfo::new(&hfs_file_system);
 

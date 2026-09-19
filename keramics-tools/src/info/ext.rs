@@ -894,6 +894,12 @@ mod tests {
 
     use crate::assert_lines_eq;
 
+    fn get_file_system() -> Result<ExtFileSystem, ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        ExtInfo::open_file_system(&data_stream, Some(&CharacterEncoding::Utf8))
+    }
+
     #[test]
     fn test_compatible_feature_status_flags_information_fmt() -> Result<(), ErrorTrace> {
         let test_struct: ExtCompatibleFeatureFlagsInfo =
@@ -931,10 +937,7 @@ mod tests {
 
     #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let ext_file_system: ExtFileSystem =
-            ExtInfo::open_file_system(&data_stream, Some(&CharacterEncoding::Utf8))?;
+        let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let mut ext_file_entry: ExtFileEntry =
@@ -967,10 +970,7 @@ mod tests {
 
     #[test]
     fn test_file_system_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let ext_file_system: ExtFileSystem =
-            ExtInfo::open_file_system(&data_stream, Some(&CharacterEncoding::Utf8))?;
+        let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let test_struct: ExtFileSystemInfo = ExtFileSystemInfo::new(&ext_file_system);
 

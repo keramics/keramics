@@ -13,15 +13,50 @@
 
 #![no_main]
 
+use std::sync::Arc;
+
 use libfuzzer_sys::fuzz_target;
 
-use keramics_core::{DataStreamReference, open_fake_data_stream};
-use keramics_formats::volsnap::VolsnapBackingVolume;
+use keramics_core::{DataStreamReference, ErrorTrace, open_fake_data_stream};
+use keramics_formats::volsnap::VolsnapShadowStorage;
+use keramics_formats::{FileResolver, FileResolverReference, PathComponent};
 
-// Volume Shadow Snapshot (volsnap) backing volume fuzz target.
+pub struct VolsnapFuzzFileResolver {
+    file_name: PathComponent,
+    data: Vec<u8>,
+}
+
+impl VolsnapFuzzFileResolver {
+    pub fn new(file_name: &str, data: &[u8]) -> Self {
+        Self {
+            file_name: PathComponent::from(file_name),
+            data: data.to_vec(),
+        }
+    }
+}
+
+impl FileResolver for VolsnapFuzzFileResolver {
+    fn get_data_stream(
+        &self,
+        path_components: &[PathComponent],
+    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+        if path_components[0] == self.file_name {
+            let data_stream: DataStreamReference = open_fake_data_stream(&self.data);
+
+            Ok(Some(data_stream))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+// Volume Shadow Snapshot (volsnap) shadow storage fuzz target.
 fuzz_target!(|data: &[u8]| {
-    let mut volsnap_backing_volume: VolsnapBackingVolume = VolsnapBackingVolume::new();
+    let mut volsnap_shadow_storage: VolsnapShadowStorage = VolsnapShadowStorage::new();
 
-    let data_stream: DataStreamReference = open_fake_data_stream(&data);
-    _ = volsnap_backing_volume.read_data_stream(&data_stream);
+    let file_resolver: VolsnapFuzzFileResolver = VolsnapFuzzFileResolver::new("volsnap.raw", &data);
+    let file_resolver_reference: FileResolverReference = Arc::new(Box::new(file_resolver));
+
+    let file_names: [PathComponent; 1] = [PathComponent::from("volsnap.raw")];
+    _ = volsnap_shadow_storage.open(&file_resolver_reference, &file_names);
 });

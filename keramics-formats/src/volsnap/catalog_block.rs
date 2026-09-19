@@ -157,6 +157,7 @@ impl VolsnapCatalogBlock {
                     shadow_copy.store_range_list_offset = entry.store_range_list_offset;
                     shadow_copy.store_bitmap_offset = entry.store_bitmap_offset;
                     shadow_copy.store_previous_bitmap_offset = entry.store_previous_bitmap_offset;
+                    shadow_copy.store_index = entry.store_index;
                     shadow_copy.type3_entry_read = true;
                 }
                 _ => {

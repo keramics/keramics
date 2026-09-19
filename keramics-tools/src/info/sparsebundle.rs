@@ -143,10 +143,15 @@ mod tests {
 
     use crate::assert_lines_eq;
 
+    fn get_image() -> Result<SparseBundleImage, ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
+        SparseBundleInfo::open_image(&path_buf)
+    }
+
     #[test]
     fn test_image_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
-        let sparsebundle_image: SparseBundleImage = SparseBundleInfo::open_image(&path_buf)?;
+        let sparsebundle_image: SparseBundleImage = get_image()?;
+
         let test_struct: SparseBundleImageInfo = SparseBundleImageInfo::new(&sparsebundle_image);
 
         let expected_string: &str = concat!(

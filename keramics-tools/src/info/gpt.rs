@@ -190,11 +190,15 @@ mod tests {
 
     use crate::assert_lines_eq;
 
-    #[test]
-    fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
+    fn get_volume_system() -> Result<GptVolumeSystem, ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/gpt/gpt.raw");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let gpt_volume_system: GptVolumeSystem = GptInfo::open_volume_system(&data_stream)?;
+        GptInfo::open_volume_system(&data_stream)
+    }
+
+    #[test]
+    fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
+        let gpt_volume_system: GptVolumeSystem = get_volume_system()?;
 
         let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
         let test_struct: GptPartitionInfo = GptPartitionInfo::new(0, &gpt_partition);
@@ -215,9 +219,7 @@ mod tests {
 
     #[test]
     fn test_volume_system_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/gpt/gpt.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let gpt_volume_system: GptVolumeSystem = GptInfo::open_volume_system(&data_stream)?;
+        let gpt_volume_system: GptVolumeSystem = get_volume_system()?;
 
         let test_struct: GptVolumeSystemInfo = GptVolumeSystemInfo::new(&gpt_volume_system);
 

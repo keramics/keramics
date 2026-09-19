@@ -13,13 +13,13 @@
 
 use keramics_core::ErrorTrace;
 
-use super::backing_volume::VolsnapBackingVolume;
+use super::shadow_storage::VolsnapShadowStorage;
 use super::snapshot::VolsnapSnapshot;
 
 /// Volume Shadow Snapshot (volsnap) snapshots iterator.
 pub struct VolsnapSnapshotsIterator<'a> {
-    /// Volume system.
-    backing_volume: &'a VolsnapBackingVolume,
+    /// Shadow storage.
+    shadow_storage: &'a VolsnapShadowStorage,
 
     /// Number of snapshots.
     number_of_snapshots: usize,
@@ -30,9 +30,9 @@ pub struct VolsnapSnapshotsIterator<'a> {
 
 impl<'a> VolsnapSnapshotsIterator<'a> {
     /// Creates a new iterator.
-    pub fn new(backing_volume: &'a VolsnapBackingVolume, number_of_snapshots: usize) -> Self {
+    pub fn new(shadow_storage: &'a VolsnapShadowStorage, number_of_snapshots: usize) -> Self {
         Self {
-            backing_volume,
+            shadow_storage,
             number_of_snapshots,
             snapshot_index: 0,
         }
@@ -48,7 +48,7 @@ impl<'a> Iterator for VolsnapSnapshotsIterator<'a> {
             return None;
         }
         let item: Self::Item = self
-            .backing_volume
+            .shadow_storage
             .get_snapshot_by_index(self.snapshot_index);
 
         self.snapshot_index += 1;

@@ -1067,6 +1067,12 @@ mod tests {
 
     use crate::assert_lines_eq;
 
+    fn get_file_system() -> Result<NtfsFileSystem, ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        NtfsInfo::open_file_system(&data_stream)
+    }
+
     #[test]
     fn test_file_attribute_flags_information_fmt() {
         let test_struct: NtfsFileAttributeFlagsInfo = NtfsFileAttributeFlagsInfo::new(0x00000020);
@@ -1082,9 +1088,7 @@ mod tests {
 
     #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let ntfs_file_system: NtfsFileSystem = NtfsInfo::open_file_system(&data_stream)?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -1112,9 +1116,7 @@ mod tests {
 
     #[test]
     fn test_file_system_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let ntfs_file_system: NtfsFileSystem = NtfsInfo::open_file_system(&data_stream)?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
         let test_struct: NtfsFileSystemInfo = NtfsFileSystemInfo::new(&ntfs_file_system);
 

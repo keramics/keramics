@@ -248,10 +248,14 @@ mod tests {
 
     use crate::assert_lines_eq;
 
+    fn get_volume_system() -> Result<LinuxLvmVolumeSystem, ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/linuxlvm/lvm2.raw");
+        LinuxLvmInfo::open_volume_system(&path_buf)
+    }
+
     #[test]
     fn test_logical_volume_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/linuxlvm/lvm2.raw");
-        let lvm_volume_system: LinuxLvmVolumeSystem = LinuxLvmInfo::open_volume_system(&path_buf)?;
+        let lvm_volume_system: LinuxLvmVolumeSystem = get_volume_system()?;
 
         let lvm_logical_volume: LinuxLvmVolume = lvm_volume_system.get_volume_by_index(0)?;
         let test_struct: LinuxLvmLogicalVolumeInfo =
@@ -272,8 +276,7 @@ mod tests {
 
     #[test]
     fn test_physical_volume_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/linuxlvm/lvm2.raw");
-        let lvm_volume_system: LinuxLvmVolumeSystem = LinuxLvmInfo::open_volume_system(&path_buf)?;
+        let lvm_volume_system: LinuxLvmVolumeSystem = get_volume_system()?;
 
         let lvm_physical_volume: &LinuxLvmPhysicalVolume =
             lvm_volume_system.get_physical_volume_by_index(0).unwrap();
@@ -294,8 +297,8 @@ mod tests {
 
     #[test]
     fn test_volume_system_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/linuxlvm/lvm2.raw");
-        let lvm_volume_system: LinuxLvmVolumeSystem = LinuxLvmInfo::open_volume_system(&path_buf)?;
+        let lvm_volume_system: LinuxLvmVolumeSystem = get_volume_system()?;
+
         let test_struct: LinuxLvmVolumeSystemInfo =
             LinuxLvmVolumeSystemInfo::new(&lvm_volume_system);
 

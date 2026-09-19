@@ -677,6 +677,12 @@ mod tests {
 
     use crate::assert_lines_eq;
 
+    fn get_file_system() -> Result<XfsFileSystem, ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/xfs/xfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        XfsInfo::open_file_system(&data_stream, Some(&CharacterEncoding::Utf8))
+    }
+
     #[test]
     fn test_date_time_information_fmt() {
         let date_time: DateTime = DateTime::PosixTime32(PosixTime32::new(1281643591));
@@ -698,10 +704,7 @@ mod tests {
 
     #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/xfs/xfs.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let xfs_file_system: XfsFileSystem =
-            XfsInfo::open_file_system(&data_stream, Some(&CharacterEncoding::Utf8))?;
+        let xfs_file_system: XfsFileSystem = get_file_system()?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let mut xfs_file_entry: XfsFileEntry =
@@ -734,10 +737,7 @@ mod tests {
 
     #[test]
     fn test_file_system_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/xfs/xfs.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let xfs_file_system: XfsFileSystem =
-            XfsInfo::open_file_system(&data_stream, Some(&CharacterEncoding::Utf8))?;
+        let xfs_file_system: XfsFileSystem = get_file_system()?;
 
         let test_struct: XfsFileSystemInfo = XfsFileSystemInfo::new(&xfs_file_system);
 

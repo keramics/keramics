@@ -231,10 +231,15 @@ mod tests {
 
     use crate::assert_lines_eq;
 
+    fn get_image() -> Result<PdiImage, ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/pdi/hfsplus.hdd/DiskDescriptor.xml");
+        PdiInfo::open_image(&path_buf)
+    }
+
     #[test]
     fn test_image_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/pdi/hfsplus.hdd/DiskDescriptor.xml");
-        let pdi_image: PdiImage = PdiInfo::open_image(&path_buf)?;
+        let pdi_image: PdiImage = get_image()?;
+
         let test_struct: PdiImageInfo = PdiImageInfo::new(&pdi_image);
 
         let expected_string: &str = concat!(

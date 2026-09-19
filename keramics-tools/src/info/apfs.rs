@@ -926,11 +926,15 @@ mod tests {
 
     use crate::assert_lines_eq;
 
-    #[test]
-    fn test_container_information_fmt() -> Result<(), ErrorTrace> {
+    fn get_container() -> Result<ApfsContainer, ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs.raw");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let apfs_container: ApfsContainer = ApfsInfo::open_container(&data_stream)?;
+        ApfsInfo::open_container(&data_stream)
+    }
+
+    #[test]
+    fn test_container_information_fmt() -> Result<(), ErrorTrace> {
+        let apfs_container: ApfsContainer = get_container()?;
 
         let test_struct: ApfsContainerInfo = ApfsContainerInfo::new(&apfs_container);
 
@@ -969,9 +973,7 @@ mod tests {
 
     #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let apfs_container: ApfsContainer = ApfsInfo::open_container(&data_stream)?;
+        let apfs_container: ApfsContainer = get_container()?;
         let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
         let apfs_file_system: ApfsFileSystem = apfs_volume.get_file_system()?;
 
@@ -1002,9 +1004,7 @@ mod tests {
 
     #[test]
     fn test_volume_information_fmt() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs.raw");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let apfs_container: ApfsContainer = ApfsInfo::open_container(&data_stream)?;
+        let apfs_container: ApfsContainer = get_container()?;
         let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
 
         let test_struct: ApfsVolumeInfo = ApfsVolumeInfo::new(0, &apfs_volume);
