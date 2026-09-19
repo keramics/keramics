@@ -14,7 +14,7 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_core::ErrorTrace;
 use keramics_formats::volsnap::{VolsnapShadowStorage, VolsnapSnapshot};
 use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 

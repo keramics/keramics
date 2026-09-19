@@ -13,6 +13,8 @@
 
 #![no_main]
 
+use std::sync::Arc;
+
 use libfuzzer_sys::fuzz_target;
 
 use keramics_core::{DataStreamReference, ErrorTrace, open_fake_data_stream};
@@ -56,5 +58,5 @@ fuzz_target!(|data: &[u8]| {
     let file_resolver_reference: FileResolverReference = Arc::new(Box::new(file_resolver));
 
     let file_names: [PathComponent; 1] = [PathComponent::from("volsnap.raw")];
-    _ = volsnap_shadow_storage.open(&file_resolver, &file_names);
+    _ = volsnap_shadow_storage.open(&file_resolver_reference, &file_names);
 });
