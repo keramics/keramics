@@ -52,7 +52,7 @@ pub fn read_data_stream_with_output_file(
 ) -> Result<(u64, String), ErrorTrace> {
     let mut data: Vec<u8> = vec![0; 35891];
     let mut md5_context: Md5Context = Md5Context::new();
-    let mut media_offset: u64 = 0;
+    let mut offset: u64 = 0;
 
     let mut output_file: File = match File::create("test.raw") {
         Ok(file) => file,
@@ -72,7 +72,7 @@ pub fn read_data_stream_with_output_file(
                         error,
                         format!(
                             "Unable to read from data stream at offset {} (0x{:08x})",
-                            media_offset, media_offset
+                            offset, offset
                         )
                     );
                     return Err(error);
@@ -92,7 +92,7 @@ pub fn read_data_stream_with_output_file(
                     ));
                 }
             };
-            media_offset += read_count as u64;
+            offset += read_count as u64;
         },
         Err(error) => {
             return Err(keramics_core::error_trace_new_with_error!(
@@ -104,5 +104,48 @@ pub fn read_data_stream_with_output_file(
     let hash_value: Vec<u8> = md5_context.finalize();
     let hash_string: String = format_as_string(&hash_value);
 
-    Ok((media_offset, hash_string))
+    Ok((offset, hash_string))
+}
+
+#[allow(dead_code)]
+pub fn read_data_stream_with_md5_per_block(
+    data_stream: &DataStreamReference,
+    block_size: usize,
+) -> Result<(u64, String), ErrorTrace> {
+    let mut data: Vec<u8> = vec![0; block_size];
+    let mut md5_context: Md5Context = Md5Context::new();
+    let mut offset: u64 = 0;
+
+    match data_stream.write() {
+        Ok(mut data_stream) => loop {
+            let read_count = data_stream.read(&mut data)?;
+            if read_count == 0 {
+                break;
+            }
+            md5_context.update(&data[..read_count]);
+
+            let next_offset: u64 = offset + (read_count as u64);
+
+            let mut block_md5_context: Md5Context = Md5Context::new();
+            block_md5_context.update(&data[..read_count]);
+            let hash_value: Vec<u8> = block_md5_context.finalize();
+            let hash_string: String = format_as_string(&hash_value);
+
+            println!(
+                "block 0x{:08x} - 0x{:08x}: MD5: {}",
+                offset, next_offset, hash_string
+            );
+            offset = next_offset;
+        },
+        Err(error) => {
+            return Err(keramics_core::error_trace_new_with_error!(
+                "Unable to obtain write lock on data stream",
+                error
+            ));
+        }
+    }
+    let hash_value: Vec<u8> = md5_context.finalize();
+    let hash_string: String = format_as_string(&hash_value);
+
+    Ok((offset, hash_string))
 }

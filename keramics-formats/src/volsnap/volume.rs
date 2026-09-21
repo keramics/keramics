@@ -101,8 +101,7 @@ impl VolsnapVolume {
                     catalog_block_offset, catalog_block_offset
                 )));
             }
-            let mut catalog_block: VolsnapCatalogBlock =
-                VolsnapCatalogBlock::new(self.bytes_per_sector);
+            let mut catalog_block: VolsnapCatalogBlock = VolsnapCatalogBlock::new(16384);
 
             match catalog_block.read_at_position(
                 data_stream,

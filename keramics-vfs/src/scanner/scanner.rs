@@ -1512,6 +1512,7 @@ impl VfsScanner {
             Some(FormatIdentifier::SgiDiskLabel) => {
                 return Ok(Some(FormatIdentifier::SgiDiskLabel));
             }
+            Some(FormatIdentifier::Volsnap) => return Ok(Some(FormatIdentifier::Volsnap)),
             Some(format_identifier) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Found unsupported non-overlapping volume system format signature: {}",

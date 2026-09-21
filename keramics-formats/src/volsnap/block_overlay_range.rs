@@ -12,24 +12,18 @@
  */
 
 /// Volume Shadow Snapshot (volsnap) block overlay range.
+#[derive(Debug)]
 pub struct VolsnapBlockOverlayRange {
-    /// Offset.
-    pub offset: u64,
+    /// End offset.
+    pub end_offset: u32,
 
-    /// Size.
-    pub size: u32,
-
-    /// Bit value.
-    pub bit_value: u8,
+    /// Value to indicate the bit in the allocation bitmap is set.
+    pub is_set: bool,
 }
 
 impl VolsnapBlockOverlayRange {
     /// Creates a new block overlay range.
-    pub fn new(offset: u64, size: u32, bit_value: u8) -> Self {
-        Self {
-            offset,
-            size,
-            bit_value,
-        }
+    pub fn new(end_offset: u32, is_set: bool) -> Self {
+        Self { end_offset, is_set }
     }
 }

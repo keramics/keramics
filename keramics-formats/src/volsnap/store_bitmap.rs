@@ -89,8 +89,8 @@ impl VolsnapStoreBitmap {
     }
 
     /// Reads the bitmap from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        let mut offset: u64 = 0;
+    pub fn read_data(&mut self, data: &[u8], bitmap_offset: &mut u64) -> Result<(), ErrorTrace> {
+        let mut offset: u64 = *bitmap_offset;
         let mut range_offset: u64 = 0;
         let mut range_bit_value: u8 = data[0] & 0x01;
 
@@ -117,6 +117,8 @@ impl VolsnapStoreBitmap {
             offset,
             range_bit_value != 0,
         ));
+        *bitmap_offset = offset;
+
         Ok(())
     }
 
@@ -127,6 +129,7 @@ impl VolsnapStoreBitmap {
         mut offset: u64,
     ) -> Result<(), ErrorTrace> {
         let mut read_store_blocks: HashSet<u64> = HashSet::new();
+        let mut bitmap_offset: u64 = 0;
 
         loop {
             if read_store_blocks.contains(&offset) {
@@ -162,8 +165,7 @@ impl VolsnapStoreBitmap {
                     "Unsupported store bitmap block - current block offset value out of bounds",
                 ));
             }
-            // TODO: track bitmap offset
-            match self.read_data(&store_block.data[128..]) {
+            match self.read_data(&store_block.data[128..], &mut bitmap_offset) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read bitmap");
@@ -284,12 +286,13 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = VolsnapStoreBitmap::new(512);
-        test_struct.read_data(&test_data[128..1152])?;
+        let mut test_struct = VolsnapStoreBitmap::new(16384);
+        let mut bitmap_offset: u64 = 0;
+        test_struct.read_data(&test_data[128..1152], &mut bitmap_offset)?;
 
         assert_eq!(test_struct.bitmap_ranges.len(), 5);
-        assert_eq!(test_struct.bitmap_ranges[1].start_offset, 0x0002c400);
-        assert_eq!(test_struct.bitmap_ranges[1].end_offset, 0x00142600);
+        assert_eq!(test_struct.bitmap_ranges[1].start_offset, 0x00588000);
+        assert_eq!(test_struct.bitmap_ranges[1].end_offset, 0x0284c000);
         assert_eq!(test_struct.bitmap_ranges[1].is_set, true);
 
         Ok(())
@@ -301,12 +304,12 @@ mod tests {
         let data_stream: DataStreamReference =
             open_fake_data_stream_with_offset(&test_data, 0x02aa0000);
 
-        let mut test_struct = VolsnapStoreBitmap::new(512);
+        let mut test_struct = VolsnapStoreBitmap::new(16384);
         test_struct.read_at_offset(&data_stream, 0x02aa0000)?;
 
         assert_eq!(test_struct.bitmap_ranges.len(), 5);
-        assert_eq!(test_struct.bitmap_ranges[1].start_offset, 0x0002c400);
-        assert_eq!(test_struct.bitmap_ranges[1].end_offset, 0x00142600);
+        assert_eq!(test_struct.bitmap_ranges[1].start_offset, 0x00588000);
+        assert_eq!(test_struct.bitmap_ranges[1].end_offset, 0x0284c000);
         assert_eq!(test_struct.bitmap_ranges[1].is_set, true);
 
         Ok(())

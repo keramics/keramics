@@ -66,40 +66,26 @@ impl VolsnapBlockDescriptor {
     /// Determines the overlay range for the offset.
     pub fn get_overlay_range(
         &self,
-        offset: u64,
+        relative_block_offset: u64,
         bytes_per_bit: u16,
-    ) -> Option<VolsnapBlockOverlayRange> {
-        if !self.is_overlay() {
-            return None;
-        }
-        let mut overlay_offset: u64 = self.original_offset;
-        let mut overlay_bitmap: u32 = self.bitmap;
-        let mut number_of_bits: usize = 32;
+    ) -> VolsnapBlockOverlayRange {
+        let mut bit_index: usize = (relative_block_offset as usize) / (bytes_per_bit as usize);
+        let mut overlay_bitmap: u32 = self.bitmap >> bit_index;
 
-        while number_of_bits > 0 {
-            if overlay_offset >= offset {
-                break;
-            }
-            overlay_bitmap >>= 1;
-            overlay_offset += bytes_per_bit as u64;
-            number_of_bits -= 1;
-        }
         let bit_value: u32 = overlay_bitmap & 0x00000001;
-        let mut overlay_size: u32 = 0;
+        overlay_bitmap >>= 1;
+        bit_index += 1;
 
-        while number_of_bits > 0 {
+        while bit_index < 32 {
             if overlay_bitmap & 0x00000001 != bit_value {
                 break;
             }
             overlay_bitmap >>= 1;
-            overlay_size += bytes_per_bit as u32;
-            number_of_bits -= 1;
+            bit_index += 1;
         }
-        Some(VolsnapBlockOverlayRange::new(
-            overlay_offset,
-            overlay_size,
-            bit_value as u8,
-        ))
+        let overlay_end_offset: u32 = (bit_index as u32) * (bytes_per_bit as u32);
+
+        VolsnapBlockOverlayRange::new(overlay_end_offset, bit_value != 0)
     }
 
     /// Determines if the block descriptor is a forwarder.

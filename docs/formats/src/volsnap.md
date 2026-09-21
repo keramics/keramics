@@ -402,8 +402,8 @@ the first bit in a byte.
 
 If a bit is set, the corresponding block is not in-use (or not allocated) by the previous store.
 
-Note that the first store can also contain a previous bitmap if an older store before it was
-removed.
+> Note that the first store can also contain a previous bitmap if an older store before it was
+> removed.
 
 The use of this bitmap is described in the section: [reading snapshot data](#reading_snapshot_data).
 
