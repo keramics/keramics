@@ -88,19 +88,19 @@ git checkout -b feature
 This project uses standard `cargo` workflows. Please ensure your changes pass all local checks
 before submitting a Pull Request (PR).
 
-**Format Rust code.**
+**Format Rust code:**
 
 ```bash
 cargo fmt --all
 ```
 
-**Build the project.**
+**Build the project:**
 
 ```bash
 cargo build --all-features
 ```
 
-**Run the tests locally.**
+**Run the tests locally:**
 
 ```bash
 cargo test --all-features
@@ -108,13 +108,13 @@ cargo test --all-features
 
 ### Python bindings
 
-**Format Python code.**
+**Format Python code:**
 
 ```bash
 black .
 ```
 
-**Run the tests locally.**
+**Run the tests locally:**
 
 ```bash
 cd keramics-python/ && tox -epy314
@@ -122,7 +122,7 @@ cd keramics-python/ && tox -epy314
 
 ### Bash scripts
 
-**Check the formatting of bash scripts.**
+**Check the formatting of bash scripts:**
 
 ```bash
 find scripts/ -name "*.sh" -exec shellcheck {} +
@@ -130,7 +130,7 @@ find scripts/ -name "*.sh" -exec shellcheck {} +
 
 ### Documentation (Markdown)
 
-**Check the formatting of Markdown files.**
+**Check the formatting of Markdown files:**
 
 ```bash
 rumdl check
@@ -138,7 +138,7 @@ rumdl check
 
 ### Other
 
-**Check for typos.**
+**Check for typos:**
 
 ```bash
 typos
