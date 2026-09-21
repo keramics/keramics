@@ -96,7 +96,8 @@ impl VfsScanNode {
             | VfsType::Udif
             | VfsType::Vhd
             | VfsType::Vhdx
-            | VfsType::Vmdk => false,
+            | VfsType::Vmdk
+            | VfsType::Volsnap => false,
         }
     }
 

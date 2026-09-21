@@ -932,6 +932,18 @@ impl ImageTool {
                         _ => path_string,
                     }
                 }
+                VfsFileEntry::Volsnap(volsnap_file_entry) => {
+                    let path_string: String = match volsnap_file_entry.get_volume_number() {
+                        Some(volume_number) => format!("/volsnap{}", volume_number),
+                        _ => path.to_string(),
+                    };
+                    match volsnap_file_entry.get_identifier() {
+                        Some(identifier) => {
+                            format!("{} (alias: /volsnap{{{}}})", path_string, identifier)
+                        }
+                        _ => path_string,
+                    }
+                }
                 _ => path.to_string(),
             },
             None => path.to_string(),

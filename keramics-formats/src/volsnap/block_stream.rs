@@ -11,24 +11,9 @@
  * under the License.
  */
 
-use crate::path_component::PathComponent;
+use crate::block_stream::BlockStream;
 
-/// Linux Logical Volume Manager (LVM) data file descriptor.
-#[derive(Clone)]
-pub struct LinuxLvmDataFileDescriptor {
-    /// File name.
-    pub(super) file_name: PathComponent,
+use super::block_reader::VolsnapBlockReader;
 
-    /// Start offset.
-    pub(super) start_offset: u64,
-}
-
-impl LinuxLvmDataFileDescriptor {
-    /// Creates a new data file descriptor.
-    pub fn new(file_name: PathComponent, start_offset: u64) -> Self {
-        Self {
-            file_name,
-            start_offset,
-        }
-    }
-}
+/// Volume Shadow Snapshot (volsnap) block stream.
+pub type VolsnapBlockStream = BlockStream<VolsnapBlockReader>;

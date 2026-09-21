@@ -11,25 +11,25 @@
  * under the License.
  */
 
-mod block_reader;
-pub mod constants;
-mod data_area_descriptor;
-mod extent;
-mod logical_volume;
-mod metadata;
-mod metadata_area_header;
-mod physical_volume;
-mod physical_volume_header;
-mod physical_volume_label;
-mod physical_volume_label_header;
-mod raw_location_descriptor;
-mod segment;
-mod stripe;
-mod volume;
-mod volume_group;
-mod volume_system;
-mod volumes;
+/// Volume Shadow Snapshot (volsnap) block overlay range.
+pub struct VolsnapBlockOverlayRange {
+    /// Offset.
+    pub offset: u64,
 
-pub use physical_volume::LinuxLvmPhysicalVolume;
-pub use volume::LinuxLvmVolume;
-pub use volume_system::LinuxLvmVolumeSystem;
+    /// Size.
+    pub size: u32,
+
+    /// Bit value.
+    pub bit_value: u8,
+}
+
+impl VolsnapBlockOverlayRange {
+    /// Creates a new block overlay range.
+    pub fn new(offset: u64, size: u32, bit_value: u8) -> Self {
+        Self {
+            offset,
+            size,
+            bit_value,
+        }
+    }
+}

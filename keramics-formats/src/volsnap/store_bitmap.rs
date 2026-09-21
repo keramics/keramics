@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::io::SeekFrom;
 
@@ -20,8 +21,11 @@ use super::store_block::VolsnapStoreBlock;
 
 /// Volume Shadow Snapshot (volsnap) store bitmap range.
 pub struct VolsnapStoreBitmapRange {
-    /// Size.
-    pub size: u64,
+    /// Start offset.
+    pub start_offset: u64,
+
+    /// End offset.
+    pub end_offset: u64,
 
     /// Value to indicate the bit was set.
     pub is_set: bool,
@@ -31,7 +35,8 @@ impl VolsnapStoreBitmapRange {
     /// Creates a new bitmap range.
     pub fn new(start_offset: u64, end_offset: u64, is_set: bool) -> Self {
         Self {
-            size: end_offset - start_offset,
+            start_offset,
+            end_offset,
             is_set,
         }
     }
@@ -42,8 +47,8 @@ pub struct VolsnapStoreBitmap {
     /// Number of bytes a single bit represents.
     bytes_per_bit: u16,
 
-    /// The ranges.
-    pub ranges: Vec<VolsnapStoreBitmapRange>,
+    /// The bitap ranges.
+    bitmap_ranges: Vec<VolsnapStoreBitmapRange>,
 }
 
 impl VolsnapStoreBitmap {
@@ -51,7 +56,35 @@ impl VolsnapStoreBitmap {
     pub fn new(bytes_per_bit: u16) -> Self {
         Self {
             bytes_per_bit,
-            ranges: Vec::new(),
+            bitmap_ranges: Vec::new(),
+        }
+    }
+
+    /// Checks if a bit is set for a specific block ofset.
+    pub fn check_if_set(&self, block_offset: u64) -> Result<bool, ErrorTrace> {
+        let range_index: usize = match self.bitmap_ranges.binary_search_by(|bitmap_range| {
+            if block_offset >= bitmap_range.end_offset {
+                Ordering::Less
+            } else if block_offset < bitmap_range.start_offset {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        }) {
+            Ok(range_index) => range_index,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing bitmap range for block offset: {} (0x{:08x})",
+                    block_offset, block_offset
+                )));
+            }
+        };
+        match self.bitmap_ranges.get(range_index) {
+            Some(bitmap_range) => Ok(bitmap_range.is_set),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Unable to retrieve bitmap range: {} for block offset: {} (0x{:08x})",
+                range_index, block_offset, block_offset
+            ))),
         }
     }
 
@@ -68,7 +101,7 @@ impl VolsnapStoreBitmap {
                 bit_values >>= 1;
 
                 if bit_value != range_bit_value {
-                    self.ranges.push(VolsnapStoreBitmapRange::new(
+                    self.bitmap_ranges.push(VolsnapStoreBitmapRange::new(
                         range_offset,
                         offset,
                         range_bit_value != 0,
@@ -79,7 +112,7 @@ impl VolsnapStoreBitmap {
                 offset += self.bytes_per_bit as u64;
             }
         }
-        self.ranges.push(VolsnapStoreBitmapRange::new(
+        self.bitmap_ranges.push(VolsnapStoreBitmapRange::new(
             range_offset,
             offset,
             range_bit_value != 0,
@@ -254,9 +287,10 @@ mod tests {
         let mut test_struct = VolsnapStoreBitmap::new(512);
         test_struct.read_data(&test_data[128..1152])?;
 
-        assert_eq!(test_struct.ranges.len(), 5);
-        assert_eq!(test_struct.ranges[1].size, 1139200);
-        assert_eq!(test_struct.ranges[1].is_set, true);
+        assert_eq!(test_struct.bitmap_ranges.len(), 5);
+        assert_eq!(test_struct.bitmap_ranges[1].start_offset, 0x0002c400);
+        assert_eq!(test_struct.bitmap_ranges[1].end_offset, 0x00142600);
+        assert_eq!(test_struct.bitmap_ranges[1].is_set, true);
 
         Ok(())
     }
@@ -270,9 +304,10 @@ mod tests {
         let mut test_struct = VolsnapStoreBitmap::new(512);
         test_struct.read_at_offset(&data_stream, 0x02aa0000)?;
 
-        assert_eq!(test_struct.ranges.len(), 5);
-        assert_eq!(test_struct.ranges[1].size, 1139200);
-        assert_eq!(test_struct.ranges[1].is_set, true);
+        assert_eq!(test_struct.bitmap_ranges.len(), 5);
+        assert_eq!(test_struct.bitmap_ranges[1].start_offset, 0x0002c400);
+        assert_eq!(test_struct.bitmap_ranges[1].end_offset, 0x00142600);
+        assert_eq!(test_struct.bitmap_ranges[1].is_set, true);
 
         Ok(())
     }

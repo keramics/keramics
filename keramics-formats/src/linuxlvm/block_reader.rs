@@ -20,7 +20,6 @@ use crate::file_resolver::FileResolverReference;
 use crate::path_component::PathComponent;
 use crate::traits::BlockReader;
 
-use super::data_file_descriptor::LinuxLvmDataFileDescriptor;
 use super::extent::{LinuxLvmExtent, LinuxLvmExtentValues};
 
 /// Linux Logical Volume Manager (LVM) block reader.
@@ -28,8 +27,8 @@ pub struct LinuxLvmBlockReader {
     /// File resolver.
     file_resolver: FileResolverReference,
 
-    /// Data file descriptors.
-    data_file_descriptors: Vec<LinuxLvmDataFileDescriptor>,
+    /// File names.
+    file_names: Vec<PathComponent>,
 
     /// Extents.
     extents: Vec<LinuxLvmExtent>,
@@ -42,13 +41,13 @@ impl LinuxLvmBlockReader {
     /// Creates a new block reader.
     pub(super) fn new(
         file_resolver: &FileResolverReference,
-        data_file_descriptors: &[LinuxLvmDataFileDescriptor],
+        file_names: &[PathComponent],
         extents: &[LinuxLvmExtent],
         size: u64,
     ) -> Self {
         Self {
             file_resolver: file_resolver.clone(),
-            data_file_descriptors: data_file_descriptors.to_vec(),
+            file_names: file_names.to_vec(),
             extents: extents.to_vec(),
             size,
         }
@@ -112,39 +111,36 @@ impl BlockReader for LinuxLvmBlockReader {
                     physical_volume_index,
                 } => {
                     // TODO: cache data streams
-                    let data_file_descriptor: &LinuxLvmDataFileDescriptor =
-                        match self.data_file_descriptors.get(*physical_volume_index) {
-                            Some(data_file_descriptor) => data_file_descriptor,
+                    let file_name: &PathComponent =
+                        match self.file_names.get(*physical_volume_index) {
+                            Some(file_name) => file_name,
                             None => {
                                 return Err(keramics_core::error_trace_new!(format!(
-                                    "Missing physical volume: {} data file descriptor",
+                                    "Missing physical volume: {} file name",
                                     physical_volume_index,
                                 )));
                             }
                         };
 
-                    let path_components: [PathComponent; 1] =
-                        [data_file_descriptor.file_name.clone()];
+                    let path_components: [PathComponent; 1] = [file_name.clone()];
 
-                    let data_stream: DataStreamReference = match self
-                        .file_resolver
-                        .get_data_stream(&path_components)
-                    {
-                        Ok(Some(data_stream)) => data_stream,
-                        Ok(None) => {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Missing data stream: {}",
-                                data_file_descriptor.file_name
-                            )));
-                        }
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!("Unable to open file: {}", data_file_descriptor.file_name)
-                            );
-                            return Err(error);
-                        }
-                    };
+                    let data_stream: DataStreamReference =
+                        match self.file_resolver.get_data_stream(&path_components) {
+                            Ok(Some(data_stream)) => data_stream,
+                            Ok(None) => {
+                                return Err(keramics_core::error_trace_new!(format!(
+                                    "Missing data stream: {}",
+                                    file_name
+                                )));
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!("Unable to open file: {}", file_name)
+                                );
+                                return Err(error);
+                            }
+                        };
                     keramics_core::data_stream_read_exact_at_position!(
                         &data_stream,
                         &mut data[data_offset..data_end_offset],

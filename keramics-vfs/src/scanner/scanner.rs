@@ -33,6 +33,7 @@ use keramics_formats::udif::UdifImage;
 use keramics_formats::vhd::VhdImage;
 use keramics_formats::vhdx::VhdxImage;
 use keramics_formats::vmdk::VmdkImage;
+use keramics_formats::volsnap::VolsnapShadowStorage;
 use keramics_formats::{FormatIdentifier, FormatScanner, PartitionIterator, Path};
 
 use crate::apfs::ApfsContainerFileSystem;
@@ -53,6 +54,7 @@ use crate::traits::{VfsImage, VfsPartitionSystem};
 use crate::types::{VfsFileSystemReference, VfsResolverReference};
 use crate::udif::UdifFileSystem;
 use crate::vmdk::VmdkFileSystem;
+use crate::volsnap::VolsnapFileSystem;
 
 use super::scan_context::VfsScanContext;
 use super::scan_node::VfsScanNode;
@@ -131,6 +133,7 @@ impl VfsScanner {
         self.phase1_volume_system_scanner.add_linuxlvm_signatures();
         self.phase1_volume_system_scanner.add_luksde_signatures();
         self.phase1_volume_system_scanner.add_sgilabel_signatures();
+        self.phase1_volume_system_scanner.add_volsnap_signatures();
 
         match self.phase1_volume_system_scanner.build() {
             Ok(_) => {}
@@ -179,6 +182,9 @@ impl VfsScanner {
         self.sub_volume_system_scanner.add_apfs_signatures();
         self.sub_volume_system_scanner.add_bde_signatures();
         self.sub_volume_system_scanner.add_linuxlvm_signatures();
+        self.sub_volume_system_scanner.add_luksde_signatures();
+        self.sub_volume_system_scanner.add_sgilabel_signatures();
+        self.sub_volume_system_scanner.add_volsnap_signatures();
 
         match self.sub_volume_system_scanner.build() {
             Ok(_) => {}
@@ -233,6 +239,7 @@ impl VfsScanner {
             FormatIdentifier::Vhd => Some(VfsType::Vhd),
             FormatIdentifier::Vhdx => Some(VfsType::Vhdx),
             FormatIdentifier::Vmdk => Some(VfsType::Vmdk),
+            FormatIdentifier::Volsnap => Some(VfsType::Volsnap),
             FormatIdentifier::Xfs => Some(VfsType::Xfs),
             _ => None,
         }
@@ -525,6 +532,21 @@ impl VfsScanner {
                 }
                 Ok(result)
             }
+            VfsType::Volsnap => match self.scan_for_file_system_format(&data_stream) {
+                Ok(Some(FormatIdentifier::Ntfs)) => Ok(Some(FormatIdentifier::Ntfs)),
+                Ok(Some(format_identifier)) => Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported file system format: {} in volsnap snapshot",
+                    format_identifier
+                ),)),
+                Ok(None) => Ok(None),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to scan data stream for file system formats"
+                    );
+                    Err(error)
+                }
+            },
         }
     }
 
@@ -691,9 +713,18 @@ impl VfsScanner {
             let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_path);
             let mut layer_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location);
 
-            if let Some(format_identifier) =
-                self.scan_for_format(&node_file_system, &layer_scan_node.location)?
-            {
+            let result: Option<FormatIdentifier> =
+                match self.scan_for_format(&node_file_system, &layer_scan_node.location) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan image layer data stream for formats"
+                        );
+                        return Err(error);
+                    }
+                };
+            if let Some(format_identifier) = result {
                 let sub_node_vfs_type: VfsType = match Self::get_vfs_type(&format_identifier) {
                     Some(vfs_type) => vfs_type,
                     None => {
@@ -1052,42 +1083,53 @@ impl VfsScanner {
                     }
                 }
             }
-            VfsType::Os => match self.scan_for_format(file_system, vfs_location)? {
-                Some(FormatIdentifier::CdsaEncr) => {
-                    // TODO: Set VfsType::SparseImage based on extension?
-                    scan_node.add_locked_sub_node(&VfsType::Udif);
-                }
-                Some(format_identifier) => {
-                    let sub_node_vfs_type: VfsType = match Self::get_vfs_type(&format_identifier) {
-                        Some(vfs_type) => vfs_type,
-                        None => {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Found unsupported format signature: {}",
-                                format_identifier
-                            )));
-                        }
-                    };
-                    let sub_node_path: Path = Path::from("/");
-                    let sub_node_vfs_location: VfsLocation =
-                        vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_path);
-                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
-
-                    match self.scan_for_sub_nodes(
-                        scan_options,
-                        file_system,
-                        vfs_location,
-                        &mut sub_scan_node,
-                    ) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(error, "Unable to scan OS");
-                            return Err(error);
-                        }
+            VfsType::Os => {
+                match self.scan_for_format(file_system, vfs_location) {
+                    Ok(Some(FormatIdentifier::CdsaEncr)) => {
+                        // TODO: Set VfsType::SparseImage based on extension?
+                        scan_node.add_locked_sub_node(&VfsType::Udif);
                     }
-                    scan_node.sub_nodes.push(sub_scan_node);
-                }
-                None => {}
-            },
+                    Ok(Some(format_identifier)) => {
+                        let sub_node_vfs_type: VfsType =
+                            match Self::get_vfs_type(&format_identifier) {
+                                Some(vfs_type) => vfs_type,
+                                None => {
+                                    return Err(keramics_core::error_trace_new!(format!(
+                                        "Found unsupported format signature: {}",
+                                        format_identifier
+                                    )));
+                                }
+                            };
+                        let sub_node_path: Path = Path::from("/");
+                        let sub_node_vfs_location: VfsLocation =
+                            vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_path);
+                        let mut sub_scan_node: VfsScanNode =
+                            VfsScanNode::new(sub_node_vfs_location);
+
+                        match self.scan_for_sub_nodes(
+                            scan_options,
+                            file_system,
+                            vfs_location,
+                            &mut sub_scan_node,
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(error, "Unable to scan OS");
+                                return Err(error);
+                            }
+                        }
+                        scan_node.sub_nodes.push(sub_scan_node);
+                    }
+                    Ok(None) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan operating system data stream for formats"
+                        );
+                        return Err(error);
+                    }
+                };
+            }
             VfsType::Pdi => {
                 let mut pdi_image: PdiImage = PdiImage::new();
 
@@ -1371,6 +1413,42 @@ impl VfsScanner {
                     }
                 }
             }
+            VfsType::Volsnap => {
+                let mut volsnap_shadow_storage: VolsnapShadowStorage = VolsnapShadowStorage::new();
+
+                match VolsnapFileSystem::open_shadow_storage(
+                    &mut volsnap_shadow_storage,
+                    file_system,
+                    path,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open volsnap shadow storage"
+                        );
+                        return Err(error);
+                    }
+                }
+                let number_of_snapshots: usize = volsnap_shadow_storage.get_number_of_snapshots();
+
+                match self.scan_for_volume_system_sub_nodes(
+                    scan_options,
+                    vfs_location,
+                    scan_node,
+                    VolsnapFileSystem::PATH_PREFIX,
+                    number_of_snapshots,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan volsnap shadow storage"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -1571,9 +1649,18 @@ impl VfsScanner {
             let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_path);
             let mut volume_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location);
 
-            if let Some(format_identifier) =
-                self.scan_for_format(&node_file_system, &volume_scan_node.location)?
-            {
+            let result: Option<FormatIdentifier> =
+                match self.scan_for_format(&node_file_system, &volume_scan_node.location) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan volume data stream for formats"
+                        );
+                        return Err(error);
+                    }
+                };
+            if let Some(format_identifier) = result {
                 let sub_node_vfs_type: VfsType = match Self::get_vfs_type(&format_identifier) {
                     Some(vfs_type) => vfs_type,
                     None => {
@@ -2188,6 +2275,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test for volsnap
 
     // TODO: add tests for scan_for_volume_system_sub_nodes
 }

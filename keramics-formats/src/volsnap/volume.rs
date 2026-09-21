@@ -28,6 +28,9 @@ pub struct VolsnapVolume {
     /// Data stream.
     pub(super) data_stream: Option<DataStreamReference>,
 
+    /// Bytes per sector.
+    pub(super) bytes_per_sector: u16,
+
     /// Volume identifier.
     pub(super) volume_identifier: Uuid,
 
@@ -43,13 +46,14 @@ impl VolsnapVolume {
     pub fn new() -> Self {
         Self {
             data_stream: None,
+            bytes_per_sector: 0,
             volume_identifier: Uuid::new(),
             storage_volume_identifier: Uuid::new(),
             shadow_copies: IndexedHashMap::new(),
         }
     }
 
-    /// Reads the volume from a data stream.
+    /// Reads the volume header and catalog from a data stream.
     pub fn read_data_stream(
         &mut self,
         data_stream: &DataStreamReference,
@@ -84,6 +88,9 @@ impl VolsnapVolume {
         self.volume_identifier = volume_header.volume_identifier;
         self.storage_volume_identifier = volume_header.storage_volume_identifier;
 
+        // TODO: read NTFS boot record to determine bytes per sector?
+        self.bytes_per_sector = 512;
+
         let mut catalog_block_offset: u64 = volume_header.catalog_offset;
         let mut read_catalog_blocks: HashSet<u64> = HashSet::new();
 
@@ -94,7 +101,8 @@ impl VolsnapVolume {
                     catalog_block_offset, catalog_block_offset
                 )));
             }
-            let mut catalog_block: VolsnapCatalogBlock = VolsnapCatalogBlock::new();
+            let mut catalog_block: VolsnapCatalogBlock =
+                VolsnapCatalogBlock::new(self.bytes_per_sector);
 
             match catalog_block.read_at_position(
                 data_stream,
@@ -130,22 +138,6 @@ impl VolsnapVolume {
             }
             catalog_block_offset = catalog_block.next_block_offset;
         }
-        for (_, shadow_copy) in self.shadow_copies.iter_mut() {
-            if shadow_copy.type3_entry_read && shadow_copy.store_metadata_offset != 0 {
-                match shadow_copy
-                    .read_store_metadata(data_stream, shadow_copy.store_metadata_offset)
-                {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read store metadata",
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-        }
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
@@ -164,26 +156,6 @@ mod tests {
     use crate::RangeStream;
     use crate::tests::get_test_data_path;
     use crate::vhd::VhdFile;
-
-    fn get_volume() -> Result<VolsnapVolume, ErrorTrace> {
-        let mut volume: VolsnapVolume = VolsnapVolume::new();
-
-        let path_string: String = get_test_data_path("volsnap/volsnap.vhd");
-        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let os_data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let mut vhd_file: VhdFile = VhdFile::new();
-        vhd_file.read_data_stream(&os_data_stream)?;
-
-        let vhd_data_stream: DataStreamReference = vhd_file.get_data_stream().unwrap();
-        let data_stream: DataStreamReference = Arc::new(RwLock::new(RangeStream::new(
-            &vhd_data_stream,
-            65536,
-            133103616,
-        )));
-        volume.read_data_stream(&data_stream)?;
-
-        Ok(volume)
-    }
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {

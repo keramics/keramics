@@ -66,8 +66,8 @@ impl NtfsBitmap {
         }
     }
 
-    /// Checks if a block is allocated.
-    pub fn check_if_block_is_allocated(&self, block_number: u64) -> Result<bool, ErrorTrace> {
+    /// Checks if a bit is set (allocated) for a specific block number.
+    pub fn check_if_set(&self, block_number: u64) -> Result<bool, ErrorTrace> {
         let block_offset: u64 = block_number * (self.cluster_block_size as u64);
 
         let range_index: usize = match self.bitmap_ranges.binary_search_by(|bitmap_range| {

@@ -15,9 +15,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use keramics_core::ErrorTrace;
-use keramics_formats::linuxlvm::{
-    LinuxLvmDataFileDescriptor, LinuxLvmPhysicalVolume, LinuxLvmVolume, LinuxLvmVolumeSystem,
-};
+use keramics_formats::linuxlvm::{LinuxLvmPhysicalVolume, LinuxLvmVolume, LinuxLvmVolumeSystem};
 use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
 use crate::formatters::ByteSize;
@@ -174,12 +172,11 @@ impl LinuxLvmInfo {
                 return Err(keramics_core::error_trace_new!("Missing file name"));
             }
         };
-        let data_file_descriptors: [LinuxLvmDataFileDescriptor; 1] =
-            [LinuxLvmDataFileDescriptor::new(file_name, 0)];
+        let file_names: [PathComponent; 1] = [file_name];
 
         let mut lvm_volume_system: LinuxLvmVolumeSystem = LinuxLvmVolumeSystem::new();
 
-        match lvm_volume_system.open(&file_resolver, &data_file_descriptors) {
+        match lvm_volume_system.open(&file_resolver, &file_names) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(

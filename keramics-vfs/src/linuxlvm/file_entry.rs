@@ -138,27 +138,21 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_formats::linuxlvm::LinuxLvmDataFileDescriptor;
     use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
     use crate::tests::get_test_data_path;
 
-    fn get_volume_system() -> Result<LinuxLvmVolumeSystem, ErrorTrace> {
+    fn get_volume_system() -> Result<Arc<LinuxLvmVolumeSystem>, ErrorTrace> {
         let path_string: String = get_test_data_path("linuxlvm");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
 
-        let data_file_descriptors: [LinuxLvmDataFileDescriptor; 1] =
-            [LinuxLvmDataFileDescriptor::new(
-                PathComponent::from("lvm2.raw"),
-                0,
-            )];
-
+        let file_names: [PathComponent; 1] = [PathComponent::from("lvm2.raw")];
         let mut volume_system: LinuxLvmVolumeSystem = LinuxLvmVolumeSystem::new();
 
-        volume_system.open(&file_resolver, &data_file_descriptors)?;
+        volume_system.open(&file_resolver, &file_names)?;
 
-        Ok(volume_system)
+        Ok(Arc::new(volume_system))
     }
 
     fn get_root_file_entry(lvm_volume_system: &Arc<LinuxLvmVolumeSystem>) -> LinuxLvmFileEntry {
@@ -180,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
-        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = Arc::new(get_volume_system()?);
+        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = get_volume_system()?;
 
         let file_entry: LinuxLvmFileEntry = get_root_file_entry(&lvm_volume_system);
 
@@ -197,7 +191,7 @@ mod tests {
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
-        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = Arc::new(get_volume_system()?);
+        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = get_volume_system()?;
 
         let file_entry: LinuxLvmFileEntry = get_root_file_entry(&lvm_volume_system);
 
@@ -214,7 +208,7 @@ mod tests {
 
     #[test]
     fn test_get_identifier() -> Result<(), ErrorTrace> {
-        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = Arc::new(get_volume_system()?);
+        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = get_volume_system()?;
 
         let file_entry: LinuxLvmFileEntry = get_root_file_entry(&lvm_volume_system);
 
@@ -231,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = Arc::new(get_volume_system()?);
+        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = get_volume_system()?;
 
         let file_entry: LinuxLvmFileEntry = get_root_file_entry(&lvm_volume_system);
 
@@ -248,7 +242,7 @@ mod tests {
 
     #[test]
     fn test_get_volume_number() -> Result<(), ErrorTrace> {
-        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = Arc::new(get_volume_system()?);
+        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = get_volume_system()?;
 
         let file_entry: LinuxLvmFileEntry = get_root_file_entry(&lvm_volume_system);
 
@@ -264,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = Arc::new(get_volume_system()?);
+        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = get_volume_system()?;
 
         let file_entry: LinuxLvmFileEntry = get_root_file_entry(&lvm_volume_system);
 
@@ -281,7 +275,7 @@ mod tests {
 
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = Arc::new(get_volume_system()?);
+        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = get_volume_system()?;
 
         let file_entry: LinuxLvmFileEntry = get_root_file_entry(&lvm_volume_system);
 
@@ -298,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = Arc::new(get_volume_system()?);
+        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = get_volume_system()?;
 
         let file_entry: LinuxLvmFileEntry = get_root_file_entry(&lvm_volume_system);
 
@@ -316,7 +310,7 @@ mod tests {
 
     #[test]
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
-        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = Arc::new(get_volume_system()?);
+        let lvm_volume_system: Arc<LinuxLvmVolumeSystem> = get_volume_system()?;
 
         let file_entry: LinuxLvmFileEntry = get_root_file_entry(&lvm_volume_system);
         assert_eq!(file_entry.is_root_file_entry(), true);

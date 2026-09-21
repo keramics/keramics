@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::sync::Arc;
+
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
@@ -24,22 +26,18 @@ use super::volume::VolsnapVolume;
 /// Volume Shadow Snapshot (volsnap) shadow storage.
 pub struct VolsnapShadowStorage {
     /// Snapshot (or source) volume.
-    snapshot_volume: VolsnapVolume,
+    pub(super) snapshot_volume: Arc<VolsnapVolume>,
 
     /// Storage volume.
-    storage_volume: Option<VolsnapVolume>,
-
-    /// Bytes per sector.
-    bytes_per_sector: u16,
+    storage_volume: Option<Arc<VolsnapVolume>>,
 }
 
 impl VolsnapShadowStorage {
     /// Creates a new shadow storage.
     pub fn new() -> Self {
         Self {
-            snapshot_volume: VolsnapVolume::new(),
+            snapshot_volume: Arc::new(VolsnapVolume::new()),
             storage_volume: None,
-            bytes_per_sector: 0,
         }
     }
 
@@ -69,27 +67,13 @@ impl VolsnapShadowStorage {
         match self
             .snapshot_volume
             .shadow_copies
-            .get_key_value_by_index(snapshot_index)
+            .get_key_by_index(snapshot_index)
         {
-            Some((identifier, shadow_copy)) => match self.snapshot_volume.data_stream.as_ref() {
-                Some(data_stream) => {
-                    let mut snapshot: VolsnapSnapshot = VolsnapSnapshot::new(
-                        data_stream,
-                        self.bytes_per_sector,
-                        identifier,
-                        shadow_copy,
-                    );
-                    match snapshot.open() {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(error, "Unable to open snapshot");
-                            return Err(error);
-                        }
-                    }
-                    Ok(snapshot)
-                }
-                None => Err(keramics_core::error_trace_new!("Missing data stream")),
-            },
+            Some(identifier) => Ok(VolsnapSnapshot::new(
+                &self.snapshot_volume,
+                self.storage_volume.as_ref(),
+                identifier,
+            )),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No snapshot with index: {}",
                 snapshot_index
@@ -135,21 +119,66 @@ impl VolsnapShadowStorage {
                 return Err(error);
             }
         };
-        match self.snapshot_volume.read_data_stream(&data_stream) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read snapshot volume");
-                return Err(error);
+        match Arc::get_mut(&mut self.snapshot_volume) {
+            Some(snapshot_volume) => match snapshot_volume.read_data_stream(&data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read snapshot volume");
+                    return Err(error);
+                }
+            },
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to snapshot volume"
+                ));
             }
         }
-        // TODO: read NTFS boot record to determine bytes per sector?
-        self.bytes_per_sector = 512;
-
         if self.snapshot_volume.volume_identifier != self.snapshot_volume.storage_volume_identifier
         {
             // TODO: look for the storage volume in the remaining file names
             // TODO: read the stores from the storage volume
             todo!();
+        }
+        match Arc::get_mut(&mut self.snapshot_volume) {
+            Some(snapshot_volume) => {
+                let data_stream: &DataStreamReference = match self.storage_volume.as_ref() {
+                    Some(storage_volume) => match storage_volume.data_stream.as_ref() {
+                        Some(data_stream) => data_stream,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(
+                                "Missing storage volume data stream"
+                            ));
+                        }
+                    },
+                    None => match snapshot_volume.data_stream.as_ref() {
+                        Some(data_stream) => data_stream,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(
+                                "Missing snapshot volume data stream"
+                            ));
+                        }
+                    },
+                };
+                for (_, shadow_copy) in snapshot_volume.shadow_copies.iter_mut() {
+                    if shadow_copy.type3_entry_read && shadow_copy.store_metadata_offset != 0 {
+                        match shadow_copy.read_store_metadata(data_stream) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read store metadata",
+                                );
+                                return Err(error);
+                            }
+                        }
+                    }
+                }
+            }
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to snapshot volume"
+                ));
+            }
         }
         Ok(())
     }
@@ -164,8 +193,8 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    use crate::RangeStream;
     use crate::file_resolver::FileResolver;
+    use crate::range_stream::RangeStream;
     use crate::tests::get_test_data_path;
     use crate::vhd::VhdFile;
 
