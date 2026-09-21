@@ -233,53 +233,34 @@ impl BlockReader for VolsnapBlockReader {
             if current_offset >= self.size {
                 break;
             }
-            let mut block_range: VolsnapBlockRange = match self
-                .get_range(self.active_shadow_copy_index, current_offset)
-            {
-                Ok(block_range) => block_range,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to determine block range for offset: {} (0x{:08x}) in shadow copy: {}",
-                            current_offset, current_offset, self.active_shadow_copy_index
-                        ),
-                    );
-                    return Err(error);
-                }
-            };
-            if !block_range.in_block_list || block_range.is_forwarder {
-                let mut shadow_copy_index = self.active_shadow_copy_index + 1;
-                let mut block_offset: u64 = block_range.offset;
+            let mut block_range: VolsnapBlockRange =
+                VolsnapBlockRange::new(current_offset, self.block_size, false, false);
+            let mut block_offset: u64 = current_offset;
+            let mut range_size: u32 = self.block_size as u32;
 
-                while shadow_copy_index < self.number_of_shadow_copies {
-                    let next_block_range: VolsnapBlockRange = match self
-                        .get_range(shadow_copy_index, block_offset)
-                    {
-                        Ok(block_range) => block_range,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to determine block range for offset: {} (0x{:08x}) in shadow copy: {}",
-                                    block_offset, block_offset, shadow_copy_index
-                                ),
-                            );
-                            return Err(error);
-                        }
-                    };
-                    block_range.offset = next_block_range.offset;
-                    block_range.size = min(block_range.size, next_block_range.size);
-                    block_range.in_block_list = next_block_range.in_block_list;
-                    block_range.is_forwarder = next_block_range.is_forwarder;
-
-                    if next_block_range.in_block_list && !next_block_range.is_forwarder {
-                        break;
+            for shadow_copy_index in self.active_shadow_copy_index..self.number_of_shadow_copies {
+                block_range = match self.get_range(shadow_copy_index, block_offset) {
+                    Ok(block_range) => block_range,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to determine block range for offset: {} (0x{:08x}) in shadow copy: {}",
+                                block_offset, block_offset, shadow_copy_index
+                            ),
+                        );
+                        return Err(error);
                     }
-                    block_offset = next_block_range.offset;
-                    shadow_copy_index += 1;
+                };
+                range_size = min(range_size, block_range.size);
+
+                if block_range.in_block_list && !block_range.is_forwarder {
+                    break;
                 }
+                block_offset = block_range.offset;
             }
+            block_range.size = range_size;
+
             if !block_range.in_block_list {
                 if self.active_shadow_copy_index + 1 == self.number_of_shadow_copies {
                     block_range.is_sparse = match self
@@ -304,28 +285,18 @@ impl BlockReader for VolsnapBlockReader {
 
             if block_range.is_sparse {
                 data[data_offset..data_end_offset].fill(0);
-            } else if block_range.in_block_list {
-                match self.snapshot_volume.data_stream.as_ref() {
-                    Some(data_stream) => {
-                        keramics_core::data_stream_read_exact_at_position!(
-                            data_stream,
-                            &mut data[data_offset..data_end_offset],
-                            SeekFrom::Start(block_range.offset)
-                        );
-                    }
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Missing snapshot volume data stream"
-                        ));
-                    }
-                }
             } else {
+                let block_offset: u64 = if block_range.in_block_list {
+                    block_range.offset
+                } else {
+                    current_offset
+                };
                 match self.snapshot_volume.data_stream.as_ref() {
                     Some(data_stream) => {
                         keramics_core::data_stream_read_exact_at_position!(
                             data_stream,
                             &mut data[data_offset..data_end_offset],
-                            SeekFrom::Start(current_offset)
+                            SeekFrom::Start(block_offset)
                         );
                     }
                     None => {
