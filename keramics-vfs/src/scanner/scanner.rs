@@ -1486,6 +1486,7 @@ impl VfsScanner {
                         return Err(error);
                     }
                 }
+                // Note that a shadow storage can have 0 snapshots.
                 let number_of_snapshots: usize = volsnap_shadow_storage.get_number_of_snapshots();
 
                 match self.scan_for_volume_system_sub_nodes(
@@ -1719,6 +1720,7 @@ impl VfsScanner {
                 };
             if let Some(format_identifier) = result {
                 if format_identifier == FormatIdentifier::Volsnap {
+                    // When dealing with volsnap also expose the current NTFS volume.
                     let node_vfs_location: VfsLocation = volume_scan_node.location.clone();
 
                     match self
