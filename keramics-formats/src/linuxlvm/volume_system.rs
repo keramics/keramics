@@ -22,7 +22,6 @@ use crate::file_resolver::FileResolverReference;
 use crate::path_component::PathComponent;
 
 use super::data_area_descriptor::LinuxLvmDataAreaDescriptor;
-use super::data_file_descriptor::LinuxLvmDataFileDescriptor;
 use super::extent::{LinuxLvmExtent, LinuxLvmExtentValues};
 use super::logical_volume::LinuxLvmLogicalVolume;
 use super::metadata::LinuxLvmMetadata;
@@ -42,8 +41,8 @@ pub struct LinuxLvmVolumeSystem {
     /// Bytes per sector.
     bytes_per_sector: u16,
 
-    /// Data file descriptors.
-    data_file_descriptors: Vec<LinuxLvmDataFileDescriptor>,
+    /// File names.
+    file_names: Vec<PathComponent>,
 
     /// Volume group.
     volume_group: Option<LinuxLvmVolumeGroup>,
@@ -55,7 +54,7 @@ impl LinuxLvmVolumeSystem {
         Self {
             file_resolver: FileResolverReference::new(Box::new(FakeFileResolver::new())),
             bytes_per_sector: 0,
-            data_file_descriptors: Vec::new(),
+            file_names: Vec::new(),
             volume_group: None,
         }
     }
@@ -128,7 +127,7 @@ impl LinuxLvmVolumeSystem {
             };
         Ok(LinuxLvmVolume::new(
             &self.file_resolver,
-            &self.data_file_descriptors,
+            &self.file_names,
             volume_index,
             logical_volume,
         ))
@@ -143,13 +142,13 @@ impl LinuxLvmVolumeSystem {
     pub fn open(
         &mut self,
         file_resolver: &FileResolverReference,
-        data_files: &[LinuxLvmDataFileDescriptor],
+        file_names: &[PathComponent],
     ) -> Result<(), ErrorTrace> {
         let mut physical_volume_labels: HashMap<String, LinuxLvmPhysicalVolumeLabel> =
             HashMap::new();
 
-        for data_file_descriptor in data_files.iter() {
-            let path_components: [PathComponent; 1] = [data_file_descriptor.file_name.clone()];
+        for file_name in file_names.iter() {
+            let path_components: [PathComponent; 1] = [file_name.clone()];
 
             let data_stream: DataStreamReference =
                 match file_resolver.get_data_stream(&path_components) {
@@ -157,18 +156,18 @@ impl LinuxLvmVolumeSystem {
                     Ok(None) => {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Missing data stream: {}",
-                            data_file_descriptor.file_name
+                            file_name
                         )));
                     }
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            format!("Unable to open file: {}", data_file_descriptor.file_name)
+                            format!("Unable to open file: {}", file_name)
                         );
                         return Err(error);
                     }
                 };
-            let volume_label_offset: u64 = data_file_descriptor.start_offset + 512;
+            let volume_label_offset: u64 = 512;
 
             let mut physical_volume_label: LinuxLvmPhysicalVolumeLabel =
                 LinuxLvmPhysicalVolumeLabel::new();
@@ -203,10 +202,7 @@ impl LinuxLvmVolumeSystem {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            format!(
-                                "Unable to read volume group from file: {}",
-                                data_file_descriptor.file_name
-                            )
+                            format!("Unable to read volume group from file: {}", file_name)
                         );
                         return Err(error);
                     }
@@ -215,9 +211,8 @@ impl LinuxLvmVolumeSystem {
                 physical_volume_label.identifier.to_string(),
                 physical_volume_label,
             );
-            // TODO: make sure the descriptors are in order of physical volume index
-            self.data_file_descriptors
-                .push(data_file_descriptor.clone());
+            // TODO: make sure the file names are in order of physical volume index
+            self.file_names.push(file_name.clone());
 
             if self.volume_group.is_none() {
                 self.volume_group = Some(volume_group);
@@ -451,12 +446,8 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
 
-        let data_file_descriptors: [LinuxLvmDataFileDescriptor; 1] =
-            [LinuxLvmDataFileDescriptor::new(
-                PathComponent::from("lvm2.raw"),
-                0,
-            )];
-        volume_system.open(&file_resolver, &data_file_descriptors)?;
+        let file_names: [PathComponent; 1] = [PathComponent::from("lvm2.raw")];
+        volume_system.open(&file_resolver, &file_names)?;
 
         Ok(volume_system)
     }
@@ -503,12 +494,8 @@ mod tests {
 
         assert!(volume_system.volume_group.is_none());
 
-        let data_file_descriptors: [LinuxLvmDataFileDescriptor; 1] =
-            [LinuxLvmDataFileDescriptor::new(
-                PathComponent::from("lvm2.raw"),
-                0,
-            )];
-        volume_system.open(&file_resolver, &data_file_descriptors)?;
+        let file_names: [PathComponent; 1] = [PathComponent::from("lvm2.raw")];
+        volume_system.open(&file_resolver, &file_names)?;
         assert!(volume_system.volume_group.is_some());
 
         Ok(())

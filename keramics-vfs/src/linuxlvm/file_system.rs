@@ -14,9 +14,7 @@
 use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
-use keramics_formats::linuxlvm::{
-    LinuxLvmDataFileDescriptor, LinuxLvmVolume, LinuxLvmVolumeSystem,
-};
+use keramics_formats::linuxlvm::{LinuxLvmVolume, LinuxLvmVolumeSystem};
 use keramics_formats::{FileResolverReference, Path, PathComponent};
 
 use crate::file_resolver::new_vfs_file_resolver;
@@ -187,10 +185,9 @@ impl LinuxLvmFileSystem {
                 ));
             }
         };
-        let data_file_descriptors: [LinuxLvmDataFileDescriptor; 1] =
-            [LinuxLvmDataFileDescriptor::new(file_name.clone(), 0)];
+        let file_names: [PathComponent; 1] = [file_name.clone()];
 
-        match volume_system.open(&file_resolver, &data_file_descriptors) {
+        match volume_system.open(&file_resolver, &file_names) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(

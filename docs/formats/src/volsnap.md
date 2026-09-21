@@ -286,9 +286,9 @@ The block descriptor is 32 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 8 | | Logical data block offset, which contains the offset of the original location of the data relative to the start of the volume |
-| 8 | 8 | | Relative store data block offset, which is relative to the start of the store. TODO: determine if the lower bits are used for different purpose |
-| 16 | 8 | | Physical data block offset, which is relative to the start of the volume |
+| 0 | 8 | | Original offset, which is relative to the start of the volume |
+| 8 | 8 | | Relative offset, which is relative to the start of the store. TODO: determine if the lower bits are used for different purpose |
+| 16 | 8 | | Offset, which is relative to the start of the volume |
 | 24 | 4 | | Flags |
 | 28 | 4 | | Allocation bitmap, which is used if flag 0x02 is set, otherwise is should contain a value of 0 |
 
@@ -449,8 +449,6 @@ For the size of the data that will fit in the buffer:
 > purposes Keramics will zero-fill the block.
 
 ## Format edge cases and corruption scenarios
-
-This chapter contains several corruption scenarios that have been encountered "in the wild".
 
 ### Catalog volume size out of bounds
 

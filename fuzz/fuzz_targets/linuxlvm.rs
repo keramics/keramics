@@ -18,7 +18,7 @@ use std::sync::Arc;
 use libfuzzer_sys::fuzz_target;
 
 use keramics_core::{DataStreamReference, ErrorTrace, open_fake_data_stream};
-use keramics_formats::linuxlvm::{LinuxLvmDataFileDescriptor, LinuxLvmVolumeSystem};
+use keramics_formats::linuxlvm::LinuxLvmVolumeSystem;
 use keramics_formats::{FileResolver, FileResolverReference, PathComponent};
 
 pub struct LinuxLvmFuzzFileResolver {
@@ -57,9 +57,6 @@ fuzz_target!(|data: &[u8]| {
     let file_resolver: LinuxLvmFuzzFileResolver = LinuxLvmFuzzFileResolver::new("lvm.raw", &data);
     let file_resolver_reference: FileResolverReference = Arc::new(Box::new(file_resolver));
 
-    let data_file_descriptors: [LinuxLvmDataFileDescriptor; 1] = [LinuxLvmDataFileDescriptor::new(
-        PathComponent::from("lvm.raw"),
-        0,
-    )];
-    _ = lvm_volume_system.open(&file_resolver_reference, &data_file_descriptors);
+    let file_names: [PathComponent; 1] = [PathComponent::from("lvm.raw")];
+    _ = lvm_volume_system.open(&file_resolver_reference, &file_names);
 });

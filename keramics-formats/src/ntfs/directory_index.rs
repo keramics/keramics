@@ -359,7 +359,7 @@ impl NtfsDirectoryIndex {
                     }
                 };
             let is_allocated: bool = match &self.bitmap {
-                Some(bitmap) => match bitmap.check_if_block_is_allocated(sub_node_vcn) {
+                Some(bitmap) => match bitmap.check_if_set(sub_node_vcn) {
                     Ok(result) => result,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -510,7 +510,7 @@ impl NtfsDirectoryIndex {
                         }
                     };
                 let is_allocated: bool = match &self.bitmap {
-                    Some(bitmap) => match bitmap.check_if_block_is_allocated(sub_node_vcn) {
+                    Some(bitmap) => match bitmap.check_if_set(sub_node_vcn) {
                         Ok(result) => result,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(

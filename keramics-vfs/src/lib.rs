@@ -51,6 +51,7 @@ mod udif;
 mod vhd;
 mod vhdx;
 mod vmdk;
+mod volsnap;
 
 // Helpers.
 mod finder;

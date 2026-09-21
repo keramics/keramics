@@ -55,6 +55,7 @@ pub enum VfsType {
     Vhd,
     Vhdx,
     Vmdk,
+    Volsnap,
     Xfs,
 }
 
@@ -88,6 +89,7 @@ impl fmt::Display for VfsType {
             VfsType::Vhd => "VHD",
             VfsType::Vhdx => "VHDX",
             VfsType::Vmdk => "VMDK",
+            VfsType::Volsnap => "volsnap",
             VfsType::Xfs => "XFS",
         };
         write!(formatter, "{}", string)
@@ -203,6 +205,10 @@ mod tests {
         let vfs_type: VfsType = VfsType::Vmdk;
         let string: String = vfs_type.to_string();
         assert_eq!(string, "VMDK");
+
+        let vfs_type: VfsType = VfsType::Volsnap;
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "volsnap");
 
         let vfs_type: VfsType = VfsType::Xfs;
         let string: String = vfs_type.to_string();

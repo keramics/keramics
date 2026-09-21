@@ -44,6 +44,11 @@ where
         self.hashmap.contains_key(key)
     }
 
+    /// Retrieves a specific key by index.
+    pub fn get_key_by_index(&self, value_index: usize) -> Option<&K> {
+        self.keys.get(value_index)
+    }
+
     /// Retrieves a specific key and value pair by index.
     pub fn get_key_value_by_index(&self, value_index: usize) -> Option<(&K, &V)> {
         match self.keys.get(value_index) {

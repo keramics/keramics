@@ -12,7 +12,10 @@
  */
 
 mod block_descriptor;
+mod block_overlay_range;
+mod block_range;
 mod block_reader;
+mod block_stream;
 mod catalog_block;
 mod catalog_block_header;
 mod catalog_entry_type2;
