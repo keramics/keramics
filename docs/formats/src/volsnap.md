@@ -450,8 +450,6 @@ For the size of the data that will fit in the buffer:
 
 ## Format edge cases and corruption scenarios
 
-This chapter contains several corruption scenarios that have been encountered "in the wild".
-
 ### Catalog volume size out of bounds
 
 > Note that this currently considered a corruption scenario future findings may or may not prove

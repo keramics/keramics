@@ -47,7 +47,7 @@ pub struct VolsnapStoreBitmap {
     /// Number of bytes a single bit represents.
     bytes_per_bit: u16,
 
-    /// The bitap ranges.
+    /// The bitmap ranges.
     bitmap_ranges: Vec<VolsnapStoreBitmapRange>,
 }
 
@@ -60,7 +60,7 @@ impl VolsnapStoreBitmap {
         }
     }
 
-    /// Checks if a bit is set for a specific block ofset.
+    /// Checks if a bit is set for a specific block offset.
     pub fn check_if_set(&self, block_offset: u64) -> Result<bool, ErrorTrace> {
         let range_index: usize = match self.bitmap_ranges.binary_search_by(|bitmap_range| {
             if block_offset >= bitmap_range.end_offset {
