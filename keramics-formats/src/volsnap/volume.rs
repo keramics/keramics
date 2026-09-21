@@ -91,52 +91,53 @@ impl VolsnapVolume {
         // TODO: read NTFS boot record to determine bytes per sector?
         self.bytes_per_sector = 512;
 
-        let mut catalog_block_offset: u64 = volume_header.catalog_offset;
-        let mut read_catalog_blocks: HashSet<u64> = HashSet::new();
+        if volume_header.catalog_offset > 0 {
+            let mut catalog_block_offset: u64 = volume_header.catalog_offset;
+            let mut read_catalog_blocks: HashSet<u64> = HashSet::new();
 
-        loop {
-            if read_catalog_blocks.contains(&catalog_block_offset) {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Catalog block at offset: {} (0x{:08x}) already read",
-                    catalog_block_offset, catalog_block_offset
-                )));
-            }
-            let mut catalog_block: VolsnapCatalogBlock =
-                VolsnapCatalogBlock::new(self.bytes_per_sector);
-
-            match catalog_block.read_at_position(
-                data_stream,
-                SeekFrom::Start(catalog_block_offset),
-                &mut self.shadow_copies,
-            ) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to read catalog block at offset: {} (0x{:08x})",
-                            catalog_block_offset, catalog_block_offset
-                        ),
-                    );
-                    return Err(error);
+            loop {
+                if read_catalog_blocks.contains(&catalog_block_offset) {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Catalog block at offset: {} (0x{:08x}) already read",
+                        catalog_block_offset, catalog_block_offset
+                    )));
                 }
-            }
-            read_catalog_blocks.insert(catalog_block_offset);
+                let mut catalog_block: VolsnapCatalogBlock = VolsnapCatalogBlock::new(16384);
 
-            if catalog_block.current_block_offset != catalog_block_offset {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported catalog block - current block offset value out of bounds",
-                ));
+                match catalog_block.read_at_position(
+                    data_stream,
+                    SeekFrom::Start(catalog_block_offset),
+                    &mut self.shadow_copies,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to read catalog block at offset: {} (0x{:08x})",
+                                catalog_block_offset, catalog_block_offset
+                            ),
+                        );
+                        return Err(error);
+                    }
+                }
+                read_catalog_blocks.insert(catalog_block_offset);
+
+                if catalog_block.current_block_offset != catalog_block_offset {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported catalog block - current block offset value out of bounds",
+                    ));
+                }
+                if catalog_block.next_block_offset == 0 {
+                    break;
+                }
+                if !catalog_block.next_block_offset.is_multiple_of(16384) {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported catalog block - next block offset value not a multiple of 16384",
+                    ));
+                }
+                catalog_block_offset = catalog_block.next_block_offset;
             }
-            if catalog_block.next_block_offset == 0 {
-                break;
-            }
-            if !catalog_block.next_block_offset.is_multiple_of(16384) {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported catalog block - next block offset value not a multiple of 16384",
-                ));
-            }
-            catalog_block_offset = catalog_block.next_block_offset;
         }
         self.data_stream = Some(data_stream.clone());
 

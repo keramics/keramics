@@ -90,7 +90,7 @@ impl VolsnapBlockReader {
                 keramics_core::error_trace_add_frame!(
                     error,
                     format!(
-                        "Unable to determine if block offset: {} (0x{:08x}) is set in bitmap",
+                        "Unable to determine if block offset: {} (0x{:08x}) is set in (current) bitmap",
                         offset, offset
                     ),
                 );
@@ -114,9 +114,21 @@ impl VolsnapBlockReader {
                 }
             }
         };
-        // TODO: check reverse block list
-        let has_reverse_block_descriptor: bool = false;
-
+        let has_reverse_block_descriptor: bool =
+            match shadow_copy.reverse_block_tree.get_value(offset) {
+                Ok(Some(_)) => true,
+                Ok(None) => false,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve reverse block descriptor for offset: {} (0x{:08x})",
+                            offset, offset
+                        ),
+                    );
+                    return Err(error);
+                }
+            };
         Ok(in_bitmap && in_previous_bitmap && !has_reverse_block_descriptor)
     }
 
@@ -147,33 +159,41 @@ impl VolsnapBlockReader {
 
         match shadow_copy.forward_block_tree.get_value(offset) {
             Ok(Some(block_descriptor)) => {
-                range_offset = if block_descriptor.is_forwarder() {
-                    block_descriptor.relative_offset
-                } else {
-                    block_descriptor.offset
-                };
+                range_offset = relative_block_offset
+                    + if block_descriptor.is_forwarder() {
+                        block_descriptor.relative_offset
+                    } else {
+                        block_descriptor.offset
+                    };
                 if shadow_copy_index != self.active_shadow_copy_index {
                     in_block_list = !block_descriptor.is_overlay();
                 } else {
-                    let result: Option<VolsnapBlockOverlayRange> = if block_descriptor.is_overlay()
-                    {
-                        block_descriptor
-                            .get_overlay_range(offset, self.snapshot_volume.bytes_per_sector)
+                    if block_descriptor.is_overlay() {
+                        let overlay_range: VolsnapBlockOverlayRange = block_descriptor
+                            .get_overlay_range(
+                                relative_block_offset,
+                                self.snapshot_volume.bytes_per_sector,
+                            );
+                        if overlay_range.is_set {
+                            range_offset = block_descriptor.offset + relative_block_offset;
+                        }
+                        range_size = overlay_range.end_offset - (relative_block_offset as u32);
+                        in_block_list = overlay_range.is_set;
                     } else if let Some(overlay_block_descriptor) = &block_descriptor.overlay {
-                        overlay_block_descriptor
-                            .get_overlay_range(offset, self.snapshot_volume.bytes_per_sector)
-                    } else {
-                        None
-                    };
-                    if let Some(overlay_range) = result {
-                        range_offset = overlay_range.offset;
-                        range_size = overlay_range.size;
-                        in_block_list = overlay_range.bit_value != 0;
+                        let overlay_range: VolsnapBlockOverlayRange = overlay_block_descriptor
+                            .get_overlay_range(
+                                relative_block_offset,
+                                self.snapshot_volume.bytes_per_sector,
+                            );
+                        if overlay_range.is_set {
+                            range_offset = overlay_block_descriptor.offset + relative_block_offset;
+                        }
+                        range_size = overlay_range.end_offset - (relative_block_offset as u32);
+                        in_block_list = true;
                     } else {
                         in_block_list = true;
                     }
                 }
-                range_offset += relative_block_offset;
                 is_forwarder = block_descriptor.is_forwarder();
             }
             Ok(None) => {}
@@ -213,11 +233,12 @@ impl BlockReader for VolsnapBlockReader {
             if current_offset >= self.size {
                 break;
             }
+            let mut block_range: VolsnapBlockRange =
+                VolsnapBlockRange::new(current_offset, self.block_size, false, false);
             let mut block_offset: u64 = current_offset;
-            let mut block_range: VolsnapBlockRange = VolsnapBlockRange::new(0, 0, false, false);
-            let mut shadow_copy_index = self.active_shadow_copy_index;
+            let mut range_size: u32 = self.block_size as u32;
 
-            while shadow_copy_index < self.number_of_shadow_copies {
+            for shadow_copy_index in self.active_shadow_copy_index..self.number_of_shadow_copies {
                 block_range = match self.get_range(shadow_copy_index, block_offset) {
                     Ok(block_range) => block_range,
                     Err(mut error) => {
@@ -231,12 +252,15 @@ impl BlockReader for VolsnapBlockReader {
                         return Err(error);
                     }
                 };
+                range_size = min(range_size, block_range.size);
+
                 if block_range.in_block_list && !block_range.is_forwarder {
                     break;
                 }
                 block_offset = block_range.offset;
-                shadow_copy_index += 1;
             }
+            block_range.size = range_size;
+
             if !block_range.in_block_list {
                 if self.active_shadow_copy_index + 1 == self.number_of_shadow_copies {
                     block_range.is_sparse = match self
@@ -260,30 +284,20 @@ impl BlockReader for VolsnapBlockReader {
             let data_end_offset: usize = data_offset + range_read_size;
 
             if block_range.is_sparse {
-                todo!();
-            } else if block_range.in_block_list {
-                match self.snapshot_volume.data_stream.as_ref() {
-                    Some(data_stream) => {
-                        keramics_core::data_stream_read_exact_at_position!(
-                            data_stream,
-                            &mut data[data_offset..data_end_offset],
-                            SeekFrom::Start(block_range.offset)
-                        )
-                    }
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Missing snapshot volume data stream"
-                        ));
-                    }
-                }
+                data[data_offset..data_end_offset].fill(0);
             } else {
+                let block_offset: u64 = if block_range.in_block_list {
+                    block_range.offset
+                } else {
+                    current_offset
+                };
                 match self.snapshot_volume.data_stream.as_ref() {
                     Some(data_stream) => {
                         keramics_core::data_stream_read_exact_at_position!(
                             data_stream,
                             &mut data[data_offset..data_end_offset],
-                            SeekFrom::Start(current_offset)
-                        )
+                            SeekFrom::Start(block_offset)
+                        );
                     }
                     None => {
                         return Err(keramics_core::error_trace_new!(
@@ -291,7 +305,7 @@ impl BlockReader for VolsnapBlockReader {
                         ));
                     }
                 }
-            };
+            }
             data_offset = data_end_offset;
             current_offset += range_read_size as u64;
         }

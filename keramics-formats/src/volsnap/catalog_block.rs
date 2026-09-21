@@ -25,8 +25,8 @@ use super::shadow_copy::VolsnapShadowCopy;
 
 /// Volume Shadow Snapshot (volsnap) catalog block.
 pub struct VolsnapCatalogBlock {
-    /// Bytes per sector.
-    bytes_per_sector: u16,
+    /// Block size.
+    block_size: u16,
 
     /// Current block offset.
     pub current_block_offset: u64,
@@ -37,9 +37,9 @@ pub struct VolsnapCatalogBlock {
 
 impl VolsnapCatalogBlock {
     /// Creates a new catalog block.
-    pub fn new(bytes_per_sector: u16) -> Self {
+    pub fn new(block_size: u16) -> Self {
         Self {
-            bytes_per_sector,
+            block_size,
             current_block_offset: 0,
             next_block_offset: 0,
         }
@@ -112,7 +112,7 @@ impl VolsnapCatalogBlock {
                     }
                     if !shadow_copies.contains_key(&entry.store_identifier) {
                         let shadow_copy: VolsnapShadowCopy =
-                            VolsnapShadowCopy::new(self.bytes_per_sector);
+                            VolsnapShadowCopy::new(self.block_size);
 
                         _ = shadow_copies.insert(entry.store_identifier.clone(), shadow_copy);
                     }
@@ -148,7 +148,7 @@ impl VolsnapCatalogBlock {
                     }
                     if !shadow_copies.contains_key(&entry.store_identifier) {
                         let shadow_copy: VolsnapShadowCopy =
-                            VolsnapShadowCopy::new(self.bytes_per_sector);
+                            VolsnapShadowCopy::new(self.block_size);
 
                         _ = shadow_copies.insert(entry.store_identifier.clone(), shadow_copy);
                     }
@@ -279,7 +279,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = VolsnapCatalogBlock::new(512);
+        let mut test_struct = VolsnapCatalogBlock::new(16384);
         let mut shadow_copies: IndexedHashMap<Uuid, VolsnapShadowCopy> = IndexedHashMap::new();
         test_struct.read_data(&test_data, 0, &mut shadow_copies)?;
 
@@ -288,7 +288,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let mut test_struct = VolsnapCatalogBlock::new(512);
+        let mut test_struct = VolsnapCatalogBlock::new(16384);
 
         let test_data: Vec<u8> = get_test_data();
         let mut shadow_copies: IndexedHashMap<Uuid, VolsnapShadowCopy> = IndexedHashMap::new();
@@ -301,7 +301,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
-        let mut test_struct = VolsnapCatalogBlock::new(512);
+        let mut test_struct = VolsnapCatalogBlock::new(16384);
         let mut shadow_copies: IndexedHashMap<Uuid, VolsnapShadowCopy> = IndexedHashMap::new();
         let result = test_struct.read_data(&test_data, 0, &mut shadow_copies);
         assert!(result.is_err());
@@ -312,7 +312,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut test_struct = VolsnapCatalogBlock::new(512);
+        let mut test_struct = VolsnapCatalogBlock::new(16384);
         let mut shadow_copies: IndexedHashMap<Uuid, VolsnapShadowCopy> = IndexedHashMap::new();
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0), &mut shadow_copies)?;
 

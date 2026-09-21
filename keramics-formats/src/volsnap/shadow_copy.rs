@@ -87,7 +87,7 @@ pub struct VolsnapShadowCopy {
 
 impl VolsnapShadowCopy {
     /// Creates a new shadow copy.
-    pub fn new(bytes_per_sector: u16) -> Self {
+    pub fn new(block_size: u16) -> Self {
         Self {
             size: 0,
             creation_time: DateTime::NotSet,
@@ -103,8 +103,8 @@ impl VolsnapShadowCopy {
             copy_set_identifier: Uuid::new(),
             attribute_flags: 0,
             store_metadata_read: false,
-            store_bitmap: VolsnapStoreBitmap::new(bytes_per_sector),
-            store_previous_bitmap: VolsnapStoreBitmap::new(bytes_per_sector),
+            store_bitmap: VolsnapStoreBitmap::new(block_size),
+            store_previous_bitmap: VolsnapStoreBitmap::new(block_size),
             forward_block_tree: BlockTree::<VolsnapBlockDescriptor>::new(0, 0, 0),
             reverse_block_tree: BlockTree::<VolsnapBlockDescriptor>::new(0, 0, 0),
         }
