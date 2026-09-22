@@ -26,6 +26,7 @@ mod file_header;
 mod file_header_v1;
 mod file_header_v2;
 mod file_header_v3;
+mod header_extension;
 mod image;
 
 pub use credential::QcowCredential;

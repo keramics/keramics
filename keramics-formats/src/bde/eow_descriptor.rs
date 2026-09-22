@@ -11,8 +11,10 @@
  * under the License.
  */
 
+use std::io::SeekFrom;
+
 use keramics_checksums::ReversedCrc32Context;
-use keramics_core::ErrorTrace;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
 
@@ -38,7 +40,7 @@ use keramics_types::{bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
             format = "hex"
         ),
     ),
-    methods("debug_read_data", "read_at_position")
+    methods("debug_read_data")
 )]
 /// BitLocker Drive Encryption (BDE) Encrypt-on-Write (EOW) descriptor.
 pub struct BdeEowDescriptor {
@@ -125,6 +127,41 @@ impl BdeEowDescriptor {
         }
         Ok(())
     }
+
+    /// Reads the Encrypt-on-Write (EOW) block record from a specific position in a data stream.
+    pub fn read_at_position(
+        &mut self,
+        data_stream: &DataStreamReference,
+        data_size: usize,
+        position: SeekFrom,
+    ) -> Result<(), ErrorTrace> {
+        let mut data: Vec<u8> = vec![0; data_size];
+
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
+
+        keramics_core::debug_trace_data_and_structure!(
+            "BdeEowDescriptor",
+            offset,
+            &data,
+            data_size,
+            BdeEowDescriptor::debug_read_data(&data)
+        );
+        match self.read_data(&data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read Encrypt-on-Write (EOW) block record at offset: {} (0x{:08x})",
+                        offset, offset
+                    )
+                );
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -133,7 +170,7 @@ mod tests {
 
     use std::io::SeekFrom;
 
-    use keramics_core::{DataStreamReference, open_fake_data_stream};
+    use keramics_core::open_fake_data_stream;
 
     fn get_test_data() -> Vec<u8> {
         vec![
@@ -217,7 +254,7 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let mut test_struct = BdeEowDescriptor::new();
-        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
+        test_struct.read_at_position(&data_stream, 512, SeekFrom::Start(0))?;
 
         Ok(())
     }

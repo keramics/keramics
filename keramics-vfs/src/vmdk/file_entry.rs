@@ -118,7 +118,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
+    use keramics_formats::{FileResolverReference, OsFileResolver, PathComponent};
 
     use crate::tests::get_test_data_path;
 
@@ -127,7 +127,8 @@ mod tests {
 
         let path_string: String = get_test_data_path("vmdk");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
         let file_name: PathComponent = PathComponent::from("ext2.vmdk");
         image.open(&file_resolver, &file_name)?;
 

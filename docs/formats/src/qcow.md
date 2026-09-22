@@ -236,7 +236,7 @@ The backing file name is set in snapshot image files and is normally stored afte
 | 0x0000000000000001 | QCOW2_INCOMPAT_DIRTY | Is dirty (or in use) |
 | 0x0000000000000002 | QCOW2_INCOMPAT_CORRUPT | Is corrupt |
 | 0x0000000000000004 | QCOW2_INCOMPAT_DATA_FILE | Uses data file |
-| 0x0000000000000008 | QCOW2_INCOMPAT_COMPRESSION | Uses non-standard compression, where "standard compression" refers to zlib |
+| 0x0000000000000008 | QCOW2_INCOMPAT_COMPRESSION | Uses non-standard compression, where "standard compression" refers to DEFLATE |
 | 0x0000000000000010 | QCOW2_INCOMPAT_EXTL2 | Has extended L2 (table) entries |
 
 ### Compatible feature flags
@@ -256,15 +256,20 @@ The backing file name is set in snapshot image files and is normally stored afte
 
 | Value | Identifier | Description |
 | --- | --- | --- |
-| 0 | | [zlib compression](zlib.md) |
+| 0 | | [DEFLATE compression](zlib.md#deflate_compressed_data) |
 | 1 | | zstd compression (RFC 8878) |
 
 ### File header extensions
 
-A file header extension consist of:
+The file header extensions consists of one or more file header extension where the last file header
+extension is a terminator and consists of 0-byte values. The file header extensions are store 8-byte
+aligned.
+
+An individual file header extension consist of:
 
 * file header extension header
 * file header extension data
+* optional alignment padding
 
 #### File header extension header
 

@@ -16,20 +16,15 @@ use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::pdi::{PdiImage, PdiImageLayer};
-use keramics_formats::{FileResolverReference, open_os_file_resolver};
+use keramics_formats::{FileResolverReference, OsFileResolver};
 
 mod util;
 
 use util::read_data_stream;
 
 fn open_image(base_path: &PathBuf) -> Result<PdiImage, ErrorTrace> {
-    let file_resolver: FileResolverReference = match open_os_file_resolver(base_path) {
-        Ok(data_stream) => data_stream,
-        Err(mut error) => {
-            keramics_core::error_trace_add_frame!(error, "Unable to open file resolver");
-            return Err(error);
-        }
-    };
+    let file_resolver: FileResolverReference =
+        FileResolverReference::new(Box::new(OsFileResolver::new(base_path.clone())));
     let mut image: PdiImage = PdiImage::new();
 
     match image.open(&file_resolver) {

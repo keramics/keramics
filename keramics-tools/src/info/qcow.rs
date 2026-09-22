@@ -53,7 +53,7 @@ struct QcowFileInfo<'a> {
 
 impl<'a> QcowFileInfo<'a> {
     const COMPRESSION_METHODS: &'static [(QcowCompressionMethod, &'static str); 2] = &[
-        (QcowCompressionMethod::Zlib, "zlib"),
+        (QcowCompressionMethod::Deflate, "DEFLATE"),
         (QcowCompressionMethod::Zstd, "zstd"),
     ];
 
@@ -277,7 +277,7 @@ mod tests {
             "    Incompatible features\t\t\t: 0x0000000000000000\n",
             "\n",
             "    Block size\t\t\t\t\t: 64.0 KiB (65536 bytes)\n",
-            "    Compression method\t\t\t\t: zlib\n",
+            "    Compression method\t\t\t\t: DEFLATE\n",
             "\n",
             "    Media information:\n",
             "        Media size\t\t\t\t: 4.0 MiB (4194304 bytes)\n",

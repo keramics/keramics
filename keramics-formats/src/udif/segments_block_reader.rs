@@ -32,8 +32,11 @@ pub struct UdifSegmentsBlockReader {
     /// File resolver.
     file_resolver: FileResolverReference,
 
-    /// Name.
-    name: String,
+    /// Segment name.
+    segment_name: String,
+
+    /// Alternate file name, in case the first segment file was renamed.
+    alternate_file_name: Option<PathComponent>,
 
     /// Segment ranges.
     segment_ranges: Vec<UdifSegmentRange>,
@@ -52,14 +55,16 @@ impl UdifSegmentsBlockReader {
     /// Creates a new segment stream.
     pub(super) fn new(
         file_resolver: &FileResolverReference,
-        name: &str,
+        segment_name: &str,
+        alternate_file_name: Option<&PathComponent>,
         segment_ranges: &[UdifSegmentRange],
         credentials: &[CdsaEncrCredential],
         size: u64,
     ) -> Self {
         Self {
             file_resolver: file_resolver.clone(),
-            name: name.to_string(),
+            segment_name: segment_name.to_string(),
+            alternate_file_name: alternate_file_name.cloned(),
             segment_ranges: segment_ranges.to_vec(),
             segment_file_cache: LruCache::new(16),
             credentials: credentials.to_vec(),
@@ -69,8 +74,14 @@ impl UdifSegmentsBlockReader {
 
     /// Opens a segment file.
     fn open_segment_file(&self, segment_number: u32) -> Result<UdifFile, ErrorTrace> {
-        let segment_file_name: String = UdifSegmentFile::get_file_name(&self.name, segment_number);
-
+        let segment_file_name: String = if segment_number > 1 {
+            UdifSegmentFile::get_file_name(&self.segment_name, segment_number)
+        } else {
+            match self.alternate_file_name.as_ref() {
+                Some(file_name) => file_name.to_string(),
+                None => UdifSegmentFile::get_file_name(&self.segment_name, segment_number),
+            }
+        };
         let path_components: [PathComponent; 1] = [PathComponent::from(&segment_file_name)];
 
         let mut data_stream: DataStreamReference =

@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use keramics_core::ErrorTrace;
 use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::udif::{UdifCompressionMethod, UdifImage};
-use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
+use keramics_formats::{FileResolverReference, OsFileResolver, PathComponent};
 use keramics_types::Uuid;
 use keramics_vfs::{VfsCredential, VfsCredentialStore};
 
@@ -127,13 +127,8 @@ impl UdifInfo {
         let mut base_path: PathBuf = path_buf.clone();
         base_path.pop();
 
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to create file resolver");
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(base_path)));
         let mut udif_image: UdifImage = UdifImage::new();
 
         let file_name: PathComponent = match path_buf.file_name() {

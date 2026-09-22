@@ -951,7 +951,7 @@ The Encrypt-on-Write (FVE-EOW) descriptor is variable of size and consists of:
 | 8 | 2 | 56 | Header size |
 | 10 | 2 | | Data size |
 | 12 | 4 | | Logical sector size (or EOW data sector size?) |
-| 16 | 4 | | Physical sector size (or block record size?) |
+| 16 | 4 | | Physical sector size |
 | 20 | 4 | | Relocation block size |
 | 24 | 4 | | Encrypt-on-Write relocation log area size |
 | 28 | 4 | | Encrypt-on-Write relocation log entry size |
@@ -1016,7 +1016,7 @@ The Encrypt-on-Write block (map) record (FVE-EOWBR) is variable of size, stored 
 | <td colspan="4">*Header*</td> |
 | 0 | 10 | "FVE-EOWBR\x00" | Signature |
 | 10 | 2 | 36 | Header size |
-| 12 | 4 | | Physical sector size |
+| 12 | 4 | | Block record size |
 | 16 | 4 | | Number of bits (in the bitmap) |
 | 20 | 4 | | Sequence number |
 | 24 | 4 | 0 | Unknown (part of sequence number?) |

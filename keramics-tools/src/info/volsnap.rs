@@ -12,11 +12,10 @@
  */
 
 use std::fmt;
-use std::path::PathBuf;
 
 use keramics_core::ErrorTrace;
 use keramics_formats::volsnap::{VolsnapShadowStorage, VolsnapSnapshot};
-use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
+use keramics_formats::{FileResolverReference, PathComponent};
 
 use crate::formatters::ByteSize;
 
@@ -127,29 +126,11 @@ pub struct VolsnapInfo {}
 
 impl VolsnapInfo {
     /// Opens a shadow storage.
-    pub fn open_shadow_storage(path_buf: &PathBuf) -> Result<VolsnapShadowStorage, ErrorTrace> {
-        let mut base_path: PathBuf = path_buf.clone();
-        base_path.pop();
-
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to create file resolver");
-                return Err(error);
-            }
-        };
-        let file_name: PathComponent = match path_buf.file_name() {
-            Some(file_name) => match file_name.to_str() {
-                Some(file_name) => PathComponent::from(file_name),
-                None => {
-                    return Err(keramics_core::error_trace_new!("Unsupported file name"));
-                }
-            },
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing file name"));
-            }
-        };
-        let file_names: [PathComponent; 1] = [file_name];
+    pub fn open_shadow_storage(
+        file_resolver: &FileResolverReference,
+        file_name: &PathComponent,
+    ) -> Result<VolsnapShadowStorage, ErrorTrace> {
+        let file_names: [PathComponent; 1] = [file_name.clone()];
 
         let mut volsnap_shadow_storage: VolsnapShadowStorage = VolsnapShadowStorage::new();
 
@@ -167,15 +148,18 @@ impl VolsnapInfo {
     }
 
     /// Prints information about a shadow storage.
-    pub fn print_shadow_storage(path_buf: &PathBuf) -> Result<(), ErrorTrace> {
-        let volsnap_shadow_storage: VolsnapShadowStorage = match Self::open_shadow_storage(path_buf)
-        {
-            Ok(volsnap_shadow_storage) => volsnap_shadow_storage,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open shadow storage");
-                return Err(error);
-            }
-        };
+    pub fn print_shadow_storage(
+        file_resolver: &FileResolverReference,
+        file_name: &PathComponent,
+    ) -> Result<(), ErrorTrace> {
+        let volsnap_shadow_storage: VolsnapShadowStorage =
+            match Self::open_shadow_storage(file_resolver, file_name) {
+                Ok(volsnap_shadow_storage) => volsnap_shadow_storage,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open shadow storage");
+                    return Err(error);
+                }
+            };
         let shadow_storage_info: VolsnapShadowStorageInfo =
             VolsnapShadowStorageInfo::new(&volsnap_shadow_storage);
 
@@ -293,16 +277,12 @@ mod tests {
     }
 
     fn get_shadow_storage() -> Result<VolsnapShadowStorage, ErrorTrace> {
-        let mut shadow_storage: VolsnapShadowStorage = VolsnapShadowStorage::new();
-
         let path_buf: PathBuf = PathBuf::from("../test_data/volsnap");
         let file_resolver: FileResolverReference =
             FileResolverReference::new(Box::new(TestFileResolver::new(path_buf)));
+        let file_name: PathComponent = PathComponent::from("volsnap.vhd");
 
-        let file_names: [PathComponent; 1] = [PathComponent::from("volsnap.vhd")];
-        shadow_storage.open(&file_resolver, &file_names)?;
-
-        Ok(shadow_storage)
+        VolsnapInfo::open_shadow_storage(&file_resolver, &file_name)
     }
 
     #[test]

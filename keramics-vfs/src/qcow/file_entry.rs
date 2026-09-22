@@ -48,7 +48,7 @@ mod tests {
     use std::sync::Arc;
 
     use keramics_core::ErrorTrace;
-    use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
+    use keramics_formats::{FileResolverReference, OsFileResolver, PathComponent};
 
     use crate::enums::VfsFileType;
     use crate::tests::get_test_data_path;
@@ -58,7 +58,8 @@ mod tests {
 
         let path_string: String = get_test_data_path("qcow");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
         let file_name: PathComponent = PathComponent::from("ext2.qcow2");
         image.open(&file_resolver, &file_name)?;
 

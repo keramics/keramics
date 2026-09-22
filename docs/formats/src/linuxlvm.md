@@ -76,8 +76,8 @@ The physical volume header (struct pv_header) is of variable size and consist of
 | --- | --- | --- | --- |
 | 0 | 32 | | Physical volume identifier, which contains a UUID stored as an ASCII string |
 | 32 | 8 | | Physical volume size, in number of bytes |
-| 40 | ... | | List of [data area descriptors](#data_area_descriptor), where the last descriptor in the list is terminator and consists of 0-byte values |
-| ... | ... | | List of [metadata area descriptors](#data_area_descriptor), where the last descriptor in the list is terminator and consists of 0-byte values |
+| 40 | ... | | List of [data area descriptors](#data_area_descriptor), where the last descriptor in the list is a terminator and consists of 0-byte values |
+| ... | ... | | List of [metadata area descriptors](#data_area_descriptor), where the last descriptor in the list is a terminator and consists of 0-byte values |
 
 The physical volume identifier can be used to uniquely identify a physical volume. The physical
 volume identifier is stored as "9LBcEB7PQTGIlLI0KxrtzrynjuSL983W" but is equivalent to its
@@ -115,7 +115,7 @@ The metadata area header (struct mda_header) is 512 bytes in size and consist of
 | 20 | 4 | 1 | Format version |
 | 24 | 8 | | Metadata area offset, which contains an offset in bytes relative to the start of the physical volume |
 | 32 | 8 | | Metadata area size, in number of bytes |
-| 40 | 4 x 24 = 96 | | List of [raw location descriptors](#raw_location_descriptor), where the last descriptor in the list is terminator and consists of 0-byte values |
+| 40 | 4 x 24 = 96 | | List of [raw location descriptors](#raw_location_descriptor), where the last descriptor in the list is a terminator and consists of 0-byte values |
 | 136 | 376 | 0 | Unknown (unused) |
 
 #### Raw location descriptor {#raw_location_descriptor}

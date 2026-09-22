@@ -462,8 +462,26 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_identifier
-    // TODO: add tests for get_name
+    #[test]
+    fn test_get_identifier() -> Result<(), ErrorTrace> {
+        let volume_system: LinuxLvmVolumeSystem = get_volume_system()?;
+
+        let identifier: Option<&str> = volume_system.get_identifier();
+        assert_eq!(identifier, Some("22IVml-3dws-I85y-vDVy-wYV3-Umbr-pUkQSX"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name() -> Result<(), ErrorTrace> {
+        let volume_system: LinuxLvmVolumeSystem = get_volume_system()?;
+
+        let name: Option<&str> = volume_system.get_name();
+        assert_eq!(name, Some("test_volume_group"));
+
+        Ok(())
+    }
+
     // TODO: add tests for get_number_of_physical_volumes
     // TODO: add tests for get_number_of_volumes
     // TODO: add tests for get_volume_by_index
