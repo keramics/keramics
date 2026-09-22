@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use keramics_core::ErrorTrace;
 use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::sparsebundle::SparseBundleImage;
-use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
+use keramics_formats::{FileResolverReference, OsFileResolver, PathComponent};
 use keramics_vfs::{VfsCredential, VfsCredentialStore};
 
 use crate::formatters::ByteSize;
@@ -80,13 +80,8 @@ pub struct SparseBundleInfo {}
 impl SparseBundleInfo {
     /// Opens an image.
     fn open_image(path_buf: &PathBuf) -> Result<SparseBundleImage, ErrorTrace> {
-        let file_resolver: FileResolverReference = match open_os_file_resolver(path_buf) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to create file resolver");
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf.clone())));
         let mut sparsebundle_image: SparseBundleImage = SparseBundleImage::new();
 
         let file_name: PathComponent = PathComponent::from("Info.plist");

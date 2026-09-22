@@ -15,20 +15,15 @@ use std::path::PathBuf;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::ewf::EwfImage;
-use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
+use keramics_formats::{FileResolverReference, OsFileResolver, PathComponent};
 
 mod util;
 
 use util::read_data_stream;
 
 fn open_image(base_path: &PathBuf, file_name: &str) -> Result<EwfImage, ErrorTrace> {
-    let file_resolver: FileResolverReference = match open_os_file_resolver(base_path) {
-        Ok(data_stream) => data_stream,
-        Err(mut error) => {
-            keramics_core::error_trace_add_frame!(error, "Unable to open file resolver");
-            return Err(error);
-        }
-    };
+    let file_resolver: FileResolverReference =
+        FileResolverReference::new(Box::new(OsFileResolver::new(base_path.clone())));
     let mut image: EwfImage = EwfImage::new();
 
     let path_component: PathComponent = PathComponent::from(file_name);

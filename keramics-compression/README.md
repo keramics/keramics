@@ -8,7 +8,7 @@ Supported decompression methods:
 
 * ADC decompression
 * Bzip2 decompression
-* Deflate decompression
+* DEFLATE decompression
 * LZFSE decompression
 * LZNT1 decompression
 * LZXPRESS (LZ77 + DIRECT2) and LZXPRESS Huffman decompression

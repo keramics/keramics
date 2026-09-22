@@ -22,7 +22,9 @@ use clap_num::maybe_hex;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_encodings::CharacterEncoding;
 use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
-use keramics_formats::{FormatIdentifier, FormatScanner, Path, RangeStream};
+use keramics_formats::{
+    FileResolverReference, FormatIdentifier, FormatScanner, Path, PathComponent, RangeStream,
+};
 use keramics_vfs::{VfsCredential, VfsCredentialStore};
 
 #[cfg(feature = "debug-trace")]
@@ -31,6 +33,7 @@ use keramics_core::mediator::Mediator;
 mod enums;
 mod formatters;
 mod info;
+mod range_file_resolver;
 mod storage_media_image;
 
 use crate::enums::{DisplayPathType, EncodingType, FormatType};
@@ -40,6 +43,7 @@ use crate::info::{
     SgiDiskLabelInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
     VolsnapInfo, XfsInfo,
 };
+use crate::range_file_resolver::RangeFileResolver;
 use crate::storage_media_image::StorageMediaImage;
 
 #[derive(Parser)]
@@ -190,52 +194,6 @@ impl InfoTool {
         }
     }
 
-    /// Retrieves a data stream.
-    pub fn get_data_stream(
-        &self,
-        path: &PathBuf,
-        image_layer: usize,
-    ) -> Result<DataStreamReference, ErrorTrace> {
-        let data_stream: DataStreamReference = if self.contents_mode {
-            match StorageMediaImage::open(path, image_layer) {
-                Ok(storage_media_image) => match storage_media_image.get_data_stream() {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Unable to retrieve data stream",
-                        ));
-                    }
-                },
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to open storage media image"
-                    );
-                    return Err(error);
-                }
-            }
-        } else {
-            match open_os_data_stream(path) {
-                Ok(data_stream) => data_stream,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
-                    return Err(error);
-                }
-            }
-        };
-        if self.offset == 0 {
-            Ok(data_stream)
-        } else {
-            let size: u64 = keramics_core::data_stream_get_size!(data_stream);
-
-            Ok(Arc::new(RwLock::new(RangeStream::new(
-                &data_stream,
-                self.offset,
-                size - self.offset,
-            ))))
-        }
-    }
-
     /// Checks the scan results.
     fn check_scan_results(
         &self,
@@ -325,6 +283,71 @@ impl InfoTool {
             result = scan_results.iter().next().cloned();
         }
         Ok(result)
+    }
+
+    /// Retrieves a data stream.
+    pub fn get_data_stream(
+        &self,
+        path: &PathBuf,
+        image_layer: usize,
+    ) -> Result<DataStreamReference, ErrorTrace> {
+        let data_stream: DataStreamReference = if self.contents_mode {
+            match StorageMediaImage::open(path, image_layer) {
+                Ok(storage_media_image) => match storage_media_image.get_data_stream() {
+                    Some(data_stream) => data_stream,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unable to retrieve data stream",
+                        ));
+                    }
+                },
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to open storage media image"
+                    );
+                    return Err(error);
+                }
+            }
+        } else {
+            match open_os_data_stream(path) {
+                Ok(data_stream) => data_stream,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
+                    return Err(error);
+                }
+            }
+        };
+        if self.offset == 0 {
+            Ok(data_stream)
+        } else {
+            let size: u64 = keramics_core::data_stream_get_size!(data_stream);
+
+            Ok(Arc::new(RwLock::new(RangeStream::new(
+                &data_stream,
+                self.offset,
+                size - self.offset,
+            ))))
+        }
+    }
+
+    /// Retrieves a file name.
+    pub fn get_file_name(&self, path: &PathBuf) -> Result<PathComponent, ErrorTrace> {
+        match path.file_name() {
+            Some(file_name) => match file_name.to_str() {
+                Some(file_name) => Ok(PathComponent::from(file_name)),
+                None => Err(keramics_core::error_trace_new!("Unsupported file name")),
+            },
+            None => Err(keramics_core::error_trace_new!("Missing file name")),
+        }
+    }
+
+    /// Retrieves a file resolver.
+    pub fn get_file_resolver(&self, path: &PathBuf) -> FileResolverReference {
+        let mut base_path: PathBuf = path.clone();
+        base_path.pop();
+
+        FileResolverReference::new(Box::new(RangeFileResolver::new(base_path, self.offset)))
     }
 
     /// Scans a data stream for format signatures.
@@ -711,7 +734,18 @@ fn main() -> ExitCode {
             FormatIdentifier::Fat => FatInfo::print_file_system(&data_stream),
             FormatIdentifier::Hfs => HfsInfo::print_file_system(&data_stream),
             FormatIdentifier::Gpt => GptInfo::print_volume_system(&data_stream),
-            FormatIdentifier::LinuxLvm => LinuxLvmInfo::print_volume_system(&arguments.source),
+            FormatIdentifier::LinuxLvm => {
+                let file_resolver: FileResolverReference =
+                    info_tool.get_file_resolver(&arguments.source);
+                let file_name: PathComponent = match info_tool.get_file_name(&arguments.source) {
+                    Ok(file_name) => file_name,
+                    Err(error) => {
+                        println!("Unable to determine file name with error:\n{}", error);
+                        return ExitCode::FAILURE;
+                    }
+                };
+                LinuxLvmInfo::print_volume_system(&file_resolver, &file_name)
+            }
             FormatIdentifier::Luks => LuksInfo::print_encrypted_volume(&data_stream),
             FormatIdentifier::Mbr => MbrInfo::print_volume_system(&data_stream),
             FormatIdentifier::Ntfs => NtfsInfo::print_file_system(&data_stream),
@@ -730,7 +764,18 @@ fn main() -> ExitCode {
             FormatIdentifier::Vhdx => VhdxInfo::print_file(&data_stream),
             // TODO: add support for individual VMDK file.
             FormatIdentifier::Vmdk => VmdkInfo::print_image(&arguments.source),
-            FormatIdentifier::Volsnap => VolsnapInfo::print_shadow_storage(&arguments.source),
+            FormatIdentifier::Volsnap => {
+                let file_resolver: FileResolverReference =
+                    info_tool.get_file_resolver(&arguments.source);
+                let file_name: PathComponent = match info_tool.get_file_name(&arguments.source) {
+                    Ok(file_name) => file_name,
+                    Err(error) => {
+                        println!("Unable to determine file name with error:\n{}", error);
+                        return ExitCode::FAILURE;
+                    }
+                };
+                VolsnapInfo::print_shadow_storage(&file_resolver, &file_name)
+            }
             FormatIdentifier::Xfs => {
                 XfsInfo::print_file_system(&data_stream, info_tool.character_encoding.as_ref())
             }

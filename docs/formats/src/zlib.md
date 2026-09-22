@@ -91,9 +91,9 @@ are not allowed according to RFC1950 and thus the maximum window size is 32768 b
 
 ## Compressed data
 
-### Deflate compressed data {#deflate_compressed_data}
+### DEFLATE compressed data {#deflate_compressed_data}
 
-The deflate compressed data consists of one or more deflate compressed blocks. Each block consists
+The DEFLATE compressed data consists of one or more DEFLATE compressed blocks. Each block consists
 of:
 
 * block header

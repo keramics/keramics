@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
 use keramics_formats::vmdk::{VmdkCompressionMethod, VmdkDiskType, VmdkImage, VmdkImageLayer};
-use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
+use keramics_formats::{FileResolverReference, OsFileResolver, PathComponent};
 use keramics_types::ByteString;
 
 use crate::formatters::ByteSize;
@@ -154,13 +154,8 @@ impl VmdkInfo {
         let mut base_path: PathBuf = path_buf.clone();
         base_path.pop();
 
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to create file resolver");
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(base_path)));
         let mut vmdk_image: VmdkImage = VmdkImage::new();
 
         let file_name: PathComponent = match path_buf.file_name() {

@@ -19,7 +19,7 @@ use keramics_formats::pdi::{
     PdiImage, PdiSegmentDescriptor, PdiSegmentFileDescriptor, PdiSegmentFileType,
     PdiSnapshotDescriptor,
 };
-use keramics_formats::{FileResolverReference, open_os_file_resolver};
+use keramics_formats::{FileResolverReference, OsFileResolver};
 use keramics_types::Uuid;
 
 use crate::formatters::ByteSize;
@@ -117,13 +117,8 @@ impl PdiInfo {
         let mut base_path: PathBuf = path_buf.clone();
         base_path.pop();
 
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to create file resolver");
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(base_path)));
         let mut pdi_image: PdiImage = PdiImage::new();
 
         match pdi_image.open(&file_resolver) {

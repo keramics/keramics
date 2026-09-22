@@ -569,8 +569,11 @@ impl BdeEncryptedVolume {
     ) -> Result<(), ErrorTrace> {
         let mut eow_descriptor: BdeEowDescriptor = BdeEowDescriptor::new();
 
-        match eow_descriptor.read_at_position(data_stream, SeekFrom::Start(eow_descriptor_offset1))
-        {
+        match eow_descriptor.read_at_position(
+            data_stream,
+            self.bytes_per_sector as usize,
+            SeekFrom::Start(eow_descriptor_offset1),
+        ) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(

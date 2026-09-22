@@ -47,7 +47,7 @@ impl BdeEowBlockBitmapRange {
         byte_order = "little",
         field(name = "signature", data_type = "[u8; 10]", format = "hex"),
         field(name = "header_size", data_type = "u16"),
-        field(name = "physical_sector_size", data_type = "u32"),
+        field(name = "block_record_size", data_type = "u32"),
         field(name = "number_of_bits", data_type = "u32"),
         field(name = "sequence_number", data_type = "u32"),
         field(name = "unknown1", data_type = "u32"),
@@ -147,7 +147,7 @@ impl BdeEowBlockRecord {
 
         self.sequence_number = bytes_to_u32_le!(data, 20);
 
-        let bitmap_end_offset: usize = 36 + (number_of_bits.next_multiple_of(8) as usize);
+        let bitmap_end_offset: usize = 36 + ((number_of_bits.next_multiple_of(8) / 8) as usize);
 
         if bitmap_end_offset > data_size {
             return Err(keramics_core::error_trace_new!(

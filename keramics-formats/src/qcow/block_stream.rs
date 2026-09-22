@@ -37,6 +37,7 @@ mod tests {
 
         Ok(QcowBlockStream::new(QcowBlockReader::new(
             &data_stream,
+            786432,
             512,
             0x3fffffffffffffff,
             29,
@@ -46,8 +47,9 @@ mod tests {
             8192,
             16,
             65536,
+            0x00003fffffffffff,
             0x4000000000000000,
-            &QcowCompressionMethod::Zlib,
+            &QcowCompressionMethod::Deflate,
             None,
             None,
             4194304,

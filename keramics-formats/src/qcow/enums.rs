@@ -13,8 +13,8 @@
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum QcowCompressionMethod {
+    Deflate,
     Unknown,
-    Zlib,
     Zstd,
 }
 

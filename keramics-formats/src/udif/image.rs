@@ -48,8 +48,11 @@ pub struct UdifImage {
     /// Segment size.
     segments_size: u64,
 
-    /// Name.   
-    name: String,
+    /// Segment name.
+    segment_name: String,
+
+    /// Alternate file name, in case the first segment file was renamed.
+    alternate_file_name: Option<PathComponent>,
 
     /// Segment ranges.
     segment_ranges: Vec<UdifSegmentRange>,
@@ -90,7 +93,8 @@ impl UdifImage {
             segment_set_identifier: Uuid::new(),
             number_of_segments: 0,
             segments_size: 0,
-            name: String::new(),
+            segment_name: String::new(),
+            alternate_file_name: None,
             segment_ranges: Vec::new(),
             segments_data_stream: None,
             bytes_per_sector: 0,
@@ -166,7 +170,7 @@ impl UdifImage {
         file_resolver: &FileResolverReference,
         file_name: &PathComponent,
     ) -> Result<(), ErrorTrace> {
-        self.name = match file_name.file_stem() {
+        self.segment_name = match file_name.file_stem() {
             Ok(Some(file_stem)) => file_stem.to_string(),
             Ok(None) => {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -179,6 +183,26 @@ impl UdifImage {
                     error,
                     format!(
                         "Unable to retrieve file stem of segment file: {}",
+                        file_name,
+                    )
+                );
+                return Err(error);
+            }
+        };
+        match file_name.extension() {
+            Ok(Some(extension)) => {
+                let extension_string: String = extension.to_string();
+
+                if extension_string.to_lowercase() != "dmg" {
+                    self.alternate_file_name = Some(file_name.clone());
+                }
+            }
+            Ok(None) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve extension of segment file: {}",
                         file_name,
                     )
                 );
@@ -269,7 +293,8 @@ impl UdifImage {
             self.segments_data_stream = Some(Arc::new(RwLock::new(UdifSegmentsBlockStream::new(
                 UdifSegmentsBlockReader::new(
                     &self.file_resolver,
-                    self.name.as_str(),
+                    self.segment_name.as_str(),
+                    self.alternate_file_name.as_ref(),
                     &self.segment_ranges,
                     &self.credentials,
                     self.segments_size,
@@ -281,8 +306,14 @@ impl UdifImage {
 
     /// Opens a segment file.
     fn open_segment_file(&self, segment_number: u32) -> Result<UdifFile, ErrorTrace> {
-        let segment_file_name: String = UdifSegmentFile::get_file_name(&self.name, segment_number);
-
+        let segment_file_name: String = if segment_number > 1 {
+            UdifSegmentFile::get_file_name(&self.segment_name, segment_number)
+        } else {
+            match self.alternate_file_name.as_ref() {
+                Some(file_name) => file_name.to_string(),
+                None => UdifSegmentFile::get_file_name(&self.segment_name, segment_number),
+            }
+        };
         let path_components: [PathComponent; 1] = [PathComponent::from(&segment_file_name)];
 
         let mut data_stream: DataStreamReference =
@@ -531,7 +562,10 @@ impl UdifImage {
         }
         let segment_number: u32 = 1;
 
-        let segment_file_name: String = UdifSegmentFile::get_file_name(&self.name, segment_number);
+        let segment_file_name: String = match self.alternate_file_name.as_ref() {
+            Some(file_name) => file_name.to_string(),
+            None => UdifSegmentFile::get_file_name(&self.segment_name, segment_number),
+        };
 
         let path_components: [PathComponent; 1] = [PathComponent::from(&segment_file_name)];
 
@@ -621,7 +655,8 @@ impl UdifImage {
             self.segments_data_stream = Some(Arc::new(RwLock::new(UdifSegmentsBlockStream::new(
                 UdifSegmentsBlockReader::new(
                     &self.file_resolver,
-                    self.name.as_str(),
+                    self.segment_name.as_str(),
+                    self.alternate_file_name.as_ref(),
                     &self.segment_ranges,
                     &self.credentials,
                     self.segments_size,

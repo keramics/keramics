@@ -75,6 +75,7 @@ mod tests {
         Ok(UdifSegmentsBlockStream::new(UdifSegmentsBlockReader::new(
             &file_resolver,
             "hfsplus_segments",
+            None,
             &segment_ranges,
             &credentials,
             1955840,

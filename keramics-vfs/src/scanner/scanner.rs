@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::collections::HashSet;
+
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use keramics_formats::apfs::{ApfsContainer, ApfsVolume};
@@ -291,28 +293,22 @@ impl VfsScanner {
                     Some(file_name) => match file_name.extension() {
                         Ok(Some(extension)) => {
                             if extension.to_string().as_str() == "sparsebundle" {
-                                let sub_node_path: Path = Path::from("/");
-                                let sub_node_vfs_location: VfsLocation = vfs_location
-                                    .new_with_layer(&VfsType::SparseBundle, sub_node_path);
-                                let mut sub_scan_node: VfsScanNode =
-                                    VfsScanNode::new(sub_node_vfs_location);
-
-                                match self.scan_for_sub_nodes(
+                                match self.scan_node(
                                     scan_options,
                                     &file_system,
                                     vfs_location,
-                                    &mut sub_scan_node,
+                                    &VfsType::SparseBundle,
+                                    &mut scan_node,
                                 ) {
                                     Ok(_) => {}
                                     Err(mut error) => {
                                         keramics_core::error_trace_add_frame!(
                                             error,
-                                            "Unable to scan for sub nodes"
+                                            "Unable to scan sparsebundle node"
                                         );
                                         return Err(error);
                                     }
                                 }
-                                scan_node.sub_nodes.push(sub_scan_node);
                             }
                         }
                         Ok(None) => {}
@@ -336,18 +332,10 @@ impl VfsScanner {
                 }
             }
             VfsFileType::File => {
-                match self.scan_for_sub_nodes(
-                    scan_options,
-                    &file_system,
-                    vfs_location,
-                    &mut scan_node,
-                ) {
+                match self.scan_sub_node(scan_options, &file_system, vfs_location, &mut scan_node) {
                     Ok(_) => {}
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to scan for sub nodes"
-                        );
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan sub node");
                         return Err(error);
                     }
                 }
@@ -361,14 +349,37 @@ impl VfsScanner {
         Ok(())
     }
 
+    /// Scans a data stream for a supported file system format.
+    pub fn scan_for_file_system_format(
+        &self,
+        data_stream: &DataStreamReference,
+    ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
+        match self.file_system_scanner.scan_data_stream(data_stream) {
+            Ok(mut scan_results) => {
+                if scan_results.len() > 1 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Found multiple file system format signatures: {:?}",
+                        scan_results
+                    )));
+                }
+                Ok(scan_results.drain().next())
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to scan data stream for file system format signatures"
+                );
+                Err(error)
+            }
+        }
+    }
+
     /// Scans for file system sub nodes.
     fn scan_for_file_system_sub_nodes(
         &self,
         vfs_location: &VfsLocation,
         scan_node: &mut VfsScanNode,
     ) -> Result<(), ErrorTrace> {
-        let vfs_type: &VfsType = scan_node.get_type();
-
         let data_stream: DataStreamReference = match self
             .resolver
             .get_data_stream_by_location_and_name(vfs_location, None)
@@ -410,14 +421,14 @@ impl VfsScanner {
             let sub_node_vfs_location: VfsLocation = scan_node
                 .location
                 .new_with_layer(&sub_node_vfs_type, sub_node_path);
-            let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
+            let sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
 
             scan_node.sub_nodes.push(sub_scan_node);
         }
         Ok(())
     }
 
-    /// Scans for a supported format.
+    /// Scans for supported formats.
     fn scan_for_format(
         &self,
         file_system: &VfsFileSystemReference,
@@ -454,6 +465,7 @@ impl VfsScanner {
             VfsType::Apm
             | VfsType::Gpt
             | VfsType::LinuxLvm
+            | VfsType::Luksde
             | VfsType::Mbr
             | VfsType::SgiDiskLabel => {
                 let mut result: Option<FormatIdentifier> = match self
@@ -482,19 +494,16 @@ impl VfsScanner {
                 }
                 Ok(result)
             }
-            // TODO: for LUKS also scan for LVM
-            VfsType::Bde | VfsType::Luksde => {
-                match self.scan_for_file_system_format(&data_stream) {
-                    Ok(scan_results) => Ok(scan_results),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to scan data stream for file system formats"
-                        );
-                        Err(error)
-                    }
+            VfsType::Bde => match self.scan_for_file_system_format(&data_stream) {
+                Ok(scan_results) => Ok(scan_results),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to scan data stream for file system formats"
+                    );
+                    Err(error)
                 }
-            }
+            },
             VfsType::Ewf
             | VfsType::SparseBundle
             | VfsType::SparseImage
@@ -588,6 +597,7 @@ impl VfsScanner {
                 }
                 Ok(result)
             }
+            // Only support an NTFS file system within a volsnap shadow storage.
             VfsType::Volsnap => match self.scan_for_file_system_format(&data_stream) {
                 Ok(Some(FormatIdentifier::Ntfs)) => Ok(Some(FormatIdentifier::Ntfs)),
                 Ok(Some(format_identifier)) => Err(keramics_core::error_trace_new!(format!(
@@ -606,30 +616,6 @@ impl VfsScanner {
         }
     }
 
-    /// Scans a data stream for a supported file system format.
-    pub fn scan_for_file_system_format(
-        &self,
-        data_stream: &DataStreamReference,
-    ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
-        match self.file_system_scanner.scan_data_stream(data_stream) {
-            Ok(mut scan_results) => {
-                if scan_results.len() > 1 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Found multiple file system format signatures"
-                    ));
-                }
-                Ok(scan_results.drain().next())
-            }
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to scan data stream for file system format signatures"
-                );
-                Err(error)
-            }
-        }
-    }
-
     /// Scans a data stream for a supported storage media image format.
     pub fn scan_for_storage_media_image_format(
         &self,
@@ -641,9 +627,10 @@ impl VfsScanner {
         {
             Ok(mut scan_results) => {
                 if scan_results.len() > 1 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Found multiple storage media image format signatures"
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Found multiple storage media image format signatures: {:?}",
+                        scan_results
+                    )));
                 }
                 match scan_results.drain().next() {
                     Some(format_identifier) => format_identifier,
@@ -697,9 +684,10 @@ impl VfsScanner {
                     {
                         Ok(mut scan_results) => {
                             if scan_results.len() > 1 {
-                                return Err(keramics_core::error_trace_new!(
-                                    "Found multiple storage media image format signatures in encrypted container"
-                                ));
+                                return Err(keramics_core::error_trace_new!(format!(
+                                    "Found multiple storage media image format signatures: {:?} in encrypted container",
+                                    scan_results
+                                )));
                             }
                             match scan_results.drain().next() {
                                 Some(format_identifier) => format_identifier,
@@ -767,10 +755,10 @@ impl VfsScanner {
 
             let node_path: Path = Path::from(layer_path.as_str());
             let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_path);
-            let mut layer_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location);
+            let mut layer_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location.clone());
 
             let result: Option<FormatIdentifier> =
-                match self.scan_for_format(&node_file_system, &layer_scan_node.location) {
+                match self.scan_for_format(&node_file_system, &node_vfs_location) {
                     Ok(result) => result,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -790,17 +778,12 @@ impl VfsScanner {
                         )));
                     }
                 };
-                let sub_node_path: Path = Path::from("/");
-                let sub_node_vfs_location: VfsLocation = layer_scan_node
-                    .location
-                    .new_with_layer(&sub_node_vfs_type, sub_node_path);
-                let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
-
-                match self.scan_for_sub_nodes(
+                match self.scan_node(
                     scan_options,
                     &node_file_system,
-                    &layer_scan_node.location,
-                    &mut sub_scan_node,
+                    &node_vfs_location,
+                    &sub_node_vfs_type,
+                    &mut layer_scan_node,
                 ) {
                     Ok(_) => {}
                     Err(mut error) => {
@@ -811,15 +794,324 @@ impl VfsScanner {
                         return Err(error);
                     }
                 }
-                layer_scan_node.sub_nodes.push(sub_scan_node);
             }
             scan_node.sub_nodes.push(layer_scan_node);
         }
         Ok(())
     }
 
+    /// Scans a data stream for a supported volume-system-in-volume-system format.
+    fn scan_for_sub_volume_system_format(
+        &self,
+        data_stream: &DataStreamReference,
+    ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
+        match self.sub_volume_system_scanner.scan_data_stream(data_stream) {
+            Ok(scan_results) => {
+                let mut result: Option<FormatIdentifier> = None;
+
+                if scan_results.len() > 1 {
+                    if scan_results.contains(&FormatIdentifier::Bde) {
+                        let mut scan_results_copy: HashSet<FormatIdentifier> = scan_results.clone();
+                        scan_results_copy.remove(&FormatIdentifier::Bde);
+
+                        if scan_results_copy.len() == 1 {
+                            result = match scan_results_copy.iter().next() {
+                                Some(format_identifier) => {
+                                    if format_identifier == &FormatIdentifier::Volsnap {
+                                        Some(FormatIdentifier::Bde)
+                                    } else {
+                                        None
+                                    }
+                                }
+                                None => None,
+                            }
+                        }
+                    }
+                    if result.is_none() {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Found multiple volume-system-in-volume-system format signatures: {:?}",
+                            scan_results
+                        )));
+                    }
+                } else {
+                    result = scan_results.iter().next().cloned();
+                }
+                Ok(result)
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to scan data stream for non-overlapping volume system format signatures"
+                );
+                Err(error)
+            }
+        }
+    }
+
+    /// Scans a data stream for a supported volume system format.
+    pub fn scan_for_volume_system_format(
+        &self,
+        data_stream: &DataStreamReference,
+    ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
+        let format_identifier: Option<FormatIdentifier> = match self
+            .phase1_volume_system_scanner
+            .scan_data_stream(data_stream)
+        {
+            Ok(mut scan_results) => {
+                if scan_results.len() > 1 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Found multiple non-overlapping volume system format signatures: {:?}",
+                        scan_results
+                    )));
+                }
+                scan_results.drain().next()
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to scan data stream for non-overlapping volume system format signatures"
+                );
+                return Err(error);
+            }
+        };
+        match &format_identifier {
+            Some(FormatIdentifier::Apfs) => return Ok(Some(FormatIdentifier::Apfs)),
+            Some(FormatIdentifier::Apm) => return Ok(Some(FormatIdentifier::Apm)),
+            Some(FormatIdentifier::Bde) => return Ok(Some(FormatIdentifier::Bde)),
+            Some(FormatIdentifier::Gpt) => return Ok(Some(FormatIdentifier::Gpt)),
+            Some(FormatIdentifier::LinuxLvm) => return Ok(Some(FormatIdentifier::LinuxLvm)),
+            Some(FormatIdentifier::Luks) => return Ok(Some(FormatIdentifier::Luks)),
+            Some(FormatIdentifier::SgiDiskLabel) => {
+                return Ok(Some(FormatIdentifier::SgiDiskLabel));
+            }
+            Some(FormatIdentifier::Volsnap) => return Ok(Some(FormatIdentifier::Volsnap)),
+            Some(format_identifier) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Found unsupported non-overlapping volume system format signature: {}",
+                    format_identifier
+                )));
+            }
+            None => {}
+        }
+        let format_identifier: Option<FormatIdentifier> = match self
+            .phase2_volume_system_scanner
+            .scan_data_stream(data_stream)
+        {
+            Ok(mut scan_results) => {
+                if scan_results.len() > 1 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Found multiple exclusion volume system format signatures: {:?}",
+                        scan_results
+                    )));
+                }
+                scan_results.drain().next()
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to scan data stream for exclusion volume system format signatures"
+                );
+                return Err(error);
+            }
+        };
+        match &format_identifier {
+            Some(FormatIdentifier::ExFat) => return Ok(None),
+            Some(FormatIdentifier::Fat) => return Ok(None),
+            Some(FormatIdentifier::Ntfs) => return Ok(None),
+            Some(format_identifier) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Found unsupported exclusion volume system format signature: {}",
+                    format_identifier
+                )));
+            }
+            None => {}
+        }
+        let format_identifier: FormatIdentifier = match self
+            .phase3_volume_system_scanner
+            .scan_data_stream(data_stream)
+        {
+            Ok(mut scan_results) => {
+                if scan_results.len() > 1 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Found multiple overlapping volume system format signatures: {:?}",
+                        scan_results
+                    )));
+                }
+                match scan_results.drain().next() {
+                    Some(format_identifier) => format_identifier,
+                    None => return Ok(None),
+                }
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to scan data stream for overlapping volume system format signatures"
+                );
+                return Err(error);
+            }
+        };
+        match &format_identifier {
+            FormatIdentifier::Mbr => {
+                // FAT does not have unique signatures.
+                let mut fat_file_system: FatFileSystem = FatFileSystem::new();
+
+                match fat_file_system.read_data_stream(data_stream) {
+                    Ok(_) => Ok(Some(FormatIdentifier::Fat)),
+                    Err(_) => Ok(Some(FormatIdentifier::Mbr)),
+                }
+            }
+            _ => Err(keramics_core::error_trace_new!(
+                "Found unsupported overlapping volume system format signature"
+            )),
+        }
+    }
+
+    /// Scans for volume system sub nodes.
+    fn scan_for_volume_system_sub_nodes(
+        &self,
+        scan_options: &VfsScanOptions,
+        vfs_location: &VfsLocation,
+        scan_node: &mut VfsScanNode,
+        path_prefix: &str,
+        number_of_volumes: usize,
+    ) -> Result<(), ErrorTrace> {
+        let vfs_type: &VfsType = scan_node.get_type();
+
+        let path: Path = Path::from("/");
+        let file_system_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, path);
+        let node_file_system: VfsFileSystemReference =
+            match self.resolver.open_file_system(&file_system_vfs_location) {
+                Ok(file_system) => file_system,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open file system");
+                    return Err(error);
+                }
+            };
+
+        match vfs_type {
+            VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel
+                if scan_options.partitions == VfsScanOptionGroup::NotSet =>
+            {
+                // TODO: invoke mediator to ask which partitions to include.
+            }
+            VfsType::LinuxLvm if scan_options.volumes == VfsScanOptionGroup::NotSet => {
+                // TODO: invoke mediator to ask which volumes to include.
+            }
+            _ => {}
+        };
+        for volume_index in 0..number_of_volumes {
+            let vfs_type: &VfsType = scan_node.get_type();
+
+            match vfs_type {
+                VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel
+                    if scan_options.partitions != VfsScanOptionGroup::NotSet
+                        && !scan_options.partitions.contains_index(volume_index + 1) =>
+                {
+                    continue;
+                }
+                VfsType::LinuxLvm
+                    if scan_options.volumes != VfsScanOptionGroup::NotSet
+                        && !scan_options.volumes.contains_index(volume_index + 1) =>
+                {
+                    continue;
+                }
+                _ => {}
+            };
+            // TODO: use volume identifier in location?
+            let volume_path: String = format!("{}{}", path_prefix, volume_index + 1);
+
+            let node_path: Path = Path::from(volume_path.as_str());
+            let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_path);
+            let mut volume_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location.clone());
+
+            let result: Option<FormatIdentifier> =
+                match self.scan_for_format(&node_file_system, &node_vfs_location) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan volume data stream for formats"
+                        );
+                        return Err(error);
+                    }
+                };
+            if let Some(format_identifier) = result {
+                let sub_node_vfs_type: VfsType = match Self::get_vfs_type(&format_identifier) {
+                    Some(vfs_type) => vfs_type,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Found unsupported format signature: {}",
+                            format_identifier
+                        )));
+                    }
+                };
+                match self.scan_node(
+                    scan_options,
+                    &node_file_system,
+                    &node_vfs_location,
+                    &sub_node_vfs_type,
+                    &mut volume_scan_node,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan for sub nodes"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            scan_node.sub_nodes.push(volume_scan_node);
+        }
+        Ok(())
+    }
+
     /// Scans a node for supported formats.
-    fn scan_for_sub_nodes(
+    fn scan_node(
+        &self,
+        scan_options: &VfsScanOptions,
+        file_system: &VfsFileSystemReference,
+        vfs_location: &VfsLocation,
+        vfs_type: &VfsType,
+        scan_node: &mut VfsScanNode,
+    ) -> Result<(), ErrorTrace> {
+        // TODO: handle image with both GPT and MBR volume systems.
+        // TODO: add support for To Go placeholder FAT file system.
+
+        if vfs_type == &VfsType::Volsnap {
+            // When dealing with a volsnap shadow storage also expose the current NTFS volume.
+            match self.scan_for_file_system_sub_nodes(vfs_location, scan_node) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to scan for file system sub nodes"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        if !scan_node.is_file_system() {
+            let sub_node_path: Path = Path::from("/");
+            let sub_node_vfs_location: VfsLocation =
+                vfs_location.new_with_layer(vfs_type, sub_node_path);
+            let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
+
+            match self.scan_sub_node(scan_options, &file_system, vfs_location, &mut sub_scan_node) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to scan sub node");
+                    return Err(error);
+                }
+            }
+            scan_node.sub_nodes.push(sub_scan_node);
+        }
+        Ok(())
+    }
+
+    /// Scans sub node for supported formats.
+    fn scan_sub_node(
         &self,
         scan_options: &VfsScanOptions,
         file_system: &VfsFileSystemReference,
@@ -828,7 +1120,6 @@ impl VfsScanner {
     ) -> Result<(), ErrorTrace> {
         let path: &Path = vfs_location.get_path();
 
-        // TODO: handle image with both GPT and MBR volume systems.
         match scan_node.get_type() {
             VfsType::Apfs
             | VfsType::ExFat
@@ -942,8 +1233,6 @@ impl VfsScanner {
                         return Err(error);
                     }
                 }
-                // TODO: add support for ToGo placeholder FAT file system.
-
                 if bde_encrypted_volume.is_locked() {
                     scan_node.is_locked = true;
                 } else {
@@ -1156,25 +1445,22 @@ impl VfsScanner {
                                     )));
                                 }
                             };
-                        let sub_node_path: Path = Path::from("/");
-                        let sub_node_vfs_location: VfsLocation =
-                            vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_path);
-                        let mut sub_scan_node: VfsScanNode =
-                            VfsScanNode::new(sub_node_vfs_location);
-
-                        match self.scan_for_sub_nodes(
+                        match self.scan_node(
                             scan_options,
                             file_system,
                             vfs_location,
-                            &mut sub_scan_node,
+                            &sub_node_vfs_type,
+                            scan_node,
                         ) {
                             Ok(_) => {}
                             Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(error, "Unable to scan OS");
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to scan operating system node"
+                                );
                                 return Err(error);
                             }
                         }
-                        scan_node.sub_nodes.push(sub_scan_node);
                     }
                     Ok(None) => {}
                     Err(mut error) => {
@@ -1509,269 +1795,6 @@ impl VfsScanner {
         }
         Ok(())
     }
-
-    /// Scans a data stream for a supported volume-system-in-volume-system format.
-    fn scan_for_sub_volume_system_format(
-        &self,
-        data_stream: &DataStreamReference,
-    ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
-        match self.sub_volume_system_scanner.scan_data_stream(data_stream) {
-            Ok(mut scan_results) => {
-                if scan_results.len() > 1 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Found multiple volume-system-in-volume-system format signatures"
-                    ));
-                }
-                Ok(scan_results.drain().next())
-            }
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to scan data stream for non-overlapping volume system format signatures"
-                );
-                Err(error)
-            }
-        }
-    }
-
-    /// Scans a data stream for a supported volume system format.
-    pub fn scan_for_volume_system_format(
-        &self,
-        data_stream: &DataStreamReference,
-    ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
-        let format_identifier: Option<FormatIdentifier> = match self
-            .phase1_volume_system_scanner
-            .scan_data_stream(data_stream)
-        {
-            Ok(mut scan_results) => {
-                if scan_results.len() > 1 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Found multiple non-overlapping volume system format signatures"
-                    ));
-                }
-                scan_results.drain().next()
-            }
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to scan data stream for non-overlapping volume system format signatures"
-                );
-                return Err(error);
-            }
-        };
-        match &format_identifier {
-            Some(FormatIdentifier::Apfs) => return Ok(Some(FormatIdentifier::Apfs)),
-            Some(FormatIdentifier::Apm) => return Ok(Some(FormatIdentifier::Apm)),
-            Some(FormatIdentifier::Bde) => return Ok(Some(FormatIdentifier::Bde)),
-            Some(FormatIdentifier::Gpt) => return Ok(Some(FormatIdentifier::Gpt)),
-            Some(FormatIdentifier::LinuxLvm) => return Ok(Some(FormatIdentifier::LinuxLvm)),
-            Some(FormatIdentifier::Luks) => return Ok(Some(FormatIdentifier::Luks)),
-            Some(FormatIdentifier::SgiDiskLabel) => {
-                return Ok(Some(FormatIdentifier::SgiDiskLabel));
-            }
-            Some(FormatIdentifier::Volsnap) => return Ok(Some(FormatIdentifier::Volsnap)),
-            Some(format_identifier) => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Found unsupported non-overlapping volume system format signature: {}",
-                    format_identifier
-                )));
-            }
-            None => {}
-        }
-        let format_identifier: Option<FormatIdentifier> = match self
-            .phase2_volume_system_scanner
-            .scan_data_stream(data_stream)
-        {
-            Ok(mut scan_results) => {
-                if scan_results.len() > 1 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Found multiple exclusion volume system format signatures"
-                    ));
-                }
-                scan_results.drain().next()
-            }
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to scan data stream for exclusion volume system format signatures"
-                );
-                return Err(error);
-            }
-        };
-        match &format_identifier {
-            Some(FormatIdentifier::ExFat) => return Ok(None),
-            Some(FormatIdentifier::Fat) => return Ok(None),
-            Some(FormatIdentifier::Ntfs) => return Ok(None),
-            Some(format_identifier) => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Found unsupported exclusion volume system format signature: {}",
-                    format_identifier
-                )));
-            }
-            None => {}
-        }
-        let format_identifier: FormatIdentifier = match self
-            .phase3_volume_system_scanner
-            .scan_data_stream(data_stream)
-        {
-            Ok(mut scan_results) => {
-                if scan_results.len() > 1 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Found multiple overlapping volume system format signatures"
-                    ));
-                }
-                match scan_results.drain().next() {
-                    Some(format_identifier) => format_identifier,
-                    None => return Ok(None),
-                }
-            }
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to scan data stream for overlapping volume system format signatures"
-                );
-                return Err(error);
-            }
-        };
-        match &format_identifier {
-            FormatIdentifier::Mbr => {
-                // FAT does not have unique signatures.
-                let mut fat_file_system: FatFileSystem = FatFileSystem::new();
-
-                match fat_file_system.read_data_stream(data_stream) {
-                    Ok(_) => Ok(Some(FormatIdentifier::Fat)),
-                    Err(_) => Ok(Some(FormatIdentifier::Mbr)),
-                }
-            }
-            _ => Err(keramics_core::error_trace_new!(
-                "Found unsupported overlapping volume system format signature"
-            )),
-        }
-    }
-
-    /// Scans for volume system sub nodes.
-    fn scan_for_volume_system_sub_nodes(
-        &self,
-        scan_options: &VfsScanOptions,
-        vfs_location: &VfsLocation,
-        scan_node: &mut VfsScanNode,
-        path_prefix: &str,
-        number_of_volumes: usize,
-    ) -> Result<(), ErrorTrace> {
-        let vfs_type: &VfsType = scan_node.get_type();
-
-        let path: Path = Path::from("/");
-        let file_system_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, path);
-        let node_file_system: VfsFileSystemReference =
-            match self.resolver.open_file_system(&file_system_vfs_location) {
-                Ok(file_system) => file_system,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to open file system");
-                    return Err(error);
-                }
-            };
-
-        match vfs_type {
-            VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel
-                if scan_options.partitions == VfsScanOptionGroup::NotSet =>
-            {
-                // TODO: invoke mediator to ask which partitions to include.
-            }
-            VfsType::LinuxLvm if scan_options.volumes == VfsScanOptionGroup::NotSet => {
-                // TODO: invoke mediator to ask which volumes to include.
-            }
-            _ => {}
-        };
-        for volume_index in 0..number_of_volumes {
-            let vfs_type: &VfsType = scan_node.get_type();
-
-            match vfs_type {
-                VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel
-                    if scan_options.partitions != VfsScanOptionGroup::NotSet
-                        && !scan_options.partitions.contains_index(volume_index + 1) =>
-                {
-                    continue;
-                }
-                VfsType::LinuxLvm
-                    if scan_options.volumes != VfsScanOptionGroup::NotSet
-                        && !scan_options.volumes.contains_index(volume_index + 1) =>
-                {
-                    continue;
-                }
-                _ => {}
-            };
-            // TODO: use volume identifier in location?
-            let volume_path: String = format!("{}{}", path_prefix, volume_index + 1);
-
-            let node_path: Path = Path::from(volume_path.as_str());
-            let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_path);
-            let mut volume_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location);
-
-            let result: Option<FormatIdentifier> =
-                match self.scan_for_format(&node_file_system, &volume_scan_node.location) {
-                    Ok(result) => result,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to scan volume data stream for formats"
-                        );
-                        return Err(error);
-                    }
-                };
-            if let Some(format_identifier) = result {
-                if format_identifier == FormatIdentifier::Volsnap {
-                    // When dealing with volsnap also expose the current NTFS volume.
-                    let node_vfs_location: VfsLocation = volume_scan_node.location.clone();
-
-                    match self
-                        .scan_for_file_system_sub_nodes(&node_vfs_location, &mut volume_scan_node)
-                    {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to scan for file system sub nodes"
-                            );
-                            return Err(error);
-                        }
-                    }
-                }
-                let sub_node_vfs_type: VfsType = match Self::get_vfs_type(&format_identifier) {
-                    Some(vfs_type) => vfs_type,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Found unsupported format signature: {}",
-                            format_identifier
-                        )));
-                    }
-                };
-                let sub_node_path: Path = Path::from("/");
-                let sub_node_vfs_location: VfsLocation = volume_scan_node
-                    .location
-                    .new_with_layer(&sub_node_vfs_type, sub_node_path);
-                let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
-
-                match self.scan_for_sub_nodes(
-                    scan_options,
-                    &node_file_system,
-                    &volume_scan_node.location,
-                    &mut sub_scan_node,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to scan for sub nodes"
-                        );
-                        return Err(error);
-                    }
-                }
-                volume_scan_node.sub_nodes.push(sub_scan_node);
-            }
-            scan_node.sub_nodes.push(volume_scan_node);
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -1950,103 +1973,6 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_format_with_pdi() -> Result<(), ErrorTrace> {
-        let format_scanner: VfsScanner = get_format_scanner()?;
-        let vfs_file_system: VfsFileSystemReference = get_file_system()?;
-
-        let path_string: String = get_test_data_path("pdi/hfsplus.hdd/DiskDescriptor.xml");
-        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
-        let format_identifier: FormatIdentifier = format_scanner
-            .scan_for_format(&vfs_file_system, &vfs_location)?
-            .unwrap();
-
-        assert_eq!(format_identifier, FormatIdentifier::Pdi);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_scan_for_format_with_qcow() -> Result<(), ErrorTrace> {
-        let format_scanner: VfsScanner = get_format_scanner()?;
-        let vfs_file_system: VfsFileSystemReference = get_file_system()?;
-
-        let path_string: String = get_test_data_path("qcow/ext2.qcow2");
-        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
-        let format_identifier: FormatIdentifier = format_scanner
-            .scan_for_format(&vfs_file_system, &vfs_location)?
-            .unwrap();
-
-        assert_eq!(format_identifier, FormatIdentifier::Qcow);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_scan_for_format_with_splitraw() -> Result<(), ErrorTrace> {
-        let format_scanner: VfsScanner = get_format_scanner()?;
-        let vfs_file_system: VfsFileSystemReference = get_file_system()?;
-
-        let path_string: String = get_test_data_path("splitraw/ext2.raw.000");
-        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
-        let format_identifier: FormatIdentifier = format_scanner
-            .scan_for_format(&vfs_file_system, &vfs_location)?
-            .unwrap();
-
-        assert_eq!(format_identifier, FormatIdentifier::SplitRaw);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_scan_for_format_with_storage_media_image() -> Result<(), ErrorTrace> {
-        let format_scanner: VfsScanner = get_format_scanner()?;
-        let mut vfs_context: VfsContext = VfsContext::new();
-
-        let path_string: String = get_test_data_path("qcow/ext2.qcow2");
-        let os_vfs_location: VfsLocation = VfsLocation::from(&path_string);
-        let path: Path = Path::from("/");
-        let vfs_file_system_path: VfsLocation =
-            os_vfs_location.new_with_layer(&VfsType::Qcow, path);
-        let vfs_file_system: VfsFileSystemReference =
-            vfs_context.open_file_system(&vfs_file_system_path)?;
-
-        let path: Path = Path::from("/qcow1");
-        let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, path);
-        let format_identifier: FormatIdentifier = format_scanner
-            .scan_for_format(&vfs_file_system, &vfs_location)?
-            .unwrap();
-
-        assert_eq!(format_identifier, FormatIdentifier::Ext);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_scan_for_format_with_volume_system() -> Result<(), ErrorTrace> {
-        let format_scanner: VfsScanner = get_format_scanner()?;
-        let mut vfs_context: VfsContext = VfsContext::new();
-
-        let path_string: String = get_test_data_path("gpt/gpt.raw");
-        let os_vfs_location: VfsLocation = VfsLocation::from(&path_string);
-        let path: Path = Path::from("/");
-        let vfs_file_system_path: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
-        let vfs_file_system: VfsFileSystemReference =
-            vfs_context.open_file_system(&vfs_file_system_path)?;
-
-        let path: Path = Path::from("/gpt1");
-        let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
-        let format_identifier: FormatIdentifier = format_scanner
-            .scan_for_format(&vfs_file_system, &vfs_location)?
-            .unwrap();
-
-        assert_eq!(format_identifier, FormatIdentifier::Ext);
-
-        Ok(())
-    }
-
-    // TODO: add test for scan_for_format with unsupported path type
-
-    #[test]
     fn test_scan_for_file_system_format_with_exfat() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
@@ -2150,6 +2076,105 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test for scan_for_file_system_sub_nodes with unsupported path type
+
+    #[test]
+    fn test_scan_for_format_with_pdi() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+        let vfs_file_system: VfsFileSystemReference = get_file_system()?;
+
+        let path_string: String = get_test_data_path("pdi/hfsplus.hdd/DiskDescriptor.xml");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_format(&vfs_file_system, &vfs_location)?
+            .unwrap();
+
+        assert_eq!(format_identifier, FormatIdentifier::Pdi);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_format_with_qcow() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+        let vfs_file_system: VfsFileSystemReference = get_file_system()?;
+
+        let path_string: String = get_test_data_path("qcow/ext2.qcow2");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_format(&vfs_file_system, &vfs_location)?
+            .unwrap();
+
+        assert_eq!(format_identifier, FormatIdentifier::Qcow);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_format_with_splitraw() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+        let vfs_file_system: VfsFileSystemReference = get_file_system()?;
+
+        let path_string: String = get_test_data_path("splitraw/ext2.raw.000");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_format(&vfs_file_system, &vfs_location)?
+            .unwrap();
+
+        assert_eq!(format_identifier, FormatIdentifier::SplitRaw);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_format_with_storage_media_image() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+        let mut vfs_context: VfsContext = VfsContext::new();
+
+        let path_string: String = get_test_data_path("qcow/ext2.qcow2");
+        let os_vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        let path: Path = Path::from("/");
+        let vfs_file_system_path: VfsLocation =
+            os_vfs_location.new_with_layer(&VfsType::Qcow, path);
+        let vfs_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&vfs_file_system_path)?;
+
+        let path: Path = Path::from("/qcow1");
+        let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, path);
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_format(&vfs_file_system, &vfs_location)?
+            .unwrap();
+
+        assert_eq!(format_identifier, FormatIdentifier::Ext);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_format_with_volume_system() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+        let mut vfs_context: VfsContext = VfsContext::new();
+
+        let path_string: String = get_test_data_path("gpt/gpt.raw");
+        let os_vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        let path: Path = Path::from("/");
+        let vfs_file_system_path: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
+        let vfs_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&vfs_file_system_path)?;
+
+        let path: Path = Path::from("/gpt1");
+        let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_format(&vfs_file_system, &vfs_location)?
+            .unwrap();
+
+        assert_eq!(format_identifier, FormatIdentifier::Ext);
+
+        Ok(())
+    }
+
+    // TODO: add test for scan_for_format with unsupported path type
 
     #[test]
     fn test_scan_for_storage_media_image_format_with_ewf() -> Result<(), ErrorTrace> {

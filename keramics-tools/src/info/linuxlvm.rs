@@ -12,11 +12,10 @@
  */
 
 use std::fmt;
-use std::path::PathBuf;
 
 use keramics_core::ErrorTrace;
 use keramics_formats::linuxlvm::{LinuxLvmPhysicalVolume, LinuxLvmVolume, LinuxLvmVolumeSystem};
-use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
+use keramics_formats::{FileResolverReference, PathComponent};
 
 use crate::formatters::ByteSize;
 
@@ -150,29 +149,11 @@ pub struct LinuxLvmInfo {}
 
 impl LinuxLvmInfo {
     /// Opens a volume system.
-    pub fn open_volume_system(path_buf: &PathBuf) -> Result<LinuxLvmVolumeSystem, ErrorTrace> {
-        let mut base_path: PathBuf = path_buf.clone();
-        base_path.pop();
-
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to create file resolver");
-                return Err(error);
-            }
-        };
-        let file_name: PathComponent = match path_buf.file_name() {
-            Some(file_name) => match file_name.to_str() {
-                Some(file_name) => PathComponent::from(file_name),
-                None => {
-                    return Err(keramics_core::error_trace_new!("Unsupported file name"));
-                }
-            },
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing file name"));
-            }
-        };
-        let file_names: [PathComponent; 1] = [file_name];
+    pub fn open_volume_system(
+        file_resolver: &FileResolverReference,
+        file_name: &PathComponent,
+    ) -> Result<LinuxLvmVolumeSystem, ErrorTrace> {
+        let file_names: [PathComponent; 1] = [file_name.clone()];
 
         let mut lvm_volume_system: LinuxLvmVolumeSystem = LinuxLvmVolumeSystem::new();
 
@@ -190,14 +171,18 @@ impl LinuxLvmInfo {
     }
 
     /// Prints information about a volume system.
-    pub fn print_volume_system(path_buf: &PathBuf) -> Result<(), ErrorTrace> {
-        let lvm_volume_system: LinuxLvmVolumeSystem = match Self::open_volume_system(path_buf) {
-            Ok(lvm_volume_system) => lvm_volume_system,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open volume system");
-                return Err(error);
-            }
-        };
+    pub fn print_volume_system(
+        file_resolver: &FileResolverReference,
+        file_name: &PathComponent,
+    ) -> Result<(), ErrorTrace> {
+        let lvm_volume_system: LinuxLvmVolumeSystem =
+            match Self::open_volume_system(file_resolver, file_name) {
+                Ok(lvm_volume_system) => lvm_volume_system,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open volume system");
+                    return Err(error);
+                }
+            };
         let volume_system_info: LinuxLvmVolumeSystemInfo =
             LinuxLvmVolumeSystemInfo::new(&lvm_volume_system);
 
@@ -243,11 +228,19 @@ impl LinuxLvmInfo {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
+    use keramics_formats::OsFileResolver;
+
     use crate::assert_lines_eq;
 
     fn get_volume_system() -> Result<LinuxLvmVolumeSystem, ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/linuxlvm/lvm2.raw");
-        LinuxLvmInfo::open_volume_system(&path_buf)
+        let path_buf: PathBuf = PathBuf::from("../test_data/linuxlvm");
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
+        let file_name: PathComponent = PathComponent::from("lvm2.raw");
+
+        LinuxLvmInfo::open_volume_system(&file_resolver, &file_name)
     }
 
     #[test]

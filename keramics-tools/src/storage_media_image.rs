@@ -28,9 +28,7 @@ use keramics_formats::udif::UdifImage;
 use keramics_formats::vhd::{VhdImage, VhdImageLayer};
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
 use keramics_formats::vmdk::{VmdkImage, VmdkImageLayer};
-use keramics_formats::{
-    FileResolverReference, FormatIdentifier, PathComponent, open_os_file_resolver,
-};
+use keramics_formats::{FileResolverReference, FormatIdentifier, OsFileResolver, PathComponent};
 use keramics_vfs::{VfsCredential, VfsCredentialStore, VfsScanner};
 
 /// Storage media image.
@@ -321,19 +319,8 @@ impl StorageMediaImage {
                 return Err(error);
             }
         };
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to create file resolver for path: {}",
-                        base_path.display()
-                    )
-                );
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(base_path)));
         let mut ewf_image: EwfImage = EwfImage::new();
 
         let path_component: PathComponent = PathComponent::from(file_name);
@@ -423,19 +410,8 @@ impl StorageMediaImage {
                 return Err(error);
             }
         };
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to create file resolver for base path: {}",
-                        base_path.display()
-                    )
-                );
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(base_path)));
         let mut pdi_image: PdiImage = PdiImage::new();
 
         match pdi_image.open(&file_resolver) {
@@ -488,19 +464,8 @@ impl StorageMediaImage {
                 return Err(error);
             }
         };
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to create file resolver for base path: {}",
-                        base_path.display()
-                    )
-                );
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(base_path)));
         let mut qcow_image: QcowImage = QcowImage::new();
 
         let path_component: PathComponent = PathComponent::from(file_name);
@@ -571,19 +536,8 @@ impl StorageMediaImage {
 
     /// Opens a sparsebundle image.
     fn open_sparsebundle_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
-        let file_resolver: FileResolverReference = match open_os_file_resolver(path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to create file resolver for path: {}",
-                        path.display()
-                    )
-                );
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path.clone())));
         let mut sparsebundle_image: SparseBundleImage = SparseBundleImage::new();
 
         let file_name: PathComponent = PathComponent::from("Info.plist");
@@ -685,19 +639,8 @@ impl StorageMediaImage {
                 return Err(error);
             }
         };
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to create file resolver for path: {}",
-                        base_path.display()
-                    )
-                );
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(base_path)));
         let mut splitraw_image: SplitRawImage = SplitRawImage::new();
 
         let path_component: PathComponent = PathComponent::from(file_name);
@@ -737,19 +680,8 @@ impl StorageMediaImage {
                 return Err(error);
             }
         };
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to create file resolver for path: {}",
-                        base_path.display()
-                    )
-                );
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(base_path)));
         let mut udif_image: UdifImage = UdifImage::new();
 
         let path_component: PathComponent = PathComponent::from(file_name);
@@ -799,19 +731,8 @@ impl StorageMediaImage {
                 return Err(error);
             }
         };
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to create file resolver for base path: {}",
-                        base_path.display()
-                    )
-                );
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(base_path)));
         let mut vhd_image: VhdImage = VhdImage::new();
 
         let path_component: PathComponent = PathComponent::from(file_name);
@@ -866,19 +787,8 @@ impl StorageMediaImage {
                 return Err(error);
             }
         };
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to create file resolver for base path: {}",
-                        base_path.display()
-                    )
-                );
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(base_path)));
         let mut vhdx_image: VhdxImage = VhdxImage::new();
 
         let path_component: PathComponent = PathComponent::from(file_name);
@@ -933,19 +843,8 @@ impl StorageMediaImage {
                 return Err(error);
             }
         };
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to create file resolver for path: {}",
-                        base_path.display()
-                    )
-                );
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(base_path)));
         let mut vmdk_image: VmdkImage = VmdkImage::new();
 
         let path_component: PathComponent = PathComponent::from(file_name);

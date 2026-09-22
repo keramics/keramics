@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use keramics_core::ErrorTrace;
 use keramics_core::formatters::format_as_string;
 use keramics_formats::ewf::{EwfHeaderValueType, EwfImage, EwfMediaType};
-use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
+use keramics_formats::{FileResolverReference, OsFileResolver, PathComponent};
 use keramics_types::Uuid;
 
 use crate::formatters::ByteSize;
@@ -191,13 +191,8 @@ impl EwfInfo {
         let mut base_path: PathBuf = path_buf.clone();
         base_path.pop();
 
-        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-            Ok(file_resolver) => file_resolver,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to create file resolver");
-                return Err(error);
-            }
-        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(base_path)));
         let file_name: PathComponent = match path_buf.file_name() {
             Some(file_name) => match file_name.to_str() {
                 Some(file_name) => PathComponent::from(file_name),

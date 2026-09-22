@@ -32,6 +32,9 @@ pub struct QcowFile {
     /// Data stream.
     data_stream: Option<DataStreamReference>,
 
+    /// Data stream size.
+    data_stream_size: u64,
+
     /// Format version.
     format_version: u32,
 
@@ -107,6 +110,7 @@ impl QcowFile {
     pub fn new() -> Self {
         Self {
             data_stream: None,
+            data_stream_size: 0,
             format_version: 0,
             features: QcowFeatures::new(),
             bytes_per_sector: 0,
@@ -123,7 +127,7 @@ impl QcowFile {
             compression_bit_shift: 0,
             compression_bit_mask: 0,
             compression_flag_bit_mask: 0,
-            compression_method: QcowCompressionMethod::Zlib,
+            compression_method: QcowCompressionMethod::Deflate,
             encryption_type: None,
             encryption_context: None,
             backing_file_name: None,
@@ -173,6 +177,7 @@ impl QcowFile {
                 Some(Arc::new(RwLock::new(QcowBlockStream::new(
                     QcowBlockReader::new(
                         data_stream,
+                        self.data_stream_size,
                         self.bytes_per_sector,
                         self.offset_bit_mask,
                         self.level1_index_bit_shift,
@@ -182,6 +187,7 @@ impl QcowFile {
                         self.level2_table_number_of_references,
                         self.number_of_cluster_block_bits,
                         self.cluster_block_size,
+                        self.compression_bit_mask,
                         self.compression_flag_bit_mask,
                         &self.compression_method,
                         self.encryption_context.as_ref(),
@@ -237,6 +243,8 @@ impl QcowFile {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
+        let data_stream_size: u64 = keramics_core::data_stream_get_size!(data_stream);
+
         match self.read_file_header(data_stream) {
             Ok(_) => {}
             Err(mut error) => {
@@ -245,6 +253,7 @@ impl QcowFile {
             }
         }
         self.data_stream = Some(data_stream.clone());
+        self.data_stream_size = data_stream_size;
 
         Ok(())
     }
@@ -280,7 +289,7 @@ impl QcowFile {
         };
         if self.format_version == 3 {
             self.compression_method = match file_header.compression_method {
-                0 => QcowCompressionMethod::Zlib,
+                0 => QcowCompressionMethod::Deflate,
                 1 => QcowCompressionMethod::Zstd,
                 _ => QcowCompressionMethod::Unknown,
             };
@@ -536,7 +545,7 @@ mod tests {
         let file: QcowFile = get_file("qcow/ext2.qcow2")?;
 
         let compression_method: &QcowCompressionMethod = file.get_compression_method();
-        assert_eq!(compression_method, &QcowCompressionMethod::Zlib);
+        assert_eq!(compression_method, &QcowCompressionMethod::Deflate);
 
         Ok(())
     }
