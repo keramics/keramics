@@ -1091,17 +1091,20 @@ fn main() -> ExitCode {
             }
         }
         Some(Commands::Hash(command_arguments)) => {
-            let storage_media_image: StorageMediaImage =
-                match StorageMediaImage::open(&arguments.source, command_arguments.image_layer) {
-                    Ok(storage_media_image) => storage_media_image,
-                    Err(error) => {
-                        println!(
-                            "Unable to open storage media image: {} with error:\n{}",
-                            source_string, error
-                        );
-                        return ExitCode::FAILURE;
-                    }
-                };
+            let storage_media_image: StorageMediaImage = match StorageMediaImage::open(
+                &arguments.source,
+                command_arguments.image_layer,
+                false,
+            ) {
+                Ok(storage_media_image) => storage_media_image,
+                Err(error) => {
+                    println!(
+                        "Unable to open storage media image: {} with error:\n{}",
+                        source_string, error
+                    );
+                    return ExitCode::FAILURE;
+                }
+            };
             let data_stream: DataStreamReference = match storage_media_image.get_data_stream() {
                 Some(data_stream) => data_stream,
                 None => {

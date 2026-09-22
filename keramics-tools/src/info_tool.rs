@@ -292,7 +292,7 @@ impl InfoTool {
         image_layer: usize,
     ) -> Result<DataStreamReference, ErrorTrace> {
         let data_stream: DataStreamReference = if self.contents_mode {
-            match StorageMediaImage::open(path, image_layer) {
+            match StorageMediaImage::open(path, image_layer, true) {
                 Ok(storage_media_image) => match storage_media_image.get_data_stream() {
                     Some(data_stream) => data_stream,
                     None => {

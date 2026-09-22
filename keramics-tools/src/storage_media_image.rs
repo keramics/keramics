@@ -146,7 +146,11 @@ impl StorageMediaImage {
     }
 
     /// Opens a storage media image.
-    pub fn open(path: &PathBuf, image_layer: usize) -> Result<StorageMediaImage, ErrorTrace> {
+    pub fn open(
+        path: &PathBuf,
+        image_layer: usize,
+        unlock_encrypted_volumes: bool,
+    ) -> Result<StorageMediaImage, ErrorTrace> {
         if path.is_dir() && path.extension() == Some("sparsebundle".as_ref()) {
             match Self::open_sparsebundle_image(path) {
                 Ok(storage_media_image) => return Ok(storage_media_image),
@@ -212,7 +216,7 @@ impl StorageMediaImage {
         };
         // Scan for volume and file system formats to detect encrypted volumes and raw storage
         // media images.
-        let format_identifier: Option<FormatIdentifier> =
+        let mut format_identifier: Option<FormatIdentifier> =
             match vfs_scanner.scan_for_volume_system_format(&data_stream) {
                 Ok(result) => result,
                 Err(mut error) => {
@@ -223,24 +227,30 @@ impl StorageMediaImage {
                     return Err(error);
                 }
             };
-        match format_identifier {
-            Some(FormatIdentifier::Bde) => return Self::open_bde_volume(path),
-            Some(FormatIdentifier::Luks) => return Self::open_luks_volume(path),
-            Some(_) => return Self::open_raw_image(path),
-            None => {}
+        if unlock_encrypted_volumes {
+            match format_identifier {
+                Some(FormatIdentifier::Bde) => return Self::open_bde_volume(path),
+                Some(FormatIdentifier::Luks) => return Self::open_luks_volume(path),
+                _ => {}
+            }
         }
-        match vfs_scanner.scan_for_file_system_format(&data_stream) {
-            Ok(Some(_)) => Self::open_raw_image(path),
-            Ok(None) => Err(keramics_core::error_trace_new!(
+        if format_identifier.is_none() {
+            format_identifier = match vfs_scanner.scan_for_file_system_format(&data_stream) {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to scan data stream for file system format signatures"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        match format_identifier {
+            Some(_) => Self::open_raw_image(path),
+            None => Err(keramics_core::error_trace_new!(
                 "No storage media image formats found"
             )),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to scan data stream for file system format signatures"
-                );
-                Err(error)
-            }
         }
     }
 
