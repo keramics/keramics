@@ -30,13 +30,14 @@ mod tests {
     use crate::ewf::block_range::{EwfBlockRange, EwfBlockRangeType};
     use crate::ewf::enums::EwfNamingSchema;
     use crate::file_resolver::FileResolverReference;
-    use crate::os_file_resolver::open_os_file_resolver;
+    use crate::os_file_resolver::OsFileResolver;
     use crate::tests::get_test_data_path;
 
     fn get_block_stream() -> Result<EwfBlockStream, ErrorTrace> {
         let path_string: String = get_test_data_path("ewf");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
 
         let block_ranges: [EwfBlockRange; 128] = [
             EwfBlockRange {

@@ -814,7 +814,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use crate::os_file_resolver::open_os_file_resolver;
+    use crate::os_file_resolver::OsFileResolver;
 
     use crate::tests::get_test_data_path;
 
@@ -823,7 +823,8 @@ mod tests {
 
         let path_string: String = get_test_data_path("ewf");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
         let file_name: PathComponent = PathComponent::from("ext2.E01");
         image.open(&file_resolver, &file_name)?;
 
@@ -905,7 +906,8 @@ mod tests {
 
         let path_string: String = get_test_data_path("ewf");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
         let file_name: PathComponent = PathComponent::from("ext2.E01");
         image.open(&file_resolver, &file_name)?;
 

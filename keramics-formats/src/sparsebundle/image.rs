@@ -354,7 +354,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use crate::os_file_resolver::open_os_file_resolver;
+    use crate::os_file_resolver::OsFileResolver;
 
     use crate::tests::get_test_data_path;
 
@@ -363,7 +363,8 @@ mod tests {
 
         let test_path_string: String = get_test_data_path(path_string);
         let path_buf: PathBuf = PathBuf::from(test_path_string.as_str());
-        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
         let file_name: PathComponent = PathComponent::from("Info.plist");
         image.open(&file_resolver, &file_name)?;
 
@@ -428,7 +429,8 @@ mod tests {
 
         let path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
         let file_name: PathComponent = PathComponent::from("Info.plist");
         image.open(&file_resolver, &file_name)?;
 
@@ -445,7 +447,8 @@ mod tests {
 
         let path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
         let file_name: PathComponent = PathComponent::from("Info.plist");
         image.read_info_plist_file(&file_resolver, &file_name)?;
 

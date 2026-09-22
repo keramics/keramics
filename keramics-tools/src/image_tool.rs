@@ -25,8 +25,8 @@ use sysinfo::System;
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
-use keramics_formats::ntfs::NtfsAttribute;
 use keramics_formats::ntfs::constants::NTFS_NAME_SPACE_DOS;
+use keramics_formats::ntfs::{NtfsAttribute, NtfsAttributeValue};
 use keramics_hashes::{DigestHashContext, Md5Context, Sha1Context};
 use keramics_types::Ucs2String;
 use keramics_vfs::{
@@ -635,7 +635,7 @@ impl ImageTool {
                                 return Err(error);
                             }
                         };
-                    if let NtfsAttribute::FileName { file_name } = attribute {
+                    if let Some(NtfsAttributeValue::FileName(file_name)) = attribute.get_value() {
                         if file_name.get_parent_file_reference() != parent_file_reference
                             || Some(file_name.get_name()) != name
                         {

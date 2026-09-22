@@ -20,7 +20,7 @@ use keramics_types::{Ucs2CharacterMappings, Ucs2String};
 
 use crate::path_component::PathComponent;
 
-use super::attribute::NtfsAttribute;
+use super::attribute::{NtfsAttribute, NtfsAttributeValue};
 use super::attribute_list::NtfsAttributeList;
 use super::constants::*;
 use super::data_fork::NtfsDataFork;
@@ -322,16 +322,18 @@ impl NtfsFileEntry {
     ) -> Result<NtfsAttribute<'_>, ErrorTrace> {
         let mft_attribute: &NtfsMftAttribute =
             match self.mft_attributes.get_attribute_by_index(attribute_index) {
-                Ok(attribute) => attribute,
+                Ok(mft_attribute) => mft_attribute,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        format!("Unable to retrieve attribute: {}", attribute_index)
+                        format!("Unable to retrieve MFT attribute: {}", attribute_index)
                     );
                     return Err(error);
                 }
             };
-        let attribute: NtfsAttribute = match mft_attribute.attribute_type {
+        let mut attribute: NtfsAttribute = NtfsAttribute::new(mft_attribute);
+
+        match mft_attribute.attribute_type {
             NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION => {
                 let standard_information: NtfsStandardInformation =
                     match NtfsStandardInformation::from_attribute(mft_attribute) {
@@ -344,9 +346,9 @@ impl NtfsFileEntry {
                             return Err(error);
                         }
                     };
-                NtfsAttribute::StandardInformation {
+                attribute.value = Some(NtfsAttributeValue::StandardInformation(
                     standard_information,
-                }
+                ));
             }
             NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST => {
                 let mut attribute_list: NtfsAttributeList = NtfsAttributeList::new();
@@ -365,7 +367,7 @@ impl NtfsFileEntry {
                         return Err(error);
                     }
                 }
-                NtfsAttribute::AttributeList { attribute_list }
+                attribute.value = Some(NtfsAttributeValue::AttributeList(attribute_list));
             }
             NTFS_ATTRIBUTE_TYPE_FILE_NAME => {
                 let file_name: NtfsFileName = match NtfsFileName::from_attribute(mft_attribute) {
@@ -378,7 +380,7 @@ impl NtfsFileEntry {
                         return Err(error);
                     }
                 };
-                NtfsAttribute::FileName { file_name }
+                attribute.value = Some(NtfsAttributeValue::FileName(file_name));
             }
             NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION => {
                 let volume_information: NtfsVolumeInformation =
@@ -392,7 +394,7 @@ impl NtfsFileEntry {
                             return Err(error);
                         }
                     };
-                NtfsAttribute::VolumeInformation { volume_information }
+                attribute.value = Some(NtfsAttributeValue::VolumeInformation(volume_information));
             }
             NTFS_ATTRIBUTE_TYPE_VOLUME_NAME => {
                 if !mft_attribute.is_resident() {
@@ -400,9 +402,9 @@ impl NtfsFileEntry {
                         "Unsupported non-resident $VOLUME_NAME attribute"
                     ));
                 }
-                let volume_name: Ucs2String =
-                    Ucs2String::from_le_bytes(&mft_attribute.resident_data);
-                NtfsAttribute::VolumeName { volume_name }
+                attribute.value = Some(NtfsAttributeValue::VolumeName(Ucs2String::from_le_bytes(
+                    &mft_attribute.resident_data,
+                )));
             }
             NTFS_ATTRIBUTE_TYPE_REPARSE_POINT => {
                 let reparse_point: NtfsReparsePoint =
@@ -416,10 +418,10 @@ impl NtfsFileEntry {
                             return Err(error);
                         }
                     };
-                NtfsAttribute::ReparsePoint { reparse_point }
+                attribute.value = Some(NtfsAttributeValue::ReparsePoint(reparse_point));
             }
-            _ => NtfsAttribute::Generic { mft_attribute },
-        };
+            _ => {}
+        }
         Ok(attribute)
     }
 

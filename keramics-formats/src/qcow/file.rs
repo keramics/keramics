@@ -18,6 +18,8 @@ use std::sync::{Arc, RwLock};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::ByteString;
 
+use crate::util::calculate_alignment_padding;
+
 use super::block_reader::QcowBlockReader;
 use super::block_stream::QcowBlockStream;
 use super::credential::QcowCredential;
@@ -26,6 +28,7 @@ use super::encryption_type::QcowEncryptionType;
 use super::enums::{QcowCompressionMethod, QcowEncryptionMethod};
 use super::features::QcowFeatures;
 use super::file_header::QcowFileHeader;
+use super::header_extension::QcowHeaderExtension;
 
 /// QEMU Copy-On-Write (QCOW) file.
 pub struct QcowFile {
@@ -98,6 +101,9 @@ pub struct QcowFile {
     /// Backing file.
     backing_file: Option<Arc<QcowFile>>,
 
+    /// Raw data file name.
+    raw_data_file_name: Option<ByteString>,
+
     /// Value to indicate the (encrypted) file is locked.
     is_locked: bool,
 
@@ -132,6 +138,7 @@ impl QcowFile {
             encryption_context: None,
             backing_file_name: None,
             backing_file: None,
+            raw_data_file_name: None,
             is_locked: false,
             media_size: 0,
         }
@@ -231,6 +238,11 @@ impl QcowFile {
     /// Retrieves the media size.
     pub fn get_media_size(&self) -> u64 {
         self.media_size
+    }
+
+    /// Retrieves the raw data file name.
+    pub fn get_raw_data_file_name(&self) -> Option<&ByteString> {
+        self.raw_data_file_name.as_ref()
     }
 
     /// Determines if the (encrypted) image is locked.
@@ -359,6 +371,18 @@ impl QcowFile {
         ));
         self.level1_table_number_of_references = level1_table_number_of_references as u32;
 
+        if self.format_version >= 3 {
+            match self.read_header_extensions(data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read header extensions"
+                    );
+                    return Err(error);
+                }
+            }
+        }
         if file_header.backing_file_name_offset > 0 && file_header.backing_file_name_size > 0 {
             match self.read_backing_file_name(
                 data_stream,
@@ -415,6 +439,65 @@ impl QcowFile {
         );
         self.backing_file_name = Some(ByteString::from(data.as_slice()));
 
+        Ok(())
+    }
+
+    /// Reads the header extensions.
+    fn read_header_extensions(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
+        let data_size: usize = self.cluster_block_size as usize;
+        let mut data: Vec<u8> = vec![0; data_size];
+
+        keramics_core::data_stream_read_exact_at_position!(
+            data_stream,
+            &mut data,
+            SeekFrom::Start(0)
+        );
+        let mut data_offset: usize = self.file_header_size as usize;
+
+        while data_offset < data_size - 8 {
+            let data_end_offset: usize = data_offset + 8;
+
+            if data[data_offset..data_end_offset] == [0; 8] {
+                break;
+            }
+            keramics_core::debug_trace_structure!(QcowHeaderExtension::debug_read_data(
+                &data[data_offset..]
+            ));
+            let mut header_extension: QcowHeaderExtension = QcowHeaderExtension::new();
+
+            match header_extension.read_data(&data[data_offset..]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read header extension");
+                    return Err(error);
+                }
+            }
+            data_offset += 8;
+
+            let data_end_offset: usize = data_offset + (header_extension.data_size as usize);
+
+            if data_end_offset > data_size {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid header extension data size value out of bounds"
+                ));
+            }
+            if &header_extension.signature == b"DATA" {
+                self.raw_data_file_name =
+                    Some(ByteString::from(&data[data_offset..data_end_offset]));
+            }
+            data_offset = data_end_offset;
+
+            let alignment_padding: usize = calculate_alignment_padding(data_offset, 8);
+
+            if alignment_padding > 0 {
+                // TODO: debug print 8-byte alignment padding.
+
+                data_offset += alignment_padding;
+            }
+        }
         Ok(())
     }
 
@@ -601,6 +684,16 @@ mod tests {
     }
 
     #[test]
+    fn test_get_raw_data_file_name() -> Result<(), ErrorTrace> {
+        let file: QcowFile = get_file("qcow/ext2.qcow2")?;
+
+        let raw_data_file_name: Option<&ByteString> = file.get_raw_data_file_name();
+        assert_eq!(raw_data_file_name, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_is_locked() -> Result<(), ErrorTrace> {
         let file: QcowFile = get_file("qcow/ext2.qcow2")?;
 
@@ -639,6 +732,7 @@ mod tests {
     }
 
     // TODO: add tests for read_backing_file_name
+    // TODO: add tests for read_header_extensions
     // TODO: add tests for set_backing_file
 
     #[test]

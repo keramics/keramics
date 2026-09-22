@@ -29,14 +29,15 @@ mod tests {
 
     use crate::cdsaencr::CdsaEncrCredential;
     use crate::file_resolver::FileResolverReference;
-    use crate::os_file_resolver::open_os_file_resolver;
+    use crate::os_file_resolver::OsFileResolver;
     use crate::tests::get_test_data_path;
     use crate::udif::segment_range::UdifSegmentRange;
 
     fn get_block_stream() -> Result<UdifSegmentsBlockStream, ErrorTrace> {
         let path_string: String = get_test_data_path("udif");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
 
         let segment_ranges: [UdifSegmentRange; 5] = [
             UdifSegmentRange {

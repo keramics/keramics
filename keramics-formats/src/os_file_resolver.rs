@@ -17,7 +17,7 @@ use std::path::{MAIN_SEPARATOR_STR, PathBuf};
 
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 
-use super::file_resolver::{FileResolver, FileResolverReference};
+use super::file_resolver::FileResolver;
 use super::path_component::PathComponent;
 
 pub struct OsFileResolver {
@@ -83,13 +83,6 @@ impl FileResolver for OsFileResolver {
     }
 }
 
-/// Opens a new operating system file resolver.
-pub fn open_os_file_resolver(base_path: &PathBuf) -> Result<FileResolverReference, ErrorTrace> {
-    let file_resolver: OsFileResolver = OsFileResolver::new(base_path.clone());
-
-    Ok(FileResolverReference::new(Box::new(file_resolver)))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,16 +104,6 @@ mod tests {
         let data_stream: Option<DataStreamReference> =
             file_resolver.get_data_stream(&path_components)?;
         assert!(data_stream.is_some());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_os_file_resolver() -> Result<(), ErrorTrace> {
-        let path_string: String = get_test_data_path("");
-        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-
-        _ = open_os_file_resolver(&path_buf)?;
 
         Ok(())
     }

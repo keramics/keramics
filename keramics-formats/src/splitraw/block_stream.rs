@@ -28,14 +28,15 @@ mod tests {
     use keramics_core::{DataStream, ErrorTrace};
 
     use crate::file_resolver::FileResolverReference;
-    use crate::os_file_resolver::open_os_file_resolver;
+    use crate::os_file_resolver::OsFileResolver;
     use crate::splitraw::enums::SplitRawNamingSchema;
     use crate::tests::get_test_data_path;
 
     fn get_block_stream() -> Result<SplitRawBlockStream, ErrorTrace> {
         let path_string: String = get_test_data_path("splitraw");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
 
         Ok(SplitRawBlockStream::new(SplitRawBlockReader::new(
             &file_resolver,

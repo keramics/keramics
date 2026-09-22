@@ -29,7 +29,7 @@ mod tests {
     use keramics_types::ByteString;
 
     use crate::file_resolver::FileResolverReference;
-    use crate::os_file_resolver::open_os_file_resolver;
+    use crate::os_file_resolver::OsFileResolver;
     use crate::tests::get_test_data_path;
     use crate::vmdk::descriptor_extent::VmdkDescriptorExtent;
     use crate::vmdk::enums::{VmdkDescriptorExtentAccessMode, VmdkDescriptorExtentType};
@@ -37,7 +37,8 @@ mod tests {
     fn get_block_stream() -> Result<VmdkBlockStream, ErrorTrace> {
         let path_string: String = get_test_data_path("vmdk");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
 
         let extents: [VmdkDescriptorExtent; 1] = [VmdkDescriptorExtent {
             media_start_sector: 0,

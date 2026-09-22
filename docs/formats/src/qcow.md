@@ -321,7 +321,15 @@ The data-file file header extension header is of variable size and consist of:
 
 #### Feature table file header extension
 
-TODO: complete section
+The feature table file header extension contains one or more feature table entries.
+
+A feature table entry is of variable size and consists of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 1 | | Feature flags type, where 0 (Incompatible feature flags), 1 (Compatible feature flags) and 2 (Autoclear feature flags) |
+| 1 | 1 | | Flag bit index, where 0 is the LSB |
+| 2 | ... | | Feature name, which contains an ASCII string with end-of-string character |
 
 ## Level 1 table
 
