@@ -58,8 +58,12 @@ mod volume_information;
 mod wof_compressed_stream;
 mod wof_reparse_data;
 
-pub use attribute::NtfsAttribute;
+pub use attribute::{NtfsAttribute, NtfsAttributeValue};
+pub use attribute_list::NtfsAttributeList;
 pub use attribute_list_entry::NtfsAttributeListEntry;
 pub use data_fork::NtfsDataFork;
 pub use file_entry::NtfsFileEntry;
+pub use file_name::NtfsFileName;
 pub use file_system::NtfsFileSystem;
+pub use standard_information::NtfsStandardInformation;
+pub use volume_information::NtfsVolumeInformation;

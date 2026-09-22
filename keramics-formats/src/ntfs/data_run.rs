@@ -22,7 +22,7 @@ pub enum NtfsDataRunType {
 }
 
 /// New Technologies File System (NTFS) data run.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct NtfsDataRun {
     /// Block number.
     pub block_number: u64,

@@ -81,6 +81,39 @@ impl NtfsMftAttribute {
         }
     }
 
+    /// Retrieves the allocated data size.
+    pub fn get_allocated_data_size(&self) -> Option<u64> {
+        if self.is_resident() {
+            None
+        } else {
+            Some(self.allocated_data_size)
+        }
+    }
+
+    /// Retrieves the data flags.
+    pub fn get_data_flags(&self) -> u16 {
+        self.data_flags
+    }
+
+    /// Retrieves the data size.
+    pub fn get_data_size(&self) -> u64 {
+        self.data_size
+    }
+
+    /// Retrieves the name.
+    pub fn get_name(&self) -> Option<&Ucs2String> {
+        self.name.as_ref()
+    }
+
+    /// Retrieves the valid data size.
+    pub fn get_valid_data_size(&self) -> Option<u64> {
+        if self.is_resident() {
+            None
+        } else {
+            Some(self.valid_data_size)
+        }
+    }
+
     /// Retrieves the number of data runs.
     pub fn get_number_of_data_runs(&self) -> usize {
         self.data_cluster_groups
@@ -271,7 +304,6 @@ impl NtfsMftAttribute {
                     &data[resident_data_offset..resident_data_end_offset],
                     resident_attribute.data_size
                 );
-
                 self.resident_data = vec![0; resident_data_size];
                 self.resident_data
                     .copy_from_slice(&data[resident_data_offset..resident_data_end_offset]);
@@ -358,9 +390,136 @@ mod tests {
         ]
     }
 
-    // TODO: add tests for is_compressed
-    // TODO: add tests for is_resident
-    // TODO: add tests for is_sparse
+    #[test]
+    fn test_get_allocated_data_size() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = NtfsMftAttribute::new();
+        test_struct.read_data(&test_data)?;
+
+        let allocated_data_size: Option<u64> = test_struct.get_allocated_data_size();
+        assert_eq!(allocated_data_size, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_flags() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = NtfsMftAttribute::new();
+        test_struct.read_data(&test_data)?;
+
+        let data_flags: u16 = test_struct.get_data_flags();
+        assert_eq!(data_flags, 0x0000);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_size() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = NtfsMftAttribute::new();
+        test_struct.read_data(&test_data)?;
+
+        let data_size: u64 = test_struct.get_data_size();
+        assert_eq!(data_size, 56);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = NtfsMftAttribute::new();
+        test_struct.read_data(&test_data)?;
+
+        let name: Option<&Ucs2String> = test_struct.get_name();
+        assert_eq!(name, Some(Ucs2String::from("$SDH")).as_ref());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_valid_data_size() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = NtfsMftAttribute::new();
+        test_struct.read_data(&test_data)?;
+
+        let valid_data_size: Option<u64> = test_struct.get_valid_data_size();
+        assert_eq!(valid_data_size, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_data_runs() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = NtfsMftAttribute::new();
+        test_struct.read_data(&test_data)?;
+
+        let number_of_data_runs: usize = test_struct.get_number_of_data_runs();
+        assert_eq!(number_of_data_runs, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_run() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = NtfsMftAttribute::new();
+        test_struct.read_data(&test_data)?;
+
+        let data_run: Option<&NtfsDataRun> = test_struct.get_data_run(0);
+        assert_eq!(data_run, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_compressed() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = NtfsMftAttribute::new();
+        test_struct.read_data(&test_data)?;
+
+        let result: bool = test_struct.is_compressed();
+        assert_eq!(result, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_resident() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = NtfsMftAttribute::new();
+        test_struct.read_data(&test_data)?;
+
+        let result: bool = test_struct.is_resident();
+        assert_eq!(result, true);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_sparse() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = NtfsMftAttribute::new();
+        test_struct.read_data(&test_data)?;
+
+        let result: bool = test_struct.is_sparse();
+        assert_eq!(result, false);
+
+        Ok(())
+    }
+
     // TODO: add tests for merge
 
     #[test]

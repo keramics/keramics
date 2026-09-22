@@ -19,7 +19,7 @@ use keramics_types::bytes_to_u32_be;
 #[layout_map(
     structure(
         byte_order = "big",
-        field(name = "signature", data_type = "u32"),
+        field(name = "signature", data_type = "[u8; 4]", format = "hex"),
         field(name = "data_size", data_type = "u32"),
     ),
     methods("debug_read_data")
@@ -27,7 +27,7 @@ use keramics_types::bytes_to_u32_be;
 /// QEMU Copy-On-Write (QCOW) (file) header extension.
 pub struct QcowHeaderExtension {
     /// Signature.
-    pub signature: u32,
+    pub signature: [u8; 4],
 
     /// Data size.
     pub data_size: u32,
@@ -37,7 +37,7 @@ impl QcowHeaderExtension {
     /// Creates a new header extension.
     pub fn new() -> Self {
         Self {
-            signature: 0,
+            signature: [0; 4],
             data_size: 0,
         }
     }
@@ -47,7 +47,7 @@ impl QcowHeaderExtension {
         if data.len() < 8 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        self.signature = bytes_to_u32_be!(data, 0);
+        self.signature.copy_from_slice(&data[0..4]);
         self.data_size = bytes_to_u32_be!(data, 4);
 
         Ok(())
@@ -73,7 +73,7 @@ mod tests {
         let mut test_struct = QcowHeaderExtension::new();
         test_struct.read_data(&test_data)?;
 
-        assert_eq!(test_struct.signature, 0x44415441);
+        assert_eq!(&test_struct.signature, &test_data[0..4]);
         assert_eq!(test_struct.data_size, 32);
 
         Ok(())

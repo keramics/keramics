@@ -76,7 +76,7 @@ pub mod cpio;
 pub use enums::FormatIdentifier;
 pub use file_resolver::{FileResolver, FileResolverReference};
 pub use iterators::{ExtendedAttributesIterator, FileEntriesIterator, PartitionsIterator};
-pub use os_file_resolver::{OsFileResolver, open_os_file_resolver};
+pub use os_file_resolver::OsFileResolver;
 pub use path::Path;
 pub use path_character_mappings::PathCharacterMappings;
 pub use path_component::PathComponent;

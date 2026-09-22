@@ -20,14 +20,15 @@ mod tests {
 
     use crate::block_stream::BlockStream;
     use crate::file_resolver::FileResolverReference;
-    use crate::os_file_resolver::open_os_file_resolver;
+    use crate::os_file_resolver::OsFileResolver;
     use crate::sparsebundle::block_reader::SparseBundleBlockReader;
     use crate::tests::get_test_data_path;
 
     fn get_block_stream() -> Result<BlockStream<SparseBundleBlockReader>, ErrorTrace> {
         let test_path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
         let path_buf: PathBuf = PathBuf::from(test_path_string.as_str());
-        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
 
         let block_reader: SparseBundleBlockReader =
             SparseBundleBlockReader::new(&file_resolver, 8388608, 4194304);

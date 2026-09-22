@@ -120,6 +120,13 @@ impl<'a> fmt::Display for QcowFileInfo<'a> {
                 backing_file_name
             )?;
         }
+        if let Some(raw_data_file_name) = &self.file.get_raw_data_file_name() {
+            writeln!(
+                formatter,
+                "    Raw data file name\t\t\t\t: {}",
+                raw_data_file_name
+            )?;
+        }
         writeln!(formatter)?;
 
         if let Some(encryption_type) = self.file.get_encryption_type() {
