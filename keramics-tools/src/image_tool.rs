@@ -732,6 +732,7 @@ impl ImageTool {
         vfs_scan_node: &VfsScanNode,
         calculate_md5: bool,
     ) -> Result<(), ErrorTrace> {
+        // Skip volsnap for now, needs more testing.
         if vfs_scan_node.get_type() == &VfsType::Volsnap {
             return Ok(());
         }
