@@ -108,7 +108,7 @@ impl<'a> fmt::Display for PdiSnapshotInfo<'a> {
     }
 }
 
-/// Information about a Parallels Disk Image (PDI) image.
+/// Information about Parallels Disk Image (PDI) format.
 pub struct PdiInfo {}
 
 impl PdiInfo {

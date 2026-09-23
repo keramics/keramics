@@ -182,7 +182,7 @@ impl<'a> fmt::Display for EwfImageInfo<'a> {
     }
 }
 
-/// Information about an Expert Witness Compression Format (EWF) image.
+/// Information about Expert Witness Compression Format (EWF).
 pub struct EwfInfo {}
 
 impl EwfInfo {

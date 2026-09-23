@@ -66,7 +66,7 @@ impl<'a> fmt::Display for SparseImageFileInfo<'a> {
     }
 }
 
-/// Information about a Mac OS sparse image (.sparseimage) file.
+/// Information about Mac OS sparse image (.sparseimage) format.
 pub struct SparseImageInfo {}
 
 impl SparseImageInfo {

@@ -603,7 +603,7 @@ impl<'a> fmt::Display for NtfsVolumeInformationInfo<'a> {
     }
 }
 
-/// Information about a New Technologies File System (NTFS).
+/// Information about New Technologies File System (NTFS) format.
 pub struct NtfsInfo {}
 
 impl NtfsInfo {

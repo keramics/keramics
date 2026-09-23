@@ -577,7 +577,7 @@ impl fmt::Display for ExtReadOnlyCompatibleFeatureFlagsInfo {
     }
 }
 
-/// Information about an Extended File System (ext).
+/// Information about Extended File System (ext) format.
 pub struct ExtInfo {}
 
 impl ExtInfo {

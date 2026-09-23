@@ -64,7 +64,7 @@ impl<'a> fmt::Display for CdsaEncrContainerInfo<'a> {
     }
 }
 
-/// Information about a Mac OS Encrypted Encoding container.
+/// Information about Mac OS Encrypted Encoding container format.
 pub struct CdsaEncrInfo {}
 
 impl CdsaEncrInfo {

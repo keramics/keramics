@@ -90,7 +90,7 @@ impl<'a> fmt::Display for VhdxFileInfo<'a> {
     }
 }
 
-/// Information about a Virtual Hard Disk (VHDX) file.
+/// Information about Virtual Hard Disk (VHDX) format.
 pub struct VhdxInfo {}
 
 impl VhdxInfo {

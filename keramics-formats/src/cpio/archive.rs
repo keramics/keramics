@@ -46,6 +46,11 @@ impl CpioArchive {
         }
     }
 
+    /// Retrieves the format.
+    pub fn get_format(&self) -> &CpioFormat {
+        &self.format
+    }
+
     /// Reads a data stream.
     pub fn read_data_stream(
         &mut self,
@@ -215,10 +220,29 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
+    fn get_archive() -> Result<CpioArchive, ErrorTrace> {
+        let mut archive: CpioArchive = CpioArchive::new();
+
+        let path_string: String = get_test_data_path("cpio/bin_le.cpio");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        archive.read_data_stream(&data_stream)?;
+
+        Ok(archive)
+    }
+
+    #[test]
+    fn test_get_format() -> Result<(), ErrorTrace> {
+        let archive: CpioArchive = get_archive()?;
+
+        let format: &CpioFormat = archive.get_format();
+        assert_eq!(format, &CpioFormat::BinaryLittleEndian);
+
+        Ok(())
+    }
+
     #[test]
     fn test_read_data_stream_with_bin_le() -> Result<(), ErrorTrace> {
-        keramics_core::mediator::Mediator { debug_output: true }.make_current();
-
         let mut archive: CpioArchive = CpioArchive::new();
 
         let path_string: String = get_test_data_path("cpio/bin_le.cpio");

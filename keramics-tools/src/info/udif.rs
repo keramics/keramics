@@ -118,7 +118,7 @@ impl<'a> fmt::Display for UdifImageInfo<'a> {
     }
 }
 
-/// Information about an Universal Disk Image Format (UDIF) image.
+/// Information about Universal Disk Image Format (UDIF).
 pub struct UdifInfo {}
 
 impl UdifInfo {

@@ -38,10 +38,10 @@ mod storage_media_image;
 
 use crate::enums::{DisplayPathType, EncodingType, FormatType};
 use crate::info::{
-    ApfsInfo, ApmInfo, BdeInfo, BsdDiskLabelInfo, CdsaEncrInfo, EwfInfo, ExFatInfo, ExtInfo,
-    FatInfo, GptInfo, HfsInfo, LinuxLvmInfo, LuksInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo,
-    SgiDiskLabelInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
-    VolsnapInfo, XfsInfo,
+    ApfsInfo, ApmInfo, BdeInfo, BsdDiskLabelInfo, CdsaEncrInfo, CpioInfo, EwfInfo, ExFatInfo,
+    ExtInfo, FatInfo, GptInfo, HfsInfo, LinuxLvmInfo, LuksInfo, MbrInfo, NtfsInfo, PdiInfo,
+    QcowInfo, SgiDiskLabelInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo,
+    VmdkInfo, VolsnapInfo, XfsInfo,
 };
 use crate::range_file_resolver::RangeFileResolver;
 use crate::storage_media_image::StorageMediaImage;
@@ -569,6 +569,7 @@ fn main() -> ExitCode {
         Some(FormatType::Bde) => FormatIdentifier::Bde,
         Some(FormatType::BsdDiskLabel) => FormatIdentifier::BsdDiskLabel,
         Some(FormatType::CdsaEncr) => FormatIdentifier::CdsaEncr,
+        Some(FormatType::Cpio) => FormatIdentifier::Cpio,
         Some(FormatType::Ewf) => FormatIdentifier::Ewf,
         Some(FormatType::ExFat) => FormatIdentifier::ExFat,
         Some(FormatType::Ext) => FormatIdentifier::Ext,
@@ -725,6 +726,7 @@ fn main() -> ExitCode {
             FormatIdentifier::Bde => BdeInfo::print_encrypted_volume(&data_stream),
             FormatIdentifier::BsdDiskLabel => BsdDiskLabelInfo::print_volume_system(&data_stream),
             FormatIdentifier::CdsaEncr => CdsaEncrInfo::print_container(&data_stream),
+            FormatIdentifier::Cpio => CpioInfo::print_archive(&data_stream),
             // TODO: add support for individual EWF segment file.
             FormatIdentifier::Ewf => EwfInfo::print_image(&arguments.source),
             FormatIdentifier::ExFat => ExFatInfo::print_file_system(&data_stream),
@@ -756,7 +758,6 @@ fn main() -> ExitCode {
             FormatIdentifier::SgiDiskLabel => SgiDiskLabelInfo::print_volume_system(&data_stream),
             FormatIdentifier::SparseBundle => SparseBundleInfo::print_image(&arguments.source),
             FormatIdentifier::SparseImage => SparseImageInfo::print_file(&data_stream),
-            // TODO: bundle all credentials into 1 credential store argument.
             FormatIdentifier::Udif => UdifInfo::print_image(&arguments.source),
             // TODO: add support for VHD image.
             FormatIdentifier::Vhd => VhdInfo::print_file(&data_stream),

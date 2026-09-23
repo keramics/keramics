@@ -222,6 +222,9 @@ pub enum FormatType {
     #[value(name = "cdsaencr")]
     CdsaEncr,
 
+    /// Copy in and out (CPIO)
+    Cpio,
+
     /// Expert Witness Compression Format (EWF)
     Ewf,
 

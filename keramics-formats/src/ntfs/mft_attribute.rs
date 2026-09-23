@@ -365,7 +365,6 @@ impl NtfsMftAttribute {
             &data[name_offset..name_end_offset],
             name_size
         );
-
         let name: Ucs2String = Ucs2String::from_le_bytes(&data[name_offset..name_end_offset]);
 
         self.name = Some(name);
@@ -531,7 +530,7 @@ mod tests {
 
         assert_eq!(test_struct.attribute_type, 0x00000090);
         assert_eq!(test_struct.attribute_size, 88);
-        assert_eq!(test_struct.name.unwrap().to_string(), "$SDH");
+        assert_eq!(test_struct.name, Some(Ucs2String::from("$SDH")));
         assert_eq!(test_struct.data_size, 56);
         assert_eq!(test_struct.data_cluster_groups.len(), 0);
         assert_eq!(test_struct.non_resident_flag, 0x00);

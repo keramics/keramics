@@ -365,7 +365,7 @@ impl ImageTool {
         let display_path: String = self.display_path.escape_path(path);
 
         let path_prefix: &str = if file_system_display_path.ends_with('/') {
-            &file_system_display_path[..file_system_display_path.len() - 1]
+            &file_system_display_path[0..file_system_display_path.len() - 1]
         } else {
             file_system_display_path.as_str()
         };
@@ -412,8 +412,8 @@ impl ImageTool {
                 format!("{}", hfs_file_entry.get_identifier())
             }
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
-                // Note that the directory entry file reference can be different
-                // from the values in the MFT entry.
+                // Note that the directory entry file reference can be different from the values
+                // in the MFT entry.
                 let file_reference: u64 = ntfs_file_entry.get_file_reference();
 
                 format!(

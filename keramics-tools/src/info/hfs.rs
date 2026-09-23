@@ -231,7 +231,7 @@ impl<'a> fmt::Display for HfsFileSystemInfo<'a> {
     }
 }
 
-/// Information about a Hierarchical File System (HFS).
+/// Information about Hierarchical File System (HFS) format.
 pub struct HfsInfo {}
 
 impl HfsInfo {

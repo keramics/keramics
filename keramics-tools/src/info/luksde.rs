@@ -74,7 +74,7 @@ impl<'a> fmt::Display for LuksEncryptedVolumeInfo<'a> {
     }
 }
 
-/// Information about Linux Unified Key Setup (LUKS) Disk Encryption.
+/// Information about Linux Unified Key Setup (LUKS) Disk Encryption format.
 pub struct LuksInfo {}
 
 impl LuksInfo {

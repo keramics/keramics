@@ -25,9 +25,10 @@ use keramics_hashes::{
 };
 use keramics_types::Ucs2String;
 use keramics_vfs::{
-    PathFilter, PathFilterSignature, VfsDataFork, VfsFileEntry, VfsFileSystem,
-    VfsFileSystemReference, VfsFinder, VfsLocation, VfsResolver, VfsResolverReference,
-    VfsScanContext, VfsScanNode, VfsScanOptions, VfsScanner, WindowsPath,
+    PathFilter, PathFilterSignature, VfsCredential, VfsCredentialStore, VfsDataFork, VfsFileEntry,
+    VfsFileSystem, VfsFileSystemReference, VfsFinder, VfsLocation, VfsResolver,
+    VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanOptions, VfsScanner, VfsType,
+    WindowsPath,
 };
 
 #[cfg(feature = "debug-trace")]
@@ -42,6 +43,10 @@ use crate::enums::{DigestHashType, DisplayPathType};
 #[derive(Parser)]
 #[command(version, about = "Calculate digest hashes of data streams", long_about = None)]
 struct CommandLineArguments {
+    #[arg(long)]
+    /// Credential to unlock format
+    credential: Vec<String>,
+
     #[cfg(feature = "debug-trace")]
     #[arg(long, default_value_t = false)]
     /// Enable debug output
@@ -360,6 +365,10 @@ impl HashTool {
 
     /// Calculates a digest hash from a scan node.
     fn calculate_hash_from_scan_node(&self, vfs_scan_node: &VfsScanNode) -> Result<(), ErrorTrace> {
+        // Skip volsnap for now, needs more testing.
+        if vfs_scan_node.get_type() == &VfsType::Volsnap {
+            return Ok(());
+        }
         if vfs_scan_node.is_empty() {
             // Only process scan nodes that contain a file system.
             if !vfs_scan_node.is_file_system() {
@@ -621,6 +630,42 @@ fn main() -> ExitCode {
             debug_output: arguments.debug,
         }
         .make_current();
+    }
+    let vfs_credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+
+    for credential in arguments.credential.iter() {
+        match credential.split_once(':') {
+            Some((credential_type, credential_data)) => {
+                let vfs_credential: VfsCredential = match credential_type {
+                    "passphrase" | "password" => {
+                        let passphrase: Vec<u8> = credential_data.as_bytes().to_vec();
+                        VfsCredential::Passphrase(passphrase)
+                    }
+                    "recovery_password" => {
+                        let recovery_password: Vec<u8> = credential_data.as_bytes().to_vec();
+                        VfsCredential::RecoveryPassword(recovery_password)
+                    }
+                    _ => {
+                        println!("Unsupported type prefix: {} in credential", credential_type);
+                        return ExitCode::FAILURE;
+                    }
+                };
+                match vfs_credential_store.add_credential(vfs_credential) {
+                    Ok(_) => {}
+                    Err(error) => {
+                        println!(
+                            "Unable to add {} to credential store with error:\n{}",
+                            credential_type, error
+                        );
+                        return ExitCode::FAILURE;
+                    }
+                }
+            }
+            None => {
+                println!("Unsupported credential - missing type prefix");
+                return ExitCode::FAILURE;
+            }
+        }
     }
     let hash_tool: HashTool = HashTool::new(
         &arguments.digest_hash_type,

@@ -202,7 +202,7 @@ impl fmt::Display for QcowIncompatibilityFeatureFlagsInfo {
     }
 }
 
-/// Information about a QEMU Copy-On-Write (QCOW) file.
+/// Information about QEMU Copy-On-Write (QCOW) format.
 pub struct QcowInfo {}
 
 impl QcowInfo {

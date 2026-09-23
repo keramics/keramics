@@ -120,7 +120,7 @@ impl<'a> fmt::Display for MbrVolumeSystemInfo<'a> {
     }
 }
 
-/// Information about a Master Boot Record (MBR).
+/// Information about Master Boot Record (MBR) format.
 pub struct MbrInfo {}
 
 impl MbrInfo {
