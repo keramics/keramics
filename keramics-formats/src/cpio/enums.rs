@@ -11,10 +11,11 @@
  * under the License.
  */
 
-mod archive;
-mod enums;
-mod file_record;
-mod file_record_bin_be;
-mod file_record_bin_le;
-mod file_record_newc;
-mod file_record_odc;
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum CpioFormat {
+    BinaryBigEndian,
+    BinaryLittleEndian,
+    NewAscii,
+    NotSet,
+    PortableAscii,
+}

@@ -24,7 +24,7 @@ use super::types::VfsFileSystemReference;
 /// Virtual File System (VFS) context.
 pub struct VfsContext {
     /// File systems cache.
-    file_systems_cache: LruCache<VfsLocation, VfsFileSystemReference>,
+    file_systems_cache: LruCache<(VfsType, VfsLocation), VfsFileSystemReference>,
 
     /// Operating system (OS) file system path.
     os_vfs_location: VfsLocation,
@@ -97,10 +97,14 @@ impl VfsContext {
         };
         let parent_vfs_location: Option<&VfsLocation> = vfs_location.get_parent();
 
-        let lookup_key: VfsLocation = match parent_vfs_location {
+        let lookup_vfs_location: VfsLocation = match parent_vfs_location {
             Some(parent_vfs_location) => parent_vfs_location.clone(),
             None => self.os_vfs_location.clone(),
         };
+        // Note that VFS file systems of different types, e.g. NTFS and volsnap, can have the same
+        // VFS location.
+        let lookup_key: (VfsType, VfsLocation) = (vfs_type.clone(), lookup_vfs_location.clone());
+
         if !self.file_systems_cache.contains(&lookup_key) {
             let parent_file_system: Option<VfsFileSystemReference> = match parent_vfs_location {
                 Some(parent_vfs_location) => match self.open_file_system(parent_vfs_location) {
@@ -117,7 +121,7 @@ impl VfsContext {
             };
             let mut file_system: VfsFileSystem = VfsFileSystem::new(vfs_type);
 
-            match file_system.open(parent_file_system.as_ref(), &lookup_key) {
+            match file_system.open(parent_file_system.as_ref(), &lookup_vfs_location) {
                 Ok(()) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to open file system");

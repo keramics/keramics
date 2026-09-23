@@ -138,9 +138,12 @@ impl BlockReader for ApfsEncryptedBlockReader {
                         SeekFrom::Start(block_physical_offset)
                     );
                     let mut block_data: Vec<u8> = vec![0; self.block_size as usize];
+                    let block_encryption_offset: u64 = (extent.encryption_identifier
+                        * (self.block_size as u64))
+                        + block_start_offset;
 
                     match self.encryption_context.decrypt_block(
-                        block_physical_offset,
+                        block_encryption_offset,
                         &encrypted_data,
                         &mut block_data,
                     ) {

@@ -240,86 +240,53 @@ impl DisplayPath {
         translation_table
     }
 
-    /// Retrieves an identifier-based display path of a VFS location.
-    fn get_identifier_display_path(
-        &self,
-        vfs_location: &VfsLocation,
-    ) -> Result<String, ErrorTrace> {
-        let display_path: Option<String> = match vfs_location {
-            VfsLocation::Layer {
-                parent, vfs_type, ..
-            } => match vfs_type {
-                VfsType::ApfsContainer | VfsType::Gpt | VfsType::LinuxLvm => {
-                    match self.vfs_resolver.get_file_entry_by_location(vfs_location) {
-                        Ok(vfs_file_entry) => match vfs_file_entry {
-                            Some(VfsFileEntry::ApfsContainer(apfs_container_file_entry)) => {
-                                match apfs_container_file_entry.get_identifier() {
-                                    Some(identifier) => {
-                                        let path_string: String =
-                                            format!("/apfs{{{}}}", identifier);
-
-                                        match self.get_path(parent) {
-                                            Ok(parent_display_path) => Some(format!(
-                                                "{}{}",
-                                                parent_display_path, path_string
-                                            )),
-                                            Err(mut error) => {
-                                                keramics_core::error_trace_add_frame!(
-                                                    error,
-                                                    "Unable to retrieve parent display path"
-                                                );
-                                                return Err(error);
-                                            }
-                                        }
-                                    }
-                                    None => None,
-                                }
-                            }
-                            Some(VfsFileEntry::Gpt(gpt_file_entry)) => gpt_file_entry
-                                .get_identifier()
-                                .map(|identifier| format!("/gpt{{{}}}", identifier)),
-                            Some(VfsFileEntry::LinuxLvm(lvm_file_entry)) => lvm_file_entry
-                                .get_identifier()
-                                .map(|identifier| format!("/lvm{{{}}}", identifier)),
-                            _ => None,
-                        },
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to retrieve file entry"
-                            );
-                            return Err(error);
-                        }
-                    }
-                }
-                _ => None,
-            },
-            _ => None,
-        };
-        match display_path {
-            Some(display_path) => Ok(display_path),
-            None => self.get_index_display_path(vfs_location),
-        }
-    }
-
-    /// Retrieves an index-based display path of a VFS location.
-    fn get_index_display_path(&self, vfs_location: &VfsLocation) -> Result<String, ErrorTrace> {
+    /// Retrieves a display path of a VFS location.
+    pub fn get_path(&self, vfs_location: &VfsLocation) -> Result<String, ErrorTrace> {
         let display_path: Option<String> = match vfs_location {
             VfsLocation::Layer {
                 path,
                 parent,
                 vfs_type,
             } => {
-                let path_string: String = path.to_string();
-
+                let path_string: String = match vfs_type {
+                    VfsType::ApfsContainer
+                    | VfsType::Gpt
+                    | VfsType::LinuxLvm
+                    | VfsType::Mbr
+                    | VfsType::SgiDiskLabel
+                    | VfsType::Volsnap => {
+                        match self.vfs_resolver.get_file_entry_by_location(vfs_location) {
+                            Ok(Some(vfs_file_entry)) => {
+                                self.get_path_component(&path, &vfs_file_entry)
+                            }
+                            Ok(None) => {
+                                return Err(keramics_core::error_trace_new!("Missing file entry"));
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to retrieve file entry"
+                                );
+                                return Err(error);
+                            }
+                        }
+                    }
+                    VfsType::Apm => {
+                        let path_string: String = path.to_string();
+                        path_string.replace("apm", "p")
+                    }
+                    _ => path.to_string(),
+                };
                 match vfs_type {
                     VfsType::Apfs
                     | VfsType::ApfsContainer
+                    | VfsType::ExFat
                     | VfsType::Ext
                     | VfsType::Fat
                     | VfsType::Hfs
                     | VfsType::LinuxLvm
                     | VfsType::Ntfs
+                    | VfsType::Volsnap
                     | VfsType::Xfs => match self.get_path(parent) {
                         Ok(parent_display_path) => {
                             Some(format!("{}{}", parent_display_path, path_string))
@@ -332,44 +299,8 @@ impl DisplayPath {
                             return Err(error);
                         }
                     },
-                    VfsType::Apm => Some(path_string.replace("apm", "p")),
-                    VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel => {
-                        match self.vfs_resolver.get_file_entry_by_location(vfs_location) {
-                            Ok(vfs_file_entry) => match vfs_file_entry {
-                                Some(VfsFileEntry::Gpt(gpt_file_entry)) => {
-                                    match gpt_file_entry.get_partition_number() {
-                                        Some(partition_number) => {
-                                            Some(format!("/p{}", partition_number))
-                                        }
-                                        None => Some(path_string.replace("gpt", "p")),
-                                    }
-                                }
-                                Some(VfsFileEntry::Mbr(mbr_file_entry)) => {
-                                    match mbr_file_entry.get_partition_number() {
-                                        Some(partition_number) => {
-                                            Some(format!("/p{}", partition_number))
-                                        }
-                                        None => Some(path_string.replace("mbr", "p")),
-                                    }
-                                }
-                                Some(VfsFileEntry::SgiDiskLabel(sgilabel_file_entry)) => {
-                                    match sgilabel_file_entry.get_partition_number() {
-                                        Some(partition_number) => {
-                                            Some(format!("/p{}", partition_number))
-                                        }
-                                        None => Some(path_string.replace("sgilabel", "p")),
-                                    }
-                                }
-                                _ => None,
-                            },
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to retrieve file entry"
-                                );
-                                return Err(error);
-                            }
-                        }
+                    VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel => {
+                        Some(path_string)
                     }
                     _ => None,
                 }
@@ -380,15 +311,68 @@ impl DisplayPath {
             Some(display_path) => Ok(display_path),
             None => Ok(String::new()),
         }
+        // TODO: sanitize path (control characters, etc.)
     }
 
-    /// Retrieves a display path of a VFS location.
-    pub fn get_path(&self, vfs_location: &VfsLocation) -> Result<String, ErrorTrace> {
+    /// Retrieves a display path component of a VFS file entry.
+    fn get_path_component(&self, path: &Path, vfs_file_entry: &VfsFileEntry) -> String {
         match &self.volume_path_type {
-            DisplayPathType::Identifier => self.get_identifier_display_path(vfs_location),
-            DisplayPathType::Index => self.get_index_display_path(vfs_location),
+            DisplayPathType::Identifier => match vfs_file_entry {
+                VfsFileEntry::ApfsContainer(apfs_container_file_entry) => {
+                    match apfs_container_file_entry.get_identifier() {
+                        Some(identifier) => format!("/apfs{{{}}}", identifier),
+                        None => path.to_string(),
+                    }
+                }
+                VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_identifier() {
+                    Some(identifier) => format!("/gpt{{{}}}", identifier),
+                    None => match gpt_file_entry.get_partition_number() {
+                        Some(partition_number) => format!("/p{}", partition_number),
+                        None => {
+                            let path_string: String = path.to_string();
+                            path_string.replace("gpt", "p")
+                        }
+                    },
+                },
+                VfsFileEntry::LinuxLvm(lvm_file_entry) => match lvm_file_entry.get_identifier() {
+                    Some(identifier) => format!("/lvm{{{}}}", identifier),
+                    None => path.to_string(),
+                },
+                VfsFileEntry::Volsnap(volsnap_file_entry) => {
+                    match volsnap_file_entry.get_identifier() {
+                        Some(identifier) => format!("/volsnap{{{}}}", identifier),
+                        None => path.to_string(),
+                    }
+                }
+                _ => path.to_string(),
+            },
+            DisplayPathType::Index => match vfs_file_entry {
+                VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_partition_number() {
+                    Some(partition_number) => format!("/p{}", partition_number),
+                    None => {
+                        let path_string: String = path.to_string();
+                        path_string.replace("gpt", "p")
+                    }
+                },
+                VfsFileEntry::Mbr(mbr_file_entry) => match mbr_file_entry.get_partition_number() {
+                    Some(partition_number) => format!("/p{}", partition_number),
+                    None => {
+                        let path_string: String = path.to_string();
+                        path_string.replace("mbr", "p")
+                    }
+                },
+                VfsFileEntry::SgiDiskLabel(sgilabel_file_entry) => {
+                    match sgilabel_file_entry.get_partition_number() {
+                        Some(partition_number) => format!("/p{}", partition_number),
+                        None => {
+                            let path_string: String = path.to_string();
+                            path_string.replace("sgilabel", "p")
+                        }
+                    }
+                }
+                _ => path.to_string(),
+            },
         }
-        // TODO: sanitize path (control characters, etc.)
     }
 
     /// Sets the volume path type.
@@ -482,67 +466,6 @@ mod tests {
     #[test]
     fn test_get_character_translation_table() {
         let _ = DisplayPath::get_character_translation_table();
-    }
-
-    #[test]
-    fn test_get_identifier_display_path() -> Result<(), ErrorTrace> {
-        let display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Identifier);
-
-        let os_vfs_location: VfsLocation = VfsLocation::from("../test_data/gpt/gpt.raw");
-
-        let test_path: String = display_path.get_identifier_display_path(&os_vfs_location)?;
-        assert_eq!(test_path, String::from(""));
-
-        let path: Path = Path::from("/gpt1");
-        let gpt_vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
-
-        let test_path: String = display_path.get_identifier_display_path(&gpt_vfs_location)?;
-        assert_eq!(
-            test_path,
-            String::from("/gpt{0b119671-75ff-4e2a-a31a-0bc83f857fdd}")
-        );
-
-        let os_vfs_location: VfsLocation = VfsLocation::from("../test_data/mbr/mbr.raw");
-
-        let test_path: String = display_path.get_identifier_display_path(&os_vfs_location)?;
-        assert_eq!(test_path, String::from(""));
-
-        let path: Path = Path::from("/mbr1");
-        let mbr_vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Mbr, path);
-
-        let test_path: String = display_path.get_identifier_display_path(&mbr_vfs_location)?;
-        assert_eq!(test_path, String::from("/p1"));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_index_display_path() -> Result<(), ErrorTrace> {
-        let display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Index);
-
-        let os_vfs_location: VfsLocation = VfsLocation::from("../test_data/gpt/gpt.raw");
-
-        let test_path: String = display_path.get_index_display_path(&os_vfs_location)?;
-        assert_eq!(test_path, String::from(""));
-
-        let path: Path = Path::from("/gpt1");
-        let gpt_vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
-
-        let test_path: String = display_path.get_index_display_path(&gpt_vfs_location)?;
-        assert_eq!(test_path, String::from("/p1"));
-
-        let os_vfs_location: VfsLocation = VfsLocation::from("../test_data/mbr/mbr.raw");
-
-        let test_path: String = display_path.get_index_display_path(&os_vfs_location)?;
-        assert_eq!(test_path, String::from(""));
-
-        let path: Path = Path::from("/mbr1");
-        let mbr_vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Mbr, path);
-
-        let test_path: String = display_path.get_index_display_path(&mbr_vfs_location)?;
-        assert_eq!(test_path, String::from("/p1"));
-
-        Ok(())
     }
 
     #[test]

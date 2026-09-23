@@ -168,6 +168,7 @@ mod tests {
                 timestamp: 1735977481
             })
         );
+        assert_eq!(test_struct.data_offset, 0);
         assert_eq!(test_struct.data_size, 0);
         // TODO: assert_eq!(test_struct.device_identifier, 0);
         assert_eq!(test_struct.path_size, 29);

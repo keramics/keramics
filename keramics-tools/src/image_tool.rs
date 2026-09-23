@@ -399,6 +399,9 @@ impl ImageTool {
             VfsFileEntry::Apfs(apfs_file_entry) => {
                 format!("{}", apfs_file_entry.get_identifier())
             }
+            VfsFileEntry::ExFat(exfat_file_entry) => {
+                format!("0x{:0x}", exfat_file_entry.get_identifier())
+            }
             VfsFileEntry::Ext(ext_file_entry) => {
                 format!("{}", ext_file_entry.get_inode_number())
             }
@@ -438,6 +441,14 @@ impl ImageTool {
                 }
                 None => Self::get_file_mode_string_from_file_type(&file_type),
             },
+            VfsFileEntry::ExFat(exfat_file_entry) => {
+                let file_attribute_flags: u16 = exfat_file_entry.get_file_attribute_flags();
+
+                Self::get_file_mode_string_from_file_attribute_flags(
+                    &file_type,
+                    file_attribute_flags as u32,
+                )
+            }
             VfsFileEntry::Fat(fat_file_entry) => {
                 let file_attribute_flags: u8 = fat_file_entry.get_file_attribute_flags();
 
@@ -721,6 +732,9 @@ impl ImageTool {
         vfs_scan_node: &VfsScanNode,
         calculate_md5: bool,
     ) -> Result<(), ErrorTrace> {
+        if vfs_scan_node.get_type() == &VfsType::Volsnap {
+            return Ok(());
+        }
         if vfs_scan_node.is_empty() {
             // Only process scan nodes that contain a file system.
             if !vfs_scan_node.is_file_system() {

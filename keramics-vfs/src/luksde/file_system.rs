@@ -166,7 +166,6 @@ impl LuksFileSystem {
                     VfsCredential::Passphrase(passphrase) => {
                         LuksCredential::Passphrase(passphrase.clone())
                     }
-                    VfsCredential::None => LuksCredential::None,
                     _ => continue,
                 };
                 luks_credentials.push(luks_credential);

@@ -15,8 +15,10 @@ use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
-use keramics_formats::apfs::{ApfsContainer, ApfsVolume};
+use keramics_formats::apfs::{ApfsContainer, ApfsCredential, ApfsVolume};
 
+use crate::credential::VfsCredential;
+use crate::credential_store::VfsCredentialStore;
 use crate::location::VfsLocation;
 use crate::path::VfsPath;
 use crate::types::VfsFileSystemReference;
@@ -87,13 +89,13 @@ impl ApfsContainerFileSystem {
                 }
                 volume_index -= 1;
 
-                let apfs_volume: ApfsVolume = match self.container.get_volume_by_index(volume_index)
+                let apfs_volume: ApfsVolume = match Self::open_volume(&self.container, volume_index)
                 {
                     Ok(apfs_volume) => apfs_volume,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            format!("Unable to retrieve APFS volume: {}", volume_index)
+                            format!("Unable to open APFS volume: {}", volume_index)
                         );
                         return Err(error);
                     }
@@ -184,9 +186,46 @@ impl ApfsContainerFileSystem {
                 return Err(error);
             }
         }
-        // TODO: handle locked container
-
         Ok(())
+    }
+
+    /// Opens an APFS volume.
+    pub(super) fn open_volume(
+        container: &ApfsContainer,
+        volume_index: usize,
+    ) -> Result<ApfsVolume, ErrorTrace> {
+        let mut apfs_volume: ApfsVolume = match container.get_volume_by_index(volume_index) {
+            Ok(apfs_volume) => apfs_volume,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve APFS volume: {}", volume_index)
+                );
+                return Err(error);
+            }
+        };
+        if apfs_volume.is_locked() {
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut apfs_credentials: Vec<ApfsCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                let apfs_credential: ApfsCredential = match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        ApfsCredential::Passphrase(passphrase.clone())
+                    }
+                    _ => continue,
+                };
+                apfs_credentials.push(apfs_credential);
+            }
+            match apfs_volume.unlock(&apfs_credentials) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Failed to unlock APFS volume");
+                    return Err(error);
+                }
+            }
+        }
+        Ok(apfs_volume)
     }
 }
 

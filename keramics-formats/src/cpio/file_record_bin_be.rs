@@ -109,6 +109,7 @@ mod tests {
             })
         );
         assert_eq!(test_struct.path_size, 29);
+        assert_eq!(test_struct.data_offset, 0);
         assert_eq!(test_struct.data_size, 0);
         assert_eq!(test_struct.checksum, 0x00000000);
 

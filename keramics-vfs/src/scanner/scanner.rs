@@ -15,7 +15,7 @@ use std::collections::HashSet;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
-use keramics_formats::apfs::{ApfsContainer, ApfsVolume};
+use keramics_formats::apfs::{ApfsContainer, ApfsCredential, ApfsVolume};
 use keramics_formats::apm::ApmVolumeSystem;
 use keramics_formats::bde::BdeEncryptedVolume;
 use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
@@ -1147,7 +1147,7 @@ impl VfsScanner {
                 }
                 // TODO: invoke mediator to ask which volumes to include.
                 for (volume_index, result) in apfs_container.volumes().enumerate() {
-                    let apfs_volume: ApfsVolume = match result {
+                    let mut apfs_volume: ApfsVolume = match result {
                         Ok(volume) => volume,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -1157,6 +1157,30 @@ impl VfsScanner {
                             return Err(error);
                         }
                     };
+                    if apfs_volume.is_locked() {
+                        let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+                        let mut apfs_credentials: Vec<ApfsCredential> = Vec::new();
+
+                        for vfs_credential in credential_store.iter() {
+                            let apfs_credential: ApfsCredential = match vfs_credential {
+                                VfsCredential::Passphrase(passphrase) => {
+                                    ApfsCredential::Passphrase(passphrase.clone())
+                                }
+                                _ => continue,
+                            };
+                            apfs_credentials.push(apfs_credential);
+                        }
+                        match apfs_volume.unlock(&apfs_credentials) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Failed to unlock APFS volume"
+                                );
+                                return Err(error);
+                            }
+                        }
+                    }
                     if scan_options.volumes != VfsScanOptionGroup::NotSet
                         && !scan_options.volumes.contains_index(volume_index + 1)
                     {
