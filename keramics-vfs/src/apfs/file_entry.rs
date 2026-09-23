@@ -18,6 +18,7 @@ use keramics_formats::PathComponent;
 use keramics_formats::apfs::{ApfsContainer, ApfsFileSystem, ApfsVolume};
 use keramics_types::Uuid;
 
+use crate::apfs::file_system::ApfsContainerFileSystem;
 use crate::enums::VfsFileType;
 
 /// Apple File System (APFS) container file entry.
@@ -121,7 +122,7 @@ impl ApfsContainerFileEntry {
     ) -> Result<ApfsContainerFileEntry, ErrorTrace> {
         match self {
             ApfsContainerFileEntry::Root { container } => {
-                match container.get_volume_by_index(sub_file_entry_index) {
+                match ApfsContainerFileSystem::open_volume(container, sub_file_entry_index) {
                     Ok(apfs_volume) => Ok(ApfsContainerFileEntry::Volume {
                         name_index: sub_file_entry_index,
                         volume: apfs_volume,
@@ -129,7 +130,7 @@ impl ApfsContainerFileEntry {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            format!("Unable to retrieve APFS volume: {}", sub_file_entry_index)
+                            format!("Unable to open APFS volume: {}", sub_file_entry_index)
                         );
                         Err(error)
                     }

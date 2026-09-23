@@ -39,6 +39,9 @@ pub struct CpioFileRecord {
     /// Path size.
     pub path_size: u32,
 
+    /// Data offset.
+    pub data_offset: u64,
+
     /// Data size.
     pub data_size: u32,
 
@@ -57,6 +60,7 @@ impl CpioFileRecord {
             number_of_links: 0,
             device_identifier: 0,
             modification_time: DateTime::NotSet,
+            data_offset: 0,
             path_size: 0,
             data_size: 0,
             checksum: 0,

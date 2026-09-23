@@ -36,7 +36,7 @@ The binary CPIO file record is variable of size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 2 | 0x71c7 | Signature, which is 070707 in octal where 0x71 0xc7 indicates the format is in big-endian and 0xc7 0x71 little-endian |
+| 0 | 2 | | Signature, which is 070707 in octal where [0x71, 0xc7] indicates the format is in big-endian and [0xc7, 0x71] little-endian |
 | 2 | 2 | | Device number of the host file system |
 | 4 | 2 | | Inode number |
 | 6 | 2 | | [File mode](#file_mode) (permissions and type) |

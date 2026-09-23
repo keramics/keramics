@@ -330,11 +330,9 @@ impl PdiImage {
                 },
                 "UID" => match Uuid::from_string(sub_xml_element.value.as_str()) {
                     Ok(_) => {}
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unsupported UID value",
-                            error
-                        ));
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unsupported UID value");
+                        return Err(error);
                     }
                 },
                 _ => {}
@@ -579,11 +577,9 @@ impl PdiImage {
                 "GUID" => {
                     snapshot_identifier = match Uuid::from_string(sub_xml_element.value.as_str()) {
                         Ok(uuid) => uuid,
-                        Err(error) => {
-                            return Err(keramics_core::error_trace_new_with_error!(
-                                "Unsupported GUID value",
-                                error
-                            ));
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(error, "Unsupported GUID value");
+                            return Err(error);
                         }
                     }
                 }
@@ -630,11 +626,9 @@ impl PdiImage {
                 "GUID" => {
                     identifier = match Uuid::from_string(sub_xml_element.value.as_str()) {
                         Ok(uuid) => uuid,
-                        Err(error) => {
-                            return Err(keramics_core::error_trace_new_with_error!(
-                                "Unsupported GUID value",
-                                error
-                            ));
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(error, "Unsupported GUID value");
+                            return Err(error);
                         }
                     }
                 }
@@ -647,11 +641,12 @@ impl PdiImage {
                                 Some(uuid)
                             }
                         }
-                        Err(error) => {
-                            return Err(keramics_core::error_trace_new_with_error!(
-                                "Unsupported ParentGUID value",
-                                error
-                            ));
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unsupported ParentGUID value"
+                            );
+                            return Err(error);
                         }
                     }
                 }
