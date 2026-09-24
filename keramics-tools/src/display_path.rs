@@ -19,7 +19,7 @@ use keramics_encodings::CharacterDecoder;
 use keramics_formats::{Path, PathComponent};
 use keramics_vfs::{VfsFileEntry, VfsLocation, VfsResolver, VfsResolverReference, VfsType};
 
-use crate::enums::DisplayPathType;
+use crate::enums::{DisplayPathType, OutputFormat};
 
 const C0_CONTROL_CHARACTERS: [&str; 32] = [
     "\\x00", "\\x01", "\\x02", "\\x03", "\\x04", "\\x05", "\\x06", "\\x07", "\\x08", "\\x09",
@@ -45,6 +45,9 @@ pub struct DisplayPath {
 
     /// Volume or partition path type
     volume_path_type: DisplayPathType,
+
+    /// Output format
+    output_format: OutputFormat,
 }
 
 impl DisplayPath {
@@ -56,6 +59,7 @@ impl DisplayPath {
             vfs_resolver: VfsResolver::current(),
             translation_table: Self::get_character_translation_table(),
             volume_path_type: volume_path_type.clone(),
+            output_format: OutputFormat::Text,
         }
     }
 
@@ -277,17 +281,36 @@ impl DisplayPath {
                     }
                     _ => path.to_string(),
                 };
-                match vfs_type {
-                    VfsType::Apfs
-                    | VfsType::ApfsContainer
-                    | VfsType::ExFat
-                    | VfsType::Ext
-                    | VfsType::Fat
-                    | VfsType::Hfs
-                    | VfsType::LinuxLvm
-                    | VfsType::Ntfs
-                    | VfsType::Volsnap
-                    | VfsType::Xfs => match self.get_path(parent) {
+                if self.output_format == OutputFormat::DfImageTools {
+                    match vfs_type {
+                        VfsType::Apfs
+                        | VfsType::ApfsContainer
+                        | VfsType::ExFat
+                        | VfsType::Ext
+                        | VfsType::Fat
+                        | VfsType::Hfs
+                        | VfsType::LinuxLvm
+                        | VfsType::Ntfs
+                        | VfsType::Volsnap
+                        | VfsType::Xfs => match self.get_path(parent) {
+                            Ok(parent_display_path) => {
+                                Some(format!("{}{}", parent_display_path, path_string))
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to retrieve parent display path"
+                                );
+                                return Err(error);
+                            }
+                        },
+                        VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel => {
+                            Some(path_string)
+                        }
+                        _ => None,
+                    }
+                } else {
+                    match self.get_path(parent) {
                         Ok(parent_display_path) => {
                             Some(format!("{}{}", parent_display_path, path_string))
                         }
@@ -298,11 +321,7 @@ impl DisplayPath {
                             );
                             return Err(error);
                         }
-                    },
-                    VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel => {
-                        Some(path_string)
                     }
-                    _ => None,
                 }
             }
             _ => None,
@@ -336,6 +355,18 @@ impl DisplayPath {
                 },
                 VfsFileEntry::LinuxLvm(lvm_file_entry) => match lvm_file_entry.get_identifier() {
                     Some(identifier) => format!("/lvm{{{}}}", identifier),
+                    None => path.to_string(),
+                },
+                VfsFileEntry::Pdi(pdi_file_entry) => match pdi_file_entry.get_identifier() {
+                    Some(identifier) => format!("/pdi{{{}}}", identifier),
+                    None => path.to_string(),
+                },
+                VfsFileEntry::Vhd(vhd_file_entry) => match vhd_file_entry.get_identifier() {
+                    Some(identifier) => format!("/vhd{{{}}}", identifier),
+                    None => path.to_string(),
+                },
+                VfsFileEntry::Vhdx(vhdx_file_entry) => match vhdx_file_entry.get_identifier() {
+                    Some(identifier) => format!("/vhdx{{{}}}", identifier),
                     None => path.to_string(),
                 },
                 VfsFileEntry::Volsnap(volsnap_file_entry) => {
@@ -373,6 +404,12 @@ impl DisplayPath {
                 _ => path.to_string(),
             },
         }
+    }
+
+    /// Sets the output format.
+    #[allow(dead_code)]
+    pub fn set_output_format(&mut self, output_format: &OutputFormat) {
+        self.output_format = output_format.clone();
     }
 
     /// Sets the volume path type.

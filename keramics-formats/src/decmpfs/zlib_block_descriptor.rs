@@ -19,7 +19,7 @@ use keramics_types::bytes_to_u32_le;
 #[layout_map(
     structure(
         byte_order = "little",
-        field(name = "offset", data_type = "u32"),
+        field(name = "offset", data_type = "u32", format = "hex"),
         field(name = "size", data_type = "u32"),
     ),
     methods("debug_read_data")

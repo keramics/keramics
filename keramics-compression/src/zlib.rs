@@ -172,17 +172,19 @@ impl ZlibContext {
 
         // TODO: change to >= 4
         if bitstream.data_size - bitstream.data_offset > 4 {
-            let mut adler32_context: Adler32Context = Adler32Context::new(1);
-            adler32_context.update(uncompressed_data);
-
-            let calculated_checksum: u32 = adler32_context.finalize();
             let stored_checksum: u32 = bytes_to_u32_be!(compressed_data, bitstream.data_offset);
 
-            if stored_checksum != calculated_checksum {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
-                    stored_checksum, calculated_checksum
-                )));
+            if stored_checksum != 0 {
+                let mut adler32_context: Adler32Context = Adler32Context::new(1);
+                adler32_context.update(uncompressed_data);
+                let calculated_checksum: u32 = adler32_context.finalize();
+
+                if stored_checksum != calculated_checksum {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                        stored_checksum, calculated_checksum
+                    )));
+                }
             }
         }
         self.uncompressed_data_size = deflate_context.uncompressed_data_size;
