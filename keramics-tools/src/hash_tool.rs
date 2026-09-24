@@ -421,11 +421,11 @@ impl HashTool {
                     WindowsPath::from_str("\\$BadClus"),
                     Some(PathComponent::from(Ucs2String::from("$Bad"))),
                 ));
-                path_filter.add_signature(PathFilterSignature::new(
-                    WindowsPath::from_str("\\hiberfil.sys"),
-                    None,
-                ));
                 if self.output_format != OutputFormat::DfImageTools {
+                    path_filter.add_signature(PathFilterSignature::new(
+                        WindowsPath::from_str("\\hiberfil.sys"),
+                        None,
+                    ));
                     path_filter.add_signature(PathFilterSignature::new(
                         WindowsPath::from_str("\\pagefile.sys"),
                         None,
