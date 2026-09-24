@@ -91,7 +91,7 @@ impl VolsnapStoreBitmap {
     /// Reads the bitmap from a buffer.
     pub fn read_data(&mut self, data: &[u8], bitmap_offset: &mut u64) -> Result<(), ErrorTrace> {
         let mut offset: u64 = *bitmap_offset;
-        let mut range_offset: u64 = 0;
+        let mut range_offset: u64 = *bitmap_offset;
         let mut range_bit_value: u8 = data[0] & 0x01;
 
         for byte_value in data.iter() {

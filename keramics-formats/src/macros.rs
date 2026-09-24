@@ -66,7 +66,10 @@ macro_rules! zlib_decompress {
             let (decompressed_slice, return_code) =
                 decompress_slice($uncompressed, $compressed, inflate_config);
             if return_code != ReturnCode::Ok {
-                return Err(keramics_core::error_trace_new!($error_message));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "{} with code: {:?}",
+                    $error_message, return_code
+                )));
             }
             decompressed_slice.len()
         }

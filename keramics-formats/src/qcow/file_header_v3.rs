@@ -51,7 +51,9 @@ pub struct QcowFileHeaderV3 {}
 impl QcowFileHeaderV3 {
     /// Reads the file header from a buffer.
     pub fn read_data(file_header: &mut QcowFileHeader, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 104 {
+        let data_size: usize = data.len();
+
+        if data_size < 104 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..4] != QCOW_FILE_HEADER_SIGNATURE {
@@ -74,7 +76,6 @@ impl QcowFileHeaderV3 {
         file_header.incompatible_feature_flags = bytes_to_u64_be!(data, 72);
         file_header.compatible_feature_flags = bytes_to_u64_be!(data, 80);
         file_header.header_size = bytes_to_u32_be!(data, 100);
-        file_header.compression_method = data[104];
 
         if file_header.number_of_cluster_block_bits <= 8
             || file_header.number_of_cluster_block_bits > 63
@@ -89,6 +90,9 @@ impl QcowFileHeaderV3 {
                 "Unsupported header size: {}",
                 file_header.header_size
             )));
+        }
+        if file_header.header_size >= 112 {
+            file_header.compression_method = data[104];
         }
         Ok(())
     }

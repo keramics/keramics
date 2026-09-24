@@ -294,3 +294,14 @@ pub enum FormatType {
     /// X File System (XFS)
     Xfs,
 }
+
+/// Output formats.
+#[derive(Clone, Debug, PartialEq, ValueEnum)]
+pub enum OutputFormat {
+    /// dfImageTools compatible output.
+    #[value(name = "dfimagetools")]
+    DfImageTools,
+
+    /// Text output.
+    Text,
+}

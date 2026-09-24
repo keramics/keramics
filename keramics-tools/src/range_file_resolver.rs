@@ -25,14 +25,22 @@ pub struct RangeFileResolver {
 
     /// The offset of the range.
     range_offset: u64,
+
+    /// Data stream.
+    data_stream: Option<DataStreamReference>,
 }
 
 impl RangeFileResolver {
     /// Creates a new file resolver.
-    pub fn new(base_path: PathBuf, range_offset: u64) -> Self {
+    pub fn new(
+        base_path: PathBuf,
+        range_offset: u64,
+        data_stream: Option<&DataStreamReference>,
+    ) -> Self {
         Self {
             base_path,
             range_offset,
+            data_stream: data_stream.cloned(),
         }
     }
 
@@ -73,12 +81,18 @@ impl FileResolver for RangeFileResolver {
         // Note that symlink_metadata() is used to prevent traversing symbolic links.
         match symlink_metadata(&path_buf) {
             Ok(_) => {
-                let data_stream: DataStreamReference = match open_os_data_stream(&path_buf) {
-                    Ok(data_stream) => data_stream,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
-                        return Err(error);
-                    }
+                let data_stream: DataStreamReference = match self.data_stream.as_ref() {
+                    Some(data_stream) => data_stream.clone(),
+                    None => match open_os_data_stream(&path_buf) {
+                        Ok(data_stream) => data_stream,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to open data stream"
+                            );
+                            return Err(error);
+                        }
+                    },
                 };
                 let size: u64 = keramics_core::data_stream_get_size!(data_stream);
 
@@ -106,7 +120,7 @@ mod tests {
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data");
-        let file_resolver: RangeFileResolver = RangeFileResolver::new(path_buf, 0);
+        let file_resolver: RangeFileResolver = RangeFileResolver::new(path_buf, 0, None);
 
         let path_components: [PathComponent; 2] = [
             PathComponent::from("directory"),

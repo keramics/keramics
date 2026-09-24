@@ -1,0 +1,150 @@
+# Build Python wheels from source.
+name: wheels
+on:
+  pull_request:
+  push:
+  release:
+    types: [published]
+  # Allow trigger via API
+  workflow_dispatch:
+permissions: read-all
+jobs:
+  manylinux:
+    runs-on: ubuntu-26.04
+    strategy:
+      matrix:
+        platform:
+        - name: aarch64
+          target: aarch64-unknown-linux-gnu
+        - name: armv7
+          target: armv7-unknown-linux-gnueabihf
+        # - name: ppc64le
+        #   target: powerpc64le-unknown-linux-gnu
+        # - name: s390x
+        #   target: s390x-unknown-linux-gnu
+        - name: x86
+          target: i686-unknown-linux-gnu
+        - name: x86_64
+          target: x86_64-unknown-linux-gnu
+    steps:
+    - uses: actions/checkout@v6
+    - name: Build wheels for Linux (manylinux)
+      uses: PyO3/maturin-action@v1
+      env:
+        SCCACHE_DISABLE: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '0' }}
+      with:
+        target: ${{ matrix.platform.target }}
+        args: --find-interpreter --release --out dist --zig
+        working-directory: keramics-python
+        sccache: 'true'
+        manylinux: auto
+        container: off
+    - name: Upload wheels
+      uses: actions/upload-artifact@v7
+      with:
+        name: wheels-linux-${{ matrix.platform.name }}
+        path: keramics-python/dist/*.whl
+  musllinux:
+    runs-on: ubuntu-26.04
+    strategy:
+      matrix:
+        platform:
+        - target: aarch64
+        - target: armv7
+        - target: x86_64
+        - target: x86
+    steps:
+    - uses: actions/checkout@v6
+    - name: Build wheels for Linux (musllinux)
+      uses: PyO3/maturin-action@v1
+      env:
+        SCCACHE_DISABLE: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '0' }}
+      with:
+        target: ${{ matrix.platform.target }}
+        args: --find-interpreter --release --out dist --zig
+        working-directory: keramics-python
+        sccache: 'true'
+        manylinux: musllinux_1_2
+        container: off
+    - name: Upload wheels
+      uses: actions/upload-artifact@v7
+      with:
+        name: wheels-musllinux-${{ matrix.platform.target }}
+        path: keramics-python/dist/*.whl
+  macos:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+        - runner: macos-26
+          target: aarch64
+        - runner: macos-26-intel
+          target: x86_64
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v6
+      with:
+        python-version: "3.14"
+    - name: Build wheels for Mac OS
+      uses: PyO3/maturin-action@v1
+      env:
+        SCCACHE_DISABLE: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '0' }}
+      with:
+        target: ${{ matrix.platform.target }}
+        args: --find-interpreter --release --out dist
+        working-directory: keramics-python
+        sccache: 'true'
+    - name: Upload wheels
+      uses: actions/upload-artifact@v7
+      with:
+        name: wheels-macos-${{ matrix.platform.target }}
+        path: keramics-python/dist/*.whl
+  sdist:
+    runs-on: ubuntu-26.04
+    steps:
+    - uses: actions/checkout@v6
+    - name: Build sdist
+      uses: PyO3/maturin-action@v1
+      with:
+        command: sdist
+        args: --out dist
+        working-directory: keramics-python
+    - name: Upload sdist
+      uses: actions/upload-artifact@v7
+      with:
+        name: wheels-sdist
+        path: keramics-python/dist/*.tar.gz
+  windows:
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        platform:
+        - runner: windows-latest
+          target: x64
+          python_arch: x64
+        - runner: windows-latest
+          target: x86
+          python_arch: x86
+        - runner: windows-11-arm
+          target: aarch64
+          python_arch: arm64
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v6
+      with:
+        python-version: "3.14"
+        architecture: ${{ matrix.platform.python_arch }}
+    - name: Build wheels for Windows
+      uses: PyO3/maturin-action@v1
+      env:
+        SCCACHE_DISABLE: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '0' }}
+      with:
+        target: ${{ matrix.platform.target }}
+        args: --find-interpreter --release --out dist
+        working-directory: keramics-python
+        sccache: 'true'
+    - name: Upload wheels
+      uses: actions/upload-artifact@v7
+      with:
+        name: wheels-windows-${{ matrix.platform.target }}
+        path: keramics-python/dist/*.whl

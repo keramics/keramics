@@ -45,7 +45,7 @@ mod storage_media_image;
 
 use crate::bodyfile::Bodyfile;
 use crate::display_path::DisplayPath;
-use crate::enums::DisplayPathType;
+use crate::enums::{DisplayPathType, OutputFormat};
 use crate::storage_media_image::StorageMediaImage;
 
 pub const FILE_ATTRIBUTE_FLAG_READ_ONLY: u32 = 0x00000001;
@@ -96,6 +96,10 @@ struct BodyfileCommandArguments {
     /// Layer within the storage media image, where 1 represents the first layer. The default is
     /// all layers.
     image_layer: usize,
+
+    /// Output format
+    #[arg(long, default_value_t = OutputFormat::Text, value_enum)]
+    output_format: OutputFormat,
 
     /// Comma separated list of partitions to include
     #[arg(long)]
@@ -193,6 +197,9 @@ struct ImageTool {
     /// The display path.
     display_path: DisplayPath,
 
+    /// Output format
+    output_format: OutputFormat,
+
     /// Value to indicate to stop on error.
     pub stop_on_error: bool,
 }
@@ -208,6 +215,7 @@ impl ImageTool {
         Self {
             vfs_resolver: VfsResolver::current(),
             display_path,
+            output_format: OutputFormat::Text,
             stop_on_error,
         }
     }
@@ -326,8 +334,11 @@ impl ImageTool {
         calculate_md5: bool,
     ) -> Result<(), ErrorTrace> {
         let md5: String = if !calculate_md5 {
-            // TODO: consider changing to: String::from("N/A (skipped)")
-            String::from("0")
+            if self.output_format == OutputFormat::DfImageTools {
+                String::from("0")
+            } else {
+                String::from("N/A (skipped)")
+            }
         } else {
             // TODO: consider skipping $BadClus:$Bad
             match file_entry.get_data_stream() {
@@ -341,13 +352,19 @@ impl ImageTool {
                             );
                             return Err(error);
                         }
-                        // TODO: consider changing to: String::from("N/A (error)")
-                        String::from("00000000000000000000000000000000")
+                        if self.output_format == OutputFormat::DfImageTools {
+                            String::from("00000000000000000000000000000000")
+                        } else {
+                            String::from("N/A (error)")
+                        }
                     }
                 },
                 Ok(None) => {
-                    // TODO: consider changing to: String::from("N/A (skipped)")
-                    String::from("00000000000000000000000000000000")
+                    if self.output_format == OutputFormat::DfImageTools {
+                        String::from("00000000000000000000000000000000")
+                    } else {
+                        String::from("N/A (skipped)")
+                    }
                 }
                 Err(mut error) => {
                     if self.stop_on_error {
@@ -357,8 +374,11 @@ impl ImageTool {
                         );
                         return Err(error);
                     }
-                    // TODO: consider changing to: String::from("N/A (error)")
-                    String::from("00000000000000000000000000000000")
+                    if self.output_format == OutputFormat::DfImageTools {
+                        String::from("00000000000000000000000000000000")
+                    } else {
+                        String::from("N/A (error)")
+                    }
                 }
             }
         };
@@ -1023,6 +1043,12 @@ impl ImageTool {
         Ok(())
     }
 
+    /// Sets the output format.
+    pub fn set_output_format(&mut self, output_format: &OutputFormat) {
+        self.display_path.set_output_format(output_format);
+        self.output_format = output_format.clone();
+    }
+
     /// Sets the volume path type.
     pub fn set_volume_path_type(&mut self, volume_path_type: &DisplayPathType) {
         self.display_path.set_volume_path_type(volume_path_type);
@@ -1086,6 +1112,7 @@ fn main() -> ExitCode {
 
     match arguments.command {
         Some(Commands::Bodyfile(command_arguments)) => {
+            image_tool.set_output_format(&command_arguments.output_format);
             image_tool.set_volume_path_type(&command_arguments.volume_path_type);
 
             match image_tool.generate_bodyfile(

@@ -343,11 +343,20 @@ impl InfoTool {
     }
 
     /// Retrieves a file resolver.
-    pub fn get_file_resolver(&self, path: &PathBuf) -> FileResolverReference {
+    pub fn get_file_resolver(
+        &self,
+        path: &PathBuf,
+        data_stream: &DataStreamReference,
+    ) -> FileResolverReference {
         let mut base_path: PathBuf = path.clone();
         base_path.pop();
 
-        FileResolverReference::new(Box::new(RangeFileResolver::new(base_path, self.offset)))
+        let offset: u64 = if self.contents_mode { 0 } else { self.offset };
+        FileResolverReference::new(Box::new(RangeFileResolver::new(
+            base_path,
+            offset,
+            Some(data_stream),
+        )))
     }
 
     /// Scans a data stream for format signatures.
@@ -738,7 +747,7 @@ fn main() -> ExitCode {
             FormatIdentifier::Gpt => GptInfo::print_volume_system(&data_stream),
             FormatIdentifier::LinuxLvm => {
                 let file_resolver: FileResolverReference =
-                    info_tool.get_file_resolver(&arguments.source);
+                    info_tool.get_file_resolver(&arguments.source, &data_stream);
                 let file_name: PathComponent = match info_tool.get_file_name(&arguments.source) {
                     Ok(file_name) => file_name,
                     Err(error) => {
@@ -767,7 +776,7 @@ fn main() -> ExitCode {
             FormatIdentifier::Vmdk => VmdkInfo::print_image(&arguments.source),
             FormatIdentifier::Volsnap => {
                 let file_resolver: FileResolverReference =
-                    info_tool.get_file_resolver(&arguments.source);
+                    info_tool.get_file_resolver(&arguments.source, &data_stream);
                 let file_name: PathComponent = match info_tool.get_file_name(&arguments.source) {
                     Ok(file_name) => file_name,
                     Err(error) => {

@@ -38,7 +38,7 @@ mod display_path;
 mod enums;
 
 use crate::display_path::DisplayPath;
-use crate::enums::{DigestHashType, DisplayPathType};
+use crate::enums::{DigestHashType, DisplayPathType, OutputFormat};
 
 #[derive(Parser)]
 #[command(version, about = "Calculate digest hashes of data streams", long_about = None)]
@@ -64,6 +64,10 @@ struct CommandLineArguments {
     /// Layer within the storage media image, where 1 represents the first layer. The default is
     /// all layers.
     image_layer: usize,
+
+    /// Output format
+    #[arg(long, default_value_t = OutputFormat::Text, value_enum)]
+    output_format: OutputFormat,
 
     /// Comma separated list of partitions to include
     #[arg(long)]
@@ -130,10 +134,14 @@ impl HashTool {
         digest_hash_type: &DigestHashType,
         display_path_type: &DisplayPathType,
         include_extended_attributes: bool,
+        output_format: &OutputFormat,
         stop_on_error: bool,
     ) -> Self {
+        let mut display_path: DisplayPath = DisplayPath::new(display_path_type);
+        display_path.set_output_format(output_format);
+
         Self {
-            display_path: DisplayPath::new(display_path_type),
+            display_path,
             digest_hash_type: digest_hash_type.clone(),
             include_extended_attributes,
             stop_on_error,
@@ -671,6 +679,7 @@ fn main() -> ExitCode {
         &arguments.digest_hash_type,
         &arguments.volume_path_type,
         arguments.extended_attributes,
+        &arguments.output_format,
         arguments.stop_on_error,
     );
     match arguments.source {
@@ -813,8 +822,13 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let hash_tool: HashTool =
-            HashTool::new(&DigestHashType::Md5, &DisplayPathType::Index, false, true);
+        let hash_tool: HashTool = HashTool::new(
+            &DigestHashType::Md5,
+            &DisplayPathType::Index,
+            false,
+            &OutputFormat::Text,
+            true,
+        );
         let md5: String = hash_tool.calculate_hash_from_data_stream(&data_stream)?;
         assert_eq!(md5, "f19106bcf25fa9cabc1b5ac91c726001");
 
@@ -826,8 +840,13 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let mut reader: Cursor<&[u8]> = Cursor::new(&test_data);
 
-        let hash_tool: HashTool =
-            HashTool::new(&DigestHashType::Md5, &DisplayPathType::Index, false, true);
+        let hash_tool: HashTool = HashTool::new(
+            &DigestHashType::Md5,
+            &DisplayPathType::Index,
+            false,
+            &OutputFormat::Text,
+            true,
+        );
         let md5: String = hash_tool.calculate_hash_from_reader(&mut reader)?;
         assert_eq!(md5, "f19106bcf25fa9cabc1b5ac91c726001");
 

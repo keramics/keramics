@@ -32,4 +32,4 @@ keramics-sigscan = { version = "0.0.1", path = "../keramics-sigscan" }
 keramics-types = { version = "0.0.1", path = "../keramics-types" }
 pest = { version = "2.8.2" }
 pest_derive = { version = "2.8.2" }
-zlib-rs = { version = "0.6.6", optional = true }
+zlib-rs = { version = "0.6.8", optional = true }
