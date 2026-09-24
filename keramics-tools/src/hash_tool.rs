@@ -122,6 +122,9 @@ struct HashTool {
     /// Value to indicate extended attributes should be included.
     include_extended_attributes: bool,
 
+    /// Output format
+    output_format: OutputFormat,
+
     /// Value to indicate to stop on error.
     stop_on_error: bool,
 }
@@ -144,6 +147,7 @@ impl HashTool {
             display_path,
             digest_hash_type: digest_hash_type.clone(),
             include_extended_attributes,
+            output_format: output_format.clone(),
             stop_on_error,
         }
     }
@@ -408,6 +412,7 @@ impl HashTool {
             };
             let mut path_filter: PathFilter = PathFilter::new();
 
+            // TODO: allow to set path filter as command line option
             if let VfsFileSystem::Ntfs(ntfs_file_system) = file_system.as_ref() {
                 path_filter.set_case_folding(PathCharacterMappings::Ucs2(
                     ntfs_file_system.get_case_folding_mappings(),
@@ -420,15 +425,16 @@ impl HashTool {
                     WindowsPath::from_str("\\hiberfil.sys"),
                     None,
                 ));
-                path_filter.add_signature(PathFilterSignature::new(
-                    WindowsPath::from_str("\\pagefile.sys"),
-                    None,
-                ));
-                // TODO: add option for dfImageTools compatibility mode
-                // path_filter.add_signature(PathFilterSignature::new(
-                //     Path::from("/**"),
-                //     Some(PathComponent::from("WofCompressedData")),
-                // ));
+                if self.output_format != OutputFormat::DfImageTools {
+                    path_filter.add_signature(PathFilterSignature::new(
+                        WindowsPath::from_str("\\pagefile.sys"),
+                        None,
+                    ));
+                    // path_filter.add_signature(PathFilterSignature::new(
+                    //     Path::from("/**"),
+                    //     Some(PathComponent::from("WofCompressedData")),
+                    // ));
+                }
             }
             match path_filter.build() {
                 Ok(_) => {}
