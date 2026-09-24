@@ -18,3 +18,6 @@ mod file_record_bin_be;
 mod file_record_bin_le;
 mod file_record_newc;
 mod file_record_odc;
+
+pub use archive::CpioArchive;
+pub use enums::CpioFormat;

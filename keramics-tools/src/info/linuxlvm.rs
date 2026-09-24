@@ -144,7 +144,7 @@ impl<'a> fmt::Display for LinuxLvmVolumeSystemInfo<'a> {
     }
 }
 
-/// Information about a Linux Logical Volume Manager (LVM).
+/// Information about Linux Logical Volume Manager (LVM) format.
 pub struct LinuxLvmInfo {}
 
 impl LinuxLvmInfo {

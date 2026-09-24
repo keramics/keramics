@@ -141,7 +141,7 @@ impl<'a> fmt::Display for ExFatFileSystemInfo<'a> {
     }
 }
 
-/// Information about an Extensible File Allocation Table (exFAT).
+/// Information about Extensible File Allocation Table (exFAT) format.
 pub struct ExFatInfo {}
 
 impl ExFatInfo {

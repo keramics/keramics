@@ -21,6 +21,7 @@ pub enum FormatIdentifier {
     Bde,
     BsdDiskLabel,
     CdsaEncr,
+    Cpio,
     Ewf,
     ExFat,
     Ext,
@@ -60,8 +61,7 @@ impl FormatIdentifier {
             | FormatIdentifier::Udif
             | FormatIdentifier::Vhd
             | FormatIdentifier::Vhdx
-            | FormatIdentifier::Vmdk
-            | FormatIdentifier::Xfs => true,
+            | FormatIdentifier::Vmdk => true,
             _ => false,
         }
     }
@@ -76,6 +76,7 @@ impl fmt::Display for FormatIdentifier {
             FormatIdentifier::Bde => "bde",
             FormatIdentifier::BsdDiskLabel => "bsdlabel",
             FormatIdentifier::CdsaEncr => "cdsaencr",
+            FormatIdentifier::Cpio => "cpio",
             FormatIdentifier::Ewf => "ewf",
             FormatIdentifier::ExFat => "exfat",
             FormatIdentifier::Ext => "ext",
@@ -129,6 +130,10 @@ mod tests {
         let format_identifier: FormatIdentifier = FormatIdentifier::CdsaEncr;
         let string: String = format_identifier.to_string();
         assert_eq!(string, "cdsaencr");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Cpio;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "cpio");
 
         let format_identifier: FormatIdentifier = FormatIdentifier::Ewf;
         let string: String = format_identifier.to_string();

@@ -152,7 +152,7 @@ impl<'a> fmt::Display for FatFileSystemInfo<'a> {
     }
 }
 
-/// Information about a File Allocation Table (FAT).
+/// Information about File Allocation Table (FAT) format.
 pub struct FatInfo {}
 
 impl FatInfo {

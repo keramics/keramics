@@ -94,7 +94,7 @@ impl<'a> fmt::Display for SgiDiskLabelVolumeSystemInfo<'a> {
     }
 }
 
-/// Information about a SGI disklabel (sgilabel).
+/// Information about SGI disklabel (sgilabel) format.
 pub struct SgiDiskLabelInfo {}
 
 impl SgiDiskLabelInfo {

@@ -85,7 +85,7 @@ impl<'a> fmt::Display for BdeEncryptedVolumeInfo<'a> {
     }
 }
 
-/// Information about BitLocker Drive Encryption (BDE).
+/// Information about BitLocker Drive Encryption (BDE) format.
 pub struct BdeInfo {}
 
 impl BdeInfo {

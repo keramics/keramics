@@ -145,7 +145,7 @@ impl<'a> fmt::Display for VmdkImageLayerInfo<'a> {
     }
 }
 
-/// Information about a VMware Virtual Disk (VMDK) image.
+/// Information about VMware Virtual Disk (VMDK) format.
 pub struct VmdkInfo {}
 
 impl VmdkInfo {

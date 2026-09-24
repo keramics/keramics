@@ -125,7 +125,7 @@ impl<'a> fmt::Display for GptVolumeSystemInfo<'a> {
     }
 }
 
-/// Information about a GUID Partition Table (GPT).
+/// Information about GUID Partition Table (GPT) format.
 pub struct GptInfo {}
 
 impl GptInfo {

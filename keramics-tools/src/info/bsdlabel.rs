@@ -91,7 +91,7 @@ impl<'a> fmt::Display for BsdDiskLabelVolumeSystemInfo<'a> {
     }
 }
 
-/// Information about a BSD disklabel (bsdlabel).
+/// Information about BSD disklabel (bsdlabel) format.
 pub struct BsdDiskLabelInfo {}
 
 impl BsdDiskLabelInfo {

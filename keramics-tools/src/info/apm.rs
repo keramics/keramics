@@ -170,7 +170,7 @@ impl<'a> fmt::Display for ApmVolumeSystemInfo<'a> {
     }
 }
 
-/// Information about an Apple Partition Map (APM).
+/// Information about Apple Partition Map (APM) format.
 pub struct ApmInfo {}
 
 impl ApmInfo {

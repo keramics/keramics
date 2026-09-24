@@ -74,7 +74,7 @@ impl<'a> fmt::Display for SparseBundleImageInfo<'a> {
     }
 }
 
-/// Information about a Mac OS sparse bundle (.sparsebundle) image.
+/// Information about Mac OS sparse bundle (.sparsebundle) format.
 pub struct SparseBundleInfo {}
 
 impl SparseBundleInfo {

@@ -121,7 +121,7 @@ impl<'a> fmt::Display for VolsnapSnapshotInfo<'a> {
     }
 }
 
-/// Information about Volume Shadow Snapshot (volsnap).
+/// Information about Volume Shadow Snapshot (volsnap) format.
 pub struct VolsnapInfo {}
 
 impl VolsnapInfo {

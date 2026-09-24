@@ -357,7 +357,7 @@ impl fmt::Display for XfsReadOnlyCompatibleFeatureFlagsInfo {
     }
 }
 
-/// Information about an X File System (XFS).
+/// Information about X File System (XFS) format.
 pub struct XfsInfo {}
 
 impl XfsInfo {
