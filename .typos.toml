@@ -19,6 +19,9 @@ extend-ignore-re = [
     # Ignore text between <!-- typos:disable --> and <!-- typos:enable -->
     "(?s)<!--\\s*typos:disable\\s*-->.*?<!--\\s*typos:enable\\s*-->",
 
+    # Ignore "CHECKSUMED"
+    "\\bCHECKSUMED\\b",
+
     # Ignore "DT_WHT"
     "\\bDT_WHT\\b",
 

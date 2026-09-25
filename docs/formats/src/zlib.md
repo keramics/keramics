@@ -119,7 +119,7 @@ The block header is 3 bits in size and consists of:
 | 2 | | Dynamic Huffman compressed block |
 | 3 | | Reserved (not used) |
 
-#### Uncompressed block data
+#### Uncompressed block data {#deflate_uncompressed_block_data}
 
 The uncompressed block data is of variable size and consists of:
 

@@ -527,7 +527,7 @@ Some aspects of this section are:
 
 * The header section is defined only once.
 * It is the first section of the first segment file. It is not found in subsequent segment files.
-* The header data itself is compressed using zlib.
+* The header data is zlib compressed data.
 * The end of line character(s) is a carriage return (0x0d) followed by a newline (0x0a).
 
 The 3rd and the 4th line consist of the following tab (0x09) separated values"
@@ -552,7 +552,7 @@ Some aspects of this section are:
 
 * The header section is defined once.
 * It is the first section of the first segment file. It is not found in subsequent segment files.
-* The header data is always processed by zlib, however the same compression level is used as for
+* The header data always is zlib compressed data, however the same compression level is used as for
   the chunks. This could mean compression level 0 which is no compression.
 
 > The SMART format uses the FTK Imager (EWF-E01) specification for this section. Note that this
@@ -565,7 +565,7 @@ Some aspects of this section are:
 * The same header section defined twice.
 * It is the first and second section of the first segment file. It is not found in subsequent
   segment files.
-* The header data itself is compressed using zlib.
+* The header data is zlib compressed data.
 * The end of line character(s) is a carriage return (0x0d) followed by a newline (0x0a).
 
 The 3rd and the 4th line consist of the following tab (0x09) separated values:
@@ -593,7 +593,7 @@ Some aspects of this section are:
 * The header is defined only once.
 * It resides after the header2 sections of the first segment file. It is not found in subsequent
   segment files.
-* The header data itself is compressed using zlib.
+* The header data is zlib compressed data.
 * The end of line character(s) is a carriage return (0x0d) followed by a newline (0x0a).
 
 The 3rd and the 4th line consist of the following tab (0x09) separated values:
@@ -620,7 +620,7 @@ Some aspects of this section are:
 * The same header section defined twice.
 * It is the first and second section of the first segment file. It is not found in subsequent
   segment files.
-* The header data itself is compressed using zlib.
+* The header data is zlib compressed data.
 * The end of line character(s) is a newline (0x0a).
 
 The header information consist of 18 lines
@@ -762,7 +762,7 @@ Some aspects of this section are:
 * In FTK Imager (EWF-E01) the same header section defined twice.
 * It is the first and second section of the first segment file. It is not found in subsequent
   segment files.
-* The header data itself is compressed using zlib. Note that the compression level can be none and
+* The header data is zlib compressed data. Note that the compression level can be none and
   therefore the header looks uncompressed.
 * In FTK Imager the end of line character(s) is a newline (0x0a).
 
@@ -1064,8 +1064,8 @@ An uncompressed data chunk is of variable size and consists of:
 | 0 | ... | | Uncompressed chunk data |
 | ... | 4 | | Checksum, which contains an Adler-32 of the chunk data |
 
-The compressed data chunk consist of [zlib compressed data](zlib.md). The checksum of the
-compressed data chunk is part the zlib compressed data format.
+The compressed data chunk consist of [zlib compressed data](zlib.md). The Adler-32 checksum of the
+compressed data chunk is part of the zlib compressed data.
 
 #### Optical disc images
 
@@ -1153,8 +1153,8 @@ The resulting size of the "compressed" chunk can therefore be larger than the de
 
 > Note that this was deducted from the behavior of FTK Imager for SMART (EWF-S01).
 
-The compressed data chunk consist of [zlib compressed data](zlib.md). The checksum of the
-compressed data chunk is part the zlib compressed data format.
+The compressed data chunk consist of [zlib compressed data](zlib.md). The Adler-32 checksum of the
+compressed data chunk is part of the zlib compressed data.
 
 #### SMART (EWF-S01)
 
@@ -1226,8 +1226,8 @@ An uncompressed data chunk is of variable size and consists of:
 | 0 | ... | | Uncompressed chunk data |
 | ... | 4 | | Checksum, which contains an Adler-32 of the chunk data |
 
-The compressed data chunk consist of [zlib compressed data](zlib.md). The checksum of the
-compressed data chunk is part the zlib compressed data format.
+The compressed data chunk consist of [zlib compressed data](zlib.md). The Adler-32 checksum of the
+compressed data chunk is part of the zlib compressed data.
 
 #### FTK Imager and EnCase 2 to 5 and linen 5 (EWF-E01)
 
@@ -1433,7 +1433,7 @@ The ltree header is 48 bytes in size and consists of:
 | 24 | 4 | | Checksum, which contains an Adler-32 of all the data within the ltree header where the checksum value itself is zeroed out |
 | 28 | 20 | | Unknown (empty values) |
 
-#### Ltree data
+#### Ltree data {#ltree_data}
 
 The ltree data string consists of an UTF-16 little-endian encoded string without byte order mark.
 The ltree data is not strict UTF-16 since it allows for unpaired surrogates, such as "U+d800" and
@@ -2342,8 +2342,8 @@ TODO: add description
 Seen in combination with some firmware versions of Tableau TD3 forensic imager.
 
 In this corruption scenario the copy of uncompressed data size value of the
-[DEFLATE uncompressed block data](zlib.md) is set to 0 instead of the 1s complement of the
-uncompressed data size.
+[DEFLATE uncompressed block data](zlib.md#deflate_uncompressed_block_data) is set to 0 instead of
+the 1s complement of the uncompressed data size.
 
 Keramics currently does not handle this corruption scenario.
 
