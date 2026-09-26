@@ -34,3 +34,6 @@ find keramics-* -name Cargo.toml -exec sed "s/^\(keramics-.* = { version\) = \"[
 
 # Update the Python binding version.
 sed "s/^version = \"[^\"]*\"/version = \"${VERSION}\"/" -i keramics-python/pyproject.toml
+
+# Update the Python module tests.
+sed "s/__version__ == \"[^\"]*\"/__version__ == \"${VERSION}\"/" -i keramics-python/tests/test_module.py
