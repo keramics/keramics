@@ -14,10 +14,9 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-EXIT_SUCCESS=0
 EXIT_FAILURE=1
 
-if test $# -ne 1
+if [ $# -ne 1 ]
 then
     echo "Usage: ./scripts/update_version.sh VERSION"
 
@@ -26,8 +25,12 @@ fi
 
 VERSION=$1
 
-sed "s/^version = \"[^\"]*\"/version = \"${VERSION}\"/" -i ./Cargo.toml
-sed "s/^version = \"[^\"]*\"/version = \"${VERSION}\"/" -i ./fuzz/Cargo.toml
-sed "s/^version = \"[^\"]*\"/version = \"${VERSION}\"/" -i ./python/Cargo.toml
+# Update the workspace version.
+sed "s/^version = \"[^\"]*\"/version = \"${VERSION}\"/" -i Cargo.toml
 
-exit ${EXIT_SUCCESS}
+# Update the dependency versions.
+sed "s/^\(keramics-.* = { version\) = \"[^\"]*\"/\1 = \"${VERSION}\"/" -i fuzz/Cargo.toml
+find keramics-* -name Cargo.toml -exec sed "s/^\(keramics-.* = { version\) = \"[^\"]*\"/\1 = \"${VERSION}\"/" -i {} \;
+
+# Update the Python binding version.
+sed "s/^version = \"[^\"]*\"/version = \"${VERSION}\"/" -i keramics-python/pyproject.toml
