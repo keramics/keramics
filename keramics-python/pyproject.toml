@@ -4,12 +4,13 @@ build-backend = "maturin"
 
 [project]
 name = "pykeramics"
-version = "0.0.1"
+version = "0.0.2"
 description = "Keramics Python bindings"
 authors = [
     { name = "Joachim Metz", email = "joachim.metz@gmail.com" },
 ]
 license = "Apache-2.0"
+license-file = "LICENSE"
 readme = "README.md"
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
