@@ -12,6 +12,7 @@ a floppy or optical disk like CD-ROM or DVD.
 * [Parallels Disk Image (PDI)](pdi.md)
 * [QEMU Copy-On-Write (QCOW)](qcow.md)
 * [Universal Disk Image Format (UDIF)](udif.md)
+* [Virtual Disk Image (VDI)](vdi.md)
 * [Virtual Hard Disk (VHD)](vhd.md)
 * [Virtual Hard Disk version 2 (VHDX)](vhdx.md)
 * [VMWare Virtual Disk Format (VMDK)](vmdk.md)
