@@ -44,6 +44,7 @@ pub mod sparsebundle;
 pub mod sparseimage;
 pub mod splitraw;
 pub mod udif;
+pub mod vdi;
 pub mod vhd;
 pub mod vhdx;
 pub mod vmdk;

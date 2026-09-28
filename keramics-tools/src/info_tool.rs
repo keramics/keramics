@@ -40,8 +40,8 @@ use crate::enums::{DisplayPathType, EncodingType, FormatType};
 use crate::info::{
     ApfsInfo, ApmInfo, BdeInfo, BsdDiskLabelInfo, CdsaEncrInfo, CpioInfo, EwfInfo, ExFatInfo,
     ExtInfo, FatInfo, GptInfo, HfsInfo, LinuxLvmInfo, LuksInfo, MbrInfo, NtfsInfo, PdiInfo,
-    QcowInfo, SgiDiskLabelInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo,
-    VmdkInfo, VolsnapInfo, XfsInfo,
+    QcowInfo, SgiDiskLabelInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VdiInfo, VhdInfo,
+    VhdxInfo, VmdkInfo, VolsnapInfo, XfsInfo,
 };
 use crate::range_file_resolver::RangeFileResolver;
 use crate::storage_media_image::StorageMediaImage;
@@ -374,6 +374,7 @@ impl InfoTool {
             // TODO: add support for sparse bundle Info.plist.
             format_scanner.add_sparseimage_signatures();
             format_scanner.add_udif_signatures();
+            format_scanner.add_vdi_signatures();
             format_scanner.add_vhd_signatures();
             format_scanner.add_vhdx_signatures();
             format_scanner.add_vmdk_signatures();
@@ -595,6 +596,7 @@ fn main() -> ExitCode {
         Some(FormatType::SparseBundle) => FormatIdentifier::SparseBundle,
         Some(FormatType::SparseImage) => FormatIdentifier::SparseImage,
         Some(FormatType::Udif) => FormatIdentifier::Udif,
+        Some(FormatType::Vdi) => FormatIdentifier::Vdi,
         Some(FormatType::Vhd) => FormatIdentifier::Vhd,
         Some(FormatType::Vhdx) => FormatIdentifier::Vhdx,
         Some(FormatType::Vmdk) => FormatIdentifier::Vmdk,
@@ -768,6 +770,8 @@ fn main() -> ExitCode {
             FormatIdentifier::SparseBundle => SparseBundleInfo::print_image(&arguments.source),
             FormatIdentifier::SparseImage => SparseImageInfo::print_file(&data_stream),
             FormatIdentifier::Udif => UdifInfo::print_image(&arguments.source),
+            // TODO: add support for VDI image.
+            FormatIdentifier::Vdi => VdiInfo::print_file(&data_stream),
             // TODO: add support for VHD image.
             FormatIdentifier::Vhd => VhdInfo::print_file(&data_stream),
             // TODO: add support for VHDX image.

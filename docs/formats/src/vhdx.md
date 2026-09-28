@@ -1,6 +1,6 @@
 # Virtual Hard Disk version 2 (VHDX) image format
 
-The Virtual Hard Disk version 2 (VHDX) format is used by Microsoft visualization products as one of
+The Virtual Hard Disk version 2 (VHDX) format is used by Microsoft virtualization products as one of
 its image formats. It is both used the store hard disk images and snapshots.
 
 ## Overview

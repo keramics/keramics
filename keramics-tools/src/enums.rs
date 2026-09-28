@@ -279,6 +279,9 @@ pub enum FormatType {
     /// Universal Disk Image Format (UDIF)
     Udif,
 
+    /// Virtual Disk Image (VDI)
+    Vdi,
+
     /// Virtual Hard Disk (VHD)
     Vhd,
 
