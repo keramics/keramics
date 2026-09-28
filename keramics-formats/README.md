@@ -27,6 +27,7 @@ Supported data formats:
 * [SGI disklabel (sgilabel)](https:////keramics.github.io/sgilabel.html)
 * Split (or segmented) RAW storage media image
 * [Universal Disk Image Format (UDIF)](https://github.com/keramics/keramics/tree/main/keramics-formats/src/udif/README.md)
+* [Virtual Disk Image (VDI)](https://github.com/keramics/keramics/tree/main/keramics-formats/src/vdi/README.md)
 * [Virtual Hard Disk (VHD) image](https://github.com/keramics/keramics/tree/main/keramics-formats/src/vhd/README.md)
 * [Virtual Hard Disk version 2 (VHDX) image](https://github.com/keramics/keramics/tree/main/keramics-formats/src/vhdx/README.md)
 * [VMWare Virtual Disk Format (VMDK)](https://github.com/keramics/keramics/tree/main/keramics-formats/src/vmdk/README.md)

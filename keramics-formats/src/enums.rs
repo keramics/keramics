@@ -40,6 +40,7 @@ pub enum FormatIdentifier {
     SplitRaw,
     Udif,
     Unknown,
+    Vdi,
     Vhd,
     Vhdx,
     Vmdk,
@@ -59,6 +60,7 @@ impl FormatIdentifier {
             | FormatIdentifier::SparseImage
             | FormatIdentifier::SplitRaw
             | FormatIdentifier::Udif
+            | FormatIdentifier::Vdi
             | FormatIdentifier::Vhd
             | FormatIdentifier::Vhdx
             | FormatIdentifier::Vmdk => true,
@@ -95,6 +97,7 @@ impl fmt::Display for FormatIdentifier {
             FormatIdentifier::SplitRaw => "splitraw",
             FormatIdentifier::Udif => "udif",
             FormatIdentifier::Unknown => "unknown",
+            FormatIdentifier::Vdi => "vdi",
             FormatIdentifier::Vhd => "vhd",
             FormatIdentifier::Vhdx => "vhdx",
             FormatIdentifier::Vmdk => "vmdk",
@@ -207,9 +210,9 @@ mod tests {
         let string: String = format_identifier.to_string();
         assert_eq!(string, "unknown");
 
-        let format_identifier: FormatIdentifier = FormatIdentifier::Vhd;
+        let format_identifier: FormatIdentifier = FormatIdentifier::Vdi;
         let string: String = format_identifier.to_string();
-        assert_eq!(string, "vhd");
+        assert_eq!(string, "vdi");
 
         let format_identifier: FormatIdentifier = FormatIdentifier::Vhdx;
         let string: String = format_identifier.to_string();

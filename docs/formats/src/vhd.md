@@ -1,6 +1,6 @@
 # Virtual Hard Disk (VHD) image format
 
-The Virtual Hard Disk (VHD) format is used by Microsoft visualization products as one of its image
+The Virtual Hard Disk (VHD) format is used by Microsoft virtualization products as one of its image
 formats. It is both used the store hard disk images and snapshots.
 
 ## Overview

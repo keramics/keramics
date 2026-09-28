@@ -34,6 +34,7 @@ use super::ntfs::constants::*;
 use super::sgilabel::constants::*;
 use super::sparseimage::constants::*;
 use super::udif::constants::*;
+use super::vdi::constants::*;
 use super::vhd::constants::*;
 use super::vhdx::constants::*;
 use super::vmdk::constants::*;
@@ -374,6 +375,16 @@ impl FormatScanner {
         ));
     }
 
+    /// Adds Virtual Disk Image (VDI) signatures.
+    pub fn add_vdi_signatures(&mut self) {
+        self.signature_scanner.add_signature(Signature::new(
+            "vdi1",
+            PatternType::BoundToStart,
+            64,
+            VDI_FILE_HEADER_SIGNATURE,
+        ));
+    }
+
     /// Adds Virtual Hard Disk (VHD) signatures.
     pub fn add_vhd_signatures(&mut self) {
         self.signature_scanner.add_signature(Signature::new(
@@ -519,6 +530,7 @@ impl FormatScanner {
                 "sgilabel1" => FormatIdentifier::SgiDiskLabel,
                 "sparseimage1" => FormatIdentifier::SparseImage,
                 "udif1" => FormatIdentifier::Udif,
+                "vdi1" => FormatIdentifier::Vdi,
                 "vhd1" => FormatIdentifier::Vhd,
                 "vhdx1" => FormatIdentifier::Vhdx,
                 "vmdk1" | "vmdk2" => FormatIdentifier::Vmdk,
@@ -563,9 +575,11 @@ mod tests {
         format_scanner.add_qcow_signatures();
         format_scanner.add_sparseimage_signatures();
         format_scanner.add_udif_signatures();
+        format_scanner.add_vdi_signatures();
         format_scanner.add_vhd_signatures();
         format_scanner.add_vhdx_signatures();
         format_scanner.add_vmdk_signatures();
+        format_scanner.add_volsnap_signatures();
         format_scanner.add_xfs_signatures();
 
         format_scanner.build()
@@ -592,9 +606,11 @@ mod tests {
         format_scanner.add_qcow_signatures();
         format_scanner.add_sparseimage_signatures();
         format_scanner.add_udif_signatures();
+        format_scanner.add_vdi_signatures();
         format_scanner.add_vhd_signatures();
         format_scanner.add_vhdx_signatures();
         format_scanner.add_vmdk_signatures();
+        format_scanner.add_volsnap_signatures();
         format_scanner.add_xfs_signatures();
 
         match format_scanner.build() {
