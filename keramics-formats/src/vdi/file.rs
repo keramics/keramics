@@ -17,11 +17,8 @@ use std::sync::{Arc, RwLock};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
-use crate::range_stream::RangeStream;
-
 use super::block_reader::VdiBlockReader;
 use super::block_stream::VdiBlockStream;
-use super::constants::*;
 use super::file_header::VdiFileHeader;
 
 /// Virtual Disk Image (VDI) file.
@@ -95,29 +92,21 @@ impl VdiFile {
     pub fn get_data_stream(&self) -> Option<DataStreamReference> {
         match &self.data_stream {
             Some(data_stream) => {
-                if self.image_type == VDI_IMAGE_TYPE_FIXED {
-                    Some(Arc::new(RwLock::new(RangeStream::new(
+                let parent_data_stream: Option<DataStreamReference> = match &self.parent_file {
+                    Some(parent_file) => parent_file.get_data_stream(),
+                    None => None,
+                };
+                Some(Arc::new(RwLock::new(VdiBlockStream::new(
+                    VdiBlockReader::new(
                         data_stream,
-                        0,
+                        self.block_map_offset as u64,
+                        self.data_offset as u64,
+                        self.block_size as u64,
+                        self.number_of_blocks,
+                        parent_data_stream,
                         self.media_size,
-                    ))))
-                } else {
-                    let parent_data_stream: Option<DataStreamReference> = match &self.parent_file {
-                        Some(parent_file) => parent_file.get_data_stream(),
-                        None => None,
-                    };
-                    Some(Arc::new(RwLock::new(VdiBlockStream::new(
-                        VdiBlockReader::new(
-                            data_stream,
-                            self.block_map_offset as u64,
-                            self.data_offset as u64,
-                            self.block_size as u64,
-                            self.number_of_blocks,
-                            parent_data_stream,
-                            self.media_size,
-                        ),
-                    ))))
-                }
+                    ),
+                ))))
             }
             None => None,
         }
