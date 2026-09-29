@@ -50,8 +50,8 @@ pub struct VdiFile {
     /// Image type.
     image_type: u32,
 
-    /// Blocks map offset.
-    blocks_map_offset: u32,
+    /// Block map offset.
+    block_map_offset: u32,
 
     /// Data offset.
     data_offset: u32,
@@ -78,7 +78,7 @@ impl VdiFile {
             parent_file: None,
             bytes_per_sector: 0,
             image_type: 0,
-            blocks_map_offset: 0,
+            block_map_offset: 0,
             data_offset: 0,
             block_size: 0,
             number_of_blocks: 0,
@@ -109,7 +109,7 @@ impl VdiFile {
                     Some(Arc::new(RwLock::new(VdiBlockStream::new(
                         VdiBlockReader::new(
                             data_stream,
-                            self.blocks_map_offset as u64,
+                            self.block_map_offset as u64,
                             self.data_offset as u64,
                             self.block_size as u64,
                             self.number_of_blocks,
@@ -163,7 +163,7 @@ impl VdiFile {
         self.parent_identifier = file_header.parent_identifier;
         self.bytes_per_sector = 512;
         self.image_type = file_header.image_type;
-        self.blocks_map_offset = file_header.blocks_map_offset;
+        self.block_map_offset = file_header.block_map_offset;
         self.data_offset = file_header.data_offset;
         self.block_size = file_header.block_size;
         self.number_of_blocks = file_header.number_of_blocks;

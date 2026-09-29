@@ -19,8 +19,8 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use crate::block_tree::BlockTree;
 use crate::traits::BlockReader;
 
+use super::block_map::{VdiBlockMap, VdiBlockMapEntry};
 use super::block_range::{VdiBlockRange, VdiBlockRangeType};
-use super::blocks_map::{VdiBlocksMap, VdiBlocksMapEntry};
 
 /// Virtual Disk Image (VDI) block reader.
 pub struct VdiBlockReader {
@@ -33,8 +33,8 @@ pub struct VdiBlockReader {
     /// Block size.
     block_size: u64,
 
-    /// Blocks map.
-    blocks_map: VdiBlocksMap,
+    /// Block map.
+    block_map: VdiBlockMap,
 
     /// Block tree.
     block_tree: BlockTree<VdiBlockRange>,
@@ -50,7 +50,7 @@ impl VdiBlockReader {
     /// Creates a block reader.
     pub fn new(
         data_stream: &DataStreamReference,
-        blocks_map_offset: u64,
+        block_map_offset: u64,
         data_offset: u64,
         block_size: u64,
         number_of_blocks: u32,
@@ -61,22 +61,22 @@ impl VdiBlockReader {
             data_stream: data_stream.clone(),
             data_offset,
             block_size,
-            blocks_map: VdiBlocksMap::new(blocks_map_offset, number_of_blocks),
+            block_map: VdiBlockMap::new(block_map_offset, number_of_blocks),
             block_tree: BlockTree::<VdiBlockRange>::new(size, 0, block_size),
             parent_data_stream,
             size,
         }
     }
 
-    /// Reads a specific blocks map entry and fills the block tree.
-    fn read_blocks_map_entry(&mut self, block_number: u64) -> Result<(), ErrorTrace> {
-        let entry: VdiBlocksMapEntry = match self
-            .blocks_map
+    /// Reads a specific block map entry and fills the block tree.
+    fn read_block_map_entry(&mut self, block_number: u64) -> Result<(), ErrorTrace> {
+        let entry: VdiBlockMapEntry = match self
+            .block_map
             .read_entry(&self.data_stream, block_number as u32)
         {
             Ok(entry) => entry,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read blocks map entry");
+                keramics_core::error_trace_add_frame!(error, "Unable to read block map entry");
                 return Err(error);
             }
         };
@@ -128,7 +128,7 @@ impl BlockReader for VdiBlockReader {
         self.size
     }
 
-    /// Reads media data based on the blocks map.
+    /// Reads media data based on the block map.
     fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
@@ -144,12 +144,12 @@ impl BlockReader for VdiBlockReader {
                 self.block_tree.get_value(current_offset);
 
             if result == Ok(None) {
-                match self.read_blocks_map_entry(block_number) {
+                match self.read_block_map_entry(block_number) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            format!("Unable to read blocks map entry: {}", block_number)
+                            format!("Unable to read block map entry: {}", block_number)
                         );
                         return Err(error);
                     }

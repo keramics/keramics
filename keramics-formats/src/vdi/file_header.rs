@@ -29,7 +29,7 @@ use super::constants::*;
         field(name = "image_type", data_type = "u32"),
         field(name = "image_flags", data_type = "u32", format = "hex"),
         field(name = "description", data_type = "ByteString<256>"),
-        field(name = "blocks_map_offset", data_type = "u32", format = "hex"),
+        field(name = "block_map_offset", data_type = "u32", format = "hex"),
         field(name = "data_offset", data_type = "u32", format = "hex"),
         field(name = "number_of_cylinders", data_type = "u32"),
         field(name = "number_of_heads", data_type = "u32"),
@@ -60,8 +60,8 @@ pub struct VdiFileHeader {
     /// Image type.
     pub image_type: u32,
 
-    /// Blocks map offset.
-    pub blocks_map_offset: u32,
+    /// Block map offset.
+    pub block_map_offset: u32,
 
     /// Data offset.
     pub data_offset: u32,
@@ -89,7 +89,7 @@ impl VdiFileHeader {
             minor_format_version: 0,
             major_format_version: 0,
             image_type: 0,
-            blocks_map_offset: 0,
+            block_map_offset: 0,
             data_offset: 0,
             data_size: 0,
             block_size: 0,
@@ -121,7 +121,7 @@ impl VdiFileHeader {
         self.minor_format_version = bytes_to_u16_le!(data, 68);
         self.major_format_version = bytes_to_u16_le!(data, 70);
         self.image_type = bytes_to_u32_le!(data, 76);
-        self.blocks_map_offset = bytes_to_u32_le!(data, 340);
+        self.block_map_offset = bytes_to_u32_le!(data, 340);
         self.data_offset = bytes_to_u32_le!(data, 344);
         self.data_size = bytes_to_u64_le!(data, 368);
         self.block_size = bytes_to_u32_le!(data, 376);
@@ -199,7 +199,7 @@ mod tests {
         assert_eq!(test_struct.minor_format_version, 1);
         assert_eq!(test_struct.major_format_version, 1);
         assert_eq!(test_struct.image_type, 1);
-        assert_eq!(test_struct.blocks_map_offset, 0x00000200);
+        assert_eq!(test_struct.block_map_offset, 0x00000200);
         assert_eq!(test_struct.data_offset, 0x00000400);
         assert_eq!(test_struct.data_size, 4194304);
         assert_eq!(test_struct.block_size, 1048576);

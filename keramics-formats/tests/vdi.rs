@@ -12,7 +12,6 @@
  */
 
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::vdi::VdiFile;

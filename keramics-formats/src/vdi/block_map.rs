@@ -25,20 +25,19 @@ use keramics_types::bytes_to_u32_le;
     ),
     methods("debug_read_data")
 )]
-/// Virtual Disk Image (VDI) blocks map entry.
-pub struct VdiBlocksMapEntry {
-    /// Block number, where 0xffffffff (or -1) represents an unallocated block and
-    /// 0xfffffffe (or -2) represents a zero block.
+/// Virtual Disk Image (VDI) block map entry.
+pub struct VdiBlockMapEntry {
+    /// Block number.
     pub block_number: u32,
 }
 
-impl VdiBlocksMapEntry {
-    /// Creates a blocks map entry.
+impl VdiBlockMapEntry {
+    /// Creates a block map entry.
     pub fn new() -> Self {
         Self { block_number: 0 }
     }
 
-    /// Reads the blocks map entry from a buffer.
+    /// Reads the block map entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 4 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
@@ -49,8 +48,8 @@ impl VdiBlocksMapEntry {
     }
 }
 
-/// Virtual Disk Image (VDI) blocks map.
-pub struct VdiBlocksMap {
+/// Virtual Disk Image (VDI) block map.
+pub struct VdiBlockMap {
     /// Offset.
     offset: u64,
 
@@ -58,8 +57,8 @@ pub struct VdiBlocksMap {
     number_of_entries: u32,
 }
 
-impl VdiBlocksMap {
-    /// Creates a new blocks map.
+impl VdiBlockMap {
+    /// Creates a new block map.
     pub fn new(offset: u64, number_of_entries: u32) -> Self {
         Self {
             offset,
@@ -67,12 +66,12 @@ impl VdiBlocksMap {
         }
     }
 
-    /// Reads a blocks map entry.
+    /// Reads a block map entry.
     pub fn read_entry(
         &self,
         data_stream: &DataStreamReference,
         entry_index: u32,
-    ) -> Result<VdiBlocksMapEntry, ErrorTrace> {
+    ) -> Result<VdiBlockMapEntry, ErrorTrace> {
         if entry_index >= self.number_of_entries {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported entry index: {} value out of bounds",
@@ -88,18 +87,18 @@ impl VdiBlocksMap {
             SeekFrom::Start(entry_offset)
         );
         keramics_core::debug_trace_data_and_structure!(
-            format!("VdiBlocksMapEntry: {}", entry_index),
+            format!("VdiBlockMapEntry: {}", entry_index),
             entry_offset,
             &data,
             data.len(),
-            VdiBlocksMapEntry::debug_read_data(&data)
+            VdiBlockMapEntry::debug_read_data(&data)
         );
-        let mut entry: VdiBlocksMapEntry = VdiBlocksMapEntry::new();
+        let mut entry: VdiBlockMapEntry = VdiBlockMapEntry::new();
 
         match entry.read_data(&data) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read blocks map");
+                keramics_core::error_trace_add_frame!(error, "Unable to read block map");
                 return Err(error);
             }
         }
@@ -123,7 +122,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = VdiBlocksMapEntry::new();
+        let mut test_struct = VdiBlockMapEntry::new();
 
         test_struct.read_data(&test_data[0..4])?;
         assert_eq!(test_struct.block_number, 1);
@@ -138,7 +137,7 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = VdiBlocksMapEntry::new();
+        let mut test_struct = VdiBlockMapEntry::new();
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
@@ -148,12 +147,12 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let test_struct = VdiBlocksMap::new(0, 3);
+        let test_struct = VdiBlockMap::new(0, 3);
 
-        let test_entry: VdiBlocksMapEntry = test_struct.read_entry(&data_stream, 0)?;
+        let test_entry: VdiBlockMapEntry = test_struct.read_entry(&data_stream, 0)?;
         assert_eq!(test_entry.block_number, 1);
 
-        let test_entry: VdiBlocksMapEntry = test_struct.read_entry(&data_stream, 1)?;
+        let test_entry: VdiBlockMapEntry = test_struct.read_entry(&data_stream, 1)?;
         assert_eq!(test_entry.block_number, 0xfffffffe);
 
         Ok(())
@@ -164,7 +163,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let test_struct = VdiBlocksMap::new(0, 3);
+        let test_struct = VdiBlockMap::new(0, 3);
 
         let result = test_struct.read_entry(&data_stream, 3);
         assert!(result.is_err());
