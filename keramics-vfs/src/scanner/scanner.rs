@@ -32,6 +32,7 @@ use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::splitraw::SplitRawImage;
 use keramics_formats::udif::UdifImage;
+use keramics_formats::vdi::VdiImage;
 use keramics_formats::vhd::VhdImage;
 use keramics_formats::vhdx::VhdxImage;
 use keramics_formats::vmdk::VmdkImage;
@@ -109,6 +110,7 @@ impl VfsScanner {
         self.storage_media_image_scanner
             .add_sparseimage_signatures();
         self.storage_media_image_scanner.add_udif_signatures();
+        self.storage_media_image_scanner.add_vdi_signatures();
         self.storage_media_image_scanner.add_vhd_signatures();
         self.storage_media_image_scanner.add_vhdx_signatures();
         self.storage_media_image_scanner.add_vmdk_signatures();
@@ -238,6 +240,7 @@ impl VfsScanner {
             FormatIdentifier::SparseImage => Some(VfsType::SparseImage),
             FormatIdentifier::SplitRaw => Some(VfsType::SplitRaw),
             FormatIdentifier::Udif => Some(VfsType::Udif),
+            FormatIdentifier::Vdi => Some(VfsType::Vdi),
             FormatIdentifier::Vhd => Some(VfsType::Vhd),
             FormatIdentifier::Vhdx => Some(VfsType::Vhdx),
             FormatIdentifier::Vmdk => Some(VfsType::Vmdk),
@@ -511,6 +514,7 @@ impl VfsScanner {
             | VfsType::Pdi
             | VfsType::Qcow
             | VfsType::Udif
+            | VfsType::Vdi
             | VfsType::Vhd
             | VfsType::Vhdx
             | VfsType::Vmdk => {
@@ -1703,6 +1707,32 @@ impl VfsScanner {
                     }
                 }
             }
+            VfsType::Vdi => {
+                let mut vdi_image: VdiImage = VdiImage::new();
+
+                match vdi_image.open_from_vfs(file_system, path) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open VDI image");
+                        return Err(error);
+                    }
+                }
+                let number_of_layers: usize = vdi_image.get_number_of_layers();
+
+                match self.scan_for_storage_media_image_sub_nodes(
+                    scan_options,
+                    vfs_location,
+                    scan_node,
+                    VdiImage::PATH_PREFIX,
+                    number_of_layers,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan VDI image");
+                        return Err(error);
+                    }
+                }
+            }
             VfsType::Vhd => {
                 let mut vhd_image: VhdImage = VhdImage::new();
 
@@ -2256,6 +2286,21 @@ mod tests {
             .unwrap();
 
         assert_eq!(format_identifier, FormatIdentifier::Udif);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_storage_media_image_format_with_vdi() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        let path_string: String = get_test_data_path("vdi/ext2.vdi");
+        let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_storage_media_image_format(&data_stream)?
+            .unwrap();
+
+        assert_eq!(format_identifier, FormatIdentifier::Vdi);
 
         Ok(())
     }

@@ -11,15 +11,9 @@
  * under the License.
  */
 
-mod block_map;
-mod block_range;
-mod block_reader;
-mod block_stream;
-pub(crate) mod constants;
-mod file;
-mod file_header;
-mod image;
+use crate::block_stream::BlockStream;
 
-pub use block_stream::VdiBlockStream;
-pub use file::VdiFile;
-pub use image::{VdiImage, VdiImageLayer};
+use super::block_reader::VdiBlockReader;
+
+/// Virtual Disk Image (VDI) block stream.
+pub type VdiBlockStream = BlockStream<VdiBlockReader>;

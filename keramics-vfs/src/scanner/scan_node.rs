@@ -94,6 +94,7 @@ impl VfsScanNode {
             | VfsType::SparseImage
             | VfsType::SplitRaw
             | VfsType::Udif
+            | VfsType::Vdi
             | VfsType::Vhd
             | VfsType::Vhdx
             | VfsType::Vmdk

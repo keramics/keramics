@@ -207,19 +207,6 @@ impl QcowFile {
         }
     }
 
-    /// Retrieves the encryption method.
-    #[deprecated(since = "0.0.1", note = "Use `get_encryption_type` instead.")]
-    pub fn get_encryption_method(&self) -> QcowEncryptionMethod {
-        match &self.encryption_type {
-            Some(encryption_type) => match encryption_type.method {
-                1 => QcowEncryptionMethod::AesCbc128,
-                2 => QcowEncryptionMethod::Luks,
-                _ => QcowEncryptionMethod::Unknown,
-            },
-            None => QcowEncryptionMethod::None,
-        }
-    }
-
     /// Retrieves the encryption type.
     pub fn get_encryption_type(&self) -> Option<&QcowEncryptionType> {
         self.encryption_type.as_ref()
@@ -629,16 +616,6 @@ mod tests {
 
         let compression_method: &QcowCompressionMethod = file.get_compression_method();
         assert_eq!(compression_method, &QcowCompressionMethod::Deflate);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_encryption_method() -> Result<(), ErrorTrace> {
-        let file: QcowFile = get_file("qcow/ext2_aes128.qcow2")?;
-
-        let encryption_method: QcowEncryptionMethod = file.get_encryption_method();
-        assert_eq!(encryption_method, QcowEncryptionMethod::AesCbc128);
 
         Ok(())
     }

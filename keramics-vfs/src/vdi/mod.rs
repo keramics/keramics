@@ -11,15 +11,8 @@
  * under the License.
  */
 
-mod block_map;
-mod block_range;
-mod block_reader;
-mod block_stream;
-pub(crate) mod constants;
-mod file;
-mod file_header;
-mod image;
+mod file_entry;
+mod file_system;
 
-pub use block_stream::VdiBlockStream;
-pub use file::VdiFile;
-pub use image::{VdiImage, VdiImageLayer};
+pub use file_entry::VdiFileEntry;
+pub use file_system::VdiFileSystem;
