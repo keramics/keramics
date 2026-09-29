@@ -11,8 +11,8 @@
  * under the License.
  */
 
-/// VDI fixed-size image type.
-pub(crate) const VDI_IMAGE_TYPE_FIXED: u32 = 2;
-
 /// VDI file header signature.
 pub(crate) const VDI_FILE_HEADER_SIGNATURE: &[u8] = &[0x7f, 0x10, 0xda, 0xbe];
+
+/// VDI fixed-size image type.
+pub(crate) const VDI_IMAGE_TYPE_FIXED: u32 = 2;
