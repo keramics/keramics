@@ -25,6 +25,7 @@ use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::splitraw::SplitRawImage;
 use keramics_formats::udif::UdifImage;
+use keramics_formats::vdi::{VdiImage, VdiImageLayer};
 use keramics_formats::vhd::{VhdImage, VhdImageLayer};
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
 use keramics_formats::vmdk::{VmdkImage, VmdkImageLayer};
@@ -62,6 +63,9 @@ pub enum StorageMediaImage {
     },
     Udif {
         udif_image: Arc<UdifImage>,
+    },
+    Vdi {
+        vdi_image_layer: VdiImageLayer,
     },
     Vhd {
         vhd_image_layer: VhdImageLayer,
@@ -115,6 +119,9 @@ impl StorageMediaImage {
             Self::SparseImage { sparseimage_file } => sparseimage_file.get_data_stream(),
             Self::SplitRaw { splitraw_image } => Some(splitraw_image.get_data_stream()),
             Self::Udif { udif_image } => udif_image.get_data_stream(),
+            Self::Vdi {
+                vdi_image_layer, ..
+            } => vdi_image_layer.get_data_stream(),
             Self::Vhd {
                 vhd_image_layer, ..
             } => vhd_image_layer.get_data_stream(),
@@ -199,6 +206,7 @@ impl StorageMediaImage {
             Some(FormatIdentifier::Qcow) => return Self::open_qcow_image(path, image_layer),
             Some(FormatIdentifier::SparseImage) => return Self::open_sparseimage_file(path),
             Some(FormatIdentifier::Udif) => return Self::open_udif_image(path),
+            Some(FormatIdentifier::Vdi) => return Self::open_vdi_image(path, image_layer),
             Some(FormatIdentifier::Vhd) => return Self::open_vhd_image(path, image_layer),
             Some(FormatIdentifier::Vhdx) => return Self::open_vhdx_image(path, image_layer),
             Some(FormatIdentifier::Vmdk) => return Self::open_vmdk_image(path, image_layer),
@@ -723,6 +731,59 @@ impl StorageMediaImage {
         Ok(Self::Udif {
             udif_image: Arc::new(udif_image),
         })
+    }
+
+    /// Opens a VDI image.
+    fn open_vdi_image(path: &PathBuf, image_layer: usize) -> Result<StorageMediaImage, ErrorTrace> {
+        let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
+            Ok(result) => result,
+            Err(mut error) => {
+                // TODO: get printable version of path instead of using display().
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to determine base path and file name of path: {}",
+                        path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(base_path)));
+        let mut vdi_image: VdiImage = VdiImage::new();
+
+        let path_components: [PathComponent; 1] = [PathComponent::from(file_name)];
+
+        match vdi_image.open(&file_resolver, &path_components) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open VDI image");
+                return Err(error);
+            }
+        }
+        let number_of_layers: usize = vdi_image.get_number_of_layers();
+
+        if number_of_layers == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported VDI image - no image layers found"
+            ));
+        }
+        let layer_index: usize = if image_layer == 0 {
+            number_of_layers - 1
+        } else {
+            image_layer - 1
+        };
+        match vdi_image.get_layer_by_index(layer_index) {
+            Ok(vdi_image_layer) => Ok(Self::Vdi { vdi_image_layer }),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve image layer: {}", layer_index)
+                );
+                Err(error)
+            }
+        }
     }
 
     /// Opens a VHD image.

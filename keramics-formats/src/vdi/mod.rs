@@ -22,4 +22,4 @@ mod image;
 
 pub use block_stream::VdiBlockStream;
 pub use file::VdiFile;
-pub use image::VdiImage;
+pub use image::{VdiImage, VdiImageLayer};
