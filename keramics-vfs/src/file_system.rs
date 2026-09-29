@@ -2704,7 +2704,7 @@ mod tests {
 
     fn get_vdi_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         // TODO: create differential test image
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhd);
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vdi);
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
