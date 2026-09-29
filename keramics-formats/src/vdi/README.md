@@ -8,10 +8,4 @@ Supported features:
 | Category | Feature(s) |
 | --- | --- |
 | Format versions | 1.1 |
-
-Unsupported features:
-
-| Category | Feature(s) |
-| --- | --- |
-| Image types | Differential (or differencing) |
-| | Snapshots |
+| Image types | Differential (or differencing), Dynamic-size (or sparse), Fixed-size |

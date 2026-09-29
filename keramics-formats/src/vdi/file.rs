@@ -78,6 +78,12 @@ impl VdiFile {
         self.bytes_per_sector
     }
 
+    /// Retrieves a data stream.
+    pub fn get_data_stream(&self) -> Option<DataStreamReference> {
+        // TODO: implement
+        None
+    }
+
     /// Retrieves the format version.
     pub fn get_format_version(&self) -> (u16, u16) {
         (self.major_format_version, self.minor_format_version)

@@ -48,6 +48,7 @@ mod sparsebundle;
 mod sparseimage;
 mod splitraw;
 mod udif;
+mod vdi;
 mod vhd;
 mod vhdx;
 mod vmdk;

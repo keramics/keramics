@@ -52,6 +52,7 @@ pub enum VfsType {
     SparseImage,
     SplitRaw,
     Udif,
+    Vdi,
     Vhd,
     Vhdx,
     Vmdk,
@@ -86,6 +87,7 @@ impl fmt::Display for VfsType {
             VfsType::SparseImage => "sparseimage",
             VfsType::SplitRaw => "split-RAW",
             VfsType::Udif => "UDIF",
+            VfsType::Vdi => "VDI",
             VfsType::Vhd => "VHD",
             VfsType::Vhdx => "VHDX",
             VfsType::Vmdk => "VMDK",
@@ -193,6 +195,10 @@ mod tests {
         let vfs_type: VfsType = VfsType::Udif;
         let string: String = vfs_type.to_string();
         assert_eq!(string, "UDIF");
+
+        let vfs_type: VfsType = VfsType::Vdi;
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "VDI");
 
         let vfs_type: VfsType = VfsType::Vhd;
         let string: String = vfs_type.to_string();

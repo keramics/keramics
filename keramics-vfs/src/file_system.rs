@@ -42,6 +42,7 @@ use super::sparseimage::{SparseImageFileEntry, SparseImageFileSystem};
 use super::splitraw::{SplitRawFileEntry, SplitRawFileSystem};
 use super::types::VfsFileSystemReference;
 use super::udif::{UdifFileEntry, UdifFileSystem};
+use super::vdi::{VdiFileEntry, VdiFileSystem};
 use super::vhd::{VhdFileEntry, VhdFileSystem};
 use super::vhdx::{VhdxFileEntry, VhdxFileSystem};
 use super::vmdk::{VmdkFileEntry, VmdkFileSystem};
@@ -72,6 +73,7 @@ pub enum VfsFileSystem {
     SparseImage(SparseImageFileSystem),
     SplitRaw(SplitRawFileSystem),
     Udif(UdifFileSystem),
+    Vdi(VdiFileSystem),
     Vhd(VhdFileSystem),
     Vhdx(VhdxFileSystem),
     Vmdk(VmdkFileSystem),
@@ -106,6 +108,7 @@ impl VfsFileSystem {
             VfsType::SparseImage => VfsFileSystem::SparseImage(SparseImageFileSystem::new()),
             VfsType::SplitRaw => VfsFileSystem::SplitRaw(SplitRawFileSystem::new()),
             VfsType::Udif => VfsFileSystem::Udif(UdifFileSystem::new()),
+            VfsType::Vdi => VfsFileSystem::Vdi(VdiFileSystem::new()),
             VfsType::Vhd => VfsFileSystem::Vhd(VhdFileSystem::new()),
             VfsType::Vhdx => VfsFileSystem::Vhdx(VhdxFileSystem::new()),
             VfsType::Vmdk => VfsFileSystem::Vmdk(VmdkFileSystem::new()),
@@ -234,6 +237,7 @@ impl VfsFileSystem {
                 Ok(splitraw_file_system.file_entry_exists(path))
             }
             VfsFileSystem::Udif(udif_file_system) => Ok(udif_file_system.file_entry_exists(path)),
+            VfsFileSystem::Vdi(vdi_file_system) => Ok(vdi_file_system.file_entry_exists(path)),
             VfsFileSystem::Vhd(vhd_file_system) => Ok(vhd_file_system.file_entry_exists(path)),
             VfsFileSystem::Vhdx(vhdx_file_system) => Ok(vhdx_file_system.file_entry_exists(path)),
             VfsFileSystem::Vmdk(vmdk_file_system) => Ok(vmdk_file_system.file_entry_exists(path)),
@@ -464,6 +468,12 @@ impl VfsFileSystem {
                     None => Ok(None),
                 }
             }
+            VfsFileSystem::Vdi(vdi_file_system) => {
+                match vdi_file_system.get_file_entry_by_path(path)? {
+                    Some(vdi_file_entry) => Ok(Some(VfsFileEntry::Vdi(vdi_file_entry))),
+                    None => Ok(None),
+                }
+            }
             VfsFileSystem::Vhd(vhd_file_system) => {
                 match vhd_file_system.get_file_entry_by_path(path)? {
                     Some(vhd_file_entry) => Ok(Some(VfsFileEntry::Vhd(vhd_file_entry))),
@@ -673,6 +683,11 @@ impl VfsFileSystem {
 
                 Ok(Some(VfsFileEntry::Udif(udif_file_entry)))
             }
+            VfsFileSystem::Vdi(vdi_file_system) => {
+                let vdi_file_entry: VdiFileEntry = vdi_file_system.get_root_file_entry();
+
+                Ok(Some(VfsFileEntry::Vdi(vdi_file_entry)))
+            }
             VfsFileSystem::Vhd(vhd_file_system) => {
                 let vhd_file_entry: VhdFileEntry = vhd_file_system.get_root_file_entry();
 
@@ -735,6 +750,7 @@ impl VfsFileSystem {
             VfsFileSystem::SparseImage(_) => VfsType::SparseImage,
             VfsFileSystem::SplitRaw(_) => VfsType::SplitRaw,
             VfsFileSystem::Udif(_) => VfsType::Udif,
+            VfsFileSystem::Vdi(_) => VfsType::Vdi,
             VfsFileSystem::Vhd(_) => VfsType::Vhd,
             VfsFileSystem::Vhdx(_) => VfsType::Vhdx,
             VfsFileSystem::Vmdk(_) => VfsType::Vmdk,
@@ -827,6 +843,9 @@ impl VfsFileSystem {
             }
             VfsFileSystem::Udif(udif_file_system) => {
                 udif_file_system.open(parent_file_system, vfs_location)
+            }
+            VfsFileSystem::Vdi(vdi_file_system) => {
+                vdi_file_system.open(parent_file_system, vfs_location)
             }
             VfsFileSystem::Vhd(vhd_file_system) => {
                 vhd_file_system.open(parent_file_system, vfs_location)
@@ -2671,6 +2690,72 @@ mod tests {
     #[test]
     fn test_get_file_entry_by_path_with_udif_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with VDI.
+
+    fn get_vdi_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        // TODO: create differential test image
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhd);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("vdi/ext2.vdi");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_vdi() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vdi_file_system()?;
+
+        let path: Path = Path::from("/vdi1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
+
+        let path: Path = Path::from("/bogus2");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_vdi_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vdi_file_system()?;
+
+        let path: Path = Path::from("/bogus2");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_vdi_layer() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vdi_file_system()?;
+
+        let path: Path = Path::from("/vdi1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_vdi_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vdi_file_system()?;
 
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
