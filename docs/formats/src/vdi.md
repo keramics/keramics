@@ -36,7 +36,7 @@ The file header is of variable size and consists of:
 | 76 | 4 | | [Image type](#image_types) |
 | 80 | 4 | | [Image flags](#image_flags) |
 | 84 | 256 | | Image description, which contains an ASCII string |
-| 340 | 4 | | Blocks map offset, relative to the start of the file |
+| 340 | 4 | | Block map offset, relative to the start of the file |
 | 344 | 4 | | Data (blocks) area offset, relative to the start of the file |
 | <td colspan="4">*Geometry*</td> |
 | 348 | 4 | 0 | Number of cylinders (no longer used?) |
