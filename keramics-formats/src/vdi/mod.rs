@@ -11,8 +11,8 @@
  * under the License.
  */
 
-mod block_reader;
 mod block_range;
+mod block_reader;
 mod block_stream;
 mod blocks_map;
 pub(crate) mod constants;

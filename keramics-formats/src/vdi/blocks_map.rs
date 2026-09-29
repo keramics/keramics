@@ -19,7 +19,10 @@ use keramics_types::bytes_to_u32_le;
 
 #[derive(LayoutMap)]
 #[layout_map(
-    structure(byte_order = "little", field(name = "block_number", data_type = "u32", format = "hex")),
+    structure(
+        byte_order = "little",
+        field(name = "block_number", data_type = "u32", format = "hex")
+    ),
     methods("debug_read_data")
 )]
 /// Virtual Disk Image (VDI) blocks map entry.

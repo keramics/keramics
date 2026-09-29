@@ -19,8 +19,8 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use crate::block_tree::BlockTree;
 use crate::traits::BlockReader;
 
-use super::blocks_map::{VdiBlocksMap, VdiBlocksMapEntry};
 use super::block_range::{VdiBlockRange, VdiBlockRangeType};
+use super::blocks_map::{VdiBlocksMap, VdiBlocksMapEntry};
 
 /// Virtual Disk Image (VDI) block reader.
 pub struct VdiBlockReader {
@@ -92,20 +92,12 @@ impl VdiBlockReader {
                         VdiBlockRangeType::InParent,
                     )
                 } else {
-                    VdiBlockRange::new(
-                        media_offset,
-                        0,
-                        self.block_size,
-                        VdiBlockRangeType::Sparse,
-                    )
+                    VdiBlockRange::new(media_offset, 0, self.block_size, VdiBlockRangeType::Sparse)
                 }
             }
-            0xfffffffe => VdiBlockRange::new(
-                media_offset,
-                0,
-                self.block_size,
-                VdiBlockRangeType::Sparse,
-            ),
+            0xfffffffe => {
+                VdiBlockRange::new(media_offset, 0, self.block_size, VdiBlockRangeType::Sparse)
+            }
             physical_block_number => VdiBlockRange::new(
                 media_offset,
                 self.data_offset + (physical_block_number as u64 * self.block_size),
