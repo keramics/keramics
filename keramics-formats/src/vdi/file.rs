@@ -12,11 +12,16 @@
  */
 
 use std::io::SeekFrom;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
+use crate::range_stream::RangeStream;
+
+use super::block_reader::VdiBlockReader;
+use super::block_stream::VdiBlockStream;
+use super::constants::*;
 use super::file_header::VdiFileHeader;
 
 /// Virtual Disk Image (VDI) file.
@@ -51,6 +56,12 @@ pub struct VdiFile {
     /// Data offset.
     data_offset: u32,
 
+    /// Block size.
+    block_size: u32,
+
+    /// Number of blocks.
+    number_of_blocks: u32,
+
     /// Media size.
     pub(super) media_size: u64,
 }
@@ -69,6 +80,8 @@ impl VdiFile {
             image_type: 0,
             blocks_map_offset: 0,
             data_offset: 0,
+            block_size: 0,
+            number_of_blocks: 0,
             media_size: 0,
         }
     }
@@ -80,8 +93,34 @@ impl VdiFile {
 
     /// Retrieves a data stream.
     pub fn get_data_stream(&self) -> Option<DataStreamReference> {
-        // TODO: implement
-        None
+        match &self.data_stream {
+            Some(data_stream) => {
+                if self.image_type == VDI_IMAGE_TYPE_FIXED {
+                    Some(Arc::new(RwLock::new(RangeStream::new(
+                        data_stream,
+                        0,
+                        self.media_size,
+                    ))))
+                } else {
+                    let parent_data_stream: Option<DataStreamReference> = match &self.parent_file {
+                        Some(parent_file) => parent_file.get_data_stream(),
+                        None => None,
+                    };
+                    Some(Arc::new(RwLock::new(VdiBlockStream::new(
+                        VdiBlockReader::new(
+                            data_stream,
+                            self.blocks_map_offset as u64,
+                            self.data_offset as u64,
+                            self.block_size as u64,
+                            self.number_of_blocks,
+                            parent_data_stream,
+                            self.media_size,
+                        ),
+                    ))))
+                }
+            }
+            None => None,
+        }
     }
 
     /// Retrieves the format version.
@@ -123,11 +162,12 @@ impl VdiFile {
         self.identifier = file_header.identifier;
         self.parent_identifier = file_header.parent_identifier;
         self.bytes_per_sector = 512;
+        self.image_type = file_header.image_type;
         self.blocks_map_offset = file_header.blocks_map_offset;
         self.data_offset = file_header.data_offset;
+        self.block_size = file_header.block_size;
+        self.number_of_blocks = file_header.number_of_blocks;
         self.media_size = file_header.data_size;
-
-        // TODO: initialize block map
 
         self.data_stream = Some(data_stream.clone());
 
@@ -213,6 +253,39 @@ mod tests {
 
         let media_size: u64 = file.get_media_size();
         assert_eq!(media_size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream() -> Result<(), ErrorTrace> {
+        use std::io::SeekFrom;
+
+        let file: VdiFile = get_file()?;
+
+        let data_stream: DataStreamReference = match file.get_data_stream() {
+            Some(data_stream) => data_stream,
+            None => return Err(keramics_core::error_trace_new!("Missing data stream")),
+        };
+        let mut data: Vec<u8> = vec![0; 512];
+
+        keramics_core::data_stream_read_at_position!(
+            &data_stream,
+            &mut data,
+            SeekFrom::Start(0x000000)
+        );
+
+        let path_string: String = get_test_data_path("vdi/ext2.vdi");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let file_data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let mut expected_data: Vec<u8> = vec![0; 512];
+
+        keramics_core::data_stream_read_at_position!(
+            &file_data_stream,
+            &mut expected_data,
+            SeekFrom::Start(0x000400)
+        );
+        assert_eq!(data, expected_data);
 
         Ok(())
     }

@@ -72,6 +72,9 @@ pub struct VdiFileHeader {
     /// Block size.
     pub block_size: u32,
 
+    /// Number of blocks.
+    pub number_of_blocks: u32,
+
     /// Identifier.
     pub identifier: Uuid,
 
@@ -90,6 +93,7 @@ impl VdiFileHeader {
             data_offset: 0,
             data_size: 0,
             block_size: 0,
+            number_of_blocks: 0,
             identifier: Uuid::new(),
             parent_identifier: None,
         }
@@ -121,10 +125,15 @@ impl VdiFileHeader {
         self.data_offset = bytes_to_u32_le!(data, 344);
         self.data_size = bytes_to_u64_le!(data, 368);
         self.block_size = bytes_to_u32_le!(data, 376);
+        self.number_of_blocks = bytes_to_u32_le!(data, 384);
         self.identifier = Uuid::from_le_bytes(&data[392..408]);
 
         if header_size >= 392 {
-            self.parent_identifier = Some(Uuid::from_le_bytes(&data[440..456]));
+            let parent_identifier: Uuid = Uuid::from_le_bytes(&data[440..456]);
+
+            if !parent_identifier.is_nil() {
+                self.parent_identifier = Some(parent_identifier);
+            }
         }
         Ok(())
     }
@@ -194,6 +203,7 @@ mod tests {
         assert_eq!(test_struct.data_offset, 0x00000400);
         assert_eq!(test_struct.data_size, 4194304);
         assert_eq!(test_struct.block_size, 1048576);
+        assert_eq!(test_struct.number_of_blocks, 4);
         assert_eq!(
             test_struct.identifier.to_string(),
             "88437ae8-9631-4c48-81c3-e787cc586501",
