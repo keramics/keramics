@@ -197,6 +197,53 @@ mod tests {
     }
 
     #[test]
+    fn test_huffman_tree_build_with_too_many_code_sizes() {
+        let code_sizes: Vec<u8> = vec![0u8; u16::MAX as usize + 1];
+
+        let mut test_huffman_tree: HuffmanTree = HuffmanTree::new(288, 15);
+
+        let result: Result<(), ErrorTrace> = test_huffman_tree.build(&code_sizes);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_huffman_tree_build_with_invalid_code_size() {
+        // A code size of 3 exceeds the largest code size (2) of the tree.
+        let code_sizes: [u8; 2] = [1, 3];
+
+        let mut test_huffman_tree: HuffmanTree = HuffmanTree::new(2, 2);
+
+        let result: Result<(), ErrorTrace> = test_huffman_tree.build(&code_sizes);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_huffman_tree_build_with_no_codes() {
+        // All symbols have a code size of 0, meaning the tree has no codes.
+        let code_sizes: [u8; 4] = [0, 0, 0, 0];
+
+        let mut test_huffman_tree: HuffmanTree = HuffmanTree::new(4, 2);
+
+        let result: Result<(), ErrorTrace> = test_huffman_tree.build(&code_sizes);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_huffman_tree_build_with_over_subscribed_code_sizes() {
+        // Five symbols with a code size of 2 over-subscribe the code space (5 > 4 available).
+        let code_sizes: [u8; 5] = [2, 2, 2, 2, 2];
+
+        let mut test_huffman_tree: HuffmanTree = HuffmanTree::new(5, 2);
+
+        let result: Result<(), ErrorTrace> = test_huffman_tree.build(&code_sizes);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_huffman_tree_decode_symbol() -> Result<(), ErrorTrace> {
         let code_sizes: Vec<u8> = get_code_sizes();
 
@@ -214,5 +261,23 @@ mod tests {
         assert_eq!(test_symbol, 141);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_huffman_tree_decode_symbol_with_invalid_code() {
+        // A single symbol with a 2-bit code leaves the code space incomplete, so a
+        // bitstream whose first two bits do not match the valid code fails to decode.
+        let code_sizes: [u8; 1] = [2];
+
+        let mut test_huffman_tree: HuffmanTree = HuffmanTree::new(1, 2);
+        test_huffman_tree.build(&code_sizes).unwrap();
+
+        // Bits read LSB first give "10" (value 0x2) which is not the valid code (0x0).
+        let test_data: [u8; 1] = [0x02];
+        let mut test_bitstream: DeflateBitstream = DeflateBitstream::new(&test_data, 0);
+
+        let result: Result<u16, ErrorTrace> = test_huffman_tree.decode_symbol(&mut test_bitstream);
+
+        assert!(result.is_err());
     }
 }

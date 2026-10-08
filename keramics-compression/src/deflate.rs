@@ -1164,6 +1164,320 @@ mod tests {
     }
 
     #[test]
+    fn test_block_header_read_from_bitstream() {
+        // The first three bits encode: bit 0 (last_block_flag), bits 1-2 (block_type).
+        // 0x01 = 0b00000001 -> last_block_flag = 1, block_type = 0 (uncompressed).
+        let test_data: [u8; 8] = [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let mut test_bitstream: DeflateBitstream = DeflateBitstream::new(&test_data, 0);
+
+        let mut test_block_header: DeflateBlockHeader = DeflateBlockHeader::new();
+        let result: Result<(), ErrorTrace> =
+            test_block_header.read_from_bitstream(&mut test_bitstream);
+        assert!(result.is_ok());
+        assert_eq!(test_block_header.last_block_flag, 1);
+        assert_eq!(test_block_header.block_type, 0);
+    }
+
+    #[test]
+    fn test_block_header_read_from_bitstream_unsupported_type() {
+        // 0x07 = 0b00000111 -> last_block_flag = 1, block_type = 3 (unsupported).
+        let test_data: [u8; 8] = [0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let mut test_bitstream: DeflateBitstream = DeflateBitstream::new(&test_data, 0);
+
+        let mut test_block_header: DeflateBlockHeader = DeflateBlockHeader::new();
+        let result: Result<(), ErrorTrace> =
+            test_block_header.read_from_bitstream(&mut test_bitstream);
+        assert!(result.is_ok());
+        assert_eq!(test_block_header.last_block_flag, 1);
+        assert_eq!(test_block_header.block_type, 3);
+    }
+
+    #[test]
+    fn test_build_fixed_huffman_trees() -> Result<(), ErrorTrace> {
+        let mut test_context: DeflateContext = DeflateContext::new();
+
+        assert!(!test_context.build_fixed_huffman_trees);
+
+        test_context.build_fixed_huffman_trees()?;
+
+        assert!(test_context.build_fixed_huffman_trees);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_uncompressed_block() -> Result<(), ErrorTrace> {
+        let expected_data: Vec<u8> = b"Hello, KeraMics stored block test data!".to_vec();
+
+        // Stored (uncompressed) block: header (last = 1, type = 0), LEN, NLEN, then raw bytes.
+        let test_data: [u8; 44] = [
+            0x01, 0x27, 0x00, 0xd8, 0xff, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20, 0x4b, 0x65,
+            0x72, 0x61, 0x4d, 0x69, 0x63, 0x73, 0x20, 0x73, 0x74, 0x6f, 0x72, 0x65, 0x64, 0x20,
+            0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x20, 0x74, 0x65, 0x73, 0x74, 0x20, 0x64, 0x61, 0x74,
+            0x61, 0x21,
+        ];
+
+        let mut test_context: DeflateContext = DeflateContext::new();
+        let mut uncompressed_data: Vec<u8> = vec![0; 39];
+
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+
+        assert_eq!(uncompressed_data, expected_data);
+        assert_eq!(test_context.uncompressed_data_size, 39);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_uncompressed_block_with_mismatched_size() {
+        // Stored block header where LEN (0x0001) does not match the complemented NLEN.
+        let test_data: [u8; 5] = [0x01, 0x01, 0x00, 0x00, 0x00];
+
+        let mut test_context: DeflateContext = DeflateContext::new();
+        let mut uncompressed_data: [u8; 1] = [0; 1];
+
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_fixed_huffman_block() -> Result<(), ErrorTrace> {
+        let expected_data: Vec<u8> = b"Hello, KeraMics stored block test data!".to_vec();
+
+        // Fixed Huffman encoded block (type 1).
+        let test_data: [u8; 41] = [
+            0xf3, 0x48, 0xcd, 0xc9, 0xc9, 0xd7, 0x51, 0xf0, 0x4e, 0x2d, 0x4a, 0xf4, 0xcd, 0x4c,
+            0x2e, 0x56, 0x28, 0x2e, 0xc9, 0x2f, 0x4a, 0x4d, 0x51, 0x48, 0xca, 0xc9, 0x4f, 0xce,
+            0x56, 0x28, 0x49, 0x2d, 0x2e, 0x51, 0x48, 0x49, 0x2c, 0x49, 0x54, 0x04, 0x00,
+        ];
+
+        let mut test_context: DeflateContext = DeflateContext::new();
+        let mut uncompressed_data: Vec<u8> = vec![0; 39];
+
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+
+        assert_eq!(uncompressed_data, expected_data);
+        assert_eq!(test_context.uncompressed_data_size, 39);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_unsupported_block_type() {
+        // Block header with an unsupported block type (type 3).
+        let test_data: [u8; 8] = [0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+
+        let mut test_context: DeflateContext = DeflateContext::new();
+        let mut uncompressed_data: [u8; 1] = [0; 1];
+
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_uncompressed_block_with_size_mismatch() {
+        // Stored block where NLEN (0x0000) does not complement LEN (0x0001).
+        let test_data: [u8; 5] = [0x01, 0x01, 0x00, 0x00, 0x00];
+
+        let mut test_context: DeflateContext = DeflateContext::new();
+        let mut uncompressed_data: [u8; 1] = [0; 1];
+
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_uncompressed_block_with_insufficient_data() {
+        // A stored block where LEN (1000) matches complemented NLEN, but the
+        // compressed data contains only 2 bytes to copy, so copy_bytes fails.
+        let test_data: [u8; 5] = [0x01, 0xE8, 0x03, 0x17, 0xFC];
+
+        let mut test_context: DeflateContext = DeflateContext::new();
+        let mut uncompressed_data: [u8; 1000] = [0; 1000];
+
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_fixed_huffman_block_with_bad_distance_offset() {
+        // Fixed block where the first length code (257) is followed by a distance
+        // index (5) that resolves to an offset (5) larger than the bytes written so
+        // far (0).
+        let test_data: [u8; 2] = [0x03, 0x52];
+
+        let mut test_context: DeflateContext = DeflateContext::new();
+        let mut uncompressed_data: [u8; 4] = [0; 4];
+
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_fixed_huffman_block_with_bad_compression_size() {
+        // Fixed block where a length code (285 -> base 258) is decoded with a valid
+        // offset (1 <= data_offset) but the requested size (258) exceeds the
+        // remaining space in the output buffer.
+        let test_data: [u8; 3] = [0x13, 0x4C, 0x05];
+
+        let mut test_context: DeflateContext = DeflateContext::new();
+        let mut uncompressed_data: [u8; 1] = [0; 1];
+
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_dynamic_huffman_trees_with_over_subscribed_codes() {
+        // A dynamic block whose 19 code sizes are all "2". That over-subscribes the
+        // code space (19 > 2^2) and fails the Huffman tree build of the code
+        // symbols.
+        let test_data: [u8; 10] = [
+            0x07, 0x3C, 0x24, 0x49, 0x92, 0x24, 0x49, 0x92, 0x24, 0x01,
+        ];
+
+        let mut test_context: DeflateContext = DeflateContext::new();
+        let mut test_bitstream: DeflateBitstream = DeflateBitstream::new(&test_data, 0);
+
+        // Read the block header.
+        let test_value: u32 = test_bitstream.get_value(3);
+        assert_eq!(test_value, 0x07);
+
+        let mut test_literals_huffman_tree: HuffmanTree = HuffmanTree::new(288, 15);
+        let mut test_distances_huffman_tree: HuffmanTree = HuffmanTree::new(30, 15);
+
+        let result: Result<(), ErrorTrace> = DebugTrace::scope(|debug_trace| {
+            test_context.build_dynamic_huffman_trees(
+                debug_trace,
+                &mut test_bitstream,
+                &mut test_literals_huffman_tree,
+                &mut test_distances_huffman_tree,
+            )
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_dynamic_huffman_trees_with_invalid_code_size_index() {
+        // A dynamic block whose codes tree is valid (symbols 16 and 17, both size 1).
+        // The first decoded code symbol is 16, i.e. a repeat at code_size_index == 0,
+        // which triggers the "Invalid code size index" error.
+        let test_data: [u8; 5] = [0x07, 0x0C, 0x48, 0x00, 0x00];
+
+        let mut test_context: DeflateContext = DeflateContext::new();
+        let mut test_bitstream: DeflateBitstream = DeflateBitstream::new(&test_data, 0);
+
+        // Read the block header.
+        let test_value: u32 = test_bitstream.get_value(3);
+        assert_eq!(test_value, 0x07);
+
+        let mut test_literals_huffman_tree: HuffmanTree = HuffmanTree::new(288, 15);
+        let mut test_distances_huffman_tree: HuffmanTree = HuffmanTree::new(30, 15);
+
+        let result: Result<(), ErrorTrace> = DebugTrace::scope(|debug_trace| {
+            test_context.build_dynamic_huffman_trees(
+                debug_trace,
+                &mut test_bitstream,
+                &mut test_literals_huffman_tree,
+                &mut test_distances_huffman_tree,
+            )
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_dynamic_huffman_trees_with_over_subscribed_literals() {
+        // A dynamic block whose code symbol tree decodes to code size 6 repeatedly.
+        // The 257 literals decoded all have size 6, which over-subscribes the
+        // literal Huffman tree (257 > 2^6 = 64).
+        let test_data: [u8; 37] = [
+            0x07, 0x0C, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        let mut test_context: DeflateContext = DeflateContext::new();
+        let mut test_bitstream: DeflateBitstream = DeflateBitstream::new(&test_data, 0);
+
+        // Read the block header.
+        let test_value: u32 = test_bitstream.get_value(3);
+        assert_eq!(test_value, 0x07);
+
+        let mut test_literals_huffman_tree: HuffmanTree = HuffmanTree::new(288, 15);
+        let mut test_distances_huffman_tree: HuffmanTree = HuffmanTree::new(30, 15);
+
+        let result: Result<(), ErrorTrace> = DebugTrace::scope(|debug_trace| {
+            test_context.build_dynamic_huffman_trees(
+                debug_trace,
+                &mut test_bitstream,
+                &mut test_literals_huffman_tree,
+                &mut test_distances_huffman_tree,
+            )
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_dynamic_huffman_trees_with_invalid_literal_code_count() {
+        // Block header (last = 1, type = 2) then 14 bits whose lower 5 bits = 31,
+        // which yields number_of_literal_codes = 288 (> 286, out of bounds).
+        let test_data: [u8; 2] = [0xfd, 0x04];
+
+        let mut test_context: DeflateContext = DeflateContext::new();
+        let mut test_bitstream: DeflateBitstream = DeflateBitstream::new(&test_data, 0);
+
+        let mut test_literals_huffman_tree: HuffmanTree = HuffmanTree::new(288, 15);
+        let mut test_distances_huffman_tree: HuffmanTree = HuffmanTree::new(30, 15);
+
+        // Read the block header.
+        let test_value: u32 = test_bitstream.get_value(3);
+        assert_eq!(test_value, 0x00000005);
+
+        let result: Result<(), ErrorTrace> = DebugTrace::scope(|debug_trace| {
+            test_context.build_dynamic_huffman_trees(
+                debug_trace,
+                &mut test_bitstream,
+                &mut test_literals_huffman_tree,
+                &mut test_distances_huffman_tree,
+            )
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_dynamic_huffman_trees_with_invalid_distance_code_count() {
+        // Block header (last = 1, type = 2) then 14 bits with literal count field = 0
+        // (count 257, valid) and distance count field = 31 (count 32 > 30, out of bounds).
+        let test_data: [u8; 3] = [0x05, 0x1f, 0x00];
+
+        let mut test_context: DeflateContext = DeflateContext::new();
+        let mut test_bitstream: DeflateBitstream = DeflateBitstream::new(&test_data, 0);
+
+        let mut test_literals_huffman_tree: HuffmanTree = HuffmanTree::new(288, 15);
+        let mut test_distances_huffman_tree: HuffmanTree = HuffmanTree::new(30, 15);
+
+        // Read the block header.
+        let test_value: u32 = test_bitstream.get_value(3);
+        assert_eq!(test_value, 0x00000005);
+
+        let result: Result<(), ErrorTrace> = DebugTrace::scope(|debug_trace| {
+            test_context.build_dynamic_huffman_trees(
+                debug_trace,
+                &mut test_bitstream,
+                &mut test_literals_huffman_tree,
+                &mut test_distances_huffman_tree,
+            )
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_build_dynamic_huffman_trees() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let mut test_context: DeflateContext = DeflateContext::new();
