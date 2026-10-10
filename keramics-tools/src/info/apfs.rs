@@ -18,7 +18,7 @@ use keramics_datetime::DateTime;
 use keramics_formats::apfs::{
     ApfsContainer, ApfsCredential, ApfsExtendedAttribute, ApfsFileEntry, ApfsFileSystem, ApfsVolume,
 };
-use keramics_formats::{ExtendedAttributeIterator, Path};
+use keramics_formats::{ExtendedAttributeIterator, FileEntryIterator, Path};
 use keramics_types::ByteString;
 use keramics_vfs::{VfsCredential, VfsCredentialStore};
 
@@ -848,8 +848,13 @@ impl ApfsInfo {
                 }
             };
             let mut path_components: Vec<String> = vec![volume_path_component];
+            let mut levels: Vec<bool> = Vec::new();
 
-            match Self::print_hierarchy_file_entry(&mut file_entry, &mut path_components) {
+            match Self::print_hierarchy_file_entry(
+                &mut file_entry,
+                &mut path_components,
+                &mut levels,
+            ) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -867,6 +872,7 @@ impl ApfsInfo {
     fn print_hierarchy_file_entry(
         file_entry: &mut ApfsFileEntry,
         path_components: &mut Vec<String>,
+        levels: &mut Vec<bool>,
     ) -> Result<(), ErrorTrace> {
         let path: String = if file_entry.is_root_directory() {
             format!("/{}/", path_components.join("/"))
@@ -878,8 +884,22 @@ impl ApfsInfo {
             path_components.push(name_string);
             format!("/{}", path_components.join("/"))
         };
-        println!("{}", path);
+        let prefix: String = crate::hierarchy::get_hierarchy_prefix(levels);
+        println!("{}{}", prefix, path);
 
+        let number_of_sub_file_entries: usize = match file_entry.get_number_of_sub_file_entries() {
+            Ok(number) => number,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve number of sub file entries of path: {}",
+                        path
+                    )
+                );
+                return Err(error);
+            }
+        };
         for (sub_file_entry_index, result) in file_entry.sub_file_entries().enumerate() {
             let mut sub_file_entry: ApfsFileEntry = match result {
                 Ok(file_entry) => file_entry,
@@ -894,7 +914,9 @@ impl ApfsInfo {
                     return Err(error);
                 }
             };
-            match Self::print_hierarchy_file_entry(&mut sub_file_entry, path_components) {
+            let is_last: bool = sub_file_entry_index + 1 == number_of_sub_file_entries;
+            levels.push(is_last);
+            match Self::print_hierarchy_file_entry(&mut sub_file_entry, path_components, levels) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -907,6 +929,7 @@ impl ApfsInfo {
                     return Err(error);
                 }
             }
+            levels.pop();
         }
         if !file_entry.is_root_directory() {
             path_components.pop();

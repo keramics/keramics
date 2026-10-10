@@ -17,7 +17,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_encodings::CharacterEncoding;
 use keramics_formats::xfs::{XfsExtendedAttribute, XfsFileEntry, XfsFileSystem};
-use keramics_formats::{ExtendedAttributeIterator, Path};
+use keramics_formats::{ExtendedAttributeIterator, FileEntryIterator, Path};
 use keramics_types::ByteString;
 
 use crate::formatters::ByteSize;
@@ -600,8 +600,9 @@ impl XfsInfo {
             },
         };
         let mut path_components: Vec<String> = Vec::new();
+        let mut levels: Vec<bool> = Vec::new();
 
-        match Self::print_hierarchy_file_entry(&mut file_entry, &mut path_components) {
+        match Self::print_hierarchy_file_entry(&mut file_entry, &mut path_components, &mut levels) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -618,6 +619,7 @@ impl XfsInfo {
     fn print_hierarchy_file_entry(
         file_entry: &mut XfsFileEntry,
         path_components: &mut Vec<String>,
+        levels: &mut Vec<bool>,
     ) -> Result<(), ErrorTrace> {
         let path: String = if file_entry.is_root_directory() {
             String::from("/")
@@ -629,8 +631,22 @@ impl XfsInfo {
             path_components.push(name_string);
             format!("/{}", path_components.join("/"))
         };
-        println!("{}", path);
+        let prefix: String = crate::hierarchy::get_hierarchy_prefix(levels);
+        println!("{}{}", prefix, path);
 
+        let number_of_sub_file_entries: usize = match file_entry.get_number_of_sub_file_entries() {
+            Ok(number) => number,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve number of sub file entries of path: {}",
+                        path
+                    )
+                );
+                return Err(error);
+            }
+        };
         for (sub_file_entry_index, result) in file_entry.sub_file_entries().enumerate() {
             let mut sub_file_entry: XfsFileEntry = match result {
                 Ok(file_entry) => file_entry,
@@ -645,7 +661,9 @@ impl XfsInfo {
                     return Err(error);
                 }
             };
-            match Self::print_hierarchy_file_entry(&mut sub_file_entry, path_components) {
+            let is_last: bool = sub_file_entry_index + 1 == number_of_sub_file_entries;
+            levels.push(is_last);
+            match Self::print_hierarchy_file_entry(&mut sub_file_entry, path_components, levels) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -658,6 +676,7 @@ impl XfsInfo {
                     return Err(error);
                 }
             }
+            levels.pop();
         }
         if !file_entry.is_root_directory() {
             path_components.pop();
