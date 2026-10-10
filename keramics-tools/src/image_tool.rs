@@ -41,6 +41,7 @@ use keramics_core::mediator::Mediator;
 mod bodyfile;
 mod display_path;
 mod enums;
+mod hierarchy;
 mod storage_media_image;
 
 use crate::bodyfile::Bodyfile;
@@ -839,29 +840,6 @@ impl ImageTool {
         Ok(())
     }
 
-    /// Retrieves a hierarchy prefix.
-    fn get_hierarchy_prefix(&self, levels: &[bool]) -> String {
-        let number_of_levels: usize = levels.len();
-        let mut prefix: String = String::new();
-
-        for (level, is_last) in levels[0..number_of_levels].iter().enumerate() {
-            if level + 1 < number_of_levels {
-                if *is_last {
-                    prefix.push_str("    ");
-                } else {
-                    prefix.push_str("│   ");
-                }
-            } else {
-                if *is_last {
-                    prefix.push_str("└── ");
-                } else {
-                    prefix.push_str("├── ");
-                }
-            }
-        }
-        prefix
-    }
-
     /// Prints the scan node as part of a hierarchy.
     fn print_scan_node_as_hierarchy(
         &self,
@@ -885,7 +863,7 @@ impl ImageTool {
                 }
             }
         };
-        let prefix: String = self.get_hierarchy_prefix(levels);
+        let prefix: String = hierarchy::get_hierarchy_prefix(levels);
         let path: &Path = scan_node_location.get_path();
         let vfs_type: &VfsType = vfs_scan_node.get_type();
 

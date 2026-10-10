@@ -1008,8 +1008,9 @@ impl NtfsInfo {
             },
         };
         let mut path_components: Vec<String> = Vec::new();
+        let mut levels: Vec<bool> = Vec::new();
 
-        match Self::print_hierarchy_file_entry(&mut file_entry, &mut path_components) {
+        match Self::print_hierarchy_file_entry(&mut file_entry, &mut path_components, &mut levels) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -1026,14 +1027,26 @@ impl NtfsInfo {
     fn print_hierarchy_file_entry(
         file_entry: &mut NtfsFileEntry,
         path_components: &mut Vec<String>,
+        levels: &mut Vec<bool>,
     ) -> Result<(), ErrorTrace> {
-        match Self::print_hierarchy_file_entry_as_path(file_entry, path_components) {
+        let prefix: String = crate::hierarchy::get_hierarchy_prefix(levels);
+        match Self::print_hierarchy_file_entry_as_path(file_entry, path_components, &prefix) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to print file entry path");
                 return Err(error);
             }
         }
+        let number_of_sub_file_entries: usize = match file_entry.get_number_of_sub_file_entries() {
+            Ok(number) => number,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve number of sub file entries"
+                );
+                return Err(error);
+            }
+        };
         for (sub_file_entry_index, result) in file_entry.sub_file_entries().enumerate() {
             let mut sub_file_entry: NtfsFileEntry = match result {
                 Ok(ntfs_file_entry) => ntfs_file_entry,
@@ -1048,7 +1061,9 @@ impl NtfsInfo {
                     return Err(error);
                 }
             };
-            match Self::print_hierarchy_file_entry(&mut sub_file_entry, path_components) {
+            let is_last: bool = sub_file_entry_index + 1 == number_of_sub_file_entries;
+            levels.push(is_last);
+            match Self::print_hierarchy_file_entry(&mut sub_file_entry, path_components, levels) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -1062,6 +1077,7 @@ impl NtfsInfo {
                     return Err(error);
                 }
             }
+            levels.pop();
         }
         if !file_entry.is_root_directory() {
             path_components.pop();
@@ -1073,6 +1089,7 @@ impl NtfsInfo {
     fn print_hierarchy_file_entry_as_path(
         file_entry: &NtfsFileEntry,
         path_components: &mut Vec<String>,
+        prefix: &str,
     ) -> Result<(), ErrorTrace> {
         let path: String = if file_entry.is_root_directory() {
             String::from("/")
@@ -1106,8 +1123,8 @@ impl NtfsInfo {
                 }
             };
             match data_fork.get_name() {
-                Some(name) => println!("{}:{}", path, name),
-                None => println!("{}", path),
+                Some(name) => println!("{}{}:{}", prefix, path, name),
+                None => println!("{}{}", prefix, path),
             };
         }
         // TODO: print index names?

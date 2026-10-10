@@ -32,6 +32,7 @@ use keramics_core::mediator::Mediator;
 
 mod enums;
 mod formatters;
+mod hierarchy;
 mod info;
 mod range_file_resolver;
 mod storage_media_image;
