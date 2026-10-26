@@ -11,9 +11,9 @@
  * under the License.
  */
 
-//! ZLIB decompression.
+//! zlib decompression.
 //!
-//! Provides decompression support for ZLIB compressed data (RFC 1950).
+//! Provides decompression support for zlib compressed data (RFC 1950).
 
 use keramics_checksums::Adler32Context;
 use keramics_core::ErrorTrace;

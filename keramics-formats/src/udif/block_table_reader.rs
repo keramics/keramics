@@ -138,7 +138,7 @@ impl UdifBlockTableReader {
                     0,
                     UdifBlockRangeType::InFile,
                 ),
-                0x80000004..0x80000008 => {
+                0x80000004..=0x80000008 => {
                     if block_table_entry.number_of_sectors > 2048 {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Unsupported compressed block table entry: {} - number of sectors value out of bounds",
