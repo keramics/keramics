@@ -170,7 +170,28 @@ A LZFSE frequency table consist of 360 16-bit values:
 
 #### Decoding the Huffman encoded frequency table
 
-TODO: describe how to decode the Huffman encoded frequency table.
+A compressed frequency table (LZFSE block version 2) is stored as a bit stream in the `header
+size - 32` bytes immediately after the 32-byte block header, and it is read least-significant-bit
+(LSB) first. It holds the same 360 values, in the same order, as the uncompressed (block version 1)
+720-byte table above.
+
+Each value is decoded using the two lookup tables below:
+
+1. Use the least significant 5 bits of the current bit stream position as an index into the 2
+   `lzfse_freq` tables.
+2. `lzfse_freq_nbits_table[index]` is the number of bits that the encoded value occupies in the bit
+   stream.
+3. If `lzfse_freq_value_table[index]` is not -1 the frequency value is that table entry (one of 0
+   to 7). Both tables repeat every 8 entries, so the 2 most significant bits of the index are
+   irrelevant for these small values.
+4. If `lzfse_freq_value_table[index]` is -1 the entry is an escape value and the frequency value
+   is read from the bits that begin at the most significant bit of the 5-bit index:
+   * when the escape is 8 bits (index 7 or 23) the frequency value is 8 plus the 4 bits at bit
+     positions 4 to 7 (values 8 to 15);
+   * when the escape is 14 bits (index 15 or 31) the frequency value is 24 plus the 10 bits at
+     bit positions 4 to 13 (values 24 to 575).
+5. Advance the bit stream position by `lzfse_freq_nbits_table[index]` bits and repeat until all 360
+   values have been read.
 
 ```text
 5-bits encoded value, special cases 8 and 14

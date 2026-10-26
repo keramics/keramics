@@ -14,7 +14,7 @@
 use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
 
-use keramics_compression::{AdcContext, Bzip2Context, LzfseContext};
+use keramics_compression::{AdcContext, Bzip2Context, LzfseContext, XzContext};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use crate::lru_cache::LruCache;
@@ -104,14 +104,24 @@ impl UdifBlockReader {
                 }
             }
             UdifCompressionMethod::Lzma => {
-                // TODO: add support for UdifCompressionMethod::Lzma,
-                todo!();
+                let mut xz_context: XzContext = XzContext::new();
+
+                match xz_context.decompress(compressed_data, data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress xz/LZMA data"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             UdifCompressionMethod::Zlib => {
                 _ = crate::zlib_decompress!(
                     &compressed_data,
                     data,
-                    "Unable to decompress zlib data"
+                    "Unable to decompress zlib/DEFLATE data"
                 );
             }
             _ => {
