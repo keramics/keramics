@@ -55,7 +55,7 @@ impl Filetime {
         let number_of_seconds: u64 = self.timestamp / 10000000;
         let (days, hours, minutes, seconds): (i64, u8, u8, u8) =
             get_time_values(number_of_seconds as i64);
-        let (year, month, day_of_month): (i16, u8, u8) = get_date_values(days, &Self::EPOCH);
+        let (year, month, day_of_month): (i32, u8, u8) = get_date_values(days, &Self::EPOCH);
         format!(
             "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:07}",
             year, month, day_of_month, hours, minutes, seconds, fraction
@@ -94,6 +94,15 @@ mod tests {
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "2010-08-12T21:06:31.5468750");
+    }
+
+    #[test]
+    fn test_to_iso8601_string_with_years_beyond_i16() {
+        // January 1, 40000, the year of which exceeds the range of an i16 value.
+        let test_struct: Filetime = Filetime::new(12117553344000000000);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "40000-01-01T00:00:00.0000000");
     }
 
     #[test]

@@ -182,16 +182,16 @@ mod tests {
 
         let date_time: DateTime = DateTime::FatDate(FatDate::new(0x3d0c));
         let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;
-        assert_eq!(timestamp, "1284249600");
+        assert_eq!(timestamp, "1281571200");
 
         let date_time: DateTime = DateTime::FatTimeDate(FatTimeDate::new(0x3d0c, 0xa8d0));
         let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;
-        assert_eq!(timestamp, "1284325592");
+        assert_eq!(timestamp, "1281647192");
 
         let date_time: DateTime =
             DateTime::FatTimeDate10Ms(FatTimeDate10Ms::new(0x3d0c, 0xa8d0, 0x7d));
         let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;
-        assert_eq!(timestamp, "1284325593.25");
+        assert_eq!(timestamp, "1281647193.25");
 
         let date_time: DateTime = DateTime::HfsTime(HfsTime::new(3458215528));
         let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;

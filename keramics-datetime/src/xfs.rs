@@ -55,7 +55,7 @@ impl XfsBigtime {
         let timestamp: i64 = ((self.timestamp / 1000000000) as i64) + 74752;
         let fraction: u64 = self.timestamp % 1000000000;
         let (days, hours, minutes, seconds): (i64, u8, u8, u8) = get_time_values(timestamp);
-        let (year, month, day_of_month): (i16, u8, u8) = get_date_values(days, &Self::EPOCH);
+        let (year, month, day_of_month): (i32, u8, u8) = get_date_values(days, &Self::EPOCH);
         format!(
             "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}",
             year, month, day_of_month, hours, minutes, seconds, fraction
@@ -116,6 +116,27 @@ mod tests {
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "2038-01-19T03:14:07.000000000");
+
+        // Exactly 365 days after the epoch, landing in a regular year.
+        let test_struct: XfsBigtime = XfsBigtime::new(365 * 86400 * 1000000000);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "1902-12-13T20:45:52.000000000");
+
+        // The leap day of the leap year 1904.
+        let test_struct: XfsBigtime = XfsBigtime::new(808 * 86400 * 1000000000);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "1904-02-29T20:45:52.000000000");
+    }
+
+    #[test]
+    fn test_to_iso8601_string_with_extreme_timestamp() {
+        // The largest representable timestamp.
+        let test_struct: XfsBigtime = XfsBigtime::new(18446744073709551615); // u64::MAX
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "2486-07-02T20:20:25.709551615");
     }
 
     #[test]
