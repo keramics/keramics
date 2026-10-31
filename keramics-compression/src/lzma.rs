@@ -662,7 +662,7 @@ impl LzmaDecoder {
     }
 
     /// Resets the decoder state and changes the properties.
-    pub fn reset_state_and_props(
+    pub fn reset_state_and_properties(
         &mut self,
         literal_context_bits: u8,
         literal_position_bits: u8,
