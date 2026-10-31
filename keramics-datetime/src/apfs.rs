@@ -47,12 +47,13 @@ impl ApfsTime {
 
     /// Retrieves an ISO 8601 string representation of the timestamp.
     pub fn to_iso8601_string(&self) -> String {
-        // Use floor division, since a negative timestamp fraction represents the time before the
-        // epoch rather than an offset after it.
+        // Negative timestamps require floor division, since a negative fraction predates the epoch.
         let timestamp: i64 = self.timestamp.div_euclid(NANOSECONDS_PER_SECOND);
         let fraction: u32 = self.timestamp.rem_euclid(NANOSECONDS_PER_SECOND) as u32;
+
         let (days, hours, minutes, seconds): (i64, u8, u8, u8) = get_time_values(timestamp);
         let (year, month, day_of_month): (i32, u8, u8) = get_date_values(days, &POSIX_EPOCH);
+
         format!(
             "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}",
             year, month, day_of_month, hours, minutes, seconds, fraction
@@ -102,8 +103,6 @@ mod tests {
 
     #[test]
     fn test_to_iso8601_string_with_negative_timestamp() {
-        // Negative timestamps require floor division, since a negative fraction represents
-        // the time predating the epoch rather than an offset after it.
         let test_struct: ApfsTime = ApfsTime::new(-500000000);
 
         let string: String = test_struct.to_iso8601_string();

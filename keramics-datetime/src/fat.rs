@@ -35,41 +35,29 @@ fn fat_get_date_values(date: u16) -> (i16, u8, u8) {
 }
 
 /// Retrieves the number of seconds since January 1, 1980.
-///
-/// A date with a zero month or zero day of month is invalid (as may be the case for an
-/// unspecified timestamp), in which case no number of seconds can be determined and 0 is
-/// returned. Similarly, a month value larger than 12 is invalid and is treated as month 12,
-/// such that an invalid date always results in a deterministic number of seconds.
 #[inline(always)]
 fn fat_get_number_of_seconds(date: u16, time: u16) -> u32 {
     let (mut year, mut month, day_of_month): (i16, u8, u8) = fat_get_date_values(date);
-    let (hours, minutes, seconds): (u8, u8, u8) = fat_get_time_values(time);
 
-    if month == 0 || day_of_month == 0 {
+    if month == 0 || month > 12 || day_of_month == 0 {
         return 0;
     }
-    if month > 12 {
-        month = 12;
-    }
-
-    // `number_of_days` contains the 0-based number of days since January 1, 1980, where day 0
-    // represents January 1, 1980.
+    // Number of days since January 1, 1980, where day 0 represents January 1, 1980.
     let mut number_of_days: u32 = (day_of_month as u32) - 1;
 
-    // Add the number of days in the months of the current year preceding the current month.
     month -= 1;
 
     while month > 0 {
         number_of_days += get_days_in_month(year as i64, month) as u32;
         month -= 1;
     }
-    // Add the number of days in the years preceding the current year.
     year -= 1;
 
     while year >= 1980 {
         number_of_days += get_days_in_year(year as i64) as u32;
         year -= 1;
     }
+    let (hours, minutes, seconds): (u8, u8, u8) = fat_get_time_values(time);
 
     let mut number_of_seconds: u32 = (number_of_days * 24) + (hours as u32);
     number_of_seconds = (number_of_seconds * 60) + (minutes as u32);
@@ -464,7 +452,7 @@ mod tests {
         let number_of_seconds: u32 = fat_get_number_of_seconds(0xff9f, 0x0000);
         assert_eq!(number_of_seconds, 4039200000); // 2107-12-31
 
-        // A zero date is invalid (such as an unspecified timestamp) and results in 0 seconds.
+        // A zero date is invalid, such as an unspecified timestamp, and results in 0 seconds.
         let number_of_seconds: u32 = fat_get_number_of_seconds(0x0000, 0x0000);
         assert_eq!(number_of_seconds, 0);
 
@@ -475,10 +463,9 @@ mod tests {
         let number_of_seconds: u32 = fat_get_number_of_seconds(0xfe0f, 0x0000);
         assert_eq!(number_of_seconds, 0);
 
-        // A month larger than 12 is invalid and is treated as month 12, resulting in a
-        // deterministic number of seconds rather than undefined behavior.
+        // A month larger than 12 is invalid and results in 0 seconds.
         let number_of_seconds: u32 = fat_get_number_of_seconds(0xffff, 0x0000);
-        assert_eq!(number_of_seconds, 4039200000); // Treated as 2107-12-31
+        assert_eq!(number_of_seconds, 0);
     }
 
     // Number of days between January 1, year 0 and a civil date, calculated with the
