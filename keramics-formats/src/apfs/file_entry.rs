@@ -883,7 +883,7 @@ mod tests {
         assert_eq!(
             apfs_file_entry.get_creation_time(),
             &DateTime::ApfsTime(ApfsTime {
-                timestamp: 1785841765254516511
+                timestamp: 1785841765254251713
             })
         );
         Ok(())
@@ -945,7 +945,7 @@ mod tests {
         assert_eq!(
             apfs_file_entry.get_modification_time(),
             &DateTime::ApfsTime(ApfsTime {
-                timestamp: 1785841765254251713
+                timestamp: 1785841765254516511
             })
         );
         Ok(())

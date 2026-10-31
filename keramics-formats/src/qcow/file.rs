@@ -25,7 +25,7 @@ use super::block_stream::QcowBlockStream;
 use super::credential::QcowCredential;
 use super::encryption::{QcowEncryption, QcowEncryptionContext};
 use super::encryption_type::QcowEncryptionType;
-use super::enums::{QcowCompressionMethod, QcowEncryptionMethod};
+use super::enums::QcowCompressionMethod;
 use super::features::QcowFeatures;
 use super::file_header::QcowFileHeader;
 use super::header_extension::QcowHeaderExtension;

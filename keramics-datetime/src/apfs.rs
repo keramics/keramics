@@ -15,6 +15,7 @@ use std::fmt;
 
 use keramics_types::{bytes_to_i64_be, bytes_to_i64_le};
 
+use super::constants::NANOSECONDS_PER_SECOND;
 use super::posix::POSIX_EPOCH;
 use super::util::{get_date_values, get_time_values};
 
@@ -46,10 +47,13 @@ impl ApfsTime {
 
     /// Retrieves an ISO 8601 string representation of the timestamp.
     pub fn to_iso8601_string(&self) -> String {
-        let timestamp: i64 = self.timestamp / 1000000000;
-        let fraction: i64 = self.timestamp % 1000000000;
+        // Negative timestamps require floor division, since a negative fraction predates the epoch.
+        let timestamp: i64 = self.timestamp.div_euclid(NANOSECONDS_PER_SECOND);
+        let fraction: u32 = self.timestamp.rem_euclid(NANOSECONDS_PER_SECOND) as u32;
+
         let (days, hours, minutes, seconds): (i64, u8, u8, u8) = get_time_values(timestamp);
-        let (year, month, day_of_month): (i16, u8, u8) = get_date_values(days, &POSIX_EPOCH);
+        let (year, month, day_of_month): (i32, u8, u8) = get_date_values(days, &POSIX_EPOCH);
+
         format!(
             "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}",
             year, month, day_of_month, hours, minutes, seconds, fraction
@@ -95,6 +99,33 @@ mod tests {
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "2010-08-12T20:06:31.987654321");
+
+        // Test with a negative timestamp.
+        let test_struct: ApfsTime = ApfsTime::new(-500000000);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "1969-12-31T23:59:59.500000000");
+
+        let test_struct: ApfsTime = ApfsTime::new(-1500000000);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "1969-12-31T23:59:58.500000000");
+
+        let test_struct: ApfsTime = ApfsTime::new(-86400500000000);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "1969-12-30T23:59:59.500000000");
+
+        // Test with the largest and smallest representable timestamps.
+        let test_struct: ApfsTime = ApfsTime::new(i64::MAX);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "2262-04-11T23:47:16.854775807");
+
+        let test_struct: ApfsTime = ApfsTime::new(i64::MIN);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "1677-09-21T00:12:43.145224192");
     }
 
     #[test]

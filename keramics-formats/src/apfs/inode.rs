@@ -27,8 +27,8 @@ use super::extended_fields::ApfsExtendedFields;
         byte_order = "little",
         field(name = "parent_identifier", data_type = "u64"),
         field(name = "data_stream_identifier", data_type = "u64"),
-        field(name = "modification_time", data_type = "ApfsTime"),
         field(name = "creation_time", data_type = "ApfsTime"),
+        field(name = "modification_time", data_type = "ApfsTime"),
         field(name = "inode_change_time", data_type = "ApfsTime"),
         field(name = "access_time", data_type = "ApfsTime"),
         field(name = "inode_flags", data_type = "u64", format = "hex"),
@@ -52,11 +52,11 @@ pub struct ApfsInode {
     /// Data stream identifier.
     pub data_stream_identifier: u64,
 
-    /// Modification date and time.
-    pub modification_time: DateTime,
-
     /// Creation date and time.
     pub creation_time: DateTime,
+
+    /// Modification date and time.
+    pub modification_time: DateTime,
 
     /// Change date and time.
     pub change_time: DateTime,
@@ -89,8 +89,8 @@ impl ApfsInode {
         Self {
             parent_identifier: 0,
             data_stream_identifier: 0,
-            modification_time: DateTime::NotSet,
             creation_time: DateTime::NotSet,
+            modification_time: DateTime::NotSet,
             change_time: DateTime::NotSet,
             access_time: DateTime::NotSet,
             number_of_links: 0,
@@ -114,14 +114,14 @@ impl ApfsInode {
 
         let timestamp: i64 = bytes_to_i64_le!(data, 16);
 
-        self.modification_time = if timestamp == 0 {
+        self.creation_time = if timestamp == 0 {
             DateTime::NotSet
         } else {
             DateTime::ApfsTime(ApfsTime::new(timestamp))
         };
         let timestamp: i64 = bytes_to_i64_le!(data, 24);
 
-        self.creation_time = if timestamp == 0 {
+        self.modification_time = if timestamp == 0 {
             DateTime::NotSet
         } else {
             DateTime::ApfsTime(ApfsTime::new(timestamp))
@@ -210,13 +210,13 @@ mod tests {
         assert_eq!(test_struct.parent_identifier, 1);
         assert_eq!(test_struct.data_stream_identifier, 2);
         assert_eq!(
-            test_struct.modification_time,
+            test_struct.creation_time,
             DateTime::ApfsTime(ApfsTime {
                 timestamp: 1538504196370157527
             })
         );
         assert_eq!(
-            test_struct.creation_time,
+            test_struct.modification_time,
             DateTime::ApfsTime(ApfsTime {
                 timestamp: 1538504198000343067
             })

@@ -38,19 +38,28 @@ fn fat_get_date_values(date: u16) -> (i16, u8, u8) {
 #[inline(always)]
 fn fat_get_number_of_seconds(date: u16, time: u16) -> u32 {
     let (mut year, mut month, day_of_month): (i16, u8, u8) = fat_get_date_values(date);
-    let (hours, minutes, seconds): (u8, u8, u8) = fat_get_time_values(time);
 
-    let mut number_of_seconds: u32 = day_of_month as u32;
+    if month == 0 || month > 12 || day_of_month == 0 {
+        return 0;
+    }
+    // Number of days since January 1, 1980, where day 0 represents January 1, 1980.
+    let mut number_of_days: u32 = (day_of_month as u32) - 1;
+
+    month -= 1;
 
     while month > 0 {
-        number_of_seconds += get_days_in_month(year, month) as u32;
+        number_of_days += get_days_in_month(year as i64, month) as u32;
         month -= 1;
     }
-    while year > 1980 {
-        number_of_seconds += get_days_in_year(year) as u32;
+    year -= 1;
+
+    while year >= 1980 {
+        number_of_days += get_days_in_year(year as i64) as u32;
         year -= 1;
     }
-    number_of_seconds = (number_of_seconds * 24) + (hours as u32);
+    let (hours, minutes, seconds): (u8, u8, u8) = fat_get_time_values(time);
+
+    let mut number_of_seconds: u32 = (number_of_days * 24) + (hours as u32);
     number_of_seconds = (number_of_seconds * 60) + (minutes as u32);
     (number_of_seconds * 60) + (seconds as u32)
 }
@@ -182,9 +191,12 @@ impl FatTimeDate {
         if self.utc_offset & 0x80 != 0 {
             let utc_offset: u8 = self.utc_offset & 0x7f;
             if utc_offset & 0x40 != 0 {
-                number_of_seconds += ((0x80 - utc_offset) as u32) * 15 * 60;
+                number_of_seconds =
+                    number_of_seconds.saturating_add(((0x80 - utc_offset) as u32) * 15 * 60);
             } else {
-                number_of_seconds -= (utc_offset as u32) * 15 * 60;
+                // Note that a timestamp in with an UTC offset can predate January 1, 1980, UTC.
+                // Such timestamps are currently represented as 0.
+                number_of_seconds = number_of_seconds.saturating_sub((utc_offset as u32) * 15 * 60);
             }
         }
         number_of_seconds
@@ -292,9 +304,12 @@ impl FatTimeDate10Ms {
         if self.utc_offset & 0x80 != 0 {
             let utc_offset: u8 = self.utc_offset & 0x7f;
             if utc_offset & 0x40 != 0 {
-                number_of_seconds += ((0x80 - utc_offset) as u32) * 15 * 60;
+                number_of_seconds =
+                    number_of_seconds.saturating_add(((0x80 - utc_offset) as u32) * 15 * 60);
             } else {
-                number_of_seconds -= (utc_offset as u32) * 15 * 60;
+                // Note that a timestamp in with an UTC offset can predate January 1, 1980, UTC.
+                // Such timestamps are currently represented as 0.
+                number_of_seconds = number_of_seconds.saturating_sub((utc_offset as u32) * 15 * 60);
             }
         }
         (number_of_seconds, fraction)
@@ -360,6 +375,20 @@ impl fmt::Display for FatTimeDate10Ms {
 mod tests {
     use super::*;
 
+    // Calculates the number of days between January 1, year 0 and a civil date, with the
+    // days-difference algorithm.
+    fn get_days_from_civil(year: i64, month: u8, day_of_month: u8) -> i64 {
+        let year: i64 = if month <= 2 { year - 1 } else { year };
+        let era: i64 = if year >= 0 { year } else { year - 399 } / 400;
+        let year_of_era: i64 = year - (era * 400);
+        let month_prime: i64 = (month as i64 + 9) % 12;
+        let day_of_year: i64 = ((153 * month_prime) + 2) / 5 + (day_of_month as i64) - 1;
+        let day_of_era: i64 =
+            (year_of_era * 365) + (year_of_era / 4) - (year_of_era / 100) + day_of_year;
+
+        (era * 146097) + day_of_era
+    }
+
     #[test]
     fn test_fat_get_date_values() {
         let (year, month, day_of_month): (i16, u8, u8) = fat_get_date_values(0x3d0c);
@@ -371,14 +400,144 @@ mod tests {
     #[test]
     fn test_fat_get_number_of_seconds() {
         let number_of_seconds: u32 = fat_get_number_of_seconds(0x3d0c, 0xa8d0);
-        assert_eq!(number_of_seconds, 968792792);
+        assert_eq!(number_of_seconds, 966114392);
+
+        // The first valid date.
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x0021, 0x0000);
+        assert_eq!(number_of_seconds, 0);
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x0022, 0x0000);
+        assert_eq!(number_of_seconds, 86400);
+
+        // The leap day of the leap year 2000.
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x285d, 0x0000);
+        assert_eq!(number_of_seconds, 636249600);
+
+        // The last day of February of the regular year 2010, and the day after.
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x3c5c, 0x0000);
+        assert_eq!(number_of_seconds, 951782400);
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x3c61, 0x0000);
+        assert_eq!(number_of_seconds, 951868800);
+
+        // Other leap days and their surroundings.
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x085d, 0x0000);
+        assert_eq!(number_of_seconds, 131328000); // 1984-02-29
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x305d, 0x0000);
+        assert_eq!(number_of_seconds, 762480000); // 2004-02-29
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x385c, 0x0000);
+        assert_eq!(number_of_seconds, 888624000); // 2008-02-28
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0xf85d, 0x0000);
+        assert_eq!(number_of_seconds, 3918153600); // 2104-02-29
+
+        // Year and month boundaries across the valid date range up to the last valid date.
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x0061, 0x0000);
+        assert_eq!(number_of_seconds, 5184000); // 1980-03-01
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x019f, 0x0000);
+        assert_eq!(number_of_seconds, 31536000); // 1980-12-31
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x0221, 0x0000);
+        assert_eq!(number_of_seconds, 31622400); // 1981-01-01
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x279f, 0x0000);
+        assert_eq!(number_of_seconds, 631065600); // 1999-12-31
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x3a21, 0x0000);
+        assert_eq!(number_of_seconds, 915235200); // 2009-01-01
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x8821, 0x0000);
+        assert_eq!(number_of_seconds, 2145916800); // 2048-01-01
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0xef9f, 0x0000);
+        assert_eq!(number_of_seconds, 3786825600); // 2099-12-31
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0xfe5c, 0x0000);
+        assert_eq!(number_of_seconds, 4012761600); // 2107-02-28
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0xf061, 0x0000);
+        assert_eq!(number_of_seconds, 3792009600); // 2100-03-01
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0xff9f, 0x0000);
+        assert_eq!(number_of_seconds, 4039200000); // 2107-12-31
+
+        // A zero date is invalid, such as an unspecified timestamp, and results in 0 seconds.
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x0000, 0x0000);
+        assert_eq!(number_of_seconds, 0);
+
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0x0000, 0xa8d0);
+        assert_eq!(number_of_seconds, 0);
+
+        // A zero month with a non-zero day of month is invalid and results in 0 seconds.
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0xfe0f, 0x0000);
+        assert_eq!(number_of_seconds, 0);
+
+        // A month larger than 12 is invalid and results in 0 seconds.
+        let number_of_seconds: u32 = fat_get_number_of_seconds(0xffff, 0x0000);
+        assert_eq!(number_of_seconds, 0);
+    }
+
+    #[test]
+    fn test_fat_get_number_of_seconds_full_range() {
+        let epoch_days: i64 = get_days_from_civil(1980, 1, 1);
+        let days_in_month: [u8; 13] = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+        for year in 1980..2108i16 {
+            let leap_year: bool = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+            for month in 1..13u8 {
+                let last_day: u8 = if month == 2 && leap_year {
+                    29
+                } else {
+                    days_in_month[month as usize]
+                };
+                for day_of_month in 1..=last_day {
+                    let date: u16 =
+                        (((year - 1980) << 9) | (month as i16) << 5 | day_of_month as i16) as u16;
+                    let expected_days: i64 =
+                        get_days_from_civil(year as i64, month, day_of_month) - epoch_days;
+                    assert_eq!(
+                        fat_get_number_of_seconds(date, 0) as i64,
+                        expected_days * 86400,
+                        "year: {}, month: {}, day_of_month: {}",
+                        year,
+                        month,
+                        day_of_month
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_fat_get_number_of_seconds_with_time_full_range() {
+        for hours in 0..24u8 {
+            for minutes in 0..60u8 {
+                for seconds_ticks in 0..30u8 {
+                    let time: u16 =
+                        ((hours as u16) << 11) | ((minutes as u16) << 5) | (seconds_ticks as u16);
+                    let oracle_seconds: u32 = ((hours as u32 * 60) + (minutes as u32)) * 60
+                        + ((seconds_ticks as u32) * 2);
+                    assert_eq!(
+                        fat_get_number_of_seconds(0x0021, time),
+                        oracle_seconds,
+                        "hours: {}, minutes: {}, seconds_ticks: {}",
+                        hours,
+                        minutes,
+                        seconds_ticks
+                    );
+                }
+            }
+        }
     }
 
     #[test]
     fn test_fat_get_number_of_seconds_with_fraction() {
         let (number_of_seconds, fraction): (u32, u32) =
             fat_get_number_of_seconds_with_fraction(0x3d0c, 0xa8d0, 0x7d);
-        assert_eq!(number_of_seconds, 968792793);
+        assert_eq!(number_of_seconds, 966114393);
         assert_eq!(fraction, 25);
     }
 
@@ -413,7 +572,7 @@ mod tests {
         let test_struct: FatDate = FatDate::new(0x3d0c);
 
         let number_of_seconds: u32 = test_struct.get_number_of_seconds();
-        assert_eq!(number_of_seconds, 968716800);
+        assert_eq!(number_of_seconds, 966038400);
     }
 
     #[test]
@@ -446,17 +605,36 @@ mod tests {
         let mut test_struct: FatTimeDate = FatTimeDate::new(0x3d0c, 0xa8d0);
 
         let number_of_seconds: u32 = test_struct.get_number_of_seconds();
-        assert_eq!(number_of_seconds, 968792792);
+        assert_eq!(number_of_seconds, 966114392);
 
         test_struct.set_utc_offset(0x88);
 
         let number_of_seconds: u32 = test_struct.get_number_of_seconds();
-        assert_eq!(number_of_seconds, 968785592);
+        assert_eq!(number_of_seconds, 966107192);
 
         test_struct.set_utc_offset(0xf8);
 
         let number_of_seconds: u32 = test_struct.get_number_of_seconds();
-        assert_eq!(number_of_seconds, 968799992);
+        assert_eq!(number_of_seconds, 966121592);
+
+        // Test with a timestamp in with an UTC offset that predates January 1, 1980, UTC.
+        let mut test_struct: FatTimeDate = FatTimeDate::new(0x0021, 0x0000);
+        test_struct.set_utc_offset(0x81);
+
+        let number_of_seconds: u32 = test_struct.get_number_of_seconds();
+        assert_eq!(number_of_seconds, 0);
+
+        let mut test_struct: FatTimeDate = FatTimeDate::new(0x0021, 0x03c0);
+        test_struct.set_utc_offset(0x81);
+
+        let number_of_seconds: u32 = test_struct.get_number_of_seconds();
+        assert_eq!(number_of_seconds, 900);
+
+        let mut test_struct: FatTimeDate = FatTimeDate::new(0x0021, 0x0000);
+        test_struct.set_utc_offset(0xf8);
+
+        let number_of_seconds: u32 = test_struct.get_number_of_seconds();
+        assert_eq!(number_of_seconds, 7200);
     }
 
     #[test]
@@ -500,19 +678,27 @@ mod tests {
         let mut test_struct: FatTimeDate10Ms = FatTimeDate10Ms::new(0x3d0c, 0xa8d0, 0x7d);
 
         let (number_of_seconds, fraction): (u32, u32) = test_struct.get_number_of_seconds();
-        assert_eq!(number_of_seconds, 968792793);
+        assert_eq!(number_of_seconds, 966114393);
         assert_eq!(fraction, 25);
 
         test_struct.set_utc_offset(0x88);
 
         let (number_of_seconds, fraction): (u32, u32) = test_struct.get_number_of_seconds();
-        assert_eq!(number_of_seconds, 968785593);
+        assert_eq!(number_of_seconds, 966107193);
         assert_eq!(fraction, 25);
 
         test_struct.set_utc_offset(0xf8);
 
         let (number_of_seconds, fraction): (u32, u32) = test_struct.get_number_of_seconds();
-        assert_eq!(number_of_seconds, 968799993);
+        assert_eq!(number_of_seconds, 966121593);
+        assert_eq!(fraction, 25);
+
+        // Test with a timestamp in with an UTC offset that predates January 1, 1980, UTC.
+        let mut test_struct: FatTimeDate10Ms = FatTimeDate10Ms::new(0x0021, 0x0000, 0x7d);
+        test_struct.set_utc_offset(0x81);
+
+        let (number_of_seconds, fraction): (u32, u32) = test_struct.get_number_of_seconds();
+        assert_eq!(number_of_seconds, 0);
         assert_eq!(fraction, 25);
     }
 
