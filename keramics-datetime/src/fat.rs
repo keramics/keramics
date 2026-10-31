@@ -209,8 +209,7 @@ impl FatTimeDate {
                 // A local time in a UTC offset ahead of UTC can predate January 1, 1980, UTC, for
                 // which a number of seconds cannot be represented. Such timestamps saturate to 0,
                 // similar to an unspecified timestamp.
-                number_of_seconds =
-                    number_of_seconds.saturating_sub((utc_offset as u32) * 15 * 60);
+                number_of_seconds = number_of_seconds.saturating_sub((utc_offset as u32) * 15 * 60);
             }
         }
         number_of_seconds
@@ -324,8 +323,7 @@ impl FatTimeDate10Ms {
                 // A local time in a UTC offset ahead of UTC can predate January 1, 1980, UTC, for
                 // which a number of seconds cannot be represented. Such timestamps saturate to 0,
                 // similar to an unspecified timestamp.
-                number_of_seconds =
-                    number_of_seconds.saturating_sub((utc_offset as u32) * 15 * 60);
+                number_of_seconds = number_of_seconds.saturating_sub((utc_offset as u32) * 15 * 60);
             }
         }
         (number_of_seconds, fraction)
@@ -513,10 +511,8 @@ mod tests {
                     days_in_month[month as usize]
                 };
                 for day_of_month in 1..=last_day {
-                    let date: u16 = (((year - 1980) << 9)
-                        | (month as i16) << 5
-                        | day_of_month as i16)
-                        as u16;
+                    let date: u16 =
+                        (((year - 1980) << 9) | (month as i16) << 5 | day_of_month as i16) as u16;
                     let oracle_days: i64 =
                         days_from_civil(year as i64, month, day_of_month) - epoch_days;
                     assert_eq!(
@@ -538,9 +534,8 @@ mod tests {
         for hours in 0..24u8 {
             for minutes in 0..60u8 {
                 for seconds_ticks in 0..30u8 {
-                    let time: u16 = ((hours as u16) << 11)
-                        | ((minutes as u16) << 5)
-                        | (seconds_ticks as u16);
+                    let time: u16 =
+                        ((hours as u16) << 11) | ((minutes as u16) << 5) | (seconds_ticks as u16);
                     let oracle_seconds: u32 = ((hours as u32 * 60) + (minutes as u32)) * 60
                         + ((seconds_ticks as u32) * 2);
                     assert_eq!(

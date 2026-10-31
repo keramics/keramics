@@ -1758,7 +1758,7 @@ mod tests {
         assert_eq!(
             result,
             Some(DateTime::ApfsTime(ApfsTime {
-                timestamp: 1785841765254516511
+                timestamp: 1785841765254251713
             }))
             .as_ref()
         );
@@ -1828,7 +1828,7 @@ mod tests {
         assert_eq!(
             result,
             Some(DateTime::ApfsTime(ApfsTime {
-                timestamp: 1785841765254251713
+                timestamp: 1785841765254516511
             }))
             .as_ref()
         );

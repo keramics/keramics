@@ -596,7 +596,7 @@ impl PyVfsLocation {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "VfsPath")]
 #[derive(Clone)]
 struct PyVfsPath {
@@ -669,7 +669,7 @@ impl PyVfsPath {
     }
 }
 
-#[pyclass]
+#[pyclass(from_py_object)]
 #[pyo3(name = "VfsPathComponent")]
 #[derive(Clone)]
 struct PyVfsPathComponent {
