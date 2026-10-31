@@ -128,12 +128,9 @@ mod tests {
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "1904-02-29T20:45:52.000000000");
-    }
 
-    #[test]
-    fn test_to_iso8601_string_with_extreme_timestamp() {
-        // The largest representable timestamp.
-        let test_struct: XfsBigtime = XfsBigtime::new(18446744073709551615); // u64::MAX
+        // Test with the largest representable timestamp.
+        let test_struct: XfsBigtime = XfsBigtime::new(u64::MAX);
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "2486-07-02T20:20:25.709551615");

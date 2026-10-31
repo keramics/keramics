@@ -94,11 +94,8 @@ mod tests {
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "2010-08-12T21:06:31.5468750");
-    }
 
-    #[test]
-    fn test_to_iso8601_string_with_years_beyond_i16() {
-        // January 1, 40000, the year of which exceeds the range of an i16 value.
+        // Test with a timestamp that exceeds the range of an i16 value (January 1, 40000).
         let test_struct: Filetime = Filetime::new(12117553344000000000);
 
         let string: String = test_struct.to_iso8601_string();

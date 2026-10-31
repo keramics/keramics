@@ -99,33 +99,27 @@ mod tests {
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "2013-08-01T15:25:28");
-    }
 
-    #[test]
-    fn test_to_iso8601_string_leap_year_boundaries() {
-        // The leap day of the leap year 1904.
+        // Test with a leap day of the leap year 1904.
         let test_struct: HfsTime = HfsTime::new(59 * 86400);
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "1904-02-29T00:00:00");
 
-        // The last day of February of the regular year 1905.
+        // Test with the last day of February of the regular year 1905.
         let test_struct: HfsTime = HfsTime::new(424 * 86400);
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "1905-02-28T00:00:00");
 
-        // The day after the last day of February.
+        // Test with the day after the last day of February.
         let test_struct: HfsTime = HfsTime::new(425 * 86400);
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "1905-03-01T00:00:00");
-    }
 
-    #[test]
-    fn test_to_iso8601_string_with_extreme_timestamp() {
-        // The largest representable timestamp.
-        let test_struct: HfsTime = HfsTime::new(4294967295); // u32::MAX
+        // Test with the largest representable timestamp.
+        let test_struct: HfsTime = HfsTime::new(u32::MAX);
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "2040-02-06T06:28:15");

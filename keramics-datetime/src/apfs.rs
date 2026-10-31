@@ -99,10 +99,8 @@ mod tests {
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "2010-08-12T20:06:31.987654321");
-    }
 
-    #[test]
-    fn test_to_iso8601_string_with_negative_timestamp() {
+        // Test with a negative timestamp.
         let test_struct: ApfsTime = ApfsTime::new(-500000000);
 
         let string: String = test_struct.to_iso8601_string();
@@ -117,17 +115,14 @@ mod tests {
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "1969-12-30T23:59:59.500000000");
-    }
 
-    #[test]
-    fn test_to_iso8601_string_with_extreme_timestamps() {
-        // The largest and smallest representable timestamps.
-        let test_struct: ApfsTime = ApfsTime::new(9223372036854775807); // i64::MAX
+        // Test with the largest and smallest representable timestamps.
+        let test_struct: ApfsTime = ApfsTime::new(i64::MAX);
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "2262-04-11T23:47:16.854775807");
 
-        let test_struct: ApfsTime = ApfsTime::new(-9223372036854775808); // i64::MIN
+        let test_struct: ApfsTime = ApfsTime::new(i64::MIN);
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "1677-09-21T00:12:43.145224192");

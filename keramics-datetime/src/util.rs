@@ -104,13 +104,10 @@ fn get_days_in_century(year: i64) -> i32 {
 const DAYS_IN_400_YEARS: i64 = 146097;
 
 /// Retrieves date values.
-///
-/// The returned year is a `i32` value, since for some timestamp formats (such as the Windows
-/// FILETIME) the number of days can exceed the range of years representable by an `i16` value.
 pub fn get_date_values(number_of_days: i64, epoch: &Epoch) -> (i32, u8, u8) {
     let mut number_of_cycles: i64 = 0;
 
-    // Day counts predating the start of the epoch month are shifted forward by whole 400 year
+    // Number of days predating the start of the epoch month are shifted forward by whole 400 year
     // cycles, since the Gregorian calendar repeats every 400 years, and the difference in years
     // is corrected at the end.
     let mut number_of_days: i64 = number_of_days + (epoch.day_of_month as i64) - 1;
@@ -119,13 +116,11 @@ pub fn get_date_values(number_of_days: i64, epoch: &Epoch) -> (i32, u8, u8) {
         number_of_days += number_of_cycles * DAYS_IN_400_YEARS;
     }
 
-    // `number_of_days` contains the 0-based number of days since the first day of the month,
-    // where day 0 represents the first day of the month.
+    // The number of days since the first day of the month, where day 0 represents the first day of
+    // the month.
     let mut year: i64 = epoch.year as i64;
     let mut month: u8 = epoch.month;
 
-    // Advance to the month containing the date, which also advances to the next year when the
-    // date predates the first day of the epoch month.
     while month > 1 {
         let days_in_month: i64 = get_days_in_month(year, month) as i64;
         if number_of_days < days_in_month {
@@ -139,7 +134,6 @@ pub fn get_date_values(number_of_days: i64, epoch: &Epoch) -> (i32, u8, u8) {
         }
         number_of_days -= days_in_month;
     }
-    // Advance to the year containing the date, by first advancing to the next century boundary.
     for _ in (year % 100)..100 {
         let days_in_year: i64 = get_days_in_year(year) as i64;
         if number_of_days < days_in_year {
@@ -148,7 +142,6 @@ pub fn get_date_values(number_of_days: i64, epoch: &Epoch) -> (i32, u8, u8) {
         year += 1;
         number_of_days -= days_in_year;
     }
-    // Advance to the century containing the date.
     let mut days_in_century: i64 = get_days_in_century(year) as i64;
 
     while number_of_days >= days_in_century {
@@ -157,7 +150,6 @@ pub fn get_date_values(number_of_days: i64, epoch: &Epoch) -> (i32, u8, u8) {
 
         days_in_century = get_days_in_century(year) as i64;
     }
-    // Advance to the year containing the date.
     let mut days_in_year: i64 = get_days_in_year(year) as i64;
 
     while number_of_days >= days_in_year {
@@ -166,7 +158,6 @@ pub fn get_date_values(number_of_days: i64, epoch: &Epoch) -> (i32, u8, u8) {
 
         days_in_year = get_days_in_year(year) as i64;
     }
-    // Advance to the month containing the date.
     let mut days_in_month: i64 = get_days_in_month(year, month) as i64;
 
     while number_of_days >= days_in_month {
@@ -204,6 +195,20 @@ pub fn get_time_values(mut number_of_seconds: i64) -> (i64, u8, u8, u8) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Calculates the number of days between January 1, year 0 and a civil date, using the
+    // days-difference algorithm.
+    fn get_days_from_civil(year: i64, month: u8, day_of_month: u8) -> i64 {
+        let year: i64 = if (month as u8) <= 2 { year - 1 } else { year };
+        let era: i64 = if year >= 0 { year } else { year - 399 } / 400;
+        let year_of_era: i64 = year - (era * 400);
+        let month_prime: i64 = (month as i64 + 9) % 12;
+        let day_of_year: i64 = ((153 * month_prime) + 2) / 5 + (day_of_month as i64) - 1;
+        let day_of_era: i64 =
+            (year_of_era * 365) + (year_of_era / 4) - (year_of_era / 100) + day_of_year;
+
+        (era * 146097) + day_of_era
+    }
 
     #[test]
     fn test_is_leap_year() {
@@ -301,10 +306,7 @@ mod tests {
         assert_eq!(get_date_values(-1, &test_epoch), (1969, 12, 31));
         assert_eq!(get_date_values(-1460, &test_epoch), (1966, 1, 2));
         assert_eq!(get_date_values(-62091, &test_epoch), (1800, 1, 1));
-    }
 
-    #[test]
-    fn test_get_date_values_before_epoch_in_epoch_month() {
         let test_epoch: Epoch = Epoch::new(2000, 1, 9);
         assert_eq!(get_date_values(-5, &test_epoch), (2000, 1, 4));
         assert_eq!(get_date_values(-8, &test_epoch), (2000, 1, 1));
@@ -316,10 +318,7 @@ mod tests {
         assert_eq!(get_date_values(-31, &test_epoch), (1970, 1, 15));
         assert_eq!(get_date_values(-46, &test_epoch), (1969, 12, 31));
         assert_eq!(get_date_values(-50, &test_epoch), (1969, 12, 27));
-    }
 
-    #[test]
-    fn test_get_date_values_before_epoch_across_month_and_year_boundaries() {
         let test_epoch: Epoch = Epoch::new(1970, 1, 1);
         assert_eq!(get_date_values(-25566, &test_epoch), (1900, 1, 2));
         assert_eq!(get_date_values(-25567, &test_epoch), (1900, 1, 1));
@@ -330,10 +329,7 @@ mod tests {
         assert_eq!(get_date_values(-31, &test_epoch), (2000, 1, 1));
         assert_eq!(get_date_values(-32, &test_epoch), (1999, 12, 31));
         assert_eq!(get_date_values(-359, &test_epoch), (1999, 2, 7));
-    }
 
-    #[test]
-    fn test_get_date_values_last_day_of_month_after_non_january_epoch() {
         let test_epoch: Epoch = Epoch::new(1582, 10, 15);
         assert_eq!(get_date_values(16, &test_epoch), (1582, 10, 31));
         assert_eq!(get_date_values(46, &test_epoch), (1582, 11, 30));
@@ -353,20 +349,6 @@ mod tests {
         assert_eq!(get_date_values(808, &test_epoch), (1904, 2, 29));
     }
 
-    // Number of days between January 1, year 0 and a civil date, calculated with the
-    // days-difference algorithm. Used as an oracle for get_date_values.
-    fn days_from_civil(year: i64, month: u8, day_of_month: u8) -> i64 {
-        let year: i64 = if (month as u8) <= 2 { year - 1 } else { year };
-        let era: i64 = if year >= 0 { year } else { year - 399 } / 400;
-        let year_of_era: i64 = year - (era * 400);
-        let month_prime: i64 = (month as i64 + 9) % 12;
-        let day_of_year: i64 = ((153 * month_prime) + 2) / 5 + (day_of_month as i64) - 1;
-        let day_of_era: i64 =
-            (year_of_era * 365) + (year_of_era / 4) - (year_of_era / 100) + day_of_year;
-
-        (era * 146097) + day_of_era
-    }
-
     #[test]
     fn test_get_date_values_against_oracle() {
         let test_epochs: [Epoch; 4] = [
@@ -377,19 +359,17 @@ mod tests {
         ];
 
         for test_epoch in test_epochs.iter() {
-            let epoch_days: i64 = days_from_civil(
+            let epoch_days: i64 = get_days_from_civil(
                 test_epoch.year as i64,
                 test_epoch.month,
                 test_epoch.day_of_month,
             );
-
-            // Dense coverage around the epoch, covering month, year and century boundaries.
             for number_of_days in -500..501 {
                 let (year, month, day_of_month): (i32, u8, u8) =
                     get_date_values(number_of_days, test_epoch);
-                let date_days: i64 = days_from_civil(year as i64, month, day_of_month);
+                let expected_days: i64 = get_days_from_civil(year as i64, month, day_of_month);
                 assert_eq!(
-                    date_days - epoch_days,
+                    expected_days - epoch_days,
                     number_of_days,
                     "epoch: {}-{:02}-{:02}",
                     test_epoch.year,
@@ -397,16 +377,15 @@ mod tests {
                     test_epoch.day_of_month
                 );
             }
-            // Sparse coverage across multiple centuries in both directions.
             for number_of_days in -400000..400001 {
                 if number_of_days % 251 != 0 {
                     continue;
                 }
                 let (year, month, day_of_month): (i32, u8, u8) =
                     get_date_values(number_of_days, test_epoch);
-                let date_days: i64 = days_from_civil(year as i64, month, day_of_month);
+                let expected_days: i64 = get_days_from_civil(year as i64, month, day_of_month);
                 assert_eq!(
-                    date_days - epoch_days,
+                    expected_days - epoch_days,
                     number_of_days,
                     "epoch: {}-{:02}-{:02}",
                     test_epoch.year,

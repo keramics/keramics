@@ -175,19 +175,16 @@ mod tests {
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "1929-05-22T03:53:28.012345679");
-    }
 
-    #[test]
-    fn test_posix_time64_ns_to_iso8601_string_dates_pre_epoch_century() {
-        // 1899-12-31T23:59:59 is the day before 1900-01-01, the last day of the pre-1900
-        // century, which predates the epoch by more than 25000 days.
+        // Test with 1899-12-31T23:59:59 which is the last day of the pre-1900 century, which
+        // predates the epoch by more than 25000 days.
         let test_struct: PosixTime64Ns = PosixTime64Ns::new(-2208988801, 0);
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "1899-12-31T23:59:59.000000000");
 
-        // 1899-12-31T00:00:00 is exactly 25568 days predating the epoch, landing on the last
-        // day of the month of a different month and year than the epoch.
+        // Test with 1899-12-31T00:00:00 which is exactly 25568 days predating the epoch, and
+        // the last day of the month of a different month and year than the epoch.
         let test_struct: PosixTime64Ns = PosixTime64Ns::new(-2209075200, 0);
 
         let string: String = test_struct.to_iso8601_string();
