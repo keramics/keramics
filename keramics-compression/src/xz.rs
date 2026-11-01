@@ -80,13 +80,14 @@ impl XzContext {
                 "Invalid compressed data value too small"
             ));
         }
-        let (check_type, check_size) = match Self::read_stream_header(compressed_data) {
-            Ok(check) => check,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read stream header");
-                return Err(error);
-            }
-        };
+        let stream_header: XzStreamHeader =
+            match XzStreamHeader::read_stream_header(compressed_data) {
+                Ok(stream_header) => stream_header,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read stream header");
+                    return Err(error);
+                }
+            };
         let mut compressed_data_offset: usize = XZ_STREAM_HEADER_SIZE;
         let mut uncompressed_offset: usize = 0;
         let uncompressed_data_size: usize = uncompressed_data.len();
@@ -136,8 +137,9 @@ impl XzContext {
                     return Err(error);
                 }
             }
-            let unpadded_size: u64 =
-                block_header.header_size as u64 + cdata_size as u64 + check_size as u64;
+            let unpadded_size: u64 = block_header.header_size as u64
+                + cdata_size as u64
+                + stream_header.check_size as u64;
             let block_padding: usize = match Self::read_block_padding(
                 compressed_data,
                 compressed_data_offset,
@@ -153,7 +155,7 @@ impl XzContext {
             compressed_data_offset += block_padding;
 
             let check_bytes: usize = match Self::verify_block_checksum(
-                check_type,
+                stream_header.check_type,
                 compressed_data,
                 compressed_data_offset,
                 &uncompressed_data
@@ -185,15 +187,18 @@ impl XzContext {
                 "Invalid compressed data value too small"
             ));
         }
-        match Self::read_footer(
-            compressed_data,
-            compressed_data_offset,
-            index_size,
-            check_type,
-        ) {
+        let stream_footer: XzStreamFooter =
+            match XzStreamFooter::read_footer(compressed_data, compressed_data_offset) {
+                Ok(stream_footer) => stream_footer,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read stream footer");
+                    return Err(error);
+                }
+            };
+        match stream_footer.verify_stream(index_size, stream_header.check_type) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read stream footer");
+                keramics_core::error_trace_add_frame!(error, "Unable to verify stream footer");
                 return Err(error);
             }
         }
@@ -213,58 +218,6 @@ impl XzContext {
         self.uncompressed_data_size = uncompressed_offset;
 
         Ok(())
-    }
-
-    /// Reads and validates the stream header.
-    fn read_stream_header(data: &[u8]) -> Result<(u8, usize), ErrorTrace> {
-        if data.len() < XZ_STREAM_HEADER_SIZE {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid compressed data value too small"
-            ));
-        }
-        if &data[0..6] != XZ_STREAM_HEADER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!("Unsupported signature"));
-        }
-        let flags_byte_0: u8 = data[6];
-        let flags_byte_1: u8 = data[7];
-
-        // The first byte of stream flags is always a 0-byte.
-        if flags_byte_0 != 0x00 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid stream flags: first byte must be zero"
-            ));
-        }
-        // The upper 4 bits of the second byte are reserved.
-        if flags_byte_1 & 0xF0 != 0x00 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid stream flags: reserved bits are set"
-            ));
-        }
-        let check_type: u8 = flags_byte_1 & 0x0F;
-
-        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
-        crc32_context.update(&data[6..8]);
-
-        let calculated_checksum: u32 = crc32_context.finalize();
-        let stored_checksum: u32 = u32::from_le_bytes(data[8..12].try_into().unwrap());
-
-        if stored_checksum != calculated_checksum {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} stream header checksums",
-                stored_checksum, calculated_checksum
-            )));
-        }
-        let check_size: usize = match check_type {
-            XZ_CHECK_NONE => 0,
-            XZ_CHECK_CRC32 => 4,
-            _ => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported check type: 0x{:x}",
-                    check_type
-                )));
-            }
-        };
-        Ok((check_type, check_size))
     }
 
     /// Reads and validates the index, verifying it against the decoded Blocks.
@@ -366,62 +319,6 @@ impl XzContext {
             )));
         }
         Ok(index_size)
-    }
-
-    /// Reads and validates the stream footer.
-    fn read_footer(
-        data: &[u8],
-        footer_offset: usize,
-        index_size: usize,
-        check_type: u8,
-    ) -> Result<(), ErrorTrace> {
-        let footer_end: usize = footer_offset + XZ_FOOTER_SIZE;
-        if footer_end > data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid compressed data value too small"
-            ));
-        }
-        // CRC32 is calculated over the backward size and stream flags.
-        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
-        crc32_context.update(&data[footer_offset + 4..footer_offset + 10]);
-        let calculated_checksum: u32 = crc32_context.finalize();
-        let stored_checksum: u32 =
-            u32::from_le_bytes(data[footer_offset..footer_offset + 4].try_into().unwrap());
-        if stored_checksum != calculated_checksum {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} stream footer checksums",
-                stored_checksum, calculated_checksum
-            )));
-        }
-        let backward_size: u32 = u32::from_le_bytes(
-            data[footer_offset + 4..footer_offset + 8]
-                .try_into()
-                .unwrap(),
-        );
-        // Index size is (backward size + 1) * 4.
-        let calculated_index_size: usize = (backward_size as usize + 1) * 4;
-        if calculated_index_size != index_size {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between calculated index size: {} and stream footer backward Size: {}",
-                index_size, calculated_index_size
-            )));
-        }
-        let footer_flags: u8 = data[footer_offset + 8];
-        let footer_check_type: u8 = data[footer_offset + 9];
-        if footer_flags != 0x00 || (footer_check_type & 0x0F) != check_type {
-            return Err(keramics_core::error_trace_new!(
-                "Mismatch between stream footer and stream header flags"
-            ));
-        }
-        if footer_check_type & 0xF0 != 0x00 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid stream footer flags: reserved bits are set"
-            ));
-        }
-        if &data[footer_offset + 10..footer_offset + 12] != XZ_FOOTER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!("Unsupported signature"));
-        }
-        Ok(())
     }
 
     /// Reads a variable-length integer (up to 9 bytes) at offset.
@@ -840,6 +737,72 @@ impl XzContext {
     }
 }
 
+/// Parsed xz stream header.
+struct XzStreamHeader {
+    /// Stream check type.
+    check_type: u8,
+
+    /// Size of the Block check in bytes.
+    check_size: usize,
+}
+
+impl XzStreamHeader {
+    /// Reads and validates the stream header.
+    fn read_stream_header(data: &[u8]) -> Result<XzStreamHeader, ErrorTrace> {
+        if data.len() < XZ_STREAM_HEADER_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        if &data[0..6] != XZ_STREAM_HEADER_SIGNATURE {
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
+        }
+        let flags_byte_0: u8 = data[6];
+        let flags_byte_1: u8 = data[7];
+
+        // The first byte of stream flags is always a 0-byte.
+        if flags_byte_0 != 0x00 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid stream flags: first byte must be zero"
+            ));
+        }
+        // The upper 4 bits of the second byte are reserved.
+        if flags_byte_1 & 0xF0 != 0x00 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid stream flags: reserved bits are set"
+            ));
+        }
+        let check_type: u8 = flags_byte_1 & 0x0F;
+
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(&data[6..8]);
+
+        let calculated_checksum: u32 = crc32_context.finalize();
+        let stored_checksum: u32 = u32::from_le_bytes(data[8..12].try_into().unwrap());
+
+        if stored_checksum != calculated_checksum {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} stream header checksums",
+                stored_checksum, calculated_checksum
+            )));
+        }
+        let check_size: usize = match check_type {
+            XZ_CHECK_NONE => 0,
+            XZ_CHECK_CRC32 => 4,
+            _ => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported check type: 0x{:x}",
+                    check_type
+                )));
+            }
+        };
+        Ok(XzStreamHeader {
+            check_type,
+            check_size,
+        })
+    }
+}
+
 /// Parsed xz block header.
 struct XzBlockHeader {
     /// Size of the block header in bytes.
@@ -1049,6 +1012,82 @@ impl XzBlockHeader {
                 "Mismatch between stored: {} and calculated: {} uncompressed sizes",
                 self.uncompressed_size, block_uncompressed_size
             )));
+        }
+        Ok(())
+    }
+}
+
+/// Parsed xz stream footer.
+struct XzStreamFooter {
+    /// Size of the Index in bytes calculated from the backward size.
+    index_size: usize,
+
+    /// Stream check type.
+    check_type: u8,
+}
+
+impl XzStreamFooter {
+    /// Reads and validates the stream footer.
+    fn read_footer(data: &[u8], footer_offset: usize) -> Result<XzStreamFooter, ErrorTrace> {
+        let footer_end: usize = footer_offset + XZ_FOOTER_SIZE;
+        if footer_end > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        // CRC32 is calculated over the backward size and stream flags.
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(&data[footer_offset + 4..footer_offset + 10]);
+        let calculated_checksum: u32 = crc32_context.finalize();
+        let stored_checksum: u32 =
+            u32::from_le_bytes(data[footer_offset..footer_offset + 4].try_into().unwrap());
+        if stored_checksum != calculated_checksum {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} stream footer checksums",
+                stored_checksum, calculated_checksum
+            )));
+        }
+        let backward_size: u32 = u32::from_le_bytes(
+            data[footer_offset + 4..footer_offset + 8]
+                .try_into()
+                .unwrap(),
+        );
+        let footer_flags: u8 = data[footer_offset + 8];
+        let footer_check_type: u8 = data[footer_offset + 9];
+
+        // The first byte of stream flags is always a 0-byte.
+        if footer_flags != 0x00 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid stream footer flags: reserved bits are set"
+            ));
+        }
+        if footer_check_type & 0xF0 != 0x00 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid stream footer flags: reserved bits are set"
+            ));
+        }
+        if &data[footer_offset + 10..footer_offset + 12] != XZ_FOOTER_SIGNATURE {
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
+        }
+        // Index size is (backward size + 1) * 4.
+        Ok(XzStreamFooter {
+            index_size: (backward_size as usize + 1) * 4,
+            check_type: footer_check_type & 0x0F,
+        })
+    }
+
+    /// Verifies that the stream footer matches the Index and the stream header.
+    fn verify_stream(&self, index_size: usize, check_type: u8) -> Result<(), ErrorTrace> {
+        if self.index_size != index_size {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between calculated index size: {} and stream footer backward Size: {}",
+                index_size, self.index_size
+            )));
+        }
+        if self.check_type != check_type {
+            return Err(keramics_core::error_trace_new!(
+                "Mismatch between stream footer and stream header flags"
+            ));
         }
         Ok(())
     }
