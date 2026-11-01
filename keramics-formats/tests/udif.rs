@@ -140,6 +140,20 @@ fn read_image_lzfse_compressed() -> Result<(), ErrorTrace> {
 }
 
 #[test]
+fn read_image_lzma_compressed() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/udif");
+    let image: UdifImage = open_image(&path_buf, "hfsplus_lzma.dmg")?;
+    let data_stream: DataStreamReference = image.get_data_stream().unwrap();
+
+    let (media_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+
+    assert_eq!(media_offset, image.get_media_size());
+    assert_eq!(md5_hash.as_str(), "ee3b14a7a0824c9d06bfeab97c614767");
+
+    Ok(())
+}
+
+#[test]
 fn read_image_with_resource_fork() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/udif");
     let image: UdifImage = open_image(&path_buf, "hfsplus_rsrc.dmg")?;

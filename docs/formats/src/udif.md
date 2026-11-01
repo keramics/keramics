@@ -31,7 +31,7 @@ Known UDIF image types are:
 | UDxx | Uncompressed UDIF |
 | UDZO | zlib/DEFLATE compressed UDIF |
 | ULFO | LZFSE compressed UDIF |
-| ULMO | LZMA compressed UDIF |
+| ULMO | xz/LZMA compressed UDIF |
 
 UDIF images can be encrypted. An encrypted UDIF image consists of one of more UDIF segment files,
 where each segment file uses a [Encrypted Encoding container](cdsaencr.md) with its own key
@@ -433,10 +433,10 @@ The block table entry (BLKXChunkEntry) is 40 bytes in size and consists of:
 | 0x7ffffffe | | Comment |
 | | | |
 | 0x80000004 | | [ADC compressed data](adc.md) |
-| 0x80000005 | | [zlib compressed data](zlib.md) |
+| 0x80000005 | | [zlib/DEFLATE compressed data](zlib.md) |
 | 0x80000006 | | bzip2 compressed data |
 | 0x80000007 | | [LZFSE compressed data](lzfse.md) |
-| 0x80000008 | | LZMA compressed data |
+| 0x80000008 | | [xz/LZMA compressed data](lzma.md) |
 | | | |
 | 0xffffffff | | Block table entries terminator |
 

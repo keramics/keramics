@@ -9,11 +9,5 @@ Supported features:
 | --- | --- |
 | Format versions | 4 |
 | Image types | Compressed, Encrypted, Split (or segmented), Uncompressed |
-| Compression methods | ADC, bzip2, LZFSE, zlib |
+| Compression methods | ADC, bzip2, LZFSE, xz (LZMA), zlib (DEFLATE) |
 | Encryption | [Mac OS encrypted encoding](https://github.com/keramics/keramics/tree/main/keramics-formats/src/cdsaencr/README.md) |
-
-Unsupported features:
-
-| Category | Feature(s) |
-| --- | --- |
-| Compression methods | LZMA |
