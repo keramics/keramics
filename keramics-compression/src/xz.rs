@@ -17,20 +17,22 @@
 
 use keramics_checksums::ReversedCrc32Context;
 use keramics_core::{DebugTrace, DebugTraceScope, ErrorTrace};
+use keramics_layout_map::LayoutMap;
+use keramics_types::{bytes_to_u16_be, bytes_to_u32_le};
 
 use super::lzma::LzmaDecoder;
 
 /// xz stream header signature.
 const XZ_STREAM_HEADER_SIGNATURE: &[u8] = b"\xfd7zXZ\x00";
 
-/// xz stream footer signature.
-const XZ_FOOTER_SIGNATURE: &[u8] = b"YZ";
-
-/// Size of the xz stream Header in bytes.
+/// Size of the xz stream header in bytes.
 const XZ_STREAM_HEADER_SIZE: usize = 12;
 
-/// Size of the xz stream Footer in bytes.
-const XZ_FOOTER_SIZE: usize = 12;
+/// xz stream footer signature.
+const XZ_STREAM_FOOTER_SIGNATURE: &[u8] = b"YZ";
+
+/// Size of the xz stream footer in bytes.
+const XZ_STREAM_FOOTER_SIZE: usize = 12;
 
 /// LZMA2 filter identifier.
 const XZ_LZMA2_FILTER_IDENTIFIER: u64 = 0x21;
@@ -42,16 +44,432 @@ const XZ_MINIMUM_BLOCK_HEADER_SIZE: usize = 8;
 const XZ_MAXIMUM_BLOCK_HEADER_SIZE: usize = 1024;
 
 /// Maximum number of bytes used to encode a variable-length integer.
-const XZ_VLI_MAXIMUM_SIZE: usize = 9;
+const XZ_MAXIMUM_VARIABLE_LENGTH_INTEGER_SIZE: usize = 9;
 
-/// Maximum allowed LZMA properties value (lclppb).
-const XZ_MAXIMUM_LZMA_PROPERTIES: u8 = (((4 * 5) + 4) * 9) + 8;
+/// xz checksum type: none.
+const XZ_CHECKSUM_TYPE_NONE: u8 = 0;
 
-/// xz check type: no check.
-const XZ_CHECK_NONE: u8 = 0;
+/// xz checksum type: CRC32.
+const XZ_CHECKSUM_TYPE_CRC32: u8 = 1;
 
-/// xz check type: CRC32.
-const XZ_CHECK_CRC32: u8 = 1;
+/// Reads a variable-length integer (up to 9 bytes) at offset.
+fn read_variable_length_integer(data: &[u8], offset: usize) -> Result<(u64, usize), ErrorTrace> {
+    let mut value: u64 = 0;
+    let mut shift: usize = 0;
+    let mut byte_offset: usize = offset;
+    let mut number_of_bytes: usize = 0;
+
+    loop {
+        if byte_offset >= data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        if number_of_bytes >= XZ_MAXIMUM_VARIABLE_LENGTH_INTEGER_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid variable-length integer: too many bytes"
+            ));
+        }
+        let byte_value: u8 = data[byte_offset];
+        byte_offset += 1;
+        number_of_bytes += 1;
+
+        if shift < 63 {
+            value |= ((byte_value & 0x7f) as u64) << shift;
+        }
+        if byte_value & 0x80 == 0x00 {
+            // A continuation of a multi-byte variable-length integer must not end with a 0-byte
+            // (non-canonical encoding).
+            if number_of_bytes > 1 && byte_value == 0x00 {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid variable-length integer: non-canonical encoding"
+                ));
+            }
+            break;
+        }
+        shift += 7;
+    }
+    Ok((value, byte_offset))
+}
+
+#[derive(LayoutMap)]
+#[layout_map(
+    structure(
+        byte_order = "little",
+        field(name = "signature", data_type = "[u8; 6]", format = "hex"),
+        field(name = "stream_flags", data_type = "[u8; 2]", format = "hex"),
+        field(name = "checksum", data_type = "u32", format = "hex"),
+    ),
+    methods("debug_read_data")
+)]
+/// Stream header used by xz compressed data.
+struct XzStreamHeader {
+    /// Stream checksum type.
+    pub checksum_type: u8,
+
+    /// Size of the block checksum in bytes.
+    pub checksum_size: usize,
+}
+
+impl XzStreamHeader {
+    /// Creates a new stream header.
+    pub fn new() -> Self {
+        Self {
+            checksum_type: 0,
+            checksum_size: 0,
+        }
+    }
+
+    /// Reads the stream header.
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        if data.len() < XZ_STREAM_HEADER_SIZE {
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
+        }
+        if &data[0..6] != XZ_STREAM_HEADER_SIGNATURE {
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
+        }
+        let flags_byte1: u8 = data[6];
+        let flags_byte2: u8 = data[7];
+
+        // The first byte of stream flags is always a 0-byte.
+        if flags_byte1 != 0x00 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid stream flags: first byte must be zero"
+            ));
+        }
+        // The upper 4 bits of the second byte are reserved.
+        if flags_byte2 & 0xf0 != 0x00 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid stream flags: reserved bits are set"
+            ));
+        }
+        let checksum_type: u8 = flags_byte2 & 0x0f;
+
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(&data[6..8]);
+
+        let calculated_checksum: u32 = crc32_context.finalize();
+        let stored_checksum: u32 = bytes_to_u32_le!(data, 8);
+
+        if stored_checksum != calculated_checksum {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} stream header checksums",
+                stored_checksum, calculated_checksum
+            )));
+        }
+        let checksum_size: usize = match checksum_type {
+            XZ_CHECKSUM_TYPE_NONE => 0,
+            XZ_CHECKSUM_TYPE_CRC32 => 4,
+            _ => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported checksum type: 0x{:02x}",
+                    checksum_type
+                )));
+            }
+        };
+        self.checksum_type = checksum_type;
+        self.checksum_size = checksum_size;
+
+        Ok(())
+    }
+}
+
+/// Block header used by xz compressed data.
+struct XzBlockHeader {
+    /// Size of the block header in bytes.
+    pub header_size: usize,
+
+    /// Stored compressed size, if present.
+    pub compressed_size: Option<u64>,
+
+    /// Stored uncompressed size, if present.
+    pub uncompressed_size: Option<u64>,
+}
+
+impl XzBlockHeader {
+    /// Creates a new block header.
+    pub fn new() -> Self {
+        Self {
+            header_size: 0,
+            compressed_size: None,
+            uncompressed_size: None,
+        }
+    }
+
+    /// Reads the block header.
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        if data.is_empty() {
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
+        }
+        let size_byte: u8 = data[0];
+        let header_size: usize = ((size_byte as usize) + 1) * 4;
+
+        if !(XZ_MINIMUM_BLOCK_HEADER_SIZE..=XZ_MAXIMUM_BLOCK_HEADER_SIZE).contains(&header_size) {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid block header size: 0x{:02x} value out of bounds",
+                size_byte
+            )));
+        }
+        if data.len() < header_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        let mut data_offset: usize = 1;
+        let flags: u8 = data[data_offset];
+        data_offset += 1;
+
+        let number_of_filters: usize = ((flags & 0x03) as usize) + 1;
+
+        if flags & 0x3c != 0x00 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid block flags: 0x{:02x} reserved bits are set",
+                flags
+            )));
+        }
+        let compressed_size: Option<u64> = if flags & 0x40 != 0 {
+            let (value, next_offset) = match read_variable_length_integer(data, data_offset) {
+                Ok((value, next_offset)) => (value, next_offset),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read variable-length integer"
+                    );
+                    return Err(error);
+                }
+            };
+            data_offset = next_offset;
+
+            Some(value)
+        } else {
+            None
+        };
+        let uncompressed_size: Option<u64> = if flags & 0x80 != 0 {
+            let (value, next_offset) = match read_variable_length_integer(data, data_offset) {
+                Ok((value, next_offset)) => (value, next_offset),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read variable-length integer"
+                    );
+                    return Err(error);
+                }
+            };
+            data_offset = next_offset;
+
+            Some(value)
+        } else {
+            None
+        };
+        // Currently only a single filter chain consisting of the LZMA2 filter is supported.
+        if number_of_filters != 1 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported number of filters: {}",
+                number_of_filters
+            )));
+        }
+        if data_offset >= header_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        let (filter_identifier, next_offset) = match read_variable_length_integer(data, data_offset)
+        {
+            Ok((filter_identifier, next_offset)) => (filter_identifier, next_offset),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read variable-length integer"
+                );
+                return Err(error);
+            }
+        };
+        data_offset = next_offset;
+
+        let (properties_size, next_offset) = match read_variable_length_integer(data, data_offset) {
+            Ok((properties_size, next_offset)) => (properties_size, next_offset),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read variable-length integer"
+                );
+                return Err(error);
+            }
+        };
+        data_offset = next_offset;
+
+        if data_offset + (properties_size as usize) > header_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        let filter_properties: &[u8] = &data[data_offset..data_offset + (properties_size as usize)];
+        data_offset += properties_size as usize;
+
+        if filter_identifier != XZ_LZMA2_FILTER_IDENTIFIER || properties_size != 1 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported filter identifier: 0x{:02x}",
+                filter_identifier
+            )));
+        }
+        let lzma2_properties: u8 = filter_properties[0];
+
+        // The upper 2 bits of the LZMA2 filter properties byte are reserved and the raw dictionary
+        // size value must be 0 to 40.
+        if lzma2_properties & 0xc0 != 0x00 || lzma2_properties & 0x3f > 40 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid LZMA2 filter properties: 0x{:02x}",
+                lzma2_properties
+            )));
+        }
+        // Header padding (up to header_size - 4) must be 0-bytes.
+        if data_offset > header_size - 4 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        for padding_byte in &data[data_offset..header_size - 4] {
+            if *padding_byte != 0x00 {
+                return Err(keramics_core::error_trace_new!(
+                    "Non 0-byte in block header padding"
+                ));
+            }
+        }
+        // The block header CRC32 is calculated over the entire block header
+        // field except the CRC32 field itself.
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(&data[0..header_size - 4]);
+
+        let calculated_checksum: u32 = crc32_context.finalize();
+        let stored_checksum: u32 = bytes_to_u32_le!(data, header_size - 4);
+
+        if stored_checksum != calculated_checksum {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} block header checksums",
+                stored_checksum, calculated_checksum
+            )));
+        }
+        self.header_size = header_size;
+        self.compressed_size = compressed_size;
+        self.uncompressed_size = uncompressed_size;
+
+        Ok(())
+    }
+
+    /// Verifies that the stored block sizes (if defined) match the decoded sizes.
+    pub fn verify_stored_sizes(
+        &self,
+        compressed_data_size: usize,
+        uncompressed_data_size: usize,
+    ) -> Result<(), ErrorTrace> {
+        if let Some(stored_compressed_size) = self.compressed_size {
+            if stored_compressed_size != compressed_data_size as u64 {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between stored: {} and calculated: {} compressed sizes",
+                    stored_compressed_size, compressed_data_size
+                )));
+            }
+        }
+        if let Some(stored_uncompressed_size) = self.uncompressed_size {
+            if stored_uncompressed_size != uncompressed_data_size as u64 {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between stored: {} and calculated: {} uncompressed sizes",
+                    stored_uncompressed_size, uncompressed_data_size
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(LayoutMap)]
+#[layout_map(
+    structure(
+        byte_order = "little",
+        field(name = "checksum", data_type = "u32", format = "hex"),
+        field(name = "backward_size", data_type = "u32"),
+        field(name = "stream_flags", data_type = "[u8; 2]", format = "hex"),
+        field(name = "signature", data_type = "[u8; 2]", format = "char"),
+    ),
+    methods("debug_read_data")
+)]
+/// Stream footer used by xz compressed data.
+struct XzStreamFooter {
+    /// Size of the index in bytes calculated from the backward size.
+    pub index_size: usize,
+
+    /// Stream checksum type.
+    pub checksum_type: u8,
+}
+
+impl XzStreamFooter {
+    /// Creates a new stream footer.
+    pub fn new() -> Self {
+        Self {
+            index_size: 0,
+            checksum_type: 0,
+        }
+    }
+
+    /// Reads the stream footer.
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        if data.len() < XZ_STREAM_FOOTER_SIZE {
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
+        }
+        // CRC32 is calculated over the backward size and stream flags.
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(&data[4..10]);
+
+        let calculated_checksum: u32 = crc32_context.finalize();
+        let stored_checksum: u32 = bytes_to_u32_le!(data, 0);
+
+        if stored_checksum != calculated_checksum {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} stream footer checksums",
+                stored_checksum, calculated_checksum
+            )));
+        }
+        let backward_size: u32 = bytes_to_u32_le!(data, 4);
+        let flags_byte1: u8 = data[8];
+        let flags_byte2: u8 = data[9];
+
+        // The first byte of stream flags is always a 0-byte.
+        if flags_byte1 != 0x00 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid stream footer flags: reserved bits are set"
+            ));
+        }
+        if flags_byte2 & 0xf0 != 0x00 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid stream footer flags: reserved bits are set"
+            ));
+        }
+        if &data[10..12] != XZ_STREAM_FOOTER_SIGNATURE {
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
+        }
+        // Index size is (backward size + 1) * 4.
+        self.index_size = ((backward_size as usize) + 1) * 4;
+        self.checksum_type = flags_byte2 & 0x0f;
+
+        Ok(())
+    }
+
+    /// Verifies that the stream footer matches the index and the stream header.
+    pub fn verify_stream(&self, index_size: usize, checksum_type: u8) -> Result<(), ErrorTrace> {
+        if self.index_size != index_size {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between calculated index size: {} and stream footer backward size: {}",
+                index_size, self.index_size
+            )));
+        }
+        if self.checksum_type != checksum_type {
+            return Err(keramics_core::error_trace_new!(
+                "Mismatch between stream footer and stream header flags"
+            ));
+        }
+        Ok(())
+    }
+}
 
 /// Context for decompressing xz (LZMA2) compressed data.
 pub struct XzContext {
@@ -80,18 +498,26 @@ impl XzContext {
                 "Invalid compressed data value too small"
             ));
         }
-        let stream_header: XzStreamHeader =
-            match XzStreamHeader::read_stream_header(compressed_data) {
-                Ok(stream_header) => stream_header,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read stream header");
-                    return Err(error);
-                }
-            };
+        keramics_core::debug_trace_data_and_structure!(
+            "XzStreamHeader",
+            0,
+            &compressed_data[0..XZ_STREAM_HEADER_SIZE],
+            XZ_STREAM_HEADER_SIZE,
+            XzStreamHeader::debug_read_data(compressed_data)
+        );
+        let mut stream_header: XzStreamHeader = XzStreamHeader::new();
+
+        match stream_header.read_data(compressed_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read stream header");
+                return Err(error);
+            }
+        }
         let mut compressed_data_offset: usize = XZ_STREAM_HEADER_SIZE;
-        let mut uncompressed_offset: usize = 0;
+        let mut uncompressed_data_offset: usize = 0;
         let uncompressed_data_size: usize = uncompressed_data.len();
-        let mut records: Vec<(u64, u64)> = vec![];
+        let mut records: Vec<(u64, u64)> = Vec::new();
 
         // The blocks are terminated by the index indicator (0x00).
         loop {
@@ -104,73 +530,84 @@ impl XzContext {
                 break;
             }
             let block_header_offset: usize = compressed_data_offset;
-            let block_header: XzBlockHeader =
-                match XzBlockHeader::read_block_header(compressed_data, compressed_data_offset) {
-                    Ok(block_header) => block_header,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to read block header");
-                        return Err(error);
-                    }
-                };
-            compressed_data_offset = block_header.header_offset;
+            let mut block_header: XzBlockHeader = XzBlockHeader::new();
 
-            let block_output_start: usize = uncompressed_offset;
-            let (cdata_size, block_uncompressed_size) = match self.decompress_block_cdata(
-                compressed_data,
-                compressed_data_offset,
-                uncompressed_data,
-                uncompressed_data_size,
-                block_output_start,
-            ) {
+            match block_header.read_data(&compressed_data[compressed_data_offset..]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read block header");
+                    return Err(error);
+                }
+            }
+            keramics_core::debug_trace_data!(
+                "XzBlockHeader",
+                block_header_offset as u64,
+                &compressed_data
+                    [block_header_offset..block_header_offset + block_header.header_size],
+                block_header.header_size
+            );
+            compressed_data_offset += block_header.header_size;
+
+            let block_uncompressed_data_offset: usize = uncompressed_data_offset;
+            let (block_compressed_data_size, block_uncompressed_data_size) = match self
+                .decompress_block_data(
+                    compressed_data,
+                    compressed_data_offset,
+                    uncompressed_data,
+                    uncompressed_data_size,
+                    block_uncompressed_data_offset,
+                ) {
                 Ok(sizes) => sizes,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to decompress block data");
                     return Err(error);
                 }
             };
-            compressed_data_offset += cdata_size;
+            compressed_data_offset += block_compressed_data_size;
 
-            match block_header.verify_stored_sizes(cdata_size, block_uncompressed_size) {
+            match block_header
+                .verify_stored_sizes(block_compressed_data_size, block_uncompressed_data_size)
+            {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to verify stored sizes");
                     return Err(error);
                 }
             }
-            let unpadded_size: u64 = block_header.header_size as u64
-                + cdata_size as u64
-                + stream_header.check_size as u64;
-            let block_padding: usize = match Self::read_block_padding(
+            let unpadded_size: u64 = (block_header.header_size as u64)
+                + (block_compressed_data_size as u64)
+                + (stream_header.checksum_size as u64);
+            let block_padding_size: usize = match Self::read_block_padding(
                 compressed_data,
                 compressed_data_offset,
                 block_header_offset,
                 unpadded_size,
             ) {
-                Ok(block_padding) => block_padding,
+                Ok(block_padding_size) => block_padding_size,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read block padding");
                     return Err(error);
                 }
             };
-            compressed_data_offset += block_padding;
+            compressed_data_offset += block_padding_size;
 
-            let check_bytes: usize = match Self::verify_block_checksum(
-                stream_header.check_type,
+            let checksum_size: usize = match Self::verify_block_checksum(
+                stream_header.checksum_type,
                 compressed_data,
                 compressed_data_offset,
-                &uncompressed_data
-                    [block_output_start..block_output_start + block_uncompressed_size],
+                &uncompressed_data[block_uncompressed_data_offset
+                    ..block_uncompressed_data_offset + block_uncompressed_data_size],
             ) {
-                Ok(check_bytes) => check_bytes,
+                Ok(checksum_size) => checksum_size,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to verify block checksum");
                     return Err(error);
                 }
             };
-            compressed_data_offset += check_bytes;
+            compressed_data_offset += checksum_size;
 
-            records.push((unpadded_size, block_uncompressed_size as u64));
-            uncompressed_offset += block_uncompressed_size;
+            records.push((unpadded_size, block_uncompressed_data_size as u64));
+            uncompressed_data_offset += block_uncompressed_data_size;
         }
         let index_size: usize =
             match Self::read_index(compressed_data, compressed_data_offset, &records) {
@@ -182,205 +619,70 @@ impl XzContext {
             };
         compressed_data_offset += index_size;
 
-        if compressed_data_offset + XZ_FOOTER_SIZE > compressed_data_size {
+        if compressed_data_offset + XZ_STREAM_FOOTER_SIZE > compressed_data_size {
             return Err(keramics_core::error_trace_new!(
                 "Invalid compressed data value too small"
             ));
         }
-        let stream_footer: XzStreamFooter =
-            match XzStreamFooter::read_footer(compressed_data, compressed_data_offset) {
-                Ok(stream_footer) => stream_footer,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read stream footer");
-                    return Err(error);
-                }
-            };
-        match stream_footer.verify_stream(index_size, stream_header.check_type) {
+        keramics_core::debug_trace_data_and_structure!(
+            "XzStreamFooter",
+            compressed_data_offset as u64,
+            &compressed_data
+                [compressed_data_offset..compressed_data_offset + XZ_STREAM_FOOTER_SIZE],
+            XZ_STREAM_FOOTER_SIZE,
+            XzStreamFooter::debug_read_data(&compressed_data[compressed_data_offset..])
+        );
+        let mut stream_footer: XzStreamFooter = XzStreamFooter::new();
+
+        match stream_footer.read_data(&compressed_data[compressed_data_offset..]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read stream footer");
+                return Err(error);
+            }
+        }
+        match stream_footer.verify_stream(index_size, stream_header.checksum_type) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to verify stream footer");
                 return Err(error);
             }
         }
-        // Note that the decompressor is strict. The stream must end exactly at the end of
+        // Note that the decompressor is strict. The stream must end exactly at the end of the
         // footer. Trailing data, including trailing (padding) bytes, is rejected.
-        if compressed_data_offset + XZ_FOOTER_SIZE != compressed_data_size {
+        if compressed_data_offset + XZ_STREAM_FOOTER_SIZE != compressed_data_size {
             return Err(keramics_core::error_trace_new!(
                 "Trailing data after end of xz stream"
             ));
         }
-        if uncompressed_offset != uncompressed_data_size {
+        if uncompressed_data_offset != uncompressed_data_size {
             return Err(keramics_core::error_trace_new!(format!(
                 "Mismatch between calculated: {} and expected: {} uncompressed data sizes",
-                uncompressed_offset, uncompressed_data_size
+                uncompressed_data_offset, uncompressed_data_size
             )));
         }
-        self.uncompressed_data_size = uncompressed_offset;
+        self.uncompressed_data_size = uncompressed_data_offset;
 
         Ok(())
     }
 
-    /// Reads and validates the index, verifying it against the decoded Blocks.
-    fn read_index(
-        data: &[u8],
-        index_offset: usize,
-        records: &[(u64, u64)],
-    ) -> Result<usize, ErrorTrace> {
-        if index_offset >= data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid compressed data value too small"
-            ));
-        }
-        if data[index_offset] != 0x00 {
-            return Err(keramics_core::error_trace_new!("Invalid index indicator"));
-        }
-        let mut offset: usize = index_offset + 1;
-        let (number_of_records, next_offset) =
-            match XzContext::read_variable_length_integer(data, offset) {
-                Ok((number_of_records, next_offset)) => (number_of_records, next_offset),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read variable-length integer"
-                    );
-                    return Err(error);
-                }
-            };
-        offset = next_offset;
-
-        if number_of_records != records.len() as u64 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between number of records: {} and number of blocks: {}",
-                number_of_records,
-                records.len()
-            )));
-        }
-        for (record_index, (unpadded_size, uncompressed_size)) in records.iter().enumerate() {
-            let (stored_unpadded, next_offset) =
-                match XzContext::read_variable_length_integer(data, offset) {
-                    Ok((stored_unpadded, next_offset)) => (stored_unpadded, next_offset),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read variable-length integer"
-                        );
-                        return Err(error);
-                    }
-                };
-            offset = next_offset;
-            let (stored_uncompressed, next_offset) =
-                match XzContext::read_variable_length_integer(data, offset) {
-                    Ok((stored_uncompressed, next_offset)) => (stored_uncompressed, next_offset),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read variable-length integer"
-                        );
-                        return Err(error);
-                    }
-                };
-            offset = next_offset;
-            if stored_unpadded != *unpadded_size || stored_uncompressed != *uncompressed_size {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Mismatch between index record {} and decoded block",
-                    record_index
-                )));
-            }
-        }
-        let index_body_size: usize = offset - index_offset;
-        let index_padding: usize = (4 - (index_body_size & 3)) & 3;
-        if index_offset + index_body_size + index_padding + 4 > data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid compressed data value too small"
-            ));
-        }
-        for padding_byte in
-            &data[index_offset + index_body_size..index_offset + index_body_size + index_padding]
-        {
-            if *padding_byte != 0x00 {
-                return Err(keramics_core::error_trace_new!(
-                    "Non 0-byte in index padding"
-                ));
-            }
-        }
-        let index_size: usize = index_body_size + index_padding + 4;
-        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
-        crc32_context.update(&data[index_offset..index_offset + index_body_size + index_padding]);
-        let calculated_checksum: u32 = crc32_context.finalize();
-        let stored_checksum: u32 = u32::from_le_bytes(
-            data[index_offset + index_size - 4..index_offset + index_size]
-                .try_into()
-                .unwrap(),
-        );
-        if stored_checksum != calculated_checksum {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} index checksums",
-                stored_checksum, calculated_checksum
-            )));
-        }
-        Ok(index_size)
-    }
-
-    /// Reads a variable-length integer (up to 9 bytes) at offset.
-    fn read_variable_length_integer(
-        data: &[u8],
-        offset: usize,
-    ) -> Result<(u64, usize), ErrorTrace> {
-        let mut value: u64 = 0;
-        let mut shift: usize = 0;
-        let mut byte_offset: usize = offset;
-        let mut number_of_bytes: usize = 0;
-
-        loop {
-            if byte_offset >= data.len() {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid compressed data value too small"
-                ));
-            }
-            if number_of_bytes >= XZ_VLI_MAXIMUM_SIZE {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid variable-length integer: too many bytes"
-                ));
-            }
-            let byte_value: u8 = data[byte_offset];
-            byte_offset += 1;
-            number_of_bytes += 1;
-            if shift < 63 {
-                value |= u64::from(byte_value & 0x7F) << shift;
-            }
-            if byte_value & 0x80 == 0x00 {
-                // A continuation of a multi-byte VLI must not end with a 0-byte (non-canonical
-                // encoding).
-                if number_of_bytes > 1 && byte_value == 0x00 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Invalid variable-length integer: non-canonical encoding"
-                    ));
-                }
-                break;
-            }
-            shift += 7;
-        }
-
-        Ok((value, byte_offset))
-    }
-
-    /// Decodes the LZMA2 chunks of a Block's Compressed Data.
-    fn decompress_block_cdata(
+    /// Decompresses the LZMA2 chunks of a block.
+    fn decompress_block_data(
         &mut self,
         data: &[u8],
         offset: usize,
         uncompressed_data: &mut [u8],
         uncompressed_data_size: usize,
-        block_output_start: usize,
+        block_uncompressed_data_offset: usize,
     ) -> Result<(usize, usize), ErrorTrace> {
-        let cdata_start: usize = offset;
+        let compressed_data_start_offset: usize = offset;
         let mut data_offset: usize = offset;
-        let mut output_offset: usize = block_output_start;
+        let mut uncompressed_data_offset: usize = block_uncompressed_data_offset;
 
         // LZMA2 chunk state.
         let mut need_properties: bool = true;
         let mut need_dictionary_reset: bool = true;
-        let mut dictionary_start: usize = block_output_start;
+        let mut dictionary_start_offset: usize = block_uncompressed_data_offset;
         let mut lzma_decoder: Option<LzmaDecoder> = None;
 
         DebugTrace::scope(|debug_trace| {
@@ -397,7 +699,7 @@ impl XzContext {
                 if control == 0x00 {
                     break;
                 }
-                if control >= 0xE0 || control == 0x01 {
+                if control >= 0xe0 || control == 0x01 {
                     need_properties = true;
                     need_dictionary_reset = true;
                 } else if need_dictionary_reset {
@@ -405,7 +707,6 @@ impl XzContext {
                         "Invalid LZMA2 chunk: dictionary reset required"
                     ));
                 }
-
                 if control >= 0x80 {
                     // LZMA chunk.
                     match Self::decompress_lzma_chunk(
@@ -414,8 +715,8 @@ impl XzContext {
                         &mut data_offset,
                         uncompressed_data,
                         uncompressed_data_size,
-                        &mut output_offset,
-                        &mut dictionary_start,
+                        &mut uncompressed_data_offset,
+                        &mut dictionary_start_offset,
                         control,
                         &mut need_properties,
                         &mut need_dictionary_reset,
@@ -437,8 +738,8 @@ impl XzContext {
                         &mut data_offset,
                         uncompressed_data,
                         uncompressed_data_size,
-                        &mut output_offset,
-                        &mut dictionary_start,
+                        &mut uncompressed_data_offset,
+                        &mut dictionary_start_offset,
                         control,
                         &mut need_dictionary_reset,
                     ) {
@@ -453,66 +754,12 @@ impl XzContext {
                     }
                 }
             }
+            let block_compressed_data_size: usize = data_offset - compressed_data_start_offset;
+            let block_uncompressed_data_size: usize =
+                uncompressed_data_offset - block_uncompressed_data_offset;
 
-            let cdata_size: usize = data_offset - cdata_start;
-            let block_uncompressed_size: usize = output_offset - block_output_start;
-            Ok((cdata_size, block_uncompressed_size))
+            Ok((block_compressed_data_size, block_uncompressed_data_size))
         })
-    }
-
-    /// Validates the Block padding and returns its size in bytes.
-    fn read_block_padding(
-        data: &[u8],
-        data_offset: usize,
-        block_header_offset: usize,
-        unpadded_size: u64,
-    ) -> Result<usize, ErrorTrace> {
-        let block_padding: usize =
-            (4 - ((block_header_offset as u64 + unpadded_size) & 3)) as usize & 3;
-
-        if data_offset + block_padding > data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid compressed data value too small"
-            ));
-        }
-        for padding_byte in &data[data_offset..data_offset + block_padding] {
-            if *padding_byte != 0x00 {
-                return Err(keramics_core::error_trace_new!(
-                    "Non 0-byte in block padding"
-                ));
-            }
-        }
-        Ok(block_padding)
-    }
-
-    /// Validates the Block checksum (if defined) and returns the number of bytes consumed.
-    fn verify_block_checksum(
-        check_type: u8,
-        data: &[u8],
-        data_offset: usize,
-        uncompressed_chunk: &[u8],
-    ) -> Result<usize, ErrorTrace> {
-        if check_type != XZ_CHECK_CRC32 {
-            return Ok(0);
-        }
-        if data_offset + 4 > data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid compressed data value too small"
-            ));
-        }
-        let stored_checksum: u32 =
-            u32::from_le_bytes(data[data_offset..data_offset + 4].try_into().unwrap());
-        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
-        crc32_context.update(uncompressed_chunk);
-        let calculated_checksum: u32 = crc32_context.finalize();
-
-        if stored_checksum != calculated_checksum {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} block checksums",
-                stored_checksum, calculated_checksum
-            )));
-        }
-        Ok(4)
     }
 
     /// Decompresses an LZMA chunk.
@@ -522,8 +769,8 @@ impl XzContext {
         data_offset: &mut usize,
         uncompressed_data: &mut [u8],
         uncompressed_data_size: usize,
-        output_offset: &mut usize,
-        dictionary_start: &mut usize,
+        uncompressed_data_offset: &mut usize,
+        dictionary_start_offset: &mut usize,
         control: u8,
         need_properties: &mut bool,
         need_dictionary_reset: &mut bool,
@@ -534,21 +781,17 @@ impl XzContext {
                 "Invalid compressed data value too small"
             ));
         }
-        // Uncompressed and Compressed Size fields hold the size
-        // minus one in 16 bits (plus 5 upper bits of the control
-        // byte for the uncompressed size). The lower 16 bits are a
-        // single value, so adding the second byte plus one must
-        // carry into the first byte.
-        let uncompressed_size: usize = (usize::from(control & 0x1F) << 16)
-            + (usize::from(data[*data_offset]) << 8)
-            + usize::from(data[*data_offset + 1])
+        // Uncompressed and compressed size fields hold the size minus 1 in 16 bits
+        // (plus 5 upper bits of the control byte for the uncompressed size).
+        let uncompressed_chunk_size: usize = ((((control & 0x1f) as usize) << 16)
+            | (bytes_to_u16_be!(data, *data_offset) as usize))
             + 1;
         *data_offset += 2;
-        let compressed_size: usize =
-            (usize::from(data[*data_offset]) << 8) + usize::from(data[*data_offset + 1]) + 1;
+
+        let compressed_chunk_size: usize = (bytes_to_u16_be!(data, *data_offset) as usize) + 1;
         *data_offset += 2;
 
-        if control >= 0xC0 {
+        if control >= 0xc0 {
             if *data_offset >= data.len() {
                 return Err(keramics_core::error_trace_new!(
                     "Invalid compressed data value too small"
@@ -556,8 +799,9 @@ impl XzContext {
             }
             let properties_byte: u8 = data[*data_offset];
             *data_offset += 1;
-            let (literal_context_bits, literal_pos_bits, pos_bits) =
-                match Self::decode_lzma_properties(properties_byte) {
+
+            let (literal_context_bits, literal_position_bits, position_bits) =
+                match LzmaDecoder::decode_properties(properties_byte) {
                     Ok(properties) => properties,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -571,8 +815,8 @@ impl XzContext {
                 Some(decoder) => {
                     match decoder.reset_state_and_properties(
                         literal_context_bits,
-                        literal_pos_bits,
-                        pos_bits,
+                        literal_position_bits,
+                        position_bits,
                     ) {
                         Ok(_) => {}
                         Err(mut error) => {
@@ -585,17 +829,20 @@ impl XzContext {
                     }
                 }
                 None => {
-                    let decoder: LzmaDecoder =
-                        match LzmaDecoder::new(literal_context_bits, literal_pos_bits, pos_bits) {
-                            Ok(decoder) => decoder,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to create LZMA decoder"
-                                );
-                                return Err(error);
-                            }
-                        };
+                    let decoder: LzmaDecoder = match LzmaDecoder::new(
+                        literal_context_bits,
+                        literal_position_bits,
+                        position_bits,
+                    ) {
+                        Ok(decoder) => decoder,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to create LZMA decoder"
+                            );
+                            return Err(error);
+                        }
+                    };
                     *lzma_decoder = Some(decoder);
                 }
             }
@@ -604,7 +851,7 @@ impl XzContext {
             return Err(keramics_core::error_trace_new!(
                 "Invalid LZMA2 chunk: properties required"
             ));
-        } else if control >= 0xA0 {
+        } else if control >= 0xa0 {
             match lzma_decoder.as_mut() {
                 Some(decoder) => {
                     decoder.reset_state();
@@ -616,17 +863,16 @@ impl XzContext {
                 }
             }
         }
-
         if *need_dictionary_reset {
-            *dictionary_start = *output_offset;
+            *dictionary_start_offset = *uncompressed_data_offset;
             *need_dictionary_reset = false;
         }
-        if *output_offset + uncompressed_size > uncompressed_data_size {
+        if *uncompressed_data_offset + uncompressed_chunk_size > uncompressed_data_size {
             return Err(keramics_core::error_trace_new!(
                 "Invalid uncompressed data value too small"
             ));
         }
-        if *data_offset + compressed_size > data.len() {
+        if *data_offset + compressed_chunk_size > data.len() {
             return Err(keramics_core::error_trace_new!(
                 "Invalid compressed data value too small"
             ));
@@ -641,12 +887,12 @@ impl XzContext {
         };
         let number_of_bytes: usize = match decoder.decompress_chunk(
             debug_trace,
-            &data[*data_offset..*data_offset + compressed_size],
+            &data[*data_offset..*data_offset + compressed_chunk_size],
             uncompressed_data,
             uncompressed_data_size,
-            *output_offset,
-            *dictionary_start,
-            uncompressed_size,
+            *uncompressed_data_offset,
+            *dictionary_start_offset,
+            uncompressed_chunk_size,
             false,
         ) {
             Ok(number_of_bytes) => number_of_bytes,
@@ -655,14 +901,14 @@ impl XzContext {
                 return Err(error);
             }
         };
-        if number_of_bytes != uncompressed_size {
+        if number_of_bytes != uncompressed_chunk_size {
             return Err(keramics_core::error_trace_new!(format!(
                 "Mismatch between calculated: {} and expected: {} LZMA2 chunk sizes",
-                number_of_bytes, uncompressed_size
+                number_of_bytes, uncompressed_chunk_size
             )));
         }
-        *data_offset += compressed_size;
-        *output_offset += uncompressed_size;
+        *data_offset += compressed_chunk_size;
+        *uncompressed_data_offset += uncompressed_chunk_size;
 
         Ok(())
     }
@@ -673,8 +919,8 @@ impl XzContext {
         data_offset: &mut usize,
         uncompressed_data: &mut [u8],
         uncompressed_data_size: usize,
-        output_offset: &mut usize,
-        dictionary_start: &mut usize,
+        uncompressed_data_offset: &mut usize,
+        dictionary_start_offset: &mut usize,
         control: u8,
         need_dictionary_reset: &mut bool,
     ) -> Result<(), ErrorTrace> {
@@ -689,407 +935,193 @@ impl XzContext {
                 "Invalid compressed data value too small"
             ));
         }
-        let compressed_size: usize =
-            (usize::from(data[*data_offset]) << 8) + usize::from(data[*data_offset + 1]) + 1;
+        let chunk_size: usize = (bytes_to_u16_be!(data, *data_offset) as usize) + 1;
         *data_offset += 2;
+
         if *need_dictionary_reset {
-            *dictionary_start = *output_offset;
+            *dictionary_start_offset = *uncompressed_data_offset;
             *need_dictionary_reset = false;
         }
-        if *output_offset + compressed_size > uncompressed_data_size {
+        if *uncompressed_data_offset + chunk_size > uncompressed_data_size {
             return Err(keramics_core::error_trace_new!(
                 "Invalid uncompressed data value too small"
             ));
         }
-        if *data_offset + compressed_size > data.len() {
+        if *data_offset + chunk_size > data.len() {
             return Err(keramics_core::error_trace_new!(
                 "Invalid compressed data value too small"
             ));
         }
-        uncompressed_data[*output_offset..*output_offset + compressed_size]
-            .copy_from_slice(&data[*data_offset..*data_offset + compressed_size]);
-        *data_offset += compressed_size;
-        *output_offset += compressed_size;
+        uncompressed_data[*uncompressed_data_offset..*uncompressed_data_offset + chunk_size]
+            .copy_from_slice(&data[*data_offset..*data_offset + chunk_size]);
+        *data_offset += chunk_size;
+        *uncompressed_data_offset += chunk_size;
 
         Ok(())
     }
 
-    /// Decodes an LZMA (lclppb) properties byte.
-    fn decode_lzma_properties(properties_value: u8) -> Result<(u8, u8, u8), ErrorTrace> {
-        if properties_value > XZ_MAXIMUM_LZMA_PROPERTIES {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid LZMA properties value: 0x{:02x}",
-                properties_value
-            )));
-        }
-        let mut value: usize = usize::from(properties_value);
-        let literal_context_bits: u8 = (value % 9) as u8;
-        value /= 9;
-        let literal_pos_bits: u8 = (value % 5) as u8;
-        let pos_bits: u8 = (value / 5) as u8;
-        if u32::from(literal_context_bits) + u32::from(literal_pos_bits) > 4 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid LZMA properties value: 0x{:02x} (lc + lp > 4)",
-                properties_value
-            )));
-        }
-        Ok((literal_context_bits, literal_pos_bits, pos_bits))
-    }
-}
+    /// Validates the block padding and returns its size in bytes.
+    fn read_block_padding(
+        data: &[u8],
+        data_offset: usize,
+        block_header_offset: usize,
+        unpadded_size: u64,
+    ) -> Result<usize, ErrorTrace> {
+        let block_padding_size: usize =
+            (4 - (((block_header_offset as u64) + unpadded_size) & 3)) as usize & 3;
 
-/// Parsed xz stream header.
-struct XzStreamHeader {
-    /// Stream check type.
-    check_type: u8,
-
-    /// Size of the Block check in bytes.
-    check_size: usize,
-}
-
-impl XzStreamHeader {
-    /// Reads and validates the stream header.
-    fn read_stream_header(data: &[u8]) -> Result<XzStreamHeader, ErrorTrace> {
-        if data.len() < XZ_STREAM_HEADER_SIZE {
+        if data_offset + block_padding_size > data.len() {
             return Err(keramics_core::error_trace_new!(
                 "Invalid compressed data value too small"
             ));
         }
-        if &data[0..6] != XZ_STREAM_HEADER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!("Unsupported signature"));
-        }
-        let flags_byte_0: u8 = data[6];
-        let flags_byte_1: u8 = data[7];
-
-        // The first byte of stream flags is always a 0-byte.
-        if flags_byte_0 != 0x00 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid stream flags: first byte must be zero"
-            ));
-        }
-        // The upper 4 bits of the second byte are reserved.
-        if flags_byte_1 & 0xF0 != 0x00 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid stream flags: reserved bits are set"
-            ));
-        }
-        let check_type: u8 = flags_byte_1 & 0x0F;
-
-        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
-        crc32_context.update(&data[6..8]);
-
-        let calculated_checksum: u32 = crc32_context.finalize();
-        let stored_checksum: u32 = u32::from_le_bytes(data[8..12].try_into().unwrap());
-
-        if stored_checksum != calculated_checksum {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} stream header checksums",
-                stored_checksum, calculated_checksum
-            )));
-        }
-        let check_size: usize = match check_type {
-            XZ_CHECK_NONE => 0,
-            XZ_CHECK_CRC32 => 4,
-            _ => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported check type: 0x{:x}",
-                    check_type
-                )));
-            }
-        };
-        Ok(XzStreamHeader {
-            check_type,
-            check_size,
-        })
-    }
-}
-
-/// Parsed xz block header.
-struct XzBlockHeader {
-    /// Size of the block header in bytes.
-    header_size: usize,
-
-    /// Offset immediately following the block header.
-    header_offset: usize,
-
-    /// Whether the Compressed Size field is present.
-    compressed_size_defined: bool,
-
-    /// Stored Compressed Size.
-    compressed_size: u64,
-
-    /// Whether the Uncompressed Size field is present.
-    uncompressed_size_defined: bool,
-
-    /// Stored Uncompressed Size.
-    uncompressed_size: u64,
-}
-
-impl XzBlockHeader {
-    /// Reads and validates a block header.
-    fn read_block_header(data: &[u8], header_offset: usize) -> Result<XzBlockHeader, ErrorTrace> {
-        if header_offset >= data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid compressed data value too small"
-            ));
-        }
-        let size_byte: u8 = data[header_offset];
-        let header_size: usize = (usize::from(size_byte) + 1) * 4;
-
-        if header_size < XZ_MINIMUM_BLOCK_HEADER_SIZE || header_size > XZ_MAXIMUM_BLOCK_HEADER_SIZE
-        {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid block header size: 0x{:x}",
-                size_byte
-            )));
-        }
-        let header_end: usize = header_offset + header_size;
-
-        if header_end + 4 > data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid compressed data value too small"
-            ));
-        }
-        let mut offset: usize = header_offset + 1;
-        let flags: u8 = data[offset];
-        offset += 1;
-
-        let number_of_filters: usize = usize::from(flags & 0x03) + 1;
-
-        if flags & 0x3C != 0x00 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid Block Flags: reserved bits are set: 0x{:x}",
-                flags
-            )));
-        }
-        let compressed_size_defined: bool = flags & 0x40 != 0;
-        let uncompressed_size_defined: bool = flags & 0x80 != 0;
-        let mut compressed_size: u64 = 0;
-
-        if compressed_size_defined {
-            let (value, new_offset) = match XzContext::read_variable_length_integer(data, offset) {
-                Ok((value, new_offset)) => (value, new_offset),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read variable-length integer"
-                    );
-                    return Err(error);
-                }
-            };
-            compressed_size = value;
-            offset = new_offset;
-        }
-        let mut uncompressed_size: u64 = 0;
-
-        if uncompressed_size_defined {
-            let (value, new_offset) = match XzContext::read_variable_length_integer(data, offset) {
-                Ok((value, new_offset)) => (value, new_offset),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read variable-length integer"
-                    );
-                    return Err(error);
-                }
-            };
-            uncompressed_size = value;
-            offset = new_offset;
-        }
-        // Currently only a single filter chain consisting of the LZMA2 filter is supported.
-        if number_of_filters != 1 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported number of filters: {}",
-                number_of_filters
-            )));
-        }
-        if offset >= header_end {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid compressed data value too small"
-            ));
-        }
-        let (filter_identifier, next_offset) =
-            match XzContext::read_variable_length_integer(data, offset) {
-                Ok((filter_identifier, next_offset)) => (filter_identifier, next_offset),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read variable-length integer"
-                    );
-                    return Err(error);
-                }
-            };
-        offset = next_offset;
-
-        let (properties_size, next_offset) =
-            match XzContext::read_variable_length_integer(data, offset) {
-                Ok((properties_size, next_offset)) => (properties_size, next_offset),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read variable-length integer"
-                    );
-                    return Err(error);
-                }
-            };
-        offset = next_offset;
-
-        if offset + properties_size as usize > header_end {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid compressed data value too small"
-            ));
-        }
-        let filter_properties: &[u8] = &data[offset..offset + properties_size as usize];
-        offset += properties_size as usize;
-
-        if filter_identifier != XZ_LZMA2_FILTER_IDENTIFIER || properties_size != 1 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported filter identifier: 0x{:02x}",
-                filter_identifier
-            )));
-        }
-        let lzma2_properties: u8 = filter_properties[0];
-        // The upper 2 bits of the LZMA2 filter properties byte are reserved and the raw dictionary
-        // size value must be 0-40.
-        if lzma2_properties & 0xC0 != 0x00 || lzma2_properties & 0x3F > 40 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid LZMA2 Filter Properties: 0x{:02x}",
-                lzma2_properties
-            )));
-        }
-        // Header padding (up to header_end - 4) must be 0-bytes.
-        if offset > header_end - 4 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid compressed data value too small"
-            ));
-        }
-        for padding_byte in &data[offset..header_end - 4] {
+        for padding_byte in &data[data_offset..data_offset + block_padding_size] {
             if *padding_byte != 0x00 {
                 return Err(keramics_core::error_trace_new!(
-                    "Non 0-byte in block header padding"
+                    "Non 0-byte in block padding"
                 ));
             }
         }
-        // The block header CRC32 is calculated over the entire block header
-        // field except the CRC32 field itself.
-        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
-        crc32_context.update(&data[header_offset..header_end - 4]);
-
-        let calculated_checksum: u32 = crc32_context.finalize();
-        let stored_checksum: u32 =
-            u32::from_le_bytes(data[header_end - 4..header_end].try_into().unwrap());
-        if stored_checksum != calculated_checksum {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} block header checksums",
-                stored_checksum, calculated_checksum
-            )));
-        }
-        Ok(XzBlockHeader {
-            header_size,
-            header_offset: header_end,
-            compressed_size_defined,
-            compressed_size,
-            uncompressed_size_defined,
-            uncompressed_size,
-        })
+        Ok(block_padding_size)
     }
 
-    /// Verifies that the stored Block sizes (if defined) match the decoded sizes.
-    fn verify_stored_sizes(
-        &self,
-        cdata_size: usize,
-        block_uncompressed_size: usize,
-    ) -> Result<(), ErrorTrace> {
-        if self.compressed_size_defined && self.compressed_size as usize != cdata_size {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between stored: {} and calculated: {} compressed sizes",
-                self.compressed_size, cdata_size
-            )));
-        }
-        if self.uncompressed_size_defined
-            && self.uncompressed_size != block_uncompressed_size as u64
-        {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between stored: {} and calculated: {} uncompressed sizes",
-                self.uncompressed_size, block_uncompressed_size
-            )));
-        }
-        Ok(())
-    }
-}
-
-/// Parsed xz stream footer.
-struct XzStreamFooter {
-    /// Size of the Index in bytes calculated from the backward size.
-    index_size: usize,
-
-    /// Stream check type.
-    check_type: u8,
-}
-
-impl XzStreamFooter {
-    /// Reads and validates the stream footer.
-    fn read_footer(data: &[u8], footer_offset: usize) -> Result<XzStreamFooter, ErrorTrace> {
-        let footer_end: usize = footer_offset + XZ_FOOTER_SIZE;
-        if footer_end > data.len() {
+    /// Reads and validates the index, verifying it against the decoded blocks.
+    fn read_index(
+        data: &[u8],
+        index_offset: usize,
+        records: &[(u64, u64)],
+    ) -> Result<usize, ErrorTrace> {
+        if index_offset >= data.len() {
             return Err(keramics_core::error_trace_new!(
                 "Invalid compressed data value too small"
             ));
         }
-        // CRC32 is calculated over the backward size and stream flags.
+        if data[index_offset] != 0x00 {
+            return Err(keramics_core::error_trace_new!("Invalid index indicator"));
+        }
+        let mut data_offset: usize = index_offset + 1;
+        let (number_of_records, next_offset) = match read_variable_length_integer(data, data_offset)
+        {
+            Ok((number_of_records, next_offset)) => (number_of_records, next_offset),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read variable-length integer"
+                );
+                return Err(error);
+            }
+        };
+        data_offset = next_offset;
+
+        if number_of_records != records.len() as u64 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between number of records: {} and number of blocks: {}",
+                number_of_records,
+                records.len()
+            )));
+        }
+        for (record_index, (unpadded_size, uncompressed_size)) in records.iter().enumerate() {
+            let (stored_unpadded_size, next_offset) =
+                match read_variable_length_integer(data, data_offset) {
+                    Ok((stored_unpadded_size, next_offset)) => (stored_unpadded_size, next_offset),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read variable-length integer"
+                        );
+                        return Err(error);
+                    }
+                };
+            data_offset = next_offset;
+
+            let (stored_uncompressed_size, next_offset) =
+                match read_variable_length_integer(data, data_offset) {
+                    Ok((stored_uncompressed_size, next_offset)) => {
+                        (stored_uncompressed_size, next_offset)
+                    }
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read variable-length integer"
+                        );
+                        return Err(error);
+                    }
+                };
+            data_offset = next_offset;
+
+            if stored_unpadded_size != *unpadded_size
+                || stored_uncompressed_size != *uncompressed_size
+            {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between index record: {} and decoded block",
+                    record_index
+                )));
+            }
+        }
+        let index_body_size: usize = data_offset - index_offset;
+        let index_padding_size: usize = (4 - (index_body_size & 3)) & 3;
+
+        if index_offset + index_body_size + index_padding_size + 4 > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        for padding_byte in &data
+            [index_offset + index_body_size..index_offset + index_body_size + index_padding_size]
+        {
+            if *padding_byte != 0x00 {
+                return Err(keramics_core::error_trace_new!(
+                    "Non 0-byte in index padding"
+                ));
+            }
+        }
+        let index_size: usize = index_body_size + index_padding_size + 4;
+
         let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
-        crc32_context.update(&data[footer_offset + 4..footer_offset + 10]);
+        crc32_context
+            .update(&data[index_offset..index_offset + index_body_size + index_padding_size]);
+
         let calculated_checksum: u32 = crc32_context.finalize();
-        let stored_checksum: u32 =
-            u32::from_le_bytes(data[footer_offset..footer_offset + 4].try_into().unwrap());
+        let stored_checksum: u32 = bytes_to_u32_le!(data, index_offset + index_size - 4);
+
         if stored_checksum != calculated_checksum {
             return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} stream footer checksums",
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} index checksums",
                 stored_checksum, calculated_checksum
             )));
         }
-        let backward_size: u32 = u32::from_le_bytes(
-            data[footer_offset + 4..footer_offset + 8]
-                .try_into()
-                .unwrap(),
-        );
-        let footer_flags: u8 = data[footer_offset + 8];
-        let footer_check_type: u8 = data[footer_offset + 9];
-
-        // The first byte of stream flags is always a 0-byte.
-        if footer_flags != 0x00 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid stream footer flags: reserved bits are set"
-            ));
-        }
-        if footer_check_type & 0xF0 != 0x00 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid stream footer flags: reserved bits are set"
-            ));
-        }
-        if &data[footer_offset + 10..footer_offset + 12] != XZ_FOOTER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!("Unsupported signature"));
-        }
-        // Index size is (backward size + 1) * 4.
-        Ok(XzStreamFooter {
-            index_size: (backward_size as usize + 1) * 4,
-            check_type: footer_check_type & 0x0F,
-        })
+        Ok(index_size)
     }
 
-    /// Verifies that the stream footer matches the Index and the stream header.
-    fn verify_stream(&self, index_size: usize, check_type: u8) -> Result<(), ErrorTrace> {
-        if self.index_size != index_size {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between calculated index size: {} and stream footer backward Size: {}",
-                index_size, self.index_size
-            )));
+    /// Validates the block checksum (if defined) and returns the number of bytes consumed.
+    fn verify_block_checksum(
+        checksum_type: u8,
+        data: &[u8],
+        data_offset: usize,
+        uncompressed_block: &[u8],
+    ) -> Result<usize, ErrorTrace> {
+        if checksum_type != XZ_CHECKSUM_TYPE_CRC32 {
+            return Ok(0);
         }
-        if self.check_type != check_type {
+        if data_offset + 4 > data.len() {
             return Err(keramics_core::error_trace_new!(
-                "Mismatch between stream footer and stream header flags"
+                "Invalid compressed data value too small"
             ));
         }
-        Ok(())
+        let stored_checksum: u32 = bytes_to_u32_le!(data, data_offset);
+
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(uncompressed_block);
+
+        let calculated_checksum: u32 = crc32_context.finalize();
+
+        if stored_checksum != calculated_checksum {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} block checksums",
+                stored_checksum, calculated_checksum
+            )));
+        }
+        Ok(4)
     }
 }
 
@@ -1443,7 +1475,7 @@ mod tests {
     ];
 
     /// Invalid xz stream: properties_reserved_bits.
-    const TEST_DATA_NEG_PROPS_RESERVED_BITS: [u8; 152] = [
+    const TEST_DATA_NEG_PROPERTIES_RESERVED_BITS: [u8; 152] = [
         0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
         0x01, 0x96, 0x00, 0x00, 0x00, 0x4f, 0x99, 0xbc, 0x4e, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
         0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
@@ -1488,7 +1520,7 @@ mod tests {
     ];
 
     /// Invalid xz stream: sequence_missing_properties_after_reset.
-    const TEST_DATA_NEG_SEQUENCE_MISSING_PROPS_AFTER_RESET: [u8; 152] = [
+    const TEST_DATA_NEG_SEQUENCE_MISSING_PROPERTIES_AFTER_RESET: [u8; 152] = [
         0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x00, 0xff, 0x12, 0xd9, 0x41, 0x02, 0x00, 0x21,
         0x01, 0x16, 0x00, 0x00, 0x00, 0x74, 0x2f, 0xe5, 0xa3, 0x01, 0x00, 0x00, 0x2a, 0x90, 0x02,
         0x66, 0x00, 0x5a, 0x5d, 0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb,
@@ -1573,8 +1605,8 @@ mod tests {
         0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c,
     ];
 
-    /// Invalid xz stream: rc_init_nonzero.
-    const TEST_DATA_NEG_RC_INIT_NONZERO: [u8; 152] = [
+    /// Invalid xz stream: range decoder initialization byte non-zero.
+    const TEST_DATA_NEG_RANGE_DECODER_INITIALIZATION_NONZERO: [u8; 152] = [
         0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
         0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
         0x01, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
@@ -1588,8 +1620,8 @@ mod tests {
         0x59, 0x5a,
     ];
 
-    /// Invalid xz stream: vli_noncanonical.
-    const TEST_DATA_NEG_VLI_NONCANONICAL: [u8; 152] = [
+    /// Invalid xz stream: variable-length integer non-canonical encoding.
+    const TEST_DATA_NEG_VARIABLE_LENGTH_INTEGER_NONCANONICAL: [u8; 152] = [
         0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
         0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
         0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
@@ -1604,19 +1636,62 @@ mod tests {
     ];
 
     fn decompress_test_data(test_data: &[u8], expected_data: &[u8]) -> Result<(), ErrorTrace> {
-        let mut context: XzContext = XzContext::new();
-        let mut uncompressed_data: Vec<u8> = vec![0u8; expected_data.len()];
-        context.decompress(test_data, &mut uncompressed_data)?;
-        assert_eq!(context.uncompressed_data_size, expected_data.len());
+        let mut test_context: XzContext = XzContext::new();
+        let mut uncompressed_data: Vec<u8> = vec![0; expected_data.len()];
+        test_context.decompress(test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, expected_data.len());
         assert_eq!(&uncompressed_data, expected_data);
         Ok(())
     }
 
     fn assert_decompress_fails(test_data: &[u8]) {
-        let mut context: XzContext = XzContext::new();
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 2048];
-        let result: Result<(), ErrorTrace> = context.decompress(test_data, &mut uncompressed_data);
+        let mut test_context: XzContext = XzContext::new();
+        let mut uncompressed_data: Vec<u8> = vec![0; 2048];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(test_data, &mut uncompressed_data);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_stream_header() -> Result<(), ErrorTrace> {
+        let mut stream_header: XzStreamHeader = XzStreamHeader::new();
+
+        stream_header.read_data(&TEST_DATA_V1)?;
+        assert_eq!(stream_header.checksum_type, XZ_CHECKSUM_TYPE_CRC32);
+        assert_eq!(stream_header.checksum_size, 4);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_stream_header_with_invalid_size() {
+        let mut stream_header: XzStreamHeader = XzStreamHeader::new();
+
+        let result: Result<(), ErrorTrace> = stream_header.read_data(&TEST_DATA_V1[0..11]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_block_header() -> Result<(), ErrorTrace> {
+        let mut block_header: XzBlockHeader = XzBlockHeader::new();
+
+        block_header.read_data(&TEST_DATA_V5C[12..])?;
+        assert_eq!(block_header.header_size, 16);
+        assert_eq!(block_header.compressed_size, Some(109));
+        assert_eq!(block_header.uncompressed_size, Some(620));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_stream_footer() -> Result<(), ErrorTrace> {
+        let mut stream_footer: XzStreamFooter = XzStreamFooter::new();
+
+        stream_footer.read_data(&TEST_DATA_V1[TEST_DATA_V1.len() - XZ_STREAM_FOOTER_SIZE..])?;
+        assert_eq!(stream_footer.index_size, 12);
+        assert_eq!(stream_footer.checksum_type, XZ_CHECKSUM_TYPE_CRC32);
+
+        Ok(())
     }
 
     #[test]
@@ -1648,21 +1723,21 @@ mod tests {
 
     #[test]
     fn test_decompress_v5a() -> Result<(), ErrorTrace> {
-        let mut expected_data: Vec<u8> = vec![0xAA, 0x55, 0x11, 0x22, 0x33];
+        let mut expected_data: Vec<u8> = vec![0xaa, 0x55, 0x11, 0x22, 0x33];
         expected_data.extend_from_slice(&TEST_INPUT_V1);
         decompress_test_data(&TEST_DATA_V5A, &expected_data)
     }
 
     #[test]
     fn test_decompress_v5b() -> Result<(), ErrorTrace> {
-        let mut expected_data: Vec<u8> = vec![0xDE, 0xAD, 0xBE, 0xEF];
+        let mut expected_data: Vec<u8> = vec![0xde, 0xad, 0xbe, 0xef];
         expected_data.extend_from_slice(&TEST_INPUT_V1);
         decompress_test_data(&TEST_DATA_V5B, &expected_data)
     }
 
     #[test]
     fn test_decompress_v5c() -> Result<(), ErrorTrace> {
-        let mut expected_data: Vec<u8> = vec![0xAA, 0x55, 0x11, 0x22, 0x33];
+        let mut expected_data: Vec<u8> = vec![0xaa, 0x55, 0x11, 0x22, 0x33];
         expected_data.extend_from_slice(&TEST_INPUT_V1);
         decompress_test_data(&TEST_DATA_V5C, &expected_data)
     }
@@ -1699,7 +1774,7 @@ mod tests {
 
     #[test]
     fn test_decompress_with_properties_reserved_bits() {
-        assert_decompress_fails(&TEST_DATA_NEG_PROPS_RESERVED_BITS);
+        assert_decompress_fails(&TEST_DATA_NEG_PROPERTIES_RESERVED_BITS);
     }
 
     #[test]
@@ -1714,7 +1789,7 @@ mod tests {
 
     #[test]
     fn test_decompress_with_sequence_missing_properties_after_reset() {
-        assert_decompress_fails(&TEST_DATA_NEG_SEQUENCE_MISSING_PROPS_AFTER_RESET);
+        assert_decompress_fails(&TEST_DATA_NEG_SEQUENCE_MISSING_PROPERTIES_AFTER_RESET);
     }
 
     #[test]
@@ -1743,93 +1818,53 @@ mod tests {
     }
 
     #[test]
-    fn test_decompress_with_rc_init_nonzero() {
-        assert_decompress_fails(&TEST_DATA_NEG_RC_INIT_NONZERO);
+    fn test_decompress_with_invalid_range_decoder_initialization_byte() {
+        assert_decompress_fails(&TEST_DATA_NEG_RANGE_DECODER_INITIALIZATION_NONZERO);
     }
 
     #[test]
     fn test_decompress_with_variable_length_integer_noncanonical() {
-        assert_decompress_fails(&TEST_DATA_NEG_VLI_NONCANONICAL);
+        assert_decompress_fails(&TEST_DATA_NEG_VARIABLE_LENGTH_INTEGER_NONCANONICAL);
     }
 
     #[test]
     fn test_read_variable_length_integer() -> Result<(), ErrorTrace> {
         let data: [u8; 4] = [0x05, 0x00, 0x85, 0x01];
-        let (value, offset) = XzContext::read_variable_length_integer(&data, 0)?;
+        let (value, offset) = read_variable_length_integer(&data, 0)?;
         assert_eq!(value, 5);
         assert_eq!(offset, 1);
-        let (value, offset) = XzContext::read_variable_length_integer(&data, 2)?;
+
+        let (value, offset) = read_variable_length_integer(&data, 2)?;
         assert_eq!(value, 133);
         assert_eq!(offset, 4);
+
         Ok(())
     }
 
     #[test]
     fn test_read_variable_length_integer_with_too_many_bytes() {
         let data: [u8; 10] = [0x80; 10];
-        let result: Result<(u64, usize), ErrorTrace> =
-            XzContext::read_variable_length_integer(&data, 0);
+        let result: Result<(u64, usize), ErrorTrace> = read_variable_length_integer(&data, 0);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_read_variable_length_integer_with_truncated_data() {
         let data: [u8; 1] = [0x80];
-        let result: Result<(u64, usize), ErrorTrace> =
-            XzContext::read_variable_length_integer(&data, 0);
+        let result: Result<(u64, usize), ErrorTrace> = read_variable_length_integer(&data, 0);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_read_variable_length_integer_with_noncanonical_encoding() {
         let data: [u8; 2] = [0x80, 0x00];
-        let result: Result<(u64, usize), ErrorTrace> =
-            XzContext::read_variable_length_integer(&data, 0);
+        let result: Result<(u64, usize), ErrorTrace> = read_variable_length_integer(&data, 0);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_read_variable_length_integer_at_end_of_data() {
-        let result: Result<(u64, usize), ErrorTrace> =
-            XzContext::read_variable_length_integer(&[], 0);
+        let result: Result<(u64, usize), ErrorTrace> = read_variable_length_integer(&[], 0);
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_decode_lzma_properties() -> Result<(), ErrorTrace> {
-        let (literal_context_bits, literal_pos_bits, pos_bits) =
-            XzContext::decode_lzma_properties(0x5d)?;
-        assert_eq!(literal_context_bits, 3);
-        assert_eq!(literal_pos_bits, 0);
-        assert_eq!(pos_bits, 2);
-        let (literal_context_bits, literal_pos_bits, pos_bits) =
-            XzContext::decode_lzma_properties(0x00)?;
-        assert_eq!(literal_context_bits, 0);
-        assert_eq!(literal_pos_bits, 0);
-        assert_eq!(pos_bits, 0);
-        let (literal_context_bits, literal_pos_bits, pos_bits) =
-            XzContext::decode_lzma_properties(0xD8)?;
-        assert_eq!(literal_context_bits, 0);
-        assert_eq!(literal_pos_bits, 4);
-        assert_eq!(pos_bits, 4);
-        Ok(())
-    }
-
-    #[test]
-    fn test_decode_lzma_properties_with_invalid_value() {
-        let result: Result<(u8, u8, u8), ErrorTrace> = XzContext::decode_lzma_properties(0xE1);
-        assert!(result.is_err());
-        let result: Result<(u8, u8, u8), ErrorTrace> = XzContext::decode_lzma_properties(0x96);
-        assert!(result.is_err());
-        let result: Result<(u8, u8, u8), ErrorTrace> = XzContext::decode_lzma_properties(0xD9);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_crc32() {
-        // "123456789" has the well-known CRC-32/ISO-HDLC checksum.
-        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
-        crc32_context.update(b"123456789");
-        assert_eq!(crc32_context.finalize(), 0xcbf43926);
     }
 }

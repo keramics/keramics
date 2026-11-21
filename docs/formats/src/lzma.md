@@ -56,13 +56,13 @@ properties = (
 and decoded with:
 
 ```python
-if properties >= (9 * 5 * 5)
-    error "Incorrect LZMA properties"
+if properties >= (9 * 5 * 5):
+    raise ValueError("Incorrect LZMA properties")
 
 literal_context_bits = properties % 9
-properties  = properties / 9
-position_bits = properties / 5
+properties //= 9
 literal_position_bits = properties % 5
+position_bits = properties // 5
 ```
 
 Also there is a limitation that (lc + lp) must be less than or equal to 4.
@@ -176,9 +176,12 @@ A reverse probability bit tree decodes the same value, but with the least signif
 first:
 
 ```text
+symbol = 1
 value = 0
 for i = 0 .. n - 1
-    value += DecodeBit(&probabilities[1 + i]) << i
+    bit = DecodeBit(&probabilities[symbol])
+    symbol = (symbol << 1) | bit
+    value |= bit << i
 ```
 
 ### State
@@ -301,11 +304,11 @@ if previous state was a match
   while symbol < 0x100
     matchBit = (matchByte >> 7) & 1
     matchByte <<= 1
+    bit = DecodeBit(probabilities[((1 + matchBit) * 0x100) + symbol])
+    symbol = (symbol << 1) | bit
 
-    if DecodeBit(probabilities[((1 + matchBit) * 0x100 + symbol]) != matchBit
+    if bit != matchBit
       break
-
-    symbol = (symbol << 1) | matchBit
 
 while symbol < 0x100
   symbol = (symbol << 1) | DecodeBit(probabilities[symbol])
@@ -374,7 +377,7 @@ kNumAlignBits      = 4
 kNumFullDistances  = 1 << (kEndPosModelIndex >> 1)  /* 128 */
 ```
 
-The number of distance slot (and therefore the range of distances) that a slot covers:
+The distance slots (and therefore the range of distances) that each slot covers:
 
 | Slot | Distance range | Distance bits |
 | --- | --- | --- |
@@ -392,10 +395,10 @@ The number of distance slot (and therefore the range of distances) that a slot c
 | 11 | 48 - 63 | 4 |
 | 12 | 64 - 95 | 5 |
 | 13 | 96 - 127 | 5 |
-| 14 | 128 - 255 | 6 + 4 |
-| 15 | 256 - 511 | 7 + 4 |
+| 14 | 128 - 191 | 2 + 4 |
+| 15 | 192 - 255 | 2 + 4 |
 | ... | ... | n + 4 |
-| 63 | 0x20000000 - 0xffffffff | 29 + 4 |
+| 63 | 0xc0000000 - 0xffffffff | 26 + 4 |
 
 The decoding is:
 
@@ -499,5 +502,9 @@ loop
 
 ## References
 
+<!-- rumdl-disable MD013 -->
+
 * [LZMA specification (DRAFT version)](https://github.com/jljusten/LZMA-SDK/blob/master/DOC/lzma-specification.txt)
 * [7-Zip format](https://github.com/jljusten/LZMA-SDK/blob/master/DOC/7zFormat.txt)
+
+<!-- rumdl-enable MD013 -->

@@ -170,10 +170,10 @@ A LZFSE frequency table consist of 360 16-bit values:
 
 #### Decoding the Huffman encoded frequency table
 
-A compressed frequency table (LZFSE block version 2) is stored as a bit stream in the `header
-size - 32` bytes immediately after the 32-byte block header, and it is read least-significant-bit
-(LSB) first. It holds the same 360 values, in the same order, as the uncompressed (block version 1)
-720-byte table above.
+A compressed frequency table (LZFSE block version 2) is stored as a bit stream in the
+`header size - 32` bytes immediately after the 32-byte block header, and it is read
+least-significant-bit (LSB) first. It holds the same 360 values, in the same order, as the
+uncompressed (block version 1) 720-byte table above.
 
 Each value is decoded using the two lookup tables below:
 

@@ -15,12 +15,14 @@
 //!
 //! Provides decompression support for LZMA (LZMA1) compressed data.
 
+use std::cmp::min;
+
 use keramics_core::{DebugTrace, DebugTraceScope, ErrorTrace};
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u32_be, bytes_to_u32_le, bytes_to_u64_le};
 
 /// Maximum value of the LZMA properties byte ((4 * 5 + 4) * 9 + 8).
-const LZMA_MAX_PROPERTIES: u8 = 224;
+const LZMA_MAXIMUM_PROPERTIES: u8 = 224;
 
 /// Minimum LZMA dictionary size.
 const LZMA_MINIMUM_DICTIONARY_SIZE: usize = 1 << 12;
@@ -38,7 +40,7 @@ const LZMA_NUMBER_OF_STATES: usize = 12;
 const LZMA_NUMBER_OF_LITERAL_STATES: usize = 7;
 
 /// Number of LZMA position states (1 << 4).
-const LZMA_POSITION_STATES: usize = 16;
+const LZMA_NUMBER_OF_POSITION_STATES: usize = 16;
 
 /// Number of LZMA distance slot states.
 const LZMA_NUMBER_OF_DISTANCE_SLOT_STATES: usize = 4;
@@ -49,30 +51,30 @@ const LZMA_NUMBER_OF_DISTANCE_SLOTS: usize = 64;
 /// First LZMA distance slot that uses the distance low bits table.
 const LZMA_DISTANCE_SLOT_LOW_BITS: usize = 4;
 
-/// First LZMA distance slot that uses plain and align bits.
+/// First LZMA distance slot that uses plain and alignment bits.
 const LZMA_DISTANCE_SLOT_PLAIN_BITS: usize = 14;
 
-/// Number of LZMA distance align bits.
-const LZMA_NUMBER_OF_DISTANCE_ALIGN_BITS: usize = 4;
+/// Number of LZMA distance alignment bits.
+const LZMA_NUMBER_OF_DISTANCE_ALIGNMENT_BITS: usize = 4;
+
+/// Minimum LZMA match length.
+const LZMA_MINIMUM_MATCH_LENGTH: usize = 2;
 
 /// Number of LZMA match length low symbols (1 << 3).
 const LZMA_MATCH_LENGTH_LOW_SYMBOLS: usize = 8;
 
-/// Minimum LZMA match length.
-const LZMA_MATCH_LENGTH_MINIMUM: usize = 2;
-
-/// Number of LZMA match length mid symbols (1 << 3).
-const LZMA_MATCH_LENGTH_MID_SYMBOLS: usize = 8;
+/// Number of LZMA match length middle symbols (1 << 3).
+const LZMA_MATCH_LENGTH_MIDDLE_SYMBOLS: usize = 8;
 
 /// Number of LZMA match length high symbols (1 << 8).
 const LZMA_MATCH_LENGTH_HIGH_SYMBOLS: usize = 256;
 
 /// Number of probability cells used by a match length decoder.
 ///
-/// Consists of: choice (1), choice2 (1), low (16 * 8), mid (16 * 8) and high (256) cells.
+/// Consists of: choice (1), choice2 (1), low (16 * 8), middle (16 * 8) and high (256) cells.
 const LZMA_MATCH_LENGTH_NUMBER_OF_CELLS: usize = 2
-    + (LZMA_POSITION_STATES * LZMA_MATCH_LENGTH_LOW_SYMBOLS)
-    + (LZMA_POSITION_STATES * LZMA_MATCH_LENGTH_MID_SYMBOLS)
+    + (LZMA_NUMBER_OF_POSITION_STATES * LZMA_MATCH_LENGTH_LOW_SYMBOLS)
+    + (LZMA_NUMBER_OF_POSITION_STATES * LZMA_MATCH_LENGTH_MIDDLE_SYMBOLS)
     + LZMA_MATCH_LENGTH_HIGH_SYMBOLS;
 
 /// Number of LZMA probability bit model total bits.
@@ -82,7 +84,7 @@ const LZMA_PROBABILITY_TOTAL_BITS: u32 = 11;
 const LZMA_PROBABILITY_TOTAL: u16 = 1 << LZMA_PROBABILITY_TOTAL_BITS;
 
 /// Initial value of an LZMA probability bit model.
-const LZMA_PROBABILITY_INIT: u16 = LZMA_PROBABILITY_TOTAL >> 1;
+const LZMA_PROBABILITY_INITIAL_VALUE: u16 = LZMA_PROBABILITY_TOTAL >> 1;
 
 /// Number of bits used when normalizing an LZMA probability bit model.
 const LZMA_PROBABILITY_MOVE_BITS: u32 = 5;
@@ -121,7 +123,6 @@ impl<'a> LzmaRangeDecoder<'a> {
     /// Determines whether the end of the chunk was reached.
     pub fn check_for_end_of_chunk(
         &mut self,
-        compressed_data: &[u8],
         allow_end_of_payload_marker: bool,
     ) -> Result<bool, ErrorTrace> {
         let finished: bool = match self.is_finished() {
@@ -144,7 +145,7 @@ impl<'a> LzmaRangeDecoder<'a> {
         }
         // When the end of payload marker (EOPM) is disallowed, i.e. for an
         // LZMA2 chunk, the chunk must have consumed exactly its compressed data.
-        if !allow_end_of_payload_marker && self.data_offset != compressed_data.len() {
+        if !allow_end_of_payload_marker && self.data_offset != self.data_size {
             return Err(keramics_core::error_trace_new!(
                 "Invalid compressed data value too large"
             ));
@@ -228,19 +229,19 @@ impl<'a> LzmaRangeDecoder<'a> {
                 }
             };
             if bit_value == 0 {
-                // 2 + 8 + mid value (0 to 7).
+                // 2 + 8 + middle value (0 to 7).
                 base_index = 2
-                    + (LZMA_POSITION_STATES * LZMA_MATCH_LENGTH_LOW_SYMBOLS)
-                    + (position_state * LZMA_MATCH_LENGTH_MID_SYMBOLS);
-                limit = LZMA_MATCH_LENGTH_MID_SYMBOLS;
+                    + (LZMA_NUMBER_OF_POSITION_STATES * LZMA_MATCH_LENGTH_LOW_SYMBOLS)
+                    + (position_state * LZMA_MATCH_LENGTH_MIDDLE_SYMBOLS);
+                limit = LZMA_MATCH_LENGTH_MIDDLE_SYMBOLS;
                 offset = LZMA_MATCH_LENGTH_LOW_SYMBOLS;
             } else {
                 // 2 + 8 + 8 + high value (0 to 255).
                 base_index = 2
-                    + (LZMA_POSITION_STATES * LZMA_MATCH_LENGTH_LOW_SYMBOLS)
-                    + (LZMA_POSITION_STATES * LZMA_MATCH_LENGTH_MID_SYMBOLS);
+                    + (LZMA_NUMBER_OF_POSITION_STATES * LZMA_MATCH_LENGTH_LOW_SYMBOLS)
+                    + (LZMA_NUMBER_OF_POSITION_STATES * LZMA_MATCH_LENGTH_MIDDLE_SYMBOLS);
                 limit = LZMA_MATCH_LENGTH_HIGH_SYMBOLS;
-                offset = LZMA_MATCH_LENGTH_LOW_SYMBOLS + LZMA_MATCH_LENGTH_MID_SYMBOLS;
+                offset = LZMA_MATCH_LENGTH_LOW_SYMBOLS + LZMA_MATCH_LENGTH_MIDDLE_SYMBOLS;
             }
         }
         let mut symbol: usize = 1;
@@ -257,7 +258,7 @@ impl<'a> LzmaRangeDecoder<'a> {
             };
             symbol = (symbol << 1) + (bit_value as usize);
         }
-        Ok(LZMA_MATCH_LENGTH_MINIMUM + (symbol - limit) + offset)
+        Ok(LZMA_MINIMUM_MATCH_LENGTH + (symbol - limit) + offset)
     }
 
     /// Normalizes the range decoder and determines whether it is at the end of the bitstream.
@@ -310,17 +311,17 @@ impl<'a> LzmaRangeDecoder<'a> {
     }
 }
 
-/// Stream header used by LZMA compressed data.
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "little",
-        field(name = "properties", data_type = "u8"),
+        field(name = "properties", data_type = "u8", format = "hex"),
         field(name = "dictionary_size", data_type = "u32"),
         field(name = "uncompressed_data_size", data_type = "u64"),
     ),
     methods("debug_read_data")
 )]
+/// Stream header used by LZMA compressed data.
 struct LzmaStreamHeader {
     /// Number of literal context bits (lc).
     literal_context_bits: u8,
@@ -357,25 +358,18 @@ impl LzmaStreamHeader {
         }
         let properties: u8 = data[0];
 
-        if properties > LZMA_MAX_PROPERTIES {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported properties value: 0x{:02x}",
-                properties
-            )));
-        }
-        let mut properties_value: usize = properties as usize;
+        let (literal_context_bits, literal_position_bits, position_bits) =
+            match LzmaDecoder::decode_properties(properties) {
+                Ok(properties) => properties,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode properties");
+                    return Err(error);
+                }
+            };
+        self.literal_context_bits = literal_context_bits;
+        self.literal_position_bits = literal_position_bits;
+        self.position_bits = position_bits;
 
-        self.literal_context_bits = (properties_value % 9) as u8;
-        properties_value /= 9;
-        self.literal_position_bits = (properties_value % 5) as u8;
-        self.position_bits = (properties_value / 5) as u8;
-
-        if (self.literal_context_bits + self.literal_position_bits) > 4 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported properties value: 0x{:02x} (lc + lp > 4)",
-                properties
-            )));
-        }
         let mut dictionary_size: usize = bytes_to_u32_le!(data, 1) as usize;
 
         if dictionary_size < LZMA_MINIMUM_DICTIONARY_SIZE {
@@ -385,6 +379,936 @@ impl LzmaStreamHeader {
         self.uncompressed_data_size = bytes_to_u64_le!(data, 5);
 
         Ok(())
+    }
+}
+
+/// Decoder for decompressing LZMA compressed data.
+pub(super) struct LzmaDecoder {
+    /// Number of literal context bits (lc).
+    literal_context_bits: u8,
+
+    /// Number of literal position bits (lp).
+    literal_position_bits: u8,
+
+    /// Number of position bits (pb).
+    position_bits: u8,
+
+    /// Decoder state (0 to 11).
+    state: usize,
+
+    /// Repeated match distances history (zero-based, rep0 to rep3).
+    repeated_distances: [usize; 4],
+
+    /// Last decoded byte value, or zero if no bytes have been decoded yet.
+    previous_byte: u8,
+
+    /// Probabilities whether a literal or match is decoded next (state * 16 + position_state).
+    match_probabilities: Vec<u16>,
+
+    /// Probabilities of a repeated match (state).
+    repeated_match_probabilities: Vec<u16>,
+
+    /// Probabilities that the repeated match distance is rep0 (state).
+    repeated_match_distance0_probabilities: Vec<u16>,
+
+    /// Probabilities that the repeated match distance is rep1 (state).
+    repeated_match_distance1_probabilities: Vec<u16>,
+
+    /// Probabilities that the repeated match distance is rep2 (state).
+    repeated_match_distance2_probabilities: Vec<u16>,
+
+    /// Probabilities of a long repeated match at rep0 (state * 16 + position_state).
+    repeated_match_distance0_long_probabilities: Vec<u16>,
+
+    /// Probabilities of the literal symbols (coder * 0x300 + subcoder).
+    literal_probabilities: Vec<u16>,
+
+    /// Probabilities of the match length decoder.
+    ///
+    /// Consists of: choice (cell 0), choice2 (cell 1),
+    /// low (cells 2 + position_state * 8), middle (cells 2 + 128 + position_state * 8)
+    /// and high (cells 258).
+    match_length_probabilities: Vec<u16>,
+
+    /// Probabilities of the repeated match length decoder (same layout as match_length_probabilities).
+    repeated_match_length_probabilities: Vec<u16>,
+
+    /// Probabilities of the distance slot (length_state * 64 + slot).
+    distance_slot_probabilities: Vec<u16>,
+
+    /// Probabilities of the distance low bits (position special decoders).
+    distance_low_bit_probabilities: Vec<u16>,
+
+    /// Probabilities of the distance alignment bits.
+    distance_alignment_probabilities: Vec<u16>,
+}
+
+impl LzmaDecoder {
+    /// Creates a new decoder with the specified properties.
+    pub fn new(
+        literal_context_bits: u8,
+        literal_position_bits: u8,
+        position_bits: u8,
+    ) -> Result<Self, ErrorTrace> {
+        if (literal_context_bits as u32) + (literal_position_bits as u32) > 4
+            || (position_bits as u32) > 4
+        {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported LZMA properties value: lc: {}, lp: {}, pb: {}",
+                literal_context_bits, literal_position_bits, position_bits
+            )));
+        }
+        let number_of_literal_states: usize = 1 << (literal_context_bits + literal_position_bits);
+
+        Ok(Self {
+            literal_context_bits,
+            literal_position_bits,
+            position_bits,
+            state: 0,
+            repeated_distances: [0; 4],
+            previous_byte: 0,
+            match_probabilities: vec![
+                LZMA_PROBABILITY_INITIAL_VALUE;
+                LZMA_NUMBER_OF_STATES * LZMA_NUMBER_OF_POSITION_STATES
+            ],
+            repeated_match_probabilities: vec![
+                LZMA_PROBABILITY_INITIAL_VALUE;
+                LZMA_NUMBER_OF_STATES
+            ],
+            repeated_match_distance0_probabilities: vec![
+                LZMA_PROBABILITY_INITIAL_VALUE;
+                LZMA_NUMBER_OF_STATES
+            ],
+            repeated_match_distance1_probabilities: vec![
+                LZMA_PROBABILITY_INITIAL_VALUE;
+                LZMA_NUMBER_OF_STATES
+            ],
+            repeated_match_distance2_probabilities: vec![
+                LZMA_PROBABILITY_INITIAL_VALUE;
+                LZMA_NUMBER_OF_STATES
+            ],
+            repeated_match_distance0_long_probabilities: vec![
+                LZMA_PROBABILITY_INITIAL_VALUE;
+                LZMA_NUMBER_OF_STATES
+                    * LZMA_NUMBER_OF_POSITION_STATES
+            ],
+            literal_probabilities: vec![
+                LZMA_PROBABILITY_INITIAL_VALUE;
+                number_of_literal_states * 0x300
+            ],
+            match_length_probabilities: vec![
+                LZMA_PROBABILITY_INITIAL_VALUE;
+                LZMA_MATCH_LENGTH_NUMBER_OF_CELLS
+            ],
+            repeated_match_length_probabilities: vec![
+                LZMA_PROBABILITY_INITIAL_VALUE;
+                LZMA_MATCH_LENGTH_NUMBER_OF_CELLS
+            ],
+            distance_slot_probabilities: vec![
+                LZMA_PROBABILITY_INITIAL_VALUE;
+                LZMA_NUMBER_OF_DISTANCE_SLOT_STATES
+                    * LZMA_NUMBER_OF_DISTANCE_SLOTS
+            ],
+            // Note that 114 probability cells (indexes 0 to 113) are used by the
+            // distance low bits (position special) decoders for slots 4 to 13.
+            distance_low_bit_probabilities: vec![LZMA_PROBABILITY_INITIAL_VALUE; 114],
+            distance_alignment_probabilities: vec![
+                LZMA_PROBABILITY_INITIAL_VALUE;
+                1 << LZMA_NUMBER_OF_DISTANCE_ALIGNMENT_BITS
+            ],
+        })
+    }
+
+    /// Decodes a match distance using plain bits and the distance alignment decoder.
+    fn decode_distance_high_bits(
+        &mut self,
+        range_decoder: &mut LzmaRangeDecoder,
+        slot: usize,
+    ) -> Result<usize, ErrorTrace> {
+        let number_of_bits: usize = (slot / 2) - 1;
+        let number_of_plain_bits: usize = number_of_bits - LZMA_NUMBER_OF_DISTANCE_ALIGNMENT_BITS;
+        let mut value: usize = 2 | (slot & 1);
+
+        for _ in 0..number_of_plain_bits {
+            let bit_value: u32 = match range_decoder.decode_bit_direct() {
+                Ok(value) => value,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
+                    return Err(error);
+                }
+            };
+            value = (value << 1) | bit_value as usize;
+        }
+        value <<= LZMA_NUMBER_OF_DISTANCE_ALIGNMENT_BITS;
+        let mut table_symbol: usize = 1;
+        let mut bit_offset: usize = 0;
+
+        // Decode the distance low 4 bits using the alignment decoder.
+        while bit_offset < LZMA_NUMBER_OF_DISTANCE_ALIGNMENT_BITS {
+            let bit_value: u32 = match range_decoder
+                .decode_bit(&mut self.distance_alignment_probabilities[table_symbol])
+            {
+                Ok(value) => value,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
+                    return Err(error);
+                }
+            };
+            if bit_value == 1 {
+                value |= 1 << bit_offset;
+            }
+            table_symbol = (table_symbol << 1) + (bit_value as usize);
+            bit_offset += 1;
+        }
+        Ok(value)
+    }
+
+    /// Decodes a match distance using the position special (distance low bits) decoders.
+    fn decode_distance_low_bits(
+        &mut self,
+        range_decoder: &mut LzmaRangeDecoder,
+        slot: usize,
+    ) -> Result<usize, ErrorTrace> {
+        let number_of_bits: usize = (slot / 2) - 1;
+        let mut value: usize = (2 | (slot & 1)) << number_of_bits;
+        // Note that the first distance low bits cell index is (value - slot).
+        let table_base: usize = value - slot;
+        let mut table_symbol: usize = 1;
+        let mut bit_offset: usize = 0;
+
+        while bit_offset < number_of_bits {
+            let table_index: usize = table_base + table_symbol - 1;
+
+            let bit_value: u32 = match range_decoder
+                .decode_bit(&mut self.distance_low_bit_probabilities[table_index])
+            {
+                Ok(value) => value,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
+                    return Err(error);
+                }
+            };
+            if bit_value == 1 {
+                value += 1 << bit_offset;
+            }
+            table_symbol = (table_symbol << 1) + (bit_value as usize);
+            bit_offset += 1;
+        }
+        Ok(value)
+    }
+
+    /// Decodes a literal and copies the byte value to the uncompressed data.
+    fn decode_literal(
+        &mut self,
+        debug_trace: &mut DebugTraceScope,
+        range_decoder: &mut LzmaRangeDecoder,
+        uncompressed_data: &mut [u8],
+        uncompressed_data_offset: &mut usize,
+        uncompressed_data_end_offset: usize,
+        literal_position_mask: usize,
+        dictionary_start_offset: usize,
+    ) -> Result<(), ErrorTrace> {
+        let subcoder: usize = (((*uncompressed_data_offset & literal_position_mask)
+            << self.literal_context_bits)
+            + (self.previous_byte as usize >> (8 - self.literal_context_bits)))
+            * 0x300;
+        let mut match_byte: u8 = if self.state >= LZMA_NUMBER_OF_LITERAL_STATES
+            && *uncompressed_data_offset - dictionary_start_offset > self.repeated_distances[0]
+        {
+            uncompressed_data[*uncompressed_data_offset - 1 - self.repeated_distances[0]]
+        } else {
+            0
+        };
+        let mut matched: bool = self.state >= LZMA_NUMBER_OF_LITERAL_STATES;
+        let mut symbol: usize = 1;
+
+        while symbol < 0x100 {
+            let literal_bit: u32 = if matched {
+                // Use the subcoder for the matched byte bit.
+                // Note that the subcoder index of the matched literal cells is
+                // 0x100 + (match_bit * 0x100) + symbol.
+                let match_bit: u8 = (match_byte >> 7) & 1;
+                let literal_index: usize = subcoder + ((1 + match_bit as usize) * 0x100) + symbol;
+                let literal_bit: u32 = match range_decoder
+                    .decode_bit(&mut self.literal_probabilities[literal_index])
+                {
+                    Ok(value) => value,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
+                        return Err(error);
+                    }
+                };
+                if literal_bit != match_bit as u32 {
+                    matched = false;
+                }
+                // Note that only the 8 bits MSB are used.
+                match_byte = match_byte.wrapping_shl(1);
+                literal_bit
+            } else {
+                let literal_index: usize = subcoder + symbol;
+
+                match range_decoder.decode_bit(&mut self.literal_probabilities[literal_index]) {
+                    Ok(value) => value,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
+                        return Err(error);
+                    }
+                }
+            };
+            symbol = (symbol << 1) + (literal_bit as usize);
+        }
+        let literal_value: u8 = (symbol & 0xff) as u8;
+
+        if *uncompressed_data_offset >= uncompressed_data_end_offset {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid uncompressed data value too small"
+            ));
+        }
+        if debug_trace.debug_output {
+            debug_trace.print_field("symbol", format!("literal: 0x{:02x}", literal_value));
+        }
+        uncompressed_data[*uncompressed_data_offset] = literal_value;
+        *uncompressed_data_offset += 1;
+
+        self.previous_byte = literal_value;
+        self.update_state_literal();
+
+        Ok(())
+    }
+
+    /// Decodes a long repeated match (i.e. a repeated match with a decoded length).
+    fn decode_long_repeated_match(
+        &mut self,
+        debug_trace: &mut DebugTraceScope,
+        range_decoder: &mut LzmaRangeDecoder,
+        uncompressed_data: &mut [u8],
+        uncompressed_data_offset: &mut usize,
+        uncompressed_data_end_offset: usize,
+        position_state: usize,
+        dictionary_start_offset: usize,
+        match_distance: usize,
+    ) -> Result<(), ErrorTrace> {
+        self.update_state_repeated();
+
+        let match_length: usize = match range_decoder.decode_length(
+            position_state,
+            &mut self.repeated_match_length_probabilities,
+        ) {
+            Ok(match_length) => match_length,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decode match length");
+                return Err(error);
+            }
+        };
+        for _ in 0..match_length {
+            if *uncompressed_data_offset >= uncompressed_data_end_offset {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid uncompressed data value too small"
+                ));
+            }
+            // Note that the repeated distance must have been a valid distance when it was stored.
+            if match_distance >= *uncompressed_data_offset - dictionary_start_offset {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid match distance: {} value out of bounds",
+                    match_distance
+                )));
+            }
+            uncompressed_data[*uncompressed_data_offset] =
+                uncompressed_data[*uncompressed_data_offset - 1 - match_distance];
+            *uncompressed_data_offset += 1;
+
+            self.previous_byte = uncompressed_data[*uncompressed_data_offset - 1];
+        }
+        if debug_trace.debug_output {
+            debug_trace.print_field(
+                "symbol",
+                format!(
+                    "long repeated match: length: {}, distance: {}",
+                    match_length, match_distance
+                ),
+            );
+        }
+        Ok(())
+    }
+
+    /// Decodes a match with a decoded distance.
+    fn decode_match(
+        &mut self,
+        debug_trace: &mut DebugTraceScope,
+        range_decoder: &mut LzmaRangeDecoder,
+        uncompressed_data: &mut [u8],
+        uncompressed_data_offset: &mut usize,
+        uncompressed_data_end_offset: usize,
+        position_state: usize,
+        dictionary_start_offset: usize,
+        expect_end_of_payload_marker: bool,
+    ) -> Result<bool, ErrorTrace> {
+        self.update_state_match();
+
+        let match_length: usize = match range_decoder
+            .decode_length(position_state, &mut self.match_length_probabilities)
+        {
+            Ok(match_length) => match_length,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decode match length");
+                return Err(error);
+            }
+        };
+        // Zero-based match length capped at 3 is used to select the distance slot table.
+        let length_state: usize = min(match_length - LZMA_MINIMUM_MATCH_LENGTH, 3);
+
+        let distance: usize = match self.decode_match_distance(range_decoder, length_state) {
+            Ok(distance) => distance,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decode match distance");
+                return Err(error);
+            }
+        };
+        // The distance value 0xffffffff is reserved for the end of payload marker (EOPM).
+        if distance as u32 == LZMA_END_OF_PAYLOAD_MARKER {
+            // The EOPM is only allowed when the end of the payload has been reached.
+            if !expect_end_of_payload_marker {
+                return Err(keramics_core::error_trace_new!(
+                    "Unexpected end of payload marker (EOPM)"
+                ));
+            }
+            let finished: bool = match range_decoder.is_finished() {
+                Ok(finished) => finished,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to determine if range decoder is finished"
+                    );
+                    return Err(error);
+                }
+            };
+            if !finished {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid end of payload marker (EOPM)"
+                ));
+            }
+            if debug_trace.debug_output {
+                debug_trace.print_field("symbol", "EOPM");
+            }
+            return Ok(true);
+        }
+        self.repeated_distances[3] = self.repeated_distances[2];
+        self.repeated_distances[2] = self.repeated_distances[1];
+        self.repeated_distances[1] = self.repeated_distances[0];
+        self.repeated_distances[0] = distance;
+
+        if distance >= *uncompressed_data_offset - dictionary_start_offset {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid match distance: {} value out of bounds",
+                distance
+            )));
+        }
+        for _ in 0..match_length {
+            if *uncompressed_data_offset >= uncompressed_data_end_offset {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid uncompressed data value too small"
+                ));
+            }
+            uncompressed_data[*uncompressed_data_offset] =
+                uncompressed_data[*uncompressed_data_offset - 1 - distance];
+            *uncompressed_data_offset += 1;
+            self.previous_byte = uncompressed_data[*uncompressed_data_offset - 1];
+        }
+        if debug_trace.debug_output {
+            debug_trace.print_field(
+                "symbol",
+                format!("match: length: {}, distance: {}", match_length, distance),
+            );
+        }
+        Ok(false)
+    }
+
+    /// Decodes a match distance, including the end of payload marker (EOPM) value.
+    fn decode_match_distance(
+        &mut self,
+        range_decoder: &mut LzmaRangeDecoder,
+        length_state: usize,
+    ) -> Result<usize, ErrorTrace> {
+        let distance_slot_base: usize = length_state * LZMA_NUMBER_OF_DISTANCE_SLOTS;
+        let mut symbol: usize = 1;
+
+        while symbol < LZMA_NUMBER_OF_DISTANCE_SLOTS {
+            let distance_slot_index: usize = distance_slot_base + symbol;
+            let bit_value: u32 = match range_decoder
+                .decode_bit(&mut self.distance_slot_probabilities[distance_slot_index])
+            {
+                Ok(value) => value,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
+                    return Err(error);
+                }
+            };
+            symbol = (symbol << 1) + (bit_value as usize);
+        }
+        let slot: usize = symbol - LZMA_NUMBER_OF_DISTANCE_SLOTS;
+
+        if slot < LZMA_DISTANCE_SLOT_LOW_BITS {
+            return Ok(slot);
+        }
+        if slot < LZMA_DISTANCE_SLOT_PLAIN_BITS {
+            // Decode the distance low bits using the position special decoders.
+            return self.decode_distance_low_bits(range_decoder, slot);
+        }
+        // Decode the distance middle bits as plain bits and the low bits using the
+        // distance alignment decoder.
+        self.decode_distance_high_bits(range_decoder, slot)
+    }
+
+    /// Decodes an LZMA properties byte into literal context bits, literal position bits and
+    /// position bits.
+    pub(super) fn decode_properties(properties_value: u8) -> Result<(u8, u8, u8), ErrorTrace> {
+        if properties_value > LZMA_MAXIMUM_PROPERTIES {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported LZMA properties value: 0x{:02x}",
+                properties_value
+            )));
+        }
+        let mut value: usize = properties_value as usize;
+
+        let literal_context_bits: u8 = (value % 9) as u8;
+        value /= 9;
+        let literal_position_bits: u8 = (value % 5) as u8;
+        let position_bits: u8 = (value / 5) as u8;
+
+        if (literal_context_bits + literal_position_bits) > 4 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported LZMA properties value: 0x{:02x} (lc + lp > 4)",
+                properties_value
+            )));
+        }
+        Ok((literal_context_bits, literal_position_bits, position_bits))
+    }
+
+    /// Decodes a repeated match (i.e. a match which uses one of the 4 latest distances).
+    fn decode_repeated_match(
+        &mut self,
+        debug_trace: &mut DebugTraceScope,
+        range_decoder: &mut LzmaRangeDecoder,
+        uncompressed_data: &mut [u8],
+        uncompressed_data_offset: &mut usize,
+        uncompressed_data_end_offset: usize,
+        position_state: usize,
+        dictionary_start_offset: usize,
+    ) -> Result<(), ErrorTrace> {
+        if *uncompressed_data_offset - dictionary_start_offset == 0 {
+            return Err(keramics_core::error_trace_new!("Invalid match at offset 0"));
+        }
+        let bit_value: u32 = match range_decoder
+            .decode_bit(&mut self.repeated_match_distance0_probabilities[self.state])
+        {
+            Ok(value) => value,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
+                return Err(error);
+            }
+        };
+        if bit_value == 0 {
+            let table_index: usize = (self.state * LZMA_NUMBER_OF_POSITION_STATES) + position_state;
+            let bit_value: u32 = match range_decoder
+                .decode_bit(&mut self.repeated_match_distance0_long_probabilities[table_index])
+            {
+                Ok(value) => value,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
+                    return Err(error);
+                }
+            };
+            if bit_value == 0 {
+                // Short repeated match: repeat the last decoded byte at rep0.
+                return self.decode_short_repeated_match(
+                    debug_trace,
+                    uncompressed_data,
+                    uncompressed_data_offset,
+                    uncompressed_data_end_offset,
+                    dictionary_start_offset,
+                );
+            }
+            // Long repeated match at rep0.
+            let match_distance: usize = self.repeated_distances[0];
+
+            return self.decode_long_repeated_match(
+                debug_trace,
+                range_decoder,
+                uncompressed_data,
+                uncompressed_data_offset,
+                uncompressed_data_end_offset,
+                position_state,
+                dictionary_start_offset,
+                match_distance,
+            );
+        }
+        let match_distance: usize = match self.select_repeated_match_distance(range_decoder) {
+            Ok(match_distance) => match_distance,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to select repeated match distance"
+                );
+                return Err(error);
+            }
+        };
+        self.decode_long_repeated_match(
+            debug_trace,
+            range_decoder,
+            uncompressed_data,
+            uncompressed_data_offset,
+            uncompressed_data_end_offset,
+            position_state,
+            dictionary_start_offset,
+            match_distance,
+        )
+    }
+
+    /// Decodes a short repeated match (i.e. a single byte at the rep0 distance).
+    fn decode_short_repeated_match(
+        &mut self,
+        debug_trace: &mut DebugTraceScope,
+        uncompressed_data: &mut [u8],
+        uncompressed_data_offset: &mut usize,
+        uncompressed_data_end_offset: usize,
+        dictionary_start_offset: usize,
+    ) -> Result<(), ErrorTrace> {
+        self.update_state_short_repeated();
+
+        let match_distance: usize = self.repeated_distances[0];
+
+        if *uncompressed_data_offset >= uncompressed_data_end_offset {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid uncompressed data value too small"
+            ));
+        }
+        // Note that a short repeated match must be a valid distance.
+        if match_distance >= *uncompressed_data_offset - dictionary_start_offset {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid match distance: {} value out of bounds",
+                match_distance
+            )));
+        }
+        uncompressed_data[*uncompressed_data_offset] =
+            uncompressed_data[*uncompressed_data_offset - 1 - match_distance];
+        *uncompressed_data_offset += 1;
+
+        self.previous_byte = uncompressed_data[*uncompressed_data_offset - 1];
+
+        if debug_trace.debug_output {
+            debug_trace.print_field(
+                "symbol",
+                format!("short repeated match: distance: {}", match_distance),
+            );
+        }
+        Ok(())
+    }
+
+    /// Decompresses a single LZMA stream chunk.
+    pub fn decompress_chunk(
+        &mut self,
+        debug_trace: &mut DebugTraceScope,
+        compressed_data: &[u8],
+        uncompressed_data: &mut [u8],
+        uncompressed_data_size: usize,
+        uncompressed_data_offset: usize,
+        dictionary_start_offset: usize,
+        expected_uncompressed_size: usize,
+        allow_end_of_payload_marker: bool,
+    ) -> Result<usize, ErrorTrace> {
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(compressed_data, 0);
+
+        match range_decoder.read_initialization_bytes() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read initialization bytes");
+                return Err(error);
+            }
+        }
+        let size_defined: bool = expected_uncompressed_size != usize::MAX;
+        let uncompressed_data_end_offset: usize = if size_defined {
+            let end_offset: usize =
+                match uncompressed_data_offset.checked_add(expected_uncompressed_size) {
+                    Some(value) => value,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid uncompressed data offset value out of bounds"
+                        ));
+                    }
+                };
+            if end_offset > uncompressed_data_size {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid uncompressed data value too small"
+                ));
+            }
+            end_offset
+        } else {
+            uncompressed_data_size
+        };
+        let position_mask: usize = (1 << self.position_bits) - 1;
+        let literal_position_mask: usize = (1 << self.literal_position_bits) - 1;
+
+        // The end of payload marker (EOPM) is always allowed in a stream with an unknown
+        // uncompressed data size. When the uncompressed data size is known, EOPM is only allowed
+        // after exactly that many bytes have been decompressed.
+        let mut expect_end_of_payload_marker: bool = !size_defined;
+        let mut current_uncompressed_data_offset: usize = uncompressed_data_offset;
+
+        debug_trace.print_start("LzmaChunk");
+
+        loop {
+            if size_defined && current_uncompressed_data_offset >= uncompressed_data_end_offset {
+                let end_of_chunk: bool =
+                    match range_decoder.check_for_end_of_chunk(allow_end_of_payload_marker) {
+                        Ok(end_of_chunk) => end_of_chunk,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to check for end of chunk"
+                            );
+                            return Err(error);
+                        }
+                    };
+                if end_of_chunk {
+                    debug_trace.print_end();
+
+                    return Ok(current_uncompressed_data_offset - uncompressed_data_offset);
+                }
+                expect_end_of_payload_marker = true;
+            }
+            let position_state: usize = current_uncompressed_data_offset & position_mask;
+            let match_index: usize = (self.state * LZMA_NUMBER_OF_POSITION_STATES) + position_state;
+
+            let bit_value: u32 =
+                match range_decoder.decode_bit(&mut self.match_probabilities[match_index]) {
+                    Ok(value) => value,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
+                        return Err(error);
+                    }
+                };
+            if bit_value == 0 {
+                match self.decode_literal(
+                    debug_trace,
+                    &mut range_decoder,
+                    uncompressed_data,
+                    &mut current_uncompressed_data_offset,
+                    uncompressed_data_end_offset,
+                    literal_position_mask,
+                    dictionary_start_offset,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to decode literal");
+                        return Err(error);
+                    }
+                }
+            } else {
+                // Decode a match.
+                let bit_value: u32 = match range_decoder
+                    .decode_bit(&mut self.repeated_match_probabilities[self.state])
+                {
+                    Ok(value) => value,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
+                        return Err(error);
+                    }
+                };
+                if bit_value == 0 {
+                    // Simple match.
+                    let end_of_chunk: bool = match self.decode_match(
+                        debug_trace,
+                        &mut range_decoder,
+                        uncompressed_data,
+                        &mut current_uncompressed_data_offset,
+                        uncompressed_data_end_offset,
+                        position_state,
+                        dictionary_start_offset,
+                        expect_end_of_payload_marker,
+                    ) {
+                        Ok(end_of_chunk) => end_of_chunk,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(error, "Unable to decode match");
+                            return Err(error);
+                        }
+                    };
+                    if end_of_chunk {
+                        debug_trace.print_end();
+
+                        return Ok(current_uncompressed_data_offset - uncompressed_data_offset);
+                    }
+                } else {
+                    // Repeated match.
+                    match self.decode_repeated_match(
+                        debug_trace,
+                        &mut range_decoder,
+                        uncompressed_data,
+                        &mut current_uncompressed_data_offset,
+                        uncompressed_data_end_offset,
+                        position_state,
+                        dictionary_start_offset,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to decode repeated match"
+                            );
+                            return Err(error);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Resets the decoder state while keeping the current properties.
+    pub fn reset_state(&mut self) {
+        self.state = 0;
+        self.repeated_distances = [0; 4];
+        self.previous_byte = 0;
+
+        self.match_probabilities
+            .fill(LZMA_PROBABILITY_INITIAL_VALUE);
+        self.repeated_match_probabilities
+            .fill(LZMA_PROBABILITY_INITIAL_VALUE);
+        self.repeated_match_distance0_probabilities
+            .fill(LZMA_PROBABILITY_INITIAL_VALUE);
+        self.repeated_match_distance1_probabilities
+            .fill(LZMA_PROBABILITY_INITIAL_VALUE);
+        self.repeated_match_distance2_probabilities
+            .fill(LZMA_PROBABILITY_INITIAL_VALUE);
+        self.repeated_match_distance0_long_probabilities
+            .fill(LZMA_PROBABILITY_INITIAL_VALUE);
+        self.literal_probabilities
+            .fill(LZMA_PROBABILITY_INITIAL_VALUE);
+        self.match_length_probabilities
+            .fill(LZMA_PROBABILITY_INITIAL_VALUE);
+        self.repeated_match_length_probabilities
+            .fill(LZMA_PROBABILITY_INITIAL_VALUE);
+        self.distance_slot_probabilities
+            .fill(LZMA_PROBABILITY_INITIAL_VALUE);
+        self.distance_low_bit_probabilities
+            .fill(LZMA_PROBABILITY_INITIAL_VALUE);
+        self.distance_alignment_probabilities
+            .fill(LZMA_PROBABILITY_INITIAL_VALUE);
+    }
+
+    /// Resets the decoder state and changes the properties.
+    pub fn reset_state_and_properties(
+        &mut self,
+        literal_context_bits: u8,
+        literal_position_bits: u8,
+        position_bits: u8,
+    ) -> Result<(), ErrorTrace> {
+        let decoder: LzmaDecoder =
+            match Self::new(literal_context_bits, literal_position_bits, position_bits) {
+                Ok(decoder) => decoder,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to create decoder");
+                    return Err(error);
+                }
+            };
+        *self = decoder;
+
+        Ok(())
+    }
+
+    /// Selects the distance of a repeated match (rep1 to rep3) and updates the distance history.
+    fn select_repeated_match_distance(
+        &mut self,
+        range_decoder: &mut LzmaRangeDecoder,
+    ) -> Result<usize, ErrorTrace> {
+        let bit_value: u32 = match range_decoder
+            .decode_bit(&mut self.repeated_match_distance1_probabilities[self.state])
+        {
+            Ok(value) => value,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
+                return Err(error);
+            }
+        };
+        if bit_value == 0 {
+            // rep1 becomes rep0.
+            let distance: usize = self.repeated_distances[1];
+
+            self.repeated_distances[1] = self.repeated_distances[0];
+            self.repeated_distances[0] = distance;
+            return Ok(self.repeated_distances[0]);
+        }
+        let bit_value: u32 = match range_decoder
+            .decode_bit(&mut self.repeated_match_distance2_probabilities[self.state])
+        {
+            Ok(value) => value,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
+                return Err(error);
+            }
+        };
+        if bit_value == 0 {
+            // rep2 becomes rep0.
+            let distance: usize = self.repeated_distances[2];
+
+            self.repeated_distances[2] = self.repeated_distances[1];
+            self.repeated_distances[1] = self.repeated_distances[0];
+            self.repeated_distances[0] = distance;
+            return Ok(self.repeated_distances[0]);
+        }
+        // rep3 becomes rep0.
+        let distance: usize = self.repeated_distances[3];
+
+        self.repeated_distances[3] = self.repeated_distances[2];
+        self.repeated_distances[2] = self.repeated_distances[1];
+        self.repeated_distances[1] = self.repeated_distances[0];
+        self.repeated_distances[0] = distance;
+
+        Ok(self.repeated_distances[0])
+    }
+
+    /// Updates the decoder state after a literal has been decoded.
+    fn update_state_literal(&mut self) {
+        let state: usize = self.state;
+
+        self.state = if state <= 3 {
+            0
+        } else if state <= 9 {
+            state - 3
+        } else {
+            state - 6
+        };
+    }
+
+    /// Updates the decoder state after a simple match has been decoded.
+    fn update_state_match(&mut self) {
+        let state: usize = self.state;
+
+        self.state = if state < LZMA_NUMBER_OF_LITERAL_STATES {
+            7
+        } else {
+            10
+        };
+    }
+
+    /// Updates the decoder state after a (long) repeated match has been decoded.
+    fn update_state_repeated(&mut self) {
+        let state: usize = self.state;
+
+        self.state = if state < LZMA_NUMBER_OF_LITERAL_STATES {
+            8
+        } else {
+            11
+        };
+    }
+
+    /// Updates the decoder state after a short repeated match has been decoded.
+    fn update_state_short_repeated(&mut self) {
+        let state: usize = self.state;
+
+        self.state = if state < LZMA_NUMBER_OF_LITERAL_STATES {
+            9
+        } else {
+            11
+        };
     }
 }
 
@@ -450,7 +1374,7 @@ impl LzmaContext {
                 return Err(error);
             }
         };
-        let target_size: usize =
+        let expected_uncompressed_size: usize =
             if stream_header.uncompressed_data_size == LZMA_UNCOMPRESSED_SIZE_UNKNOWN {
                 usize::MAX
             } else {
@@ -466,7 +1390,7 @@ impl LzmaContext {
                 uncompressed_data_size,
                 0,
                 0,
-                target_size,
+                expected_uncompressed_size,
                 true,
             ) {
                 Ok(number_of_bytes) => {
@@ -479,894 +1403,6 @@ impl LzmaContext {
             }
             Ok(())
         })
-    }
-}
-
-/// Decoder for decompressing LZMA compressed data.
-pub(crate) struct LzmaDecoder {
-    /// Number of literal context bits (lc).
-    literal_context_bits: u8,
-
-    /// Number of literal position bits (lp).
-    literal_position_bits: u8,
-
-    /// Number of position bits (pb).
-    position_bits: u8,
-
-    /// Decoder state (0 to 11).
-    state: usize,
-
-    /// Rep 0 distance (zero-based).
-    rep0: usize,
-
-    /// Rep 1 distance (zero-based).
-    rep1: usize,
-
-    /// Rep 2 distance (zero-based).
-    rep2: usize,
-
-    /// Rep 3 distance (zero-based).
-    rep3: usize,
-
-    /// Last decoded byte value, or zero if no bytes have been decoded yet.
-    previous_byte: u8,
-
-    /// Probabilities whether a literal or match is decoded next (state * 16 + position_state).
-    is_match: Vec<u16>,
-
-    /// Probabilities of a repeated match (state).
-    repeated_match_probabilities: Vec<u16>,
-
-    /// Probabilities that the repeated match distance is rep 0 (state).
-    is_rep0: Vec<u16>,
-
-    /// Probabilities that the repeated match distance is rep 1 (state).
-    is_rep1: Vec<u16>,
-
-    /// Probabilities that the repeated match distance is rep 2 (state).
-    is_rep2: Vec<u16>,
-
-    /// Probabilities of a long repeated match at rep 0 (state * 16 + position_state).
-    is_rep0_long: Vec<u16>,
-
-    /// Probabilities of the literal symbols (coder * 0x300 + subcoder).
-    literal: Vec<u16>,
-
-    /// Probabilities of the match length decoder.
-    ///
-    /// Consists of: choice (cell 0), choice2 (cell 1),
-    /// low (cells 2 + position_state * 8), mid (cells 2 + 128 + position_state * 8)
-    /// and high (cells 258).
-    match_lengths: Vec<u16>,
-
-    /// Probabilities of the rep match length decoder (same layout as match_lengths).
-    rep_len: Vec<u16>,
-
-    /// Probabilities of the distance slot (length state * 64 + slot).
-    distance_slots: Vec<u16>,
-
-    /// Probabilities of the distance low bits (position special decoders).
-    distance_low_bits: Vec<u16>,
-
-    /// Probabilities of the distance align bits.
-    dist_align: Vec<u16>,
-}
-
-impl LzmaDecoder {
-    /// Creates a new decoder.
-    pub fn new(
-        literal_context_bits: u8,
-        literal_position_bits: u8,
-        position_bits: u8,
-    ) -> Result<Self, ErrorTrace> {
-        match Self::create(literal_context_bits, literal_position_bits, position_bits) {
-            Ok(decoder) => Ok(decoder),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to create decoder");
-                return Err(error);
-            }
-        }
-    }
-
-    /// Creates a new decoder with the specified properties.
-    fn create(
-        literal_context_bits: u8,
-        literal_position_bits: u8,
-        position_bits: u8,
-    ) -> Result<Self, ErrorTrace> {
-        if u32::from(literal_context_bits) + u32::from(literal_position_bits) > 4
-            || u32::from(position_bits) > 4
-        {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported LZMA properties value: lc: {}, lp: {}, pb: {}",
-                literal_context_bits, literal_position_bits, position_bits
-            )));
-        }
-        let number_of_literal_states: usize = 1 << (literal_context_bits + literal_position_bits);
-
-        Ok(Self {
-            literal_context_bits,
-            literal_position_bits,
-            position_bits,
-            state: 0,
-            rep0: 0,
-            rep1: 0,
-            rep2: 0,
-            rep3: 0,
-            previous_byte: 0,
-            is_match: vec![LZMA_PROBABILITY_INIT; LZMA_NUMBER_OF_STATES * LZMA_POSITION_STATES],
-            repeated_match_probabilities: vec![LZMA_PROBABILITY_INIT; LZMA_NUMBER_OF_STATES],
-            is_rep0: vec![LZMA_PROBABILITY_INIT; LZMA_NUMBER_OF_STATES],
-            is_rep1: vec![LZMA_PROBABILITY_INIT; LZMA_NUMBER_OF_STATES],
-            is_rep2: vec![LZMA_PROBABILITY_INIT; LZMA_NUMBER_OF_STATES],
-            is_rep0_long: vec![LZMA_PROBABILITY_INIT; LZMA_NUMBER_OF_STATES * LZMA_POSITION_STATES],
-            literal: vec![LZMA_PROBABILITY_INIT; number_of_literal_states * 0x300],
-            match_lengths: vec![LZMA_PROBABILITY_INIT; LZMA_MATCH_LENGTH_NUMBER_OF_CELLS],
-            rep_len: vec![LZMA_PROBABILITY_INIT; LZMA_MATCH_LENGTH_NUMBER_OF_CELLS],
-            distance_slots: vec![
-                LZMA_PROBABILITY_INIT;
-                LZMA_NUMBER_OF_DISTANCE_SLOT_STATES * LZMA_NUMBER_OF_DISTANCE_SLOTS
-            ],
-            // Note that 114 probability cells (indexes 0 to 113) are used by the
-            // distance low bits (position special) decoders for slots 4 to 13.
-            distance_low_bits: vec![LZMA_PROBABILITY_INIT; 114],
-            dist_align: vec![LZMA_PROBABILITY_INIT; 1 << LZMA_NUMBER_OF_DISTANCE_ALIGN_BITS],
-        })
-    }
-
-    /// Resets the decoder state while keeping the current properties.
-    pub fn reset_state(&mut self) {
-        self.state = 0;
-        self.rep0 = 0;
-        self.rep1 = 0;
-        self.rep2 = 0;
-        self.rep3 = 0;
-        self.previous_byte = 0;
-
-        for probability in self.is_match.iter_mut() {
-            *probability = LZMA_PROBABILITY_INIT;
-        }
-        for probability in self.repeated_match_probabilities.iter_mut() {
-            *probability = LZMA_PROBABILITY_INIT;
-        }
-        for probability in self.is_rep0.iter_mut() {
-            *probability = LZMA_PROBABILITY_INIT;
-        }
-        for probability in self.is_rep1.iter_mut() {
-            *probability = LZMA_PROBABILITY_INIT;
-        }
-        for probability in self.is_rep2.iter_mut() {
-            *probability = LZMA_PROBABILITY_INIT;
-        }
-        for probability in self.is_rep0_long.iter_mut() {
-            *probability = LZMA_PROBABILITY_INIT;
-        }
-        for probability in self.literal.iter_mut() {
-            *probability = LZMA_PROBABILITY_INIT;
-        }
-        for probability in self.match_lengths.iter_mut() {
-            *probability = LZMA_PROBABILITY_INIT;
-        }
-        for probability in self.rep_len.iter_mut() {
-            *probability = LZMA_PROBABILITY_INIT;
-        }
-        for probability in self.distance_slots.iter_mut() {
-            *probability = LZMA_PROBABILITY_INIT;
-        }
-        for probability in self.distance_low_bits.iter_mut() {
-            *probability = LZMA_PROBABILITY_INIT;
-        }
-        for probability in self.dist_align.iter_mut() {
-            *probability = LZMA_PROBABILITY_INIT;
-        }
-    }
-
-    /// Resets the decoder state and changes the properties.
-    pub fn reset_state_and_properties(
-        &mut self,
-        literal_context_bits: u8,
-        literal_position_bits: u8,
-        position_bits: u8,
-    ) -> Result<(), ErrorTrace> {
-        let decoder: LzmaDecoder =
-            match Self::create(literal_context_bits, literal_position_bits, position_bits) {
-                Ok(decoder) => decoder,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to create decoder");
-                    return Err(error);
-                }
-            };
-        *self = decoder;
-
-        Ok(())
-    }
-}
-
-impl LzmaDecoder {
-    /// Decompresses a single LZMA stream chunk.
-    pub fn decompress_chunk(
-        &mut self,
-        debug_trace: &mut DebugTraceScope,
-        compressed_data: &[u8],
-        uncompressed_data: &mut [u8],
-        uncompressed_data_size: usize,
-        uncompressed_data_offset: usize,
-        dictionary_start: usize,
-        target_size: usize,
-        allow_end_of_payload_marker: bool,
-    ) -> Result<usize, ErrorTrace> {
-        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(compressed_data, 0);
-
-        match range_decoder.read_initialization_bytes() {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read initialization bytes");
-                return Err(error);
-            }
-        }
-        let size_defined: bool = target_size != usize::MAX;
-        let end: usize = if size_defined {
-            let end_position: usize = match uncompressed_data_offset.checked_add(target_size) {
-                Some(value) => value,
-                None => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Invalid uncompressed data offset value out of bounds"
-                    ));
-                }
-            };
-            if end_position > uncompressed_data_size {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid uncompressed data value too small"
-                ));
-            }
-            end_position
-        } else {
-            uncompressed_data_size
-        };
-        let pos_mask: usize = (1 << self.position_bits) - 1;
-        let literal_pos_mask: usize = (1 << self.literal_position_bits) - 1;
-
-        // The end of payload marker (EOPM) is always allowed in a stream with an unknown
-        // uncompressed data size. When the uncompressed data size is known, EOPM is only allowed
-        // after exactly that many bytes have been decompressed.
-        let mut expect_end_of_payload_marker: bool = !size_defined;
-        let mut written_offset: usize = uncompressed_data_offset;
-
-        loop {
-            if size_defined && written_offset >= end {
-                let end_of_chunk: bool = match range_decoder
-                    .check_for_end_of_chunk(compressed_data, allow_end_of_payload_marker)
-                {
-                    Ok(end_of_chunk) => end_of_chunk,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to check for end of chunk"
-                        );
-                        return Err(error);
-                    }
-                };
-                if end_of_chunk {
-                    return Ok(written_offset - uncompressed_data_offset);
-                }
-                expect_end_of_payload_marker = true;
-            }
-            let pos_state: usize = written_offset & pos_mask;
-            let is_match_index: usize = self.state * LZMA_POSITION_STATES + pos_state;
-
-            let bit_value: u32 = match range_decoder.decode_bit(&mut self.is_match[is_match_index])
-            {
-                Ok(value) => value,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
-                    return Err(error);
-                }
-            };
-            if bit_value == 0 {
-                match self.decode_literal(
-                    debug_trace,
-                    &mut range_decoder,
-                    uncompressed_data,
-                    &mut written_offset,
-                    end,
-                    literal_pos_mask,
-                    dictionary_start,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to decode literal");
-                        return Err(error);
-                    }
-                }
-            } else {
-                // Decode a match.
-                let bit_value: u32 = match range_decoder
-                    .decode_bit(&mut self.repeated_match_probabilities[self.state])
-                {
-                    Ok(value) => value,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
-                        return Err(error);
-                    }
-                };
-                if bit_value == 0 {
-                    // Simple match.
-                    let end_of_chunk: bool = match self.decode_match(
-                        debug_trace,
-                        &mut range_decoder,
-                        uncompressed_data,
-                        &mut written_offset,
-                        end,
-                        pos_state,
-                        dictionary_start,
-                        expect_end_of_payload_marker,
-                    ) {
-                        Ok(end_of_chunk) => end_of_chunk,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(error, "Unable to decode match");
-                            return Err(error);
-                        }
-                    };
-                    if end_of_chunk {
-                        return Ok(written_offset - uncompressed_data_offset);
-                    }
-                } else {
-                    // Repeated match.
-                    match self.decode_repeated_match(
-                        debug_trace,
-                        &mut range_decoder,
-                        uncompressed_data,
-                        &mut written_offset,
-                        end,
-                        pos_state,
-                        dictionary_start,
-                    ) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to decode repeated match"
-                            );
-                            return Err(error);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Decodes a literal and copies the byte value to the uncompressed data.
-    fn decode_literal(
-        &mut self,
-        debug_trace: &mut DebugTraceScope,
-        range_decoder: &mut LzmaRangeDecoder,
-        uncompressed_data: &mut [u8],
-        uncompressed_data_offset: &mut usize,
-        end: usize,
-        literal_pos_mask: usize,
-        dictionary_start: usize,
-    ) -> Result<(), ErrorTrace> {
-        let subcoder: usize = (((*uncompressed_data_offset & literal_pos_mask)
-            << self.literal_context_bits)
-            + (self.previous_byte as usize >> (8 - self.literal_context_bits)))
-            * 0x300;
-        let mut match_byte: u8 = if self.state >= LZMA_NUMBER_OF_LITERAL_STATES
-            && *uncompressed_data_offset - dictionary_start > self.rep0
-        {
-            uncompressed_data[*uncompressed_data_offset - 1 - self.rep0]
-        } else {
-            0
-        };
-        let mut matched: bool = self.state >= LZMA_NUMBER_OF_LITERAL_STATES;
-        let mut symbol: usize = 1;
-
-        while symbol < 0x100 {
-            let literal_bit: u32 = if matched {
-                // Use the subcoder for the matched byte bit.
-
-                // Note that the subcoder index of the matched literal cells is
-                // 0x100 + (match_bit * 0x100) + symbol.
-                let match_bit: u8 = (match_byte >> 7) & 1;
-                let literal_index: usize = subcoder + ((1 + match_bit as usize) * 0x100) + symbol;
-                let literal_bit: u32 =
-                    match range_decoder.decode_bit(&mut self.literal[literal_index]) {
-                        Ok(value) => value,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
-                            return Err(error);
-                        }
-                    };
-                if literal_bit != match_bit as u32 {
-                    matched = false;
-                }
-                // Note that only the 8 bits MSB are used.
-                match_byte = match_byte.wrapping_shl(1);
-                literal_bit
-            } else {
-                let literal_index: usize = subcoder + symbol;
-
-                match range_decoder.decode_bit(&mut self.literal[literal_index]) {
-                    Ok(value) => value,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
-                        return Err(error);
-                    }
-                }
-            };
-            symbol = (symbol << 1) + (literal_bit as usize);
-        }
-        let literal_value: u8 = (symbol & 0xff) as u8;
-
-        if *uncompressed_data_offset >= end {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid uncompressed data value too small"
-            ));
-        }
-        debug_trace.print_field("symbol", format!("literal: 0x{:02x}", literal_value));
-        uncompressed_data[*uncompressed_data_offset] = literal_value;
-        *uncompressed_data_offset += 1;
-
-        self.previous_byte = literal_value;
-        self.update_state_literal();
-
-        Ok(())
-    }
-
-    /// Decodes a match with a decoded distance.
-    fn decode_match(
-        &mut self,
-        debug_trace: &mut DebugTraceScope,
-        range_decoder: &mut LzmaRangeDecoder,
-        uncompressed_data: &mut [u8],
-        uncompressed_data_offset: &mut usize,
-        end: usize,
-        pos_state: usize,
-        dictionary_start: usize,
-        expect_end_of_payload_marker: bool,
-    ) -> Result<bool, ErrorTrace> {
-        self.update_state_match();
-
-        let match_length: usize =
-            match range_decoder.decode_length(pos_state, &mut self.match_lengths) {
-                Ok(match_length) => match_length,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to decode match length");
-                    return Err(error);
-                }
-            };
-        // Zero-based match length capped at 3 is used to select the distance slot table.
-        let len_state: usize = (match_length - LZMA_MATCH_LENGTH_MINIMUM).min(3);
-
-        let distance: usize = match self.decode_match_distance(range_decoder, len_state) {
-            Ok(distance) => distance,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to decode match distance");
-                return Err(error);
-            }
-        };
-        // The distance value 0xffffffff is reserved for the end of payload marker (EOPM).
-        if distance as u32 == LZMA_END_OF_PAYLOAD_MARKER {
-            // The EOPM is only allowed when the end of the payload has been reached.
-            if !expect_end_of_payload_marker {
-                return Err(keramics_core::error_trace_new!(
-                    "Unexpected end of payload marker (EOPM)"
-                ));
-            }
-            let finished: bool = match range_decoder.is_finished() {
-                Ok(finished) => finished,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to determine if range decoder is finished"
-                    );
-                    return Err(error);
-                }
-            };
-            if !finished {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid end of payload marker (EOPM)"
-                ));
-            }
-            debug_trace.print_field("symbol", String::from("EOPM"));
-
-            return Ok(true);
-        }
-        self.rep3 = self.rep2;
-        self.rep2 = self.rep1;
-        self.rep1 = self.rep0;
-        self.rep0 = distance;
-
-        if distance >= *uncompressed_data_offset - dictionary_start {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid match distance: {} out of bounds",
-                distance
-            )));
-        }
-        for _ in 0..match_length {
-            if *uncompressed_data_offset >= end {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid uncompressed data value too small"
-                ));
-            }
-            uncompressed_data[*uncompressed_data_offset] =
-                uncompressed_data[*uncompressed_data_offset - 1 - distance];
-            *uncompressed_data_offset += 1;
-            self.previous_byte = uncompressed_data[*uncompressed_data_offset - 1];
-        }
-        debug_trace.print_field(
-            "symbol",
-            format!("match: length: {}, distance: {}", match_length, distance),
-        );
-        Ok(false)
-    }
-
-    /// Decodes a match distance, including the end of payload marker (EOPM) value.
-    fn decode_match_distance(
-        &mut self,
-        range_decoder: &mut LzmaRangeDecoder,
-        len_state: usize,
-    ) -> Result<usize, ErrorTrace> {
-        let distance_slot_base: usize = len_state * LZMA_NUMBER_OF_DISTANCE_SLOTS;
-        let mut symbol: usize = 1;
-
-        while symbol < LZMA_NUMBER_OF_DISTANCE_SLOTS {
-            let distance_slot_index: usize = distance_slot_base + symbol;
-            let bit_value: u32 =
-                match range_decoder.decode_bit(&mut self.distance_slots[distance_slot_index]) {
-                    Ok(value) => value,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
-                        return Err(error);
-                    }
-                };
-            symbol = (symbol << 1) + (bit_value as usize);
-        }
-        let slot: usize = symbol - LZMA_NUMBER_OF_DISTANCE_SLOTS;
-
-        if slot < LZMA_DISTANCE_SLOT_LOW_BITS {
-            return Ok(slot);
-        }
-        if slot < LZMA_DISTANCE_SLOT_PLAIN_BITS {
-            // Decode the distance low bits using the position special decoders.
-            return self.decode_distance_low_bits(range_decoder, slot);
-        }
-        // Decode the distance middle bits as plain bits and the low bits using the
-        // distance align decoder.
-        self.decode_distance_high_bits(range_decoder, slot)
-    }
-
-    /// Decodes a match distance using the position special (distance low bits) decoders.
-    fn decode_distance_low_bits(
-        &mut self,
-        range_decoder: &mut LzmaRangeDecoder,
-        slot: usize,
-    ) -> Result<usize, ErrorTrace> {
-        let number_of_bits: usize = (slot / 2) - 1;
-        let mut value: usize = (2 | (slot & 1)) << number_of_bits;
-        // Note that the first distance low bits cell index is (value - slot).
-        let table_base: usize = value - slot;
-        let mut table_symbol: usize = 1;
-        let mut bit_offset: usize = 0;
-
-        while bit_offset < number_of_bits {
-            let table_index: usize = table_base + table_symbol - 1;
-
-            let bit_value: u32 =
-                match range_decoder.decode_bit(&mut self.distance_low_bits[table_index]) {
-                    Ok(value) => value,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
-                        return Err(error);
-                    }
-                };
-            if bit_value == 1 {
-                value += 1 << bit_offset;
-            }
-            table_symbol = (table_symbol << 1) + (bit_value as usize);
-            bit_offset += 1;
-        }
-        Ok(value)
-    }
-
-    /// Decodes a match distance using plain bits and the distance align decoder.
-    fn decode_distance_high_bits(
-        &mut self,
-        range_decoder: &mut LzmaRangeDecoder,
-        slot: usize,
-    ) -> Result<usize, ErrorTrace> {
-        let number_of_bits: usize = (slot / 2) - 1;
-        let number_of_plain_bits: usize = number_of_bits - LZMA_NUMBER_OF_DISTANCE_ALIGN_BITS;
-        let mut value: usize = 2 | (slot & 1);
-
-        for _ in 0..number_of_plain_bits {
-            let bit_value: u32 = match range_decoder.decode_bit_direct() {
-                Ok(value) => value,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
-                    return Err(error);
-                }
-            };
-            value = (value << 1) | bit_value as usize;
-        }
-        value <<= LZMA_NUMBER_OF_DISTANCE_ALIGN_BITS;
-        let mut table_symbol: usize = 1;
-        let mut bit_offset: usize = 0;
-
-        // Decode the distance low 4 bits using the align decoder.
-        while bit_offset < LZMA_NUMBER_OF_DISTANCE_ALIGN_BITS {
-            let bit_value: u32 = match range_decoder.decode_bit(&mut self.dist_align[table_symbol])
-            {
-                Ok(value) => value,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
-                    return Err(error);
-                }
-            };
-            if bit_value == 1 {
-                value |= 1 << bit_offset;
-            }
-            table_symbol = (table_symbol << 1) + (bit_value as usize);
-            bit_offset += 1;
-        }
-        Ok(value)
-    }
-
-    /// Decodes a repeated match (i.e. a match which uses one of the 4 latest distances).
-    fn decode_repeated_match(
-        &mut self,
-        debug_trace: &mut DebugTraceScope,
-        range_decoder: &mut LzmaRangeDecoder,
-        uncompressed_data: &mut [u8],
-        uncompressed_data_offset: &mut usize,
-        end: usize,
-        pos_state: usize,
-        dictionary_start: usize,
-    ) -> Result<(), ErrorTrace> {
-        if *uncompressed_data_offset - dictionary_start == 0 {
-            return Err(keramics_core::error_trace_new!("Invalid match at offset 0"));
-        }
-        let bit_value: u32 = match range_decoder.decode_bit(&mut self.is_rep0[self.state]) {
-            Ok(value) => value,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
-                return Err(error);
-            }
-        };
-        if bit_value == 0 {
-            let table_index: usize = (self.state * LZMA_POSITION_STATES) + pos_state;
-            let bit_value: u32 = match range_decoder.decode_bit(&mut self.is_rep0_long[table_index])
-            {
-                Ok(value) => value,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
-                    return Err(error);
-                }
-            };
-            if bit_value == 0 {
-                // Short repeated match: repeat the last decoded byte at rep 0.
-                return self.decode_short_repeated_match(
-                    debug_trace,
-                    uncompressed_data,
-                    uncompressed_data_offset,
-                    end,
-                    dictionary_start,
-                );
-            }
-            // Long repeated match at rep 0.
-            let match_distance: usize = self.rep0;
-
-            return self.decode_long_repeated_match(
-                debug_trace,
-                range_decoder,
-                uncompressed_data,
-                uncompressed_data_offset,
-                end,
-                pos_state,
-                dictionary_start,
-                match_distance,
-            );
-        }
-        let match_distance: usize = match self.select_repeated_match_distance(range_decoder) {
-            Ok(match_distance) => match_distance,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to select repeated match distance"
-                );
-                return Err(error);
-            }
-        };
-        self.decode_long_repeated_match(
-            debug_trace,
-            range_decoder,
-            uncompressed_data,
-            uncompressed_data_offset,
-            end,
-            pos_state,
-            dictionary_start,
-            match_distance,
-        )
-    }
-
-    /// Decodes a long repeated match (i.e. a repeated match with a decoded length).
-    fn decode_long_repeated_match(
-        &mut self,
-        debug_trace: &mut DebugTraceScope,
-        range_decoder: &mut LzmaRangeDecoder,
-        uncompressed_data: &mut [u8],
-        uncompressed_data_offset: &mut usize,
-        end: usize,
-        pos_state: usize,
-        dictionary_start: usize,
-        match_distance: usize,
-    ) -> Result<(), ErrorTrace> {
-        self.update_state_repeated();
-
-        let match_length: usize = match range_decoder.decode_length(pos_state, &mut self.rep_len) {
-            Ok(match_length) => match_length,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to decode match length");
-                return Err(error);
-            }
-        };
-        for _ in 0..match_length {
-            if *uncompressed_data_offset >= end {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid uncompressed data value too small"
-                ));
-            }
-            // Note that the repeated distance must have been a valid distance when it was stored.
-            if match_distance >= *uncompressed_data_offset - dictionary_start {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Invalid match distance: {} out of bounds",
-                    match_distance
-                )));
-            }
-            uncompressed_data[*uncompressed_data_offset] =
-                uncompressed_data[*uncompressed_data_offset - 1 - match_distance];
-            *uncompressed_data_offset += 1;
-
-            self.previous_byte = uncompressed_data[*uncompressed_data_offset - 1];
-        }
-        debug_trace.print_field(
-            "symbol",
-            format!(
-                "long repeated match: length: {}, distance: {}",
-                match_length, match_distance
-            ),
-        );
-        Ok(())
-    }
-
-    /// Decodes a short repeated match (i.e. a single byte at the rep 0 distance).
-    fn decode_short_repeated_match(
-        &mut self,
-        debug_trace: &mut DebugTraceScope,
-        uncompressed_data: &mut [u8],
-        uncompressed_data_offset: &mut usize,
-        end: usize,
-        dictionary_start: usize,
-    ) -> Result<(), ErrorTrace> {
-        self.update_state_short_repeated();
-
-        let match_distance: usize = self.rep0;
-
-        if *uncompressed_data_offset >= end {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid uncompressed data value too small"
-            ));
-        }
-        // Note that a short repeated match must be a valid distance.
-        if match_distance >= *uncompressed_data_offset - dictionary_start {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid match distance: {} out of bounds",
-                match_distance
-            )));
-        }
-        uncompressed_data[*uncompressed_data_offset] =
-            uncompressed_data[*uncompressed_data_offset - 1 - match_distance];
-        *uncompressed_data_offset += 1;
-
-        self.previous_byte = uncompressed_data[*uncompressed_data_offset - 1];
-
-        debug_trace.print_field(
-            "symbol",
-            format!("short repeated match: distance: {}", match_distance),
-        );
-        Ok(())
-    }
-
-    /// Selects the distance of a repeated match (rep 1 to rep 3) and updates the distance history.
-    fn select_repeated_match_distance(
-        &mut self,
-        range_decoder: &mut LzmaRangeDecoder,
-    ) -> Result<usize, ErrorTrace> {
-        let bit_value: u32 = match range_decoder.decode_bit(&mut self.is_rep1[self.state]) {
-            Ok(value) => value,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
-                return Err(error);
-            }
-        };
-        if bit_value == 0 {
-            // rep1 becomes rep0.
-            let distance: usize = self.rep1;
-
-            self.rep1 = self.rep0;
-            self.rep0 = distance;
-            return Ok(self.rep0);
-        }
-        let bit_value: u32 = match range_decoder.decode_bit(&mut self.is_rep2[self.state]) {
-            Ok(value) => value,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to decode bit");
-                return Err(error);
-            }
-        };
-        if bit_value == 0 {
-            // rep2 becomes rep0.
-            let distance: usize = self.rep2;
-
-            self.rep2 = self.rep1;
-            self.rep1 = self.rep0;
-            self.rep0 = distance;
-            return Ok(self.rep0);
-        }
-        // rep3 becomes rep0.
-        let distance: usize = self.rep3;
-
-        self.rep3 = self.rep2;
-        self.rep2 = self.rep1;
-        self.rep1 = self.rep0;
-        self.rep0 = distance;
-
-        Ok(self.rep0)
-    }
-
-    /// Updates the decoder state after a literal has been decoded.
-    fn update_state_literal(&mut self) {
-        let state: usize = self.state;
-
-        self.state = if state <= 3 {
-            0
-        } else if state <= 9 {
-            state - 3
-        } else {
-            state - 6
-        };
-    }
-
-    /// Updates the decoder state after a simple match has been decoded.
-    fn update_state_match(&mut self) {
-        let state: usize = self.state;
-
-        self.state = if state < LZMA_NUMBER_OF_LITERAL_STATES {
-            7
-        } else {
-            10
-        };
-    }
-
-    /// Updates the decoder state after a (long) repeated match has been decoded.
-    fn update_state_repeated(&mut self) {
-        let state: usize = self.state;
-
-        self.state = if state < LZMA_NUMBER_OF_LITERAL_STATES {
-            8
-        } else {
-            11
-        };
-    }
-
-    /// Updates the decoder state after a short repeated match has been decoded.
-    fn update_state_short_repeated(&mut self) {
-        let state: usize = self.state;
-
-        self.state = if state < LZMA_NUMBER_OF_LITERAL_STATES {
-            9
-        } else {
-            11
-        };
     }
 }
 
@@ -1393,8 +1429,8 @@ mod tests {
     ];
 
     /// LZMA stream of "hello world" repeated 200 times (2200 bytes).
-    /// Uses a known uncompressed data size and no end of payload marker (EOPM).
-    const TEST_DATA_P1_KNOWN_SIZE_NO_EOPM: [u8; 49] = [
+    /// Uses an unknown uncompressed data size, 8 MiB dictionary size, and an end of payload marker (EOPM).
+    const TEST_DATA_UNKNOWN_SIZE_LARGE_DICTIONARY: [u8; 49] = [
         0x5d, 0x00, 0x00, 0x80, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x34,
         0x19, 0x49, 0xee, 0x8d, 0xe9, 0x17, 0x89, 0x3a, 0x33, 0x60, 0x0a, 0x36, 0x3d, 0xd0, 0xbf,
         0x6e, 0xfc, 0xeb, 0xa2, 0x43, 0x50, 0x04, 0xde, 0x91, 0x7b, 0x7b, 0x3d, 0x95, 0xff, 0xff,
@@ -1511,7 +1547,7 @@ mod tests {
 
     /// Generates a pseudo-random data sequence.
     fn pseudo_random(number_of_bytes: usize, mut seed: u64) -> Vec<u8> {
-        let mut data: Vec<u8> = vec![];
+        let mut data: Vec<u8> = Vec::new();
 
         while data.len() < number_of_bytes {
             seed = (seed.wrapping_mul(1103515245).wrapping_add(12345)) & 0x7fffffff;
@@ -1522,7 +1558,7 @@ mod tests {
 
     fn get_test_data_distance_slots() -> Vec<u8> {
         let distances: [usize; 13] = [5, 6, 7, 9, 13, 18, 30, 36, 52, 65, 90, 102, 127];
-        let mut data: Vec<u8> = vec![];
+        let mut data: Vec<u8> = Vec::new();
 
         for distance in distances {
             let block_size: usize = distance - 1;
@@ -1535,6 +1571,41 @@ mod tests {
             data.push(200 + (distance % 50) as u8);
         }
         data
+    }
+
+    #[test]
+    fn test_decode_properties() -> Result<(), ErrorTrace> {
+        let (literal_context_bits, literal_position_bits, position_bits) =
+            LzmaDecoder::decode_properties(0x5d)?;
+        assert_eq!(literal_context_bits, 3);
+        assert_eq!(literal_position_bits, 0);
+        assert_eq!(position_bits, 2);
+
+        let (literal_context_bits, literal_position_bits, position_bits) =
+            LzmaDecoder::decode_properties(0x00)?;
+        assert_eq!(literal_context_bits, 0);
+        assert_eq!(literal_position_bits, 0);
+        assert_eq!(position_bits, 0);
+
+        let (literal_context_bits, literal_position_bits, position_bits) =
+            LzmaDecoder::decode_properties(0xd8)?;
+        assert_eq!(literal_context_bits, 0);
+        assert_eq!(literal_position_bits, 4);
+        assert_eq!(position_bits, 4);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decode_properties_with_invalid_value() {
+        let result: Result<(u8, u8, u8), ErrorTrace> = LzmaDecoder::decode_properties(0xe1);
+        assert!(result.is_err());
+
+        let result: Result<(u8, u8, u8), ErrorTrace> = LzmaDecoder::decode_properties(0x96);
+        assert!(result.is_err());
+
+        let result: Result<(u8, u8, u8), ErrorTrace> = LzmaDecoder::decode_properties(0xd9);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1569,7 +1640,7 @@ mod tests {
         let mut test_data: [u8; 13] = [
             0x5d, 0x00, 0x00, 0x10, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         ];
-        test_data[0] = 0xE0;
+        test_data[0] = 0xe0;
         let result: Result<(), ErrorTrace> = stream_header.read_data(&test_data);
         assert!(result.is_err());
     }
@@ -1579,7 +1650,7 @@ mod tests {
         let mut test_context: LzmaContext = LzmaContext::new();
 
         let expected_data: Vec<u8> = b"hello world".to_vec().repeat(200);
-        let mut uncompressed_data: Vec<u8> = vec![0u8; expected_data.len()];
+        let mut uncompressed_data: Vec<u8> = vec![0; expected_data.len()];
         test_context.decompress(&TEST_DATA_P1_ALONE, &mut uncompressed_data)?;
         assert_eq!(test_context.uncompressed_data_size, expected_data.len());
         assert_eq!(&uncompressed_data, &expected_data);
@@ -1592,7 +1663,7 @@ mod tests {
         let mut test_context: LzmaContext = LzmaContext::new();
 
         let expected_data: Vec<u8> = b"hello world".to_vec().repeat(200);
-        let mut uncompressed_data: Vec<u8> = vec![0u8; expected_data.len()];
+        let mut uncompressed_data: Vec<u8> = vec![0; expected_data.len()];
         test_context.decompress(&TEST_DATA_P1_KNOWN_SIZE_EOPM, &mut uncompressed_data)?;
         assert_eq!(test_context.uncompressed_data_size, expected_data.len());
         assert_eq!(&uncompressed_data, &expected_data);
@@ -1601,12 +1672,15 @@ mod tests {
     }
 
     #[test]
-    fn test_decompress_with_known_size_and_no_end_of_payload_marker() -> Result<(), ErrorTrace> {
+    fn test_decompress_with_unknown_size_and_large_dictionary() -> Result<(), ErrorTrace> {
         let mut test_context: LzmaContext = LzmaContext::new();
 
         let expected_data: Vec<u8> = b"hello world".to_vec().repeat(200);
-        let mut uncompressed_data: Vec<u8> = vec![0u8; expected_data.len()];
-        test_context.decompress(&TEST_DATA_P1_KNOWN_SIZE_NO_EOPM, &mut uncompressed_data)?;
+        let mut uncompressed_data: Vec<u8> = vec![0; expected_data.len()];
+        test_context.decompress(
+            &TEST_DATA_UNKNOWN_SIZE_LARGE_DICTIONARY,
+            &mut uncompressed_data,
+        )?;
         assert_eq!(test_context.uncompressed_data_size, expected_data.len());
         assert_eq!(&uncompressed_data, &expected_data);
 
@@ -1617,11 +1691,11 @@ mod tests {
     fn test_decompress_with_pattern_4096() -> Result<(), ErrorTrace> {
         let mut test_context: LzmaContext = LzmaContext::new();
 
-        let mut expected_data: Vec<u8> = vec![];
+        let mut expected_data: Vec<u8> = Vec::new();
         for _ in 0..16 {
             expected_data.extend_from_slice(&(0..=255u8).collect::<Vec<u8>>());
         }
-        let mut uncompressed_data: Vec<u8> = vec![0u8; expected_data.len()];
+        let mut uncompressed_data: Vec<u8> = vec![0; expected_data.len()];
         test_context.decompress(&TEST_DATA_PATTERN_4096, &mut uncompressed_data)?;
         assert_eq!(test_context.uncompressed_data_size, expected_data.len());
         assert_eq!(&uncompressed_data, &expected_data);
@@ -1634,7 +1708,7 @@ mod tests {
         let mut test_context: LzmaContext = LzmaContext::new();
 
         let expected_data: Vec<u8> = get_test_data_distance_slots();
-        let mut uncompressed_data: Vec<u8> = vec![0u8; expected_data.len()];
+        let mut uncompressed_data: Vec<u8> = vec![0; expected_data.len()];
         test_context.decompress(&TEST_DATA_DISTANCE_SLOTS, &mut uncompressed_data)?;
         assert_eq!(test_context.uncompressed_data_size, expected_data.len());
         assert_eq!(&uncompressed_data, &expected_data);
@@ -1646,13 +1720,15 @@ mod tests {
     fn test_decompress_with_small_distances() -> Result<(), ErrorTrace> {
         let mut test_context: LzmaContext = LzmaContext::new();
 
-        let mut expected_data: Vec<u8> = vec![];
+        let mut expected_data: Vec<u8> = Vec::new();
         for value in 1..300 {
             let byte: u8 = (value % 251) as u8;
 
-            expected_data.extend(std::iter::repeat(byte).take(value % 3 + 1));
+            for _ in 0..(value % 3 + 1) {
+                expected_data.push(byte);
+            }
         }
-        let mut uncompressed_data: Vec<u8> = vec![0u8; expected_data.len()];
+        let mut uncompressed_data: Vec<u8> = vec![0; expected_data.len()];
         test_context.decompress(&TEST_DATA_SMALL_DISTANCES, &mut uncompressed_data)?;
         assert_eq!(test_context.uncompressed_data_size, expected_data.len());
         assert_eq!(&uncompressed_data, &expected_data);
@@ -1664,8 +1740,8 @@ mod tests {
     fn test_decompress_with_repeated_matches() -> Result<(), ErrorTrace> {
         let mut test_context: LzmaContext = LzmaContext::new();
 
-        let expected_data: Vec<u8> = vec![0u8; 5000];
-        let mut uncompressed_data: Vec<u8> = vec![0u8; expected_data.len()];
+        let expected_data: Vec<u8> = vec![0; 5000];
+        let mut uncompressed_data: Vec<u8> = vec![0; expected_data.len()];
         test_context.decompress(&TEST_DATA_ZEROS, &mut uncompressed_data)?;
         assert_eq!(test_context.uncompressed_data_size, expected_data.len());
         assert_eq!(&uncompressed_data, &expected_data);
@@ -1680,20 +1756,20 @@ mod tests {
         let test_data: [u8; 12] = [
             0x5d, 0x00, 0x00, 0x10, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         ];
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 2200];
+        let mut uncompressed_data: Vec<u8> = vec![0; 2200];
         let result: Result<(), ErrorTrace> =
             test_context.decompress(&test_data, &mut uncompressed_data);
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_decompress_with_invalid_range_coder_init_byte() {
+    fn test_decompress_with_invalid_range_decoder_initialization_byte() {
         let mut test_context: LzmaContext = LzmaContext::new();
 
         let mut test_data: Vec<u8> = TEST_DATA_P1_ALONE.to_vec();
 
         test_data[13] = 0x01;
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 2200];
+        let mut uncompressed_data: Vec<u8> = vec![0; 2200];
         let result: Result<(), ErrorTrace> =
             test_context.decompress(&test_data, &mut uncompressed_data);
         assert!(result.is_err());
@@ -1703,7 +1779,7 @@ mod tests {
     fn test_decompress_with_unsupported_size() {
         let mut test_context: LzmaContext = LzmaContext::new();
 
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 100];
+        let mut uncompressed_data: Vec<u8> = vec![0; 100];
         let result: Result<(), ErrorTrace> =
             test_context.decompress(&TEST_DATA_P1_KNOWN_SIZE_EOPM, &mut uncompressed_data);
         assert!(result.is_err());
@@ -1713,7 +1789,7 @@ mod tests {
     fn test_decompress_with_truncated_stream() {
         let mut test_context: LzmaContext = LzmaContext::new();
 
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 2200];
+        let mut uncompressed_data: Vec<u8> = vec![0; 2200];
         let result: Result<(), ErrorTrace> = test_context.decompress(
             &TEST_DATA_P1_ALONE[0..TEST_DATA_P1_ALONE.len() - 2],
             &mut uncompressed_data,
