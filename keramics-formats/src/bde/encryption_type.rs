@@ -61,3 +61,27 @@ impl fmt::Display for BdeEncryptionType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_fvek_size_key_size_and_fmt() {
+        let cases: [(u16, usize, usize, &str); 7] = [
+            (0x8000, 76, 16, "AES-128-CBC with Elephant Diffuser"),
+            (0x8001, 76, 32, "AES-256-CBC with Elephant Diffuser"),
+            (0x8002, 28, 16, "AES-128-CBC"),
+            (0x8003, 44, 32, "AES-256-CBC"),
+            (0x8004, 44, 32, "AES-128-XTS"),
+            (0x8005, 76, 64, "AES-256-XTS"),
+            (0x9999, 0, 0, "Unknown: 0x00009999"),
+        ];
+        for (method, expected_fvek_size, expected_key_size, expected_display) in cases {
+            let encryption_type: BdeEncryptionType = BdeEncryptionType::new(method);
+            assert_eq!(encryption_type.get_fvek_size(), expected_fvek_size);
+            assert_eq!(encryption_type.get_key_size(), expected_key_size);
+            assert_eq!(encryption_type.to_string(), expected_display);
+        }
+    }
+}

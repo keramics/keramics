@@ -519,3 +519,279 @@ impl BlockReader for QcowBlockReader {
         Ok(data_offset)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::open_fake_data_stream;
+
+    use crate::qcow::encryption::QcowEncryption;
+    use crate::qcow::encryption_type::QcowEncryptionType;
+
+    #[test]
+    fn test_read_data_from_blocks_plain_sparse_backing_and_compressed() -> Result<(), ErrorTrace> {
+        // Cluster size is 512 bytes (9 bits) with 4 entries per L2 table (L1 shift is 11).
+        // Level 1 table at offset 0 maps entry 0 to the L2 table at offset 512 and leaves entry 1 sparse.
+        // Level 2 table at offset 512 maps entry 0 to a plain cluster at offset 1024, entries 1 and 3
+        // to the backing file or sparse zeros, and entry 2 to a compressed cluster at offset 1536.
+        let mut image: Vec<u8> = vec![0; 2560];
+        // L1 entry 0 = 512.
+        image[0..8].copy_from_slice(&512u64.to_be_bytes());
+        // L1 entry 1 = 0.
+        // L2 entry 0 = 1024.
+        image[512..520].copy_from_slice(&1024u64.to_be_bytes());
+        // L2 entry 1 = 0.
+        // L2 entry 2 = compressed flag (bit 62) | 1536.
+        let compressed_reference: u64 = (1u64 << 62) | 1536u64;
+        image[528..536].copy_from_slice(&compressed_reference.to_be_bytes());
+
+        // Plain cluster at offset 1024.
+        image[1024..1536].fill(0xaa);
+
+        // Raw DEFLATE stored block (BFINAL=1, BTYPE=00, LEN=16, NLEN=0xffef, 16 bytes of 0xcc).
+        let mut deflate_data: Vec<u8> = vec![0x01, 0x10, 0x00, 0xef, 0xff];
+        deflate_data.extend_from_slice(&[0xcc; 16]);
+        image[1536..1536 + deflate_data.len()].copy_from_slice(&deflate_data);
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let mut backing_data: Vec<u8> = vec![0; 4096];
+        backing_data[512..1024].fill(0xbb);
+        let backing_stream: DataStreamReference = open_fake_data_stream(&backing_data);
+
+        let mut reader: QcowBlockReader = QcowBlockReader::new(
+            &data_stream,
+            image.len() as u64,
+            512,
+            0x00ff_ffff_ffff_ffff,
+            11,
+            0,
+            2,
+            0x03,
+            4,
+            9,
+            512,
+            0x0000_00ff_ffff_ffff,
+            1u64 << 62,
+            &QcowCompressionMethod::Deflate,
+            None,
+            Some(backing_stream),
+            4096,
+        );
+        assert_eq!(reader.get_size(), 4096);
+
+        // Read across plain (0..512), backing (512..1024), compressed (1024..1536),
+        // backing (1536..2048), and sparse L1 (2048..2560).
+        let mut buffer: Vec<u8> = vec![0xff; 2560];
+        let read_count: usize = reader.read_data_from_blocks(&mut buffer, 0)?;
+        assert_eq!(read_count, 2560);
+        assert_eq!(&buffer[0..512], &[0xaa; 512]);
+        assert_eq!(&buffer[512..1024], &[0xbb; 512]);
+        assert_eq!(&buffer[1024..1040], &[0xcc; 16]);
+        assert_eq!(&buffer[1040..1536], &[0x00; 496]);
+        assert_eq!(&buffer[2048..2560], &[0x00; 512]);
+
+        // Read compressed cluster again to hit block_cache.
+        let mut cached: [u8; 16] = [0; 16];
+        let read_count: usize = reader.read_data_from_blocks(&mut cached, 1024)?;
+        assert_eq!(read_count, 16);
+        assert_eq!(cached, [0xcc; 16]);
+
+        // Read at offset >= size returns 0.
+        let read_count: usize = reader.read_data_from_blocks(&mut cached, 4096)?;
+        assert_eq!(read_count, 0);
+
+        // Without backing file, L2 entry 1 is sparse.
+        let mut reader_no_backing: QcowBlockReader = QcowBlockReader::new(
+            &data_stream,
+            image.len() as u64,
+            512,
+            0x00ff_ffff_ffff_ffff,
+            11,
+            0,
+            2,
+            0x03,
+            4,
+            9,
+            512,
+            0x0000_00ff_ffff_ffff,
+            1u64 << 62,
+            &QcowCompressionMethod::Deflate,
+            None,
+            None,
+            4096,
+        );
+        let mut sparse_buffer: [u8; 512] = [0xff; 512];
+        let read_count: usize = reader_no_backing.read_data_from_blocks(&mut sparse_buffer, 512)?;
+        assert_eq!(read_count, 512);
+        assert_eq!(sparse_buffer, [0x00; 512]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_from_blocks_encrypted() -> Result<(), ErrorTrace> {
+        let mut image: Vec<u8> = vec![0; 1536];
+        // L1 entry 0 -> L2 table at offset 512.
+        image[0..8].copy_from_slice(&512u64.to_be_bytes());
+        // L2 entry 0 -> encrypted cluster at offset 1024.
+        image[512..520].copy_from_slice(&1024u64.to_be_bytes());
+        image[1024..1536].fill(0x22);
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let encryption_type: QcowEncryptionType = QcowEncryptionType::new(1);
+        let encryption_context: QcowEncryptionContext =
+            QcowEncryption::get_encryption_context(&encryption_type, &[0x11; 16])?.unwrap();
+
+        let mut reader: QcowBlockReader = QcowBlockReader::new(
+            &data_stream,
+            image.len() as u64,
+            512,
+            0x00ff_ffff_ffff_ffff,
+            11,
+            0,
+            1,
+            0x03,
+            4,
+            9,
+            512,
+            0x0000_00ff_ffff_ffff,
+            1u64 << 62,
+            &QcowCompressionMethod::Deflate,
+            Some(&encryption_context),
+            None,
+            2048,
+        );
+        let mut buffer: [u8; 512] = [0; 512];
+        let read_count: usize = reader.read_data_from_blocks(&mut buffer, 0)?;
+        assert_eq!(read_count, 512);
+        assert_ne!(buffer, [0x22; 512]);
+
+        // Second read hits block_cache.
+        let mut cached: [u8; 16] = [0; 16];
+        let read_count: usize = reader.read_data_from_blocks(&mut cached, 0)?;
+        assert_eq!(read_count, 16);
+        assert_eq!(&cached, &buffer[0..16]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_from_blocks_with_errors() -> Result<(), ErrorTrace> {
+        // Test unsupported compression method.
+        let mut image: Vec<u8> = vec![0; 2048];
+        image[0..8].copy_from_slice(&512u64.to_be_bytes());
+        let compressed_reference: u64 = (1u64 << 62) | 1024u64;
+        image[512..520].copy_from_slice(&compressed_reference.to_be_bytes());
+        // Invalid compressed block offset out of bounds at L2 entry 1.
+        let out_of_bounds_compressed_reference: u64 = (1u64 << 62) | 4096u64;
+        image[520..528].copy_from_slice(&out_of_bounds_compressed_reference.to_be_bytes());
+        // Out of bounds encrypted block offset at L2 entry 2.
+        image[528..536].copy_from_slice(&4096u64.to_be_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let mut reader: QcowBlockReader = QcowBlockReader::new(
+            &data_stream,
+            image.len() as u64,
+            512,
+            0x00ff_ffff_ffff_ffff,
+            11,
+            0,
+            1,
+            0x03,
+            4,
+            9,
+            512,
+            0x0000_00ff_ffff_ffff,
+            1u64 << 62,
+            &QcowCompressionMethod::Unknown,
+            None,
+            None,
+            2048,
+        );
+        let mut buffer: [u8; 512] = [0; 512];
+        let result: Result<usize, ErrorTrace> = reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        // Compressed offset out of bounds.
+        let result: Result<usize, ErrorTrace> = reader.read_data_from_blocks(&mut buffer, 512);
+        assert!(result.is_err());
+
+        // Invalid DEFLATE data error.
+        let mut reader_deflate: QcowBlockReader = QcowBlockReader::new(
+            &data_stream,
+            image.len() as u64,
+            512,
+            0x00ff_ffff_ffff_ffff,
+            11,
+            0,
+            1,
+            0x03,
+            4,
+            9,
+            512,
+            0x0000_00ff_ffff_ffff,
+            1u64 << 62,
+            &QcowCompressionMethod::Deflate,
+            None,
+            None,
+            2048,
+        );
+        let result: Result<usize, ErrorTrace> =
+            reader_deflate.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        // Encrypted offset out of bounds.
+        let encryption_type: QcowEncryptionType = QcowEncryptionType::new(1);
+        let encryption_context: QcowEncryptionContext =
+            QcowEncryption::get_encryption_context(&encryption_type, &[0x11; 16])?.unwrap();
+        let mut reader_encrypted: QcowBlockReader = QcowBlockReader::new(
+            &data_stream,
+            image.len() as u64,
+            512,
+            0x00ff_ffff_ffff_ffff,
+            11,
+            0,
+            1,
+            0x03,
+            4,
+            9,
+            512,
+            0x0000_00ff_ffff_ffff,
+            1u64 << 62,
+            &QcowCompressionMethod::Deflate,
+            Some(&encryption_context),
+            None,
+            2048,
+        );
+        let result: Result<usize, ErrorTrace> =
+            reader_encrypted.read_data_from_blocks(&mut buffer, 1024);
+        assert!(result.is_err());
+
+        // Truncated stream fails L1 cluster table entry read.
+        let short_stream: DataStreamReference = open_fake_data_stream(&[0u8; 4]);
+        let mut reader_short: QcowBlockReader = QcowBlockReader::new(
+            &short_stream,
+            4,
+            512,
+            0x00ff_ffff_ffff_ffff,
+            11,
+            0,
+            1,
+            0x03,
+            4,
+            9,
+            512,
+            0x0000_00ff_ffff_ffff,
+            1u64 << 62,
+            &QcowCompressionMethod::Deflate,
+            None,
+            None,
+            2048,
+        );
+        let result: Result<usize, ErrorTrace> = reader_short.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+}

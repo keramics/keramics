@@ -143,6 +143,11 @@ impl NtfsAttributeList {
 mod tests {
     use super::*;
 
+    use keramics_core::open_fake_data_stream;
+
+    use crate::ntfs::cluster_group::NtfsClusterGroup;
+    use crate::ntfs::data_run::{NtfsDataRun, NtfsDataRunType};
+
     fn get_test_data() -> Vec<u8> {
         vec![
             0x20, 0x00, 0x00, 0x00, 0x70, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -184,8 +189,74 @@ mod tests {
 
         assert_eq!(test_struct.entries.len(), 1);
 
+        // Test with truncated entry data.
+        let mut invalid_attribute_list: NtfsAttributeList = NtfsAttributeList::new();
+        let result: Result<(), ErrorTrace> = invalid_attribute_list.read_data(&test_data[0..10]);
+        assert!(result.is_err());
+
         Ok(())
     }
 
-    // TODO: add tests for read_attribute
+    #[test]
+    fn test_read_attribute() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let empty_stream: DataStreamReference = open_fake_data_stream(&[]);
+
+        // Test with resident $ATTRIBUTE_LIST attribute.
+        let mut resident_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        resident_attribute.attribute_type = NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST;
+        resident_attribute.resident_data = test_data.clone();
+        let mut attribute_list: NtfsAttributeList = NtfsAttributeList::new();
+        attribute_list.read_attribute(&resident_attribute, &empty_stream, 4096)?;
+        assert_eq!(attribute_list.entries.len(), 1);
+
+        // Test with non-resident $ATTRIBUTE_LIST attribute backed by a cluster group.
+        let mut cluster_data: Vec<u8> = vec![0; 4096];
+        cluster_data[0..test_data.len()].copy_from_slice(&test_data);
+        let cluster_stream: DataStreamReference = open_fake_data_stream(&cluster_data);
+        let mut cluster_group: NtfsClusterGroup = NtfsClusterGroup::new(0, 0);
+        cluster_group.data_runs.push(NtfsDataRun {
+            block_number: 0,
+            number_of_blocks: 1,
+            run_type: NtfsDataRunType::InFile,
+        });
+        let mut non_resident_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        non_resident_attribute.attribute_type = NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST;
+        non_resident_attribute.non_resident_flag = 1;
+        non_resident_attribute.data_size = test_data.len() as u64;
+        non_resident_attribute.allocated_data_size = 4096;
+        non_resident_attribute.valid_data_size = test_data.len() as u64;
+        non_resident_attribute
+            .data_cluster_groups
+            .push(cluster_group);
+        let mut non_resident_list: NtfsAttributeList = NtfsAttributeList::new();
+        non_resident_list.read_attribute(&non_resident_attribute, &cluster_stream, 4096)?;
+        assert_eq!(non_resident_list.entries.len(), 1);
+
+        // Test with unsupported attribute type.
+        let mut wrong_type_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        wrong_type_attribute.attribute_type = NTFS_ATTRIBUTE_TYPE_DATA;
+        let mut list: NtfsAttributeList = NtfsAttributeList::new();
+        let result: Result<(), ErrorTrace> =
+            list.read_attribute(&wrong_type_attribute, &empty_stream, 4096);
+        assert!(result.is_err());
+
+        // Test with compressed $ATTRIBUTE_LIST attribute.
+        let mut compressed_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        compressed_attribute.attribute_type = NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST;
+        compressed_attribute.data_flags = 0x0001;
+        let result: Result<(), ErrorTrace> =
+            list.read_attribute(&compressed_attribute, &empty_stream, 4096);
+        assert!(result.is_err());
+
+        // Test with invalid resident attribute data.
+        let mut invalid_resident: NtfsMftAttribute = NtfsMftAttribute::new();
+        invalid_resident.attribute_type = NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST;
+        invalid_resident.resident_data = vec![0; 4];
+        let result: Result<(), ErrorTrace> =
+            list.read_attribute(&invalid_resident, &empty_stream, 4096);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 }

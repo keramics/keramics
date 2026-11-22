@@ -43,3 +43,23 @@ impl HfsFork {
         &self.fork_type
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::{ErrorTrace, open_fake_data_stream};
+
+    #[test]
+    fn test_get_data_stream_and_type() -> Result<(), ErrorTrace> {
+        let data_stream: DataStreamReference = open_fake_data_stream(b"test");
+        let fork: HfsFork = HfsFork::new(HfsForkType::Data, data_stream);
+
+        assert_eq!(fork.get_type(), &HfsForkType::Data);
+        let fork_data_stream: &DataStreamReference = fork.get_data_stream();
+        let data_size: u64 = keramics_core::data_stream_get_size!(fork_data_stream);
+        assert_eq!(data_size, 4);
+
+        Ok(())
+    }
+}

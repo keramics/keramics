@@ -351,3 +351,165 @@ impl XfsExtentsTree {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::open_fake_data_stream;
+
+    fn build_packed_extent_bytes(
+        logical_block_number: u64,
+        physical_block_number: u64,
+        number_of_blocks: u32,
+    ) -> [u8; 16] {
+        let upper: u64 = (logical_block_number << 9) | ((physical_block_number >> 43) & 0x1ff);
+        let lower: u64 = ((physical_block_number & 0x7ff_ffff_ffff) << 21)
+            | ((number_of_blocks as u64) & 0x1fffff);
+        let mut bytes: [u8; 16] = [0; 16];
+        bytes[0..8].copy_from_slice(&upper.to_be_bytes());
+        bytes[8..16].copy_from_slice(&lower.to_be_bytes());
+        bytes
+    }
+
+    #[test]
+    fn test_read_extents_v4_branch_and_leaf() -> Result<(), ErrorTrace> {
+        let block_size: usize = 512;
+        let mut image: Vec<u8> = vec![0; 4 * block_size];
+
+        // Block 1: v4 branch node ("BMAP", level=1, number_of_records=1, pointing to block 2).
+        let branch: &mut [u8] = &mut image[block_size..2 * block_size];
+        branch[0..4].copy_from_slice(XFS_EXTENT_TREE_SIGNATURE);
+        branch[4..6].copy_from_slice(&1u16.to_be_bytes());
+        branch[6..8].copy_from_slice(&1u16.to_be_bytes());
+        let number_of_pairs: usize = (block_size - 24) / 16;
+        let values_offset: usize = 24 + (number_of_pairs * 8);
+        branch[24..32].copy_from_slice(&0u64.to_be_bytes());
+        branch[values_offset..values_offset + 8].copy_from_slice(&2u64.to_be_bytes());
+
+        // Block 2: v4 leaf node ("BMAP", level=0, number_of_records=1).
+        let leaf: &mut [u8] = &mut image[2 * block_size..3 * block_size];
+        leaf[0..4].copy_from_slice(XFS_EXTENT_TREE_SIGNATURE);
+        leaf[4..6].copy_from_slice(&0u16.to_be_bytes());
+        leaf[6..8].copy_from_slice(&1u16.to_be_bytes());
+        leaf[24..40].copy_from_slice(&build_packed_extent_bytes(0, 10, 4));
+
+        // Root node inline data: header (level=2, number_of_records=1) + key (8) + value (block 1).
+        let mut root_node_data: Vec<u8> = vec![0; 20];
+        root_node_data[0..2].copy_from_slice(&2u16.to_be_bytes());
+        root_node_data[2..4].copy_from_slice(&1u16.to_be_bytes());
+        root_node_data[4..12].copy_from_slice(&0u64.to_be_bytes());
+        root_node_data[12..20].copy_from_slice(&1u64.to_be_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let extents_tree: XfsExtentsTree = XfsExtentsTree::new(4, 16, 4, block_size as u32);
+        let mut extents: Vec<XfsPackedExtent> = Vec::new();
+        extents_tree.read_extents(&data_stream, &root_node_data, &mut extents)?;
+
+        assert_eq!(extents.len(), 1);
+        assert_eq!(extents[0].logical_block_number, 0);
+        assert_eq!(extents[0].physical_block_number, 10);
+        assert_eq!(extents[0].number_of_blocks, 4);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_extents_v5_leaf() -> Result<(), ErrorTrace> {
+        let block_size: usize = 512;
+        let mut image: Vec<u8> = vec![0; 3 * block_size];
+
+        // Block 1: v5 leaf node ("BMA3", 72-byte header, level=0, number_of_records=1).
+        let leaf: &mut [u8] = &mut image[block_size..2 * block_size];
+        leaf[0..4].copy_from_slice(XFS_EXTENT_TREE_V5_SIGNATURE);
+        leaf[4..6].copy_from_slice(&0u16.to_be_bytes());
+        leaf[6..8].copy_from_slice(&1u16.to_be_bytes());
+        leaf[72..88].copy_from_slice(&build_packed_extent_bytes(2, 20, 3));
+
+        let mut root_node_data: Vec<u8> = vec![0; 20];
+        root_node_data[0..2].copy_from_slice(&1u16.to_be_bytes());
+        root_node_data[2..4].copy_from_slice(&1u16.to_be_bytes());
+        root_node_data[12..20].copy_from_slice(&1u64.to_be_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let extents_tree: XfsExtentsTree = XfsExtentsTree::new(5, 16, 4, block_size as u32);
+        let mut extents: Vec<XfsPackedExtent> = Vec::new();
+        extents_tree.read_extents(&data_stream, &root_node_data, &mut extents)?;
+
+        // XfsExtentsList inserts a sparse extent for logical blocks 0..2 before block 2..5.
+        assert_eq!(extents.len(), 2);
+        assert_eq!(extents[0].logical_block_number, 0);
+        assert_eq!(extents[0].number_of_blocks, 2);
+        assert_eq!(extents[1].logical_block_number, 2);
+        assert_eq!(extents[1].physical_block_number, 20);
+        assert_eq!(extents[1].number_of_blocks, 3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_extents_with_errors() {
+        let block_size: usize = 512;
+        let mut image: Vec<u8> = vec![0; 4 * block_size];
+
+        // Block 1: unsupported signature.
+        image[block_size..block_size + 4].copy_from_slice(b"XXXX");
+
+        // Block 2: branch node with record count out of bounds.
+        let invalid_count_branch: &mut [u8] = &mut image[2 * block_size..3 * block_size];
+        invalid_count_branch[0..4].copy_from_slice(XFS_EXTENT_TREE_SIGNATURE);
+        invalid_count_branch[4..6].copy_from_slice(&1u16.to_be_bytes());
+        invalid_count_branch[6..8].copy_from_slice(&100u16.to_be_bytes());
+
+        // Block 3: branch node with sub-block number 0.
+        let zero_child_branch: &mut [u8] = &mut image[3 * block_size..4 * block_size];
+        zero_child_branch[0..4].copy_from_slice(XFS_EXTENT_TREE_SIGNATURE);
+        zero_child_branch[4..6].copy_from_slice(&1u16.to_be_bytes());
+        zero_child_branch[6..8].copy_from_slice(&1u16.to_be_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let extents_tree: XfsExtentsTree = XfsExtentsTree::new(4, 16, 4, block_size as u32);
+        let mut extents: Vec<XfsPackedExtent> = Vec::new();
+
+        // Test truncated root header.
+        let result: Result<(), ErrorTrace> =
+            extents_tree.read_extents(&data_stream, &[0; 2], &mut extents);
+        assert!(result.is_err());
+
+        // Test root record count out of bounds.
+        let mut invalid_root_count: Vec<u8> = vec![0; 20];
+        invalid_root_count[2..4].copy_from_slice(&5u16.to_be_bytes());
+        let result: Result<(), ErrorTrace> =
+            extents_tree.read_extents(&data_stream, &invalid_root_count, &mut extents);
+        assert!(result.is_err());
+
+        // Test root pointing to block number 0.
+        let mut zero_root: Vec<u8> = vec![0; 20];
+        zero_root[2..4].copy_from_slice(&1u16.to_be_bytes());
+        let result: Result<(), ErrorTrace> =
+            extents_tree.read_extents(&data_stream, &zero_root, &mut extents);
+        assert!(result.is_err());
+
+        // Test unsupported node signature (block 1), out-of-bounds branch count (block 2),
+        // zero branch child (block 3), and out-of-bounds stream offset (block 10).
+        for block_number in [1u64, 2, 3, 10] {
+            let mut root_node_data: Vec<u8> = vec![0; 20];
+            root_node_data[2..4].copy_from_slice(&1u16.to_be_bytes());
+            root_node_data[12..20].copy_from_slice(&block_number.to_be_bytes());
+            let result: Result<(), ErrorTrace> =
+                extents_tree.read_extents(&data_stream, &root_node_data, &mut extents);
+            assert!(result.is_err());
+        }
+
+        // Test duplicate block number (cycle detection).
+        let mut read_block_numbers: HashSet<u64> = HashSet::new();
+        read_block_numbers.insert(1);
+        let result: Result<(), ErrorTrace> = extents_tree.get_extents_from_node(
+            &data_stream,
+            1,
+            &mut extents,
+            &mut read_block_numbers,
+        );
+        assert!(result.is_err());
+    }
+}

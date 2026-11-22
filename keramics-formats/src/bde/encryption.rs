@@ -76,3 +76,41 @@ impl BdeEncryption {
         )))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_encryption_context() -> Result<(), ErrorTrace> {
+        let key_data: [u8; 64] = [0x11; 64];
+
+        // Test all supported BDE encryption methods.
+        for method in [0x8000u16, 0x8001, 0x8002, 0x8003, 0x8004, 0x8005] {
+            let encryption_type: BdeEncryptionType = BdeEncryptionType::new(method);
+            let context: Option<BdeEncryptionContext> =
+                BdeEncryption::get_encryption_context(512, &encryption_type, &key_data)?;
+            assert!(context.is_some());
+        }
+
+        // Test unsupported encryption method returns None.
+        let unsupported_type: BdeEncryptionType = BdeEncryptionType::new(0x9999);
+        let context: Option<BdeEncryptionContext> =
+            BdeEncryption::get_encryption_context(512, &unsupported_type, &key_data)?;
+        assert!(context.is_none());
+
+        // Test short key data returns error.
+        let cbc_type: BdeEncryptionType = BdeEncryptionType::new(0x8002);
+        let result: Result<Option<BdeEncryptionContext>, ErrorTrace> =
+            BdeEncryption::get_encryption_context(512, &cbc_type, &[0; 8]);
+        assert!(result.is_err());
+
+        // Test short diffuser key data returns error.
+        let diffuser_type: BdeEncryptionType = BdeEncryptionType::new(0x8000);
+        let result: Result<Option<BdeEncryptionContext>, ErrorTrace> =
+            BdeEncryption::get_encryption_context(512, &diffuser_type, &[0; 32]);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+}

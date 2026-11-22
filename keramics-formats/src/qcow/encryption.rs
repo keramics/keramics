@@ -75,3 +75,39 @@ impl QcowEncryption {
         Ok(Some(QcowEncryptionContext { cipher_context }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_encryption_context_and_decrypt_sector() -> Result<(), ErrorTrace> {
+        // Test unsupported encryption method returns None.
+        let unsupported_type: QcowEncryptionType = QcowEncryptionType::new(0);
+        let context: Option<QcowEncryptionContext> =
+            QcowEncryption::get_encryption_context(&unsupported_type, &[0; 16])?;
+        assert!(context.is_none());
+
+        // Test invalid key length returns error.
+        let aes_type: QcowEncryptionType = QcowEncryptionType::new(1);
+        let result: Result<Option<QcowEncryptionContext>, ErrorTrace> =
+            QcowEncryption::get_encryption_context(&aes_type, &[0; 5]);
+        assert!(result.is_err());
+
+        // Test valid AES-128-CBC sector decryption.
+        let context: QcowEncryptionContext =
+            QcowEncryption::get_encryption_context(&aes_type, &[0x11; 16])?.unwrap();
+        let encrypted_data: [u8; 32] = [0x22; 32];
+        let mut decrypted_data: [u8; 32] = [0; 32];
+        context.decrypt_sector(1, &encrypted_data, &mut decrypted_data)?;
+        assert_ne!(decrypted_data, encrypted_data);
+
+        // Test decrypt_sector with invalid (non-block-aligned) buffer size.
+        let mut short_output: [u8; 10] = [0; 10];
+        let result: Result<(), ErrorTrace> =
+            context.decrypt_sector(1, &encrypted_data[0..10], &mut short_output);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+}

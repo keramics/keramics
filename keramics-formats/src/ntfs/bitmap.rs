@@ -279,6 +279,9 @@ mod tests {
 
     use keramics_core::open_fake_data_stream;
 
+    use crate::ntfs::cluster_group::NtfsClusterGroup;
+    use crate::ntfs::data_run::NtfsDataRun;
+
     fn get_test_data() -> Vec<u8> {
         vec![
             0xf7, 0xff, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -606,6 +609,115 @@ mod tests {
         assert_eq!(test_struct.bitmap_ranges[2].start_offset, 16384);
         assert_eq!(test_struct.bitmap_ranges[2].end_offset, 94208);
         assert_eq!(test_struct.bitmap_ranges[2].is_set, true);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_check_if_set_and_initialize() -> Result<(), ErrorTrace> {
+        // Test resident $BITMAP initialization and check_if_set.
+        let mut resident_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        resident_attribute.non_resident_flag = 0;
+        resident_attribute.data_size = 2;
+        resident_attribute.resident_data = vec![0b0000_0101, 0b0000_0010];
+
+        let empty_stream: DataStreamReference = open_fake_data_stream(&[]);
+        let mut bitmap: NtfsBitmap = NtfsBitmap::new(4096, 4096);
+        bitmap.initialize(&empty_stream, &resident_attribute)?;
+
+        assert!(bitmap.check_if_set(0)?);
+        assert!(!bitmap.check_if_set(1)?);
+        assert!(bitmap.check_if_set(2)?);
+        assert!(bitmap.check_if_set(9)?);
+        assert!(!bitmap.check_if_set(15)?);
+
+        let result: Result<bool, ErrorTrace> = bitmap.check_if_set(16);
+        assert!(result.is_err());
+
+        // Test non-resident $BITMAP initialization.
+        let mut image: Vec<u8> = vec![0; 8192];
+        image[4096] = 0b0000_0011;
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+
+        let mut non_resident_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        non_resident_attribute.non_resident_flag = 1;
+        non_resident_attribute.data_size = 4096;
+        let mut cluster_group: NtfsClusterGroup = NtfsClusterGroup::new(0, 0);
+        cluster_group.data_runs.push(NtfsDataRun {
+            block_number: 1,
+            number_of_blocks: 1,
+            run_type: NtfsDataRunType::InFile,
+        });
+        non_resident_attribute
+            .data_cluster_groups
+            .push(cluster_group);
+
+        let mut bitmap: NtfsBitmap = NtfsBitmap::new(4096, 4096);
+        bitmap.initialize(&data_stream, &non_resident_attribute)?;
+
+        assert!(bitmap.check_if_set(0)?);
+        assert!(bitmap.check_if_set(1)?);
+        assert!(!bitmap.check_if_set(2)?);
+
+        // Test compressed non-resident $BITMAP error.
+        let mut compressed_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        compressed_attribute.non_resident_flag = 1;
+        compressed_attribute.data_flags = 0x0001;
+        let mut bitmap: NtfsBitmap = NtfsBitmap::new(4096, 4096);
+        let result: Result<(), ErrorTrace> = bitmap.initialize(&data_stream, &compressed_attribute);
+        assert!(result.is_err());
+
+        // Test mismatched first virtual cluster number error.
+        let mut invalid_first_virtual_cluster_number_attribute: NtfsMftAttribute =
+            NtfsMftAttribute::new();
+        invalid_first_virtual_cluster_number_attribute.non_resident_flag = 1;
+        invalid_first_virtual_cluster_number_attribute
+            .data_cluster_groups
+            .push(NtfsClusterGroup::new(1, 1));
+        let mut bitmap: NtfsBitmap = NtfsBitmap::new(4096, 4096);
+        let result: Result<(), ErrorTrace> = bitmap.initialize(
+            &data_stream,
+            &invalid_first_virtual_cluster_number_attribute,
+        );
+        assert!(result.is_err());
+
+        // Test unsupported data run type error.
+        let mut sparse_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        sparse_attribute.non_resident_flag = 1;
+        let mut sparse_group: NtfsClusterGroup = NtfsClusterGroup::new(0, 0);
+        sparse_group.data_runs.push(NtfsDataRun {
+            block_number: 0,
+            number_of_blocks: 1,
+            run_type: NtfsDataRunType::Sparse,
+        });
+        sparse_attribute.data_cluster_groups.push(sparse_group);
+        let mut bitmap: NtfsBitmap = NtfsBitmap::new(4096, 4096);
+        let result: Result<(), ErrorTrace> = bitmap.initialize(&data_stream, &sparse_attribute);
+        assert!(result.is_err());
+
+        // Test mismatched last virtual cluster number error.
+        let mut invalid_last_virtual_cluster_number_attribute: NtfsMftAttribute =
+            NtfsMftAttribute::new();
+        invalid_last_virtual_cluster_number_attribute.non_resident_flag = 1;
+        let mut invalid_last_cluster_group: NtfsClusterGroup = NtfsClusterGroup::new(0, 5);
+        invalid_last_cluster_group.data_runs.push(NtfsDataRun {
+            block_number: 1,
+            number_of_blocks: 1,
+            run_type: NtfsDataRunType::InFile,
+        });
+        invalid_last_virtual_cluster_number_attribute
+            .data_cluster_groups
+            .push(invalid_last_cluster_group);
+        let mut bitmap: NtfsBitmap = NtfsBitmap::new(4096, 4096);
+        let result: Result<(), ErrorTrace> =
+            bitmap.initialize(&data_stream, &invalid_last_virtual_cluster_number_attribute);
+        assert!(result.is_err());
+
+        // Test truncated data stream read error.
+        let mut bitmap: NtfsBitmap = NtfsBitmap::new(4096, 4096);
+        let result: Result<(), ErrorTrace> =
+            bitmap.initialize(&empty_stream, &non_resident_attribute);
+        assert!(result.is_err());
 
         Ok(())
     }

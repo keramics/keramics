@@ -550,12 +550,11 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_core::open_os_data_stream;
+    use keramics_core::{open_fake_data_stream, open_os_data_stream};
 
     use crate::tests::get_test_data_path;
 
-    #[test]
-    fn test_build() -> Result<(), ErrorTrace> {
+    fn build_all_signatures_scanner() -> Result<FormatScanner, ErrorTrace> {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apfs_signatures();
         format_scanner.add_apm_signatures();
@@ -570,9 +569,11 @@ mod tests {
         format_scanner.add_hfs_signatures();
         format_scanner.add_linuxlvm_signatures();
         format_scanner.add_luksde_signatures();
+        format_scanner.add_mbr_signatures();
         format_scanner.add_ntfs_signatures();
         format_scanner.add_pdi_signatures();
         format_scanner.add_qcow_signatures();
+        format_scanner.add_sgilabel_signatures();
         format_scanner.add_sparseimage_signatures();
         format_scanner.add_udif_signatures();
         format_scanner.add_vdi_signatures();
@@ -582,44 +583,20 @@ mod tests {
         format_scanner.add_volsnap_signatures();
         format_scanner.add_xfs_signatures();
 
-        format_scanner.build()
+        format_scanner.build()?;
+        Ok(format_scanner)
+    }
+
+    #[test]
+    fn test_build() -> Result<(), ErrorTrace> {
+        _ = build_all_signatures_scanner()?;
+        Ok(())
     }
 
     #[test]
     fn test_scan_data_stream() -> Result<(), ErrorTrace> {
-        let mut format_scanner: FormatScanner = FormatScanner::new();
-        format_scanner.add_apfs_signatures();
-        format_scanner.add_apm_signatures();
-        format_scanner.add_bde_signatures();
-        format_scanner.add_bsdlabel_signatures();
-        format_scanner.add_cdsaencr_signatures();
-        format_scanner.add_ewf_signatures();
-        format_scanner.add_ext_signatures();
-        format_scanner.add_exfat_signatures();
-        format_scanner.add_fat_signatures();
-        format_scanner.add_gpt_signatures();
-        format_scanner.add_hfs_signatures();
-        format_scanner.add_linuxlvm_signatures();
-        format_scanner.add_luksde_signatures();
-        format_scanner.add_ntfs_signatures();
-        format_scanner.add_pdi_signatures();
-        format_scanner.add_qcow_signatures();
-        format_scanner.add_sparseimage_signatures();
-        format_scanner.add_udif_signatures();
-        format_scanner.add_vdi_signatures();
-        format_scanner.add_vhd_signatures();
-        format_scanner.add_vhdx_signatures();
-        format_scanner.add_vmdk_signatures();
-        format_scanner.add_volsnap_signatures();
-        format_scanner.add_xfs_signatures();
+        let format_scanner: FormatScanner = build_all_signatures_scanner()?;
 
-        match format_scanner.build() {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to build format scanner");
-                return Err(error);
-            }
-        };
         let path_string: String = get_test_data_path("qcow/ext2.qcow2");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
@@ -628,6 +605,91 @@ mod tests {
 
         assert_eq!(scan_results.len(), 1);
         assert_eq!(scan_results.iter().next(), Some(&FormatIdentifier::Qcow));
+
+        // Test header-bound signatures for all supported formats.
+        let header_cases: [(usize, &[u8], FormatIdentifier); 24] = [
+            (
+                32,
+                APFS_CONTAINER_SUPERBLOCK_SIGNATURE,
+                FormatIdentifier::Apfs,
+            ),
+            (
+                560,
+                b"Apple_partition_map\0\0\0\0\0\0\0\0\0\0\0\0\0",
+                FormatIdentifier::Apm,
+            ),
+            (3, BDE_FILE_SYSTEM_SIGNATURE, FormatIdentifier::Bde),
+            (512, BSD_DISKLABEL_SIGNATURE, FormatIdentifier::BsdDiskLabel),
+            (
+                0,
+                CDSAENCR_CONTAINER_HEADER_SIGNATURE,
+                FormatIdentifier::CdsaEncr,
+            ),
+            (0, EWF_FILE_HEADER_SIGNATURE, FormatIdentifier::Ewf),
+            (3, b"EXFAT   ", FormatIdentifier::ExFat),
+            (1080, EXT_SUPERBLOCK_SIGNATURE, FormatIdentifier::Ext),
+            (54, b"FAT16   ", FormatIdentifier::Fat),
+            (512, GPT_PARTITION_TABLE_SIGNATURE, FormatIdentifier::Gpt),
+            (1024, HFSPLUS_VOLUME_HEADER_SIGNATURE, FormatIdentifier::Hfs),
+            (
+                512,
+                LINUX_LVM_PHYSICAL_VOLUME_SIGNATURE,
+                FormatIdentifier::LinuxLvm,
+            ),
+            (0, LUKS_VOLUME_HEADER_SIGNATURE, FormatIdentifier::Luks),
+            (510, MBR_BOOT_SIGNATURE, FormatIdentifier::Mbr),
+            (3, NTFS_FILE_SYSTEM_SIGNATURE, FormatIdentifier::Ntfs),
+            (39, b"<Parallels_disk_image ", FormatIdentifier::Pdi),
+            (0, SGI_DISKLABEL_SIGNATURE, FormatIdentifier::SgiDiskLabel),
+            (
+                0,
+                SPARSEIMAGE_FILE_HEADER_SIGNATURE,
+                FormatIdentifier::SparseImage,
+            ),
+            (64, VDI_FILE_HEADER_SIGNATURE, FormatIdentifier::Vdi),
+            (0, VHDX_FILE_HEADER_SIGNATURE, FormatIdentifier::Vhdx),
+            (0, VMDK_SPARSE_FILE_HEADER_SIGNATURE, FormatIdentifier::Vmdk),
+            (0x00001e00, VOLSNAP_IDENTIFIER, FormatIdentifier::Volsnap),
+            (0, XFS_SUPERBLOCK_SIGNATURE, FormatIdentifier::Xfs),
+            (82, b"FAT32   ", FormatIdentifier::Fat),
+        ];
+        for (offset, signature, expected_identifier) in header_cases {
+            let mut buffer: Vec<u8> = vec![0; offset + signature.len() + 64];
+            buffer[offset..offset + signature.len()].copy_from_slice(signature);
+            let stream: DataStreamReference = open_fake_data_stream(&buffer);
+            let results: HashSet<FormatIdentifier> = format_scanner.scan_data_stream(&stream)?;
+            assert!(
+                results.contains(&expected_identifier),
+                "Expected {:?} at offset {}",
+                expected_identifier,
+                offset
+            );
+        }
+
+        // Test footer-bound signatures (CDSAENCR v1, UDIF, VHD) and small stream (< footer range).
+        let footer_cases: [(usize, &[u8], FormatIdentifier); 3] = [
+            (
+                8,
+                CDSAENCR_CONTAINER_FOOTER_SIGNATURE,
+                FormatIdentifier::CdsaEncr,
+            ),
+            (512, UDIF_FILE_FOOTER_SIGNATURE, FormatIdentifier::Udif),
+            (512, VHD_FILE_FOOTER_SIGNATURE, FormatIdentifier::Vhd),
+        ];
+        for (distance_from_end, signature, expected_identifier) in footer_cases {
+            let mut buffer: Vec<u8> = vec![0; 1024];
+            let start: usize = buffer.len() - distance_from_end;
+            buffer[start..start + signature.len()].copy_from_slice(signature);
+            let stream: DataStreamReference = open_fake_data_stream(&buffer);
+            let results: HashSet<FormatIdentifier> = format_scanner.scan_data_stream(&stream)?;
+            assert!(results.contains(&expected_identifier));
+        }
+
+        // Test small stream shorter than footer range with debug output enabled.
+        keramics_core::mediator::Mediator { debug_output: true }.make_current();
+        let tiny_stream: DataStreamReference = open_fake_data_stream(&[0; 16]);
+        let results: HashSet<FormatIdentifier> = format_scanner.scan_data_stream(&tiny_stream)?;
+        assert!(results.is_empty());
 
         Ok(())
     }

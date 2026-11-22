@@ -42,3 +42,23 @@ impl PdiSnapshotDescriptor {
         self.parent_identifier.as_ref()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_getters() {
+        let identifier: Uuid = Uuid::from_be_bytes(&[1; 16]);
+        let parent_identifier: Uuid = Uuid::from_be_bytes(&[2; 16]);
+        let descriptor: PdiSnapshotDescriptor =
+            PdiSnapshotDescriptor::new(identifier.clone(), Some(parent_identifier.clone()));
+
+        assert_eq!(descriptor.get_identifier(), &identifier);
+        assert_eq!(descriptor.get_parent_identifier(), Some(&parent_identifier));
+
+        let root_descriptor: PdiSnapshotDescriptor =
+            PdiSnapshotDescriptor::new(identifier.clone(), None);
+        assert_eq!(root_descriptor.get_parent_identifier(), None);
+    }
+}

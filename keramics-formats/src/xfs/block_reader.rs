@@ -141,3 +141,96 @@ impl BlockReader for XfsBlockReader {
         Ok(data_offset)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::open_fake_data_stream;
+
+    #[test]
+    fn test_get_size() {
+        let data_stream: DataStreamReference = open_fake_data_stream(&[]);
+        let block_reader: XfsBlockReader = XfsBlockReader::new(&data_stream, 4, 512, &[], 1024);
+
+        assert_eq!(block_reader.get_size(), 1024);
+    }
+
+    #[test]
+    fn test_read_data_from_blocks() -> Result<(), ErrorTrace> {
+        let mut backing: Vec<u8> = vec![0; 24];
+        backing[0..8].copy_from_slice(b"AAAAAAAA");
+        backing[8..16].copy_from_slice(b"BBBBBBBB");
+        backing[16..24].copy_from_slice(b"CCCCCCCC");
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&backing);
+        let extents: [XfsPackedExtent; 3] = [
+            XfsPackedExtent {
+                number_of_blocks: 1,
+                physical_block_number: 0,
+                logical_block_number: 0,
+                extent_type: XfsExtentType::InFile,
+            },
+            XfsPackedExtent {
+                number_of_blocks: 1,
+                physical_block_number: 0,
+                logical_block_number: 1,
+                extent_type: XfsExtentType::Sparse,
+            },
+            XfsPackedExtent {
+                number_of_blocks: 1,
+                physical_block_number: 2,
+                logical_block_number: 2,
+                extent_type: XfsExtentType::InFile,
+            },
+        ];
+        let mut block_reader: XfsBlockReader =
+            XfsBlockReader::new(&data_stream, 4, 8, &extents, 20);
+
+        // Test reading across an in-file extent, a sparse extent, and a second in-file extent.
+        let mut data: [u8; 16] = [0xff; 16];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut data, 4)?;
+        assert_eq!(read_count, 16);
+        assert_eq!(&data, b"AAAA\x00\x00\x00\x00\x00\x00\x00\x00CCCC");
+
+        // Test stopping when current_offset reaches total size.
+        let mut tail_data: [u8; 8] = [0xff; 8];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut tail_data, 16)?;
+        assert_eq!(read_count, 8);
+        assert_eq!(&tail_data, b"CCCCCCCC");
+
+        let mut at_end: [u8; 4] = [0; 4];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut at_end, 20)?;
+        assert_eq!(read_count, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_from_blocks_with_errors() {
+        let data_stream: DataStreamReference = open_fake_data_stream(b"AAAAAAAA");
+        let extents: [XfsPackedExtent; 1] = [XfsPackedExtent {
+            number_of_blocks: 1,
+            physical_block_number: 0,
+            logical_block_number: 2,
+            extent_type: XfsExtentType::InFile,
+        }];
+        let mut block_reader: XfsBlockReader =
+            XfsBlockReader::new(&data_stream, 4, 8, &extents, 64);
+
+        // Test with offset before first extent.
+        let mut data: [u8; 4] = [0; 4];
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut data, 0);
+        assert!(result.is_err());
+
+        // Test with offset after last extent.
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut data, 32);
+        assert!(result.is_err());
+
+        // Test reading past the end of extents while still below logical size.
+        let mut wide_data: [u8; 16] = [0; 16];
+        let result: Result<usize, ErrorTrace> =
+            block_reader.read_data_from_blocks(&mut wide_data, 16);
+        assert!(result.is_err());
+    }
+}

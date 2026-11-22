@@ -49,3 +49,28 @@ impl fmt::Display for BdeKeyProtectorType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fmt() {
+        assert_eq!(BdeKeyProtectorType::ClearKey.to_string(), "Clear key");
+        assert_eq!(BdeKeyProtectorType::ExternalKey.to_string(), "External key");
+        assert_eq!(
+            BdeKeyProtectorType::Passphrase.to_string(),
+            "Passphrase (or password)"
+        );
+        assert_eq!(
+            BdeKeyProtectorType::RecoveryPassword.to_string(),
+            "Recovery password"
+        );
+        assert_eq!(BdeKeyProtectorType::Tpm.to_string(), "TPM");
+        assert_eq!(BdeKeyProtectorType::TpmAndPin.to_string(), "TPM and pin");
+        assert_eq!(
+            BdeKeyProtectorType::Unknown(0x1234).to_string(),
+            "Unknown: 0x1234"
+        );
+    }
+}

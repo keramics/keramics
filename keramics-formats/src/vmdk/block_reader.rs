@@ -391,3 +391,212 @@ impl BlockReader for VmdkBlockReader {
         Ok(data_offset)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    use keramics_core::open_fake_data_stream;
+    use keramics_types::ByteString;
+
+    use crate::file_resolver::FileResolver;
+    use crate::vmdk::enums::VmdkDescriptorExtentAccessMode;
+
+    /// In-memory file resolver for testing.
+    struct TestFileResolver {
+        /// Data streams indexed by file name.
+        files: HashMap<String, DataStreamReference>,
+
+        /// File name configured to return an error.
+        fail_name: Option<String>,
+    }
+
+    impl FileResolver for TestFileResolver {
+        /// Retrieves a data stream for the given path components.
+        fn get_data_stream(
+            &self,
+            path_components: &[PathComponent],
+        ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+            if let Some(first_component) = path_components.first() {
+                let name: String = first_component.to_string();
+                if self.fail_name.as_ref() == Some(&name) {
+                    return Err(keramics_core::error_trace_new!("Injected resolver error"));
+                }
+                return Ok(self.files.get(&name).cloned());
+            }
+            Ok(None)
+        }
+    }
+
+    fn create_extent(
+        media_start_sector: u64,
+        number_of_sectors: u64,
+        file_name: Option<&str>,
+        extent_type: VmdkDescriptorExtentType,
+    ) -> VmdkDescriptorExtent {
+        let mut extent: VmdkDescriptorExtent = VmdkDescriptorExtent::new(
+            0,
+            number_of_sectors,
+            file_name.map(ByteString::from),
+            extent_type,
+            VmdkDescriptorExtentAccessMode::ReadWrite,
+        );
+        extent.media_start_sector = media_start_sector;
+        extent.media_end_sector = media_start_sector + number_of_sectors;
+        extent
+    }
+
+    #[test]
+    fn test_read_data_from_blocks_flat_and_zero() -> Result<(), ErrorTrace> {
+        let mut files: HashMap<String, DataStreamReference> = HashMap::new();
+        files.insert(
+            String::from("extent1.raw"),
+            open_fake_data_stream(&vec![0xaa; 512]),
+        );
+        files.insert(
+            String::from("alt_extent2.raw"),
+            open_fake_data_stream(&vec![0xbb; 512]),
+        );
+        let file_resolver: FileResolverReference = Arc::new(Box::new(TestFileResolver {
+            files,
+            fail_name: None,
+        }));
+
+        let extent1: VmdkDescriptorExtent =
+            create_extent(0, 1, Some("extent1.raw"), VmdkDescriptorExtentType::Flat);
+        let extent2: VmdkDescriptorExtent =
+            create_extent(1, 1, None, VmdkDescriptorExtentType::Zero);
+        let mut extent3: VmdkDescriptorExtent = create_extent(
+            2,
+            1,
+            Some("ignored.raw"),
+            VmdkDescriptorExtentType::VmfsFlat,
+        );
+        extent3.alternate_file_name = Some(PathComponent::from("alt_extent2.raw"));
+
+        let extents: [VmdkDescriptorExtent; 3] = [extent1, extent2, extent3];
+        let mut block_reader: VmdkBlockReader =
+            VmdkBlockReader::new(&file_resolver, 512, &extents, None, 1536);
+
+        assert_eq!(block_reader.get_size(), 1536);
+
+        let mut buffer: Vec<u8> = vec![0xff; 1536];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut buffer, 0)?;
+        assert_eq!(read_count, 1536);
+        assert_eq!(&buffer[0..512], &[0xaa; 512]);
+        assert_eq!(&buffer[512..1024], &[0x00; 512]);
+        assert_eq!(&buffer[1024..1536], &[0xbb; 512]);
+
+        // Read again from cached extent file and stop at reader size boundary.
+        let mut tail_buffer: Vec<u8> = vec![0; 1024];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut tail_buffer, 1024)?;
+        assert_eq!(read_count, 512);
+        assert_eq!(&tail_buffer[0..512], &[0xbb; 512]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_from_blocks_with_errors() {
+        let mut files: HashMap<String, DataStreamReference> = HashMap::new();
+        files.insert(
+            String::from("bad_sparse.vmdk"),
+            open_fake_data_stream(&[0u8; 16]),
+        );
+        files.insert(
+            String::from("bad_cowd.vmdk"),
+            open_fake_data_stream(&[0u8; 16]),
+        );
+        let file_resolver: FileResolverReference = Arc::new(Box::new(TestFileResolver {
+            files,
+            fail_name: Some(String::from("fail.raw")),
+        }));
+
+        let mut buffer: [u8; 512] = [0; 512];
+
+        // Missing extent for media offset (binary search miss).
+        let extents: [VmdkDescriptorExtent; 1] =
+            [create_extent(2, 1, None, VmdkDescriptorExtentType::Zero)];
+        let mut block_reader: VmdkBlockReader =
+            VmdkBlockReader::new(&file_resolver, 512, &extents, None, 2048);
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        let result: Result<usize, ErrorTrace> =
+            block_reader.read_data_from_blocks(&mut buffer, 1536);
+        assert!(result.is_err());
+
+        // Missing extent when advancing past the last extent.
+        let mut large_buffer: [u8; 1024] = [0; 1024];
+        let result: Result<usize, ErrorTrace> =
+            block_reader.read_data_from_blocks(&mut large_buffer, 1024);
+        assert!(result.is_err());
+
+        // Missing extent file name.
+        let extents: [VmdkDescriptorExtent; 1] =
+            [create_extent(0, 1, None, VmdkDescriptorExtentType::Flat)];
+        let mut block_reader: VmdkBlockReader =
+            VmdkBlockReader::new(&file_resolver, 512, &extents, None, 512);
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        // Missing extent file in resolver.
+        let extents: [VmdkDescriptorExtent; 1] = [create_extent(
+            0,
+            1,
+            Some("missing.raw"),
+            VmdkDescriptorExtentType::Flat,
+        )];
+        let mut block_reader: VmdkBlockReader =
+            VmdkBlockReader::new(&file_resolver, 512, &extents, None, 512);
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        // Resolver error when opening extent file.
+        let extents: [VmdkDescriptorExtent; 1] = [create_extent(
+            0,
+            1,
+            Some("fail.raw"),
+            VmdkDescriptorExtentType::Flat,
+        )];
+        let mut block_reader: VmdkBlockReader =
+            VmdkBlockReader::new(&file_resolver, 512, &extents, None, 512);
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        // Invalid sparse VMDK file.
+        let extents: [VmdkDescriptorExtent; 1] = [create_extent(
+            0,
+            1,
+            Some("bad_sparse.vmdk"),
+            VmdkDescriptorExtentType::Sparse,
+        )];
+        let mut block_reader: VmdkBlockReader =
+            VmdkBlockReader::new(&file_resolver, 512, &extents, None, 512);
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        // Invalid sparse COWD file.
+        let extents: [VmdkDescriptorExtent; 1] = [create_extent(
+            0,
+            1,
+            Some("bad_cowd.vmdk"),
+            VmdkDescriptorExtentType::VmfsSparse,
+        )];
+        let mut block_reader: VmdkBlockReader =
+            VmdkBlockReader::new(&file_resolver, 512, &extents, None, 512);
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        // Unsupported extent type.
+        let extents: [VmdkDescriptorExtent; 1] =
+            [create_extent(0, 1, None, VmdkDescriptorExtentType::Unknown)];
+        let mut block_reader: VmdkBlockReader =
+            VmdkBlockReader::new(&file_resolver, 512, &extents, None, 512);
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+    }
+}
