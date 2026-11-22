@@ -63,41 +63,6 @@ impl BdeBlockReader {
         }
     }
 
-    /// Reads and decrypts a sector.
-    fn read_sector(
-        &mut self,
-        sector_number: u64,
-        sector_physical_offset: u64,
-    ) -> Result<Vec<u8>, ErrorTrace> {
-        let mut sector_data: Vec<u8> = vec![0; self.bytes_per_sector as usize];
-
-        keramics_core::data_stream_read_exact_at_position!(
-            &self.data_stream,
-            &mut sector_data,
-            SeekFrom::Start(sector_physical_offset)
-        );
-        match self
-            .encryption_context
-            .decrypt_sector_in_place(sector_physical_offset, &mut sector_data)
-        {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Unable to decrypt sector: {}", sector_number)
-                );
-                return Err(error);
-            }
-        }
-        keramics_core::debug_trace_data!(
-            "BdeSectorData",
-            sector_physical_offset,
-            &sector_data,
-            self.bytes_per_sector
-        );
-        Ok(sector_data)
-    }
-
     /// Reads a partial or cached single sector into the output buffer.
     fn read_cached_sector(
         &mut self,
@@ -133,6 +98,41 @@ impl BdeBlockReader {
         output.copy_from_slice(&sector_data[sector_data_offset..sector_data_end_offset]);
 
         Ok(())
+    }
+
+    /// Reads and decrypts a sector.
+    fn read_sector(
+        &mut self,
+        sector_number: u64,
+        sector_physical_offset: u64,
+    ) -> Result<Vec<u8>, ErrorTrace> {
+        let mut sector_data: Vec<u8> = vec![0; self.bytes_per_sector as usize];
+
+        keramics_core::data_stream_read_exact_at_position!(
+            &self.data_stream,
+            &mut sector_data,
+            SeekFrom::Start(sector_physical_offset)
+        );
+        match self
+            .encryption_context
+            .decrypt_sector_in_place(sector_physical_offset, &mut sector_data)
+        {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to decrypt sector: {}", sector_number)
+                );
+                return Err(error);
+            }
+        }
+        keramics_core::debug_trace_data!(
+            "BdeSectorData",
+            sector_physical_offset,
+            &sector_data,
+            self.bytes_per_sector
+        );
+        Ok(sector_data)
     }
 }
 

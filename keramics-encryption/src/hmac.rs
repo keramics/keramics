@@ -68,6 +68,41 @@ impl<T: DigestHashContext + Clone, const BLOCK_SIZE: usize, const HASH_SIZE: usi
         }
     }
 
+    /// Calculates a HMAC.
+    pub fn calculate_hmac(
+        &mut self,
+        key: &[u8],
+        data: &[u8],
+        hmac: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        if hmac.len() < HASH_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid HMAC value too small"
+            ));
+        }
+        self.set_key(key);
+        self.calculate_hmac_with_key(data, hmac)
+    }
+
+    /// Calculates a HMAC using the previously configured key.
+    pub fn calculate_hmac_with_key(&self, data: &[u8], hmac: &mut [u8]) -> Result<(), ErrorTrace> {
+        if hmac.len() < HASH_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid HMAC value too small"
+            ));
+        }
+        let mut inner_hash: [u8; HASH_SIZE] = [0; HASH_SIZE];
+        let mut inner_context: T = self.inner_digest_context.clone();
+        inner_context.update(data);
+        inner_context.finalize_into(&mut inner_hash);
+
+        let mut outer_context: T = self.outer_digest_context.clone();
+        outer_context.update(&inner_hash);
+        outer_context.finalize_into(&mut hmac[0..HASH_SIZE]);
+
+        Ok(())
+    }
+
     /// Sets the key and precomputes the inner and outer digest hash states.
     pub fn set_key(&mut self, key: &[u8]) {
         let key_size: usize = key.len();
@@ -95,41 +130,6 @@ impl<T: DigestHashContext + Clone, const BLOCK_SIZE: usize, const HASH_SIZE: usi
 
         self.outer_digest_context = T::new();
         self.outer_digest_context.update(&outer_padding);
-    }
-
-    /// Calculates a HMAC using the previously configured key.
-    pub fn calculate_hmac_with_key(&self, data: &[u8], hmac: &mut [u8]) -> Result<(), ErrorTrace> {
-        if hmac.len() < HASH_SIZE {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid HMAC value too small"
-            ));
-        }
-        let mut inner_hash: [u8; HASH_SIZE] = [0; HASH_SIZE];
-        let mut inner_context: T = self.inner_digest_context.clone();
-        inner_context.update(data);
-        inner_context.finalize_into(&mut inner_hash);
-
-        let mut outer_context: T = self.outer_digest_context.clone();
-        outer_context.update(&inner_hash);
-        outer_context.finalize_into(&mut hmac[0..HASH_SIZE]);
-
-        Ok(())
-    }
-
-    /// Calculates a HMAC.
-    pub fn calculate_hmac(
-        &mut self,
-        key: &[u8],
-        data: &[u8],
-        hmac: &mut [u8],
-    ) -> Result<(), ErrorTrace> {
-        if hmac.len() < HASH_SIZE {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid HMAC value too small"
-            ));
-        }
-        self.set_key(key);
-        self.calculate_hmac_with_key(data, hmac)
     }
 }
 

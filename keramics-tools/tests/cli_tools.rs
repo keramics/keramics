@@ -31,20 +31,20 @@ fn assert_keramicsinfo_cases(cases: &[(&[&str], &str)]) {
 
     for (arguments, expected_header) in cases {
         let output: Output = run_binary(binary_path, arguments);
-        let stdout: String = String::from_utf8_lossy(&output.stdout).into_owned();
+        let standard_output: String = String::from_utf8_lossy(&output.stdout).into_owned();
         assert!(
             output.status.success(),
             "keramicsinfo failed on {:?}: stdout={} stderr={}",
             arguments,
-            stdout,
+            standard_output,
             String::from_utf8_lossy(&output.stderr)
         );
         assert!(
-            stdout.contains(expected_header),
+            standard_output.contains(expected_header),
             "keramicsinfo output for {:?} did not contain {:?}: {}",
             arguments,
             expected_header,
-            stdout
+            standard_output
         );
     }
 }

@@ -492,8 +492,11 @@ mod tests {
         let directory_entry: OsFileEntry = get_os_file_entry("directory")?;
         assert_eq!(directory_entry.get_file_type(), VfsFileType::Directory);
 
-        let symlink_entry: OsFileEntry = get_os_file_entry("directory/symbolic_link")?;
-        assert_eq!(symlink_entry.get_file_type(), VfsFileType::SymbolicLink);
+        let symbolic_link_entry: OsFileEntry = get_os_file_entry("directory/symbolic_link")?;
+        assert_eq!(
+            symbolic_link_entry.get_file_type(),
+            VfsFileType::SymbolicLink
+        );
 
         Ok(())
     }

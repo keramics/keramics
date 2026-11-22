@@ -60,18 +60,6 @@ impl Uuid {
         }
     }
 
-    /// Converts the UUID to a big-endian byte sequence.
-    pub fn to_be_bytes(&self) -> [u8; 16] {
-        let mut data: [u8; 16] = [0; 16];
-        data[0..4].copy_from_slice(&self.part1.to_be_bytes());
-        data[4..6].copy_from_slice(&self.part2.to_be_bytes());
-        data[6..8].copy_from_slice(&self.part3.to_be_bytes());
-        data[8..10].copy_from_slice(&self.part4.to_be_bytes());
-        data[10..12].copy_from_slice(&((self.part5 >> 32) as u16).to_be_bytes());
-        data[12..16].copy_from_slice(&(self.part5 as u32).to_be_bytes());
-        data
-    }
-
     /// Creates a new UUID from a string.
     pub fn from_string(mut string: &str) -> Result<Self, ErrorTrace> {
         let mut string_length: usize = string.len();
@@ -156,6 +144,18 @@ impl Uuid {
     /// Determines if the UUID is the Nil UUID (00000000-0000-0000-0000-000000000000)
     pub fn is_nil(&self) -> bool {
         self.part1 == 0 && self.part2 == 0 && self.part3 == 0 && self.part4 == 0 && self.part5 == 0
+    }
+
+    /// Converts the UUID to a big-endian byte sequence.
+    pub fn to_be_bytes(&self) -> [u8; 16] {
+        let mut data: [u8; 16] = [0; 16];
+        data[0..4].copy_from_slice(&self.part1.to_be_bytes());
+        data[4..6].copy_from_slice(&self.part2.to_be_bytes());
+        data[6..8].copy_from_slice(&self.part3.to_be_bytes());
+        data[8..10].copy_from_slice(&self.part4.to_be_bytes());
+        data[10..12].copy_from_slice(&((self.part5 >> 32) as u16).to_be_bytes());
+        data[12..16].copy_from_slice(&(self.part5 as u32).to_be_bytes());
+        data
     }
 }
 
