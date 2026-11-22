@@ -58,7 +58,7 @@ impl UdifBlockReader {
         }
     }
 
-    /// Decompressed a block.
+    /// Decompresses a block.
     fn decompress_block(&self, compressed_data: &[u8], data: &mut [u8]) -> Result<(), ErrorTrace> {
         match self.compression_method {
             UdifCompressionMethod::Adc => {

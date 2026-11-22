@@ -275,7 +275,7 @@ impl<'a> LzmaRangeDecoder<'a> {
 
     /// Normalizes the range and code values.
     pub fn normalize(&mut self) -> Result<(), ErrorTrace> {
-        // 1 << 24 = 16777216
+        // 1 << 24 = 16777216.
         if self.range < 16777216 {
             if self.data_offset >= self.data_size {
                 return Err(keramics_core::error_trace_new!(
@@ -358,7 +358,7 @@ impl LzmaStreamHeader {
         }
         let properties: u8 = data[0];
 
-        let (literal_context_bits, literal_position_bits, position_bits) =
+        let (literal_context_bits, literal_position_bits, position_bits): (u8, u8, u8) =
             match LzmaDecoder::decode_properties(properties) {
                 Ok(properties) => properties,
                 Err(mut error) => {
@@ -1577,19 +1577,19 @@ mod tests {
 
     #[test]
     fn test_decode_properties() -> Result<(), ErrorTrace> {
-        let (literal_context_bits, literal_position_bits, position_bits) =
+        let (literal_context_bits, literal_position_bits, position_bits): (u8, u8, u8) =
             LzmaDecoder::decode_properties(0x5d)?;
         assert_eq!(literal_context_bits, 3);
         assert_eq!(literal_position_bits, 0);
         assert_eq!(position_bits, 2);
 
-        let (literal_context_bits, literal_position_bits, position_bits) =
+        let (literal_context_bits, literal_position_bits, position_bits): (u8, u8, u8) =
             LzmaDecoder::decode_properties(0x00)?;
         assert_eq!(literal_context_bits, 0);
         assert_eq!(literal_position_bits, 0);
         assert_eq!(position_bits, 0);
 
-        let (literal_context_bits, literal_position_bits, position_bits) =
+        let (literal_context_bits, literal_position_bits, position_bits): (u8, u8, u8) =
             LzmaDecoder::decode_properties(0xd8)?;
         assert_eq!(literal_context_bits, 0);
         assert_eq!(literal_position_bits, 4);
@@ -2035,7 +2035,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decoder_decode_literal_errors() -> Result<(), ErrorTrace> {
+    fn test_decoder_decode_literal_with_errors() -> Result<(), ErrorTrace> {
         DebugTrace::scope(|debug_trace: &mut DebugTraceScope| {
             // Normal literal bit decode error.
             let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
@@ -2097,7 +2097,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decoder_decode_match_errors() -> Result<(), ErrorTrace> {
+    fn test_decoder_decode_match_with_errors() -> Result<(), ErrorTrace> {
         DebugTrace::scope(|debug_trace: &mut DebugTraceScope| {
             // Length decode error.
             let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
@@ -2236,7 +2236,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decoder_decode_repeated_match_and_errors() -> Result<(), ErrorTrace> {
+    fn test_decoder_decode_repeated_match_with_errors() -> Result<(), ErrorTrace> {
         DebugTrace::scope(|debug_trace: &mut DebugTraceScope| {
             let mut uncompressed_data: [u8; 8] = [0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0];
 
@@ -2324,7 +2324,7 @@ mod tests {
             assert_eq!(uncompressed_data[4], 0x43);
             assert_eq!(uncompressed_data[5], 0x44);
 
-            // decode_short_repeated_match: output buffer too small and out-of-bounds distance.
+            // Test decode_short_repeated_match with output buffer too small and out-of-bounds distance.
             let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
             uncompressed_data_offset = 8;
             let result: Result<(), ErrorTrace> = decoder.decode_short_repeated_match(
@@ -2347,7 +2347,7 @@ mod tests {
             );
             assert!(result.is_err());
 
-            // decode_long_repeated_match: length error, output too small, out-of-bounds distance.
+            // Test decode_long_repeated_match with length error, output too small, and out-of-bounds distance.
             let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
             let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
             range_decoder.range = 0x0000_0001;
@@ -2403,16 +2403,16 @@ mod tests {
     }
 
     #[test]
-    fn test_decoder_decompress_chunk_errors() -> Result<(), ErrorTrace> {
+    fn test_decoder_decompress_chunk_with_errors() -> Result<(), ErrorTrace> {
         DebugTrace::scope(|debug_trace: &mut DebugTraceScope| {
             let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
             let mut uncompressed_data: [u8; 8] = [0; 8];
-            let init_bytes: [u8; 5] = [0x00, 0x00, 0x00, 0x00, 0x01];
+            let initialization_bytes: [u8; 5] = [0x00, 0x00, 0x00, 0x00, 0x01];
 
             // Overflow on uncompressed_data_offset + expected_uncompressed_size.
             let result: Result<usize, ErrorTrace> = decoder.decompress_chunk(
                 debug_trace,
-                &init_bytes,
+                &initialization_bytes,
                 &mut uncompressed_data,
                 8,
                 usize::MAX - 1,
@@ -2425,7 +2425,7 @@ mod tests {
             // Expected uncompressed size exceeds output buffer size.
             let result: Result<usize, ErrorTrace> = decoder.decompress_chunk(
                 debug_trace,
-                &init_bytes,
+                &initialization_bytes,
                 &mut uncompressed_data,
                 8,
                 4,
@@ -2438,7 +2438,7 @@ mod tests {
             // End of chunk check fails (code != 0 and EOPM disallowed).
             let result: Result<usize, ErrorTrace> = decoder.decompress_chunk(
                 debug_trace,
-                &init_bytes,
+                &initialization_bytes,
                 &mut uncompressed_data,
                 8,
                 0,

@@ -228,16 +228,17 @@ impl XzBlockHeader {
             )));
         }
         let compressed_size: Option<u64> = if flags & 0x40 != 0 {
-            let (value, next_offset) = match read_variable_length_integer(data, data_offset) {
-                Ok((value, next_offset)) => (value, next_offset),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read variable-length integer"
-                    );
-                    return Err(error);
-                }
-            };
+            let (value, next_offset): (u64, usize) =
+                match read_variable_length_integer(data, data_offset) {
+                    Ok((value, next_offset)) => (value, next_offset),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read variable-length integer"
+                        );
+                        return Err(error);
+                    }
+                };
             data_offset = next_offset;
 
             Some(value)
@@ -245,16 +246,17 @@ impl XzBlockHeader {
             None
         };
         let uncompressed_size: Option<u64> = if flags & 0x80 != 0 {
-            let (value, next_offset) = match read_variable_length_integer(data, data_offset) {
-                Ok((value, next_offset)) => (value, next_offset),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read variable-length integer"
-                    );
-                    return Err(error);
-                }
-            };
+            let (value, next_offset): (u64, usize) =
+                match read_variable_length_integer(data, data_offset) {
+                    Ok((value, next_offset)) => (value, next_offset),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read variable-length integer"
+                        );
+                        return Err(error);
+                    }
+                };
             data_offset = next_offset;
 
             Some(value)
@@ -273,29 +275,30 @@ impl XzBlockHeader {
                 "Invalid compressed data value too small"
             ));
         }
-        let (filter_identifier, next_offset) = match read_variable_length_integer(data, data_offset)
-        {
-            Ok((filter_identifier, next_offset)) => (filter_identifier, next_offset),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to read variable-length integer"
-                );
-                return Err(error);
-            }
-        };
+        let (filter_identifier, next_offset): (u64, usize) =
+            match read_variable_length_integer(data, data_offset) {
+                Ok((filter_identifier, next_offset)) => (filter_identifier, next_offset),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read variable-length integer"
+                    );
+                    return Err(error);
+                }
+            };
         data_offset = next_offset;
 
-        let (properties_size, next_offset) = match read_variable_length_integer(data, data_offset) {
-            Ok((properties_size, next_offset)) => (properties_size, next_offset),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to read variable-length integer"
-                );
-                return Err(error);
-            }
-        };
+        let (properties_size, next_offset): (u64, usize) =
+            match read_variable_length_integer(data, data_offset) {
+                Ok((properties_size, next_offset)) => (properties_size, next_offset),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read variable-length integer"
+                    );
+                    return Err(error);
+                }
+            };
         data_offset = next_offset;
 
         if data_offset + (properties_size as usize) > header_size {
@@ -549,20 +552,23 @@ impl XzContext {
             compressed_data_offset += block_header.header_size;
 
             let block_uncompressed_data_offset: usize = uncompressed_data_offset;
-            let (block_compressed_data_size, block_uncompressed_data_size) = match self
-                .decompress_block_data(
+            let (block_compressed_data_size, block_uncompressed_data_size): (usize, usize) =
+                match self.decompress_block_data(
                     compressed_data,
                     compressed_data_offset,
                     uncompressed_data,
                     uncompressed_data_size,
                     block_uncompressed_data_offset,
                 ) {
-                Ok(sizes) => sizes,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to decompress block data");
-                    return Err(error);
-                }
-            };
+                    Ok(sizes) => sizes,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress block data"
+                        );
+                        return Err(error);
+                    }
+                };
             compressed_data_offset += block_compressed_data_size;
 
             match block_header
@@ -800,7 +806,7 @@ impl XzContext {
             let properties_byte: u8 = data[*data_offset];
             *data_offset += 1;
 
-            let (literal_context_bits, literal_position_bits, position_bits) =
+            let (literal_context_bits, literal_position_bits, position_bits): (u8, u8, u8) =
                 match LzmaDecoder::decode_properties(properties_byte) {
                     Ok(properties) => properties,
                     Err(mut error) => {
@@ -1000,17 +1006,17 @@ impl XzContext {
             return Err(keramics_core::error_trace_new!("Invalid index indicator"));
         }
         let mut data_offset: usize = index_offset + 1;
-        let (number_of_records, next_offset) = match read_variable_length_integer(data, data_offset)
-        {
-            Ok((number_of_records, next_offset)) => (number_of_records, next_offset),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to read variable-length integer"
-                );
-                return Err(error);
-            }
-        };
+        let (number_of_records, next_offset): (u64, usize) =
+            match read_variable_length_integer(data, data_offset) {
+                Ok((number_of_records, next_offset)) => (number_of_records, next_offset),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read variable-length integer"
+                    );
+                    return Err(error);
+                }
+            };
         data_offset = next_offset;
 
         if number_of_records != records.len() as u64 {
@@ -1021,7 +1027,7 @@ impl XzContext {
             )));
         }
         for (record_index, (unpadded_size, uncompressed_size)) in records.iter().enumerate() {
-            let (stored_unpadded_size, next_offset) =
+            let (stored_unpadded_size, next_offset): (u64, usize) =
                 match read_variable_length_integer(data, data_offset) {
                     Ok((stored_unpadded_size, next_offset)) => (stored_unpadded_size, next_offset),
                     Err(mut error) => {
@@ -1034,7 +1040,7 @@ impl XzContext {
                 };
             data_offset = next_offset;
 
-            let (stored_uncompressed_size, next_offset) =
+            let (stored_uncompressed_size, next_offset): (u64, usize) =
                 match read_variable_length_integer(data, data_offset) {
                     Ok((stored_uncompressed_size, next_offset)) => {
                         (stored_uncompressed_size, next_offset)
@@ -1130,51 +1136,6 @@ mod tests {
     use super::*;
 
     use keramics_core::mediator::Mediator;
-
-    /// Input of TEST_DATA_V1: "keramics xz decompression vector. " repeated.
-    const TEST_INPUT_V1: [u8; 615] = [
-        0x6b, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x73, 0x20, 0x78, 0x7a, 0x20, 0x64, 0x65, 0x63,
-        0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x20, 0x74, 0x65, 0x73, 0x74,
-        0x20, 0x76, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x2e, 0x20, 0x6b, 0x65, 0x72, 0x61, 0x6d, 0x69,
-        0x63, 0x73, 0x20, 0x78, 0x7a, 0x20, 0x64, 0x65, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73,
-        0x73, 0x69, 0x6f, 0x6e, 0x20, 0x74, 0x65, 0x73, 0x74, 0x20, 0x76, 0x65, 0x63, 0x74, 0x6f,
-        0x72, 0x2e, 0x20, 0x6b, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x73, 0x20, 0x78, 0x7a, 0x20,
-        0x64, 0x65, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x20, 0x74,
-        0x65, 0x73, 0x74, 0x20, 0x76, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x2e, 0x20, 0x6b, 0x65, 0x72,
-        0x61, 0x6d, 0x69, 0x63, 0x73, 0x20, 0x78, 0x7a, 0x20, 0x64, 0x65, 0x63, 0x6f, 0x6d, 0x70,
-        0x72, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x20, 0x74, 0x65, 0x73, 0x74, 0x20, 0x76, 0x65,
-        0x63, 0x74, 0x6f, 0x72, 0x2e, 0x20, 0x6b, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x73, 0x20,
-        0x78, 0x7a, 0x20, 0x64, 0x65, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73, 0x69, 0x6f,
-        0x6e, 0x20, 0x74, 0x65, 0x73, 0x74, 0x20, 0x76, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x2e, 0x20,
-        0x6b, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x73, 0x20, 0x78, 0x7a, 0x20, 0x64, 0x65, 0x63,
-        0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x20, 0x74, 0x65, 0x73, 0x74,
-        0x20, 0x76, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x2e, 0x20, 0x6b, 0x65, 0x72, 0x61, 0x6d, 0x69,
-        0x63, 0x73, 0x20, 0x78, 0x7a, 0x20, 0x64, 0x65, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73,
-        0x73, 0x69, 0x6f, 0x6e, 0x20, 0x74, 0x65, 0x73, 0x74, 0x20, 0x76, 0x65, 0x63, 0x74, 0x6f,
-        0x72, 0x2e, 0x20, 0x6b, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x73, 0x20, 0x78, 0x7a, 0x20,
-        0x64, 0x65, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x20, 0x74,
-        0x65, 0x73, 0x74, 0x20, 0x76, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x2e, 0x20, 0x6b, 0x65, 0x72,
-        0x61, 0x6d, 0x69, 0x63, 0x73, 0x20, 0x78, 0x7a, 0x20, 0x64, 0x65, 0x63, 0x6f, 0x6d, 0x70,
-        0x72, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x20, 0x74, 0x65, 0x73, 0x74, 0x20, 0x76, 0x65,
-        0x63, 0x74, 0x6f, 0x72, 0x2e, 0x20, 0x6b, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x73, 0x20,
-        0x78, 0x7a, 0x20, 0x64, 0x65, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73, 0x69, 0x6f,
-        0x6e, 0x20, 0x74, 0x65, 0x73, 0x74, 0x20, 0x76, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x2e, 0x20,
-        0x54, 0x68, 0x65, 0x20, 0x71, 0x75, 0x69, 0x63, 0x6b, 0x20, 0x62, 0x72, 0x6f, 0x77, 0x6e,
-        0x20, 0x66, 0x6f, 0x78, 0x20, 0x6a, 0x75, 0x6d, 0x70, 0x73, 0x20, 0x6f, 0x76, 0x65, 0x72,
-        0x20, 0x74, 0x68, 0x65, 0x20, 0x6c, 0x61, 0x7a, 0x79, 0x20, 0x64, 0x6f, 0x67, 0x2e, 0x20,
-        0x54, 0x68, 0x65, 0x20, 0x71, 0x75, 0x69, 0x63, 0x6b, 0x20, 0x62, 0x72, 0x6f, 0x77, 0x6e,
-        0x20, 0x66, 0x6f, 0x78, 0x20, 0x6a, 0x75, 0x6d, 0x70, 0x73, 0x20, 0x6f, 0x76, 0x65, 0x72,
-        0x20, 0x74, 0x68, 0x65, 0x20, 0x6c, 0x61, 0x7a, 0x79, 0x20, 0x64, 0x6f, 0x67, 0x2e, 0x20,
-        0x54, 0x68, 0x65, 0x20, 0x71, 0x75, 0x69, 0x63, 0x6b, 0x20, 0x62, 0x72, 0x6f, 0x77, 0x6e,
-        0x20, 0x66, 0x6f, 0x78, 0x20, 0x6a, 0x75, 0x6d, 0x70, 0x73, 0x20, 0x6f, 0x76, 0x65, 0x72,
-        0x20, 0x74, 0x68, 0x65, 0x20, 0x6c, 0x61, 0x7a, 0x79, 0x20, 0x64, 0x6f, 0x67, 0x2e, 0x20,
-        0x54, 0x68, 0x65, 0x20, 0x71, 0x75, 0x69, 0x63, 0x6b, 0x20, 0x62, 0x72, 0x6f, 0x77, 0x6e,
-        0x20, 0x66, 0x6f, 0x78, 0x20, 0x6a, 0x75, 0x6d, 0x70, 0x73, 0x20, 0x6f, 0x76, 0x65, 0x72,
-        0x20, 0x74, 0x68, 0x65, 0x20, 0x6c, 0x61, 0x7a, 0x79, 0x20, 0x64, 0x6f, 0x67, 0x2e, 0x20,
-        0x54, 0x68, 0x65, 0x20, 0x71, 0x75, 0x69, 0x63, 0x6b, 0x20, 0x62, 0x72, 0x6f, 0x77, 0x6e,
-        0x20, 0x66, 0x6f, 0x78, 0x20, 0x6a, 0x75, 0x6d, 0x70, 0x73, 0x20, 0x6f, 0x76, 0x65, 0x72,
-        0x20, 0x74, 0x68, 0x65, 0x20, 0x6c, 0x61, 0x7a, 0x79, 0x20, 0x64, 0x6f, 0x67, 0x2e, 0x20,
-    ];
 
     /// xz stream of TEST_INPUT_V1, single Block, CRC32 check, no size fields.
     const TEST_DATA_V1: [u8; 152] = [
@@ -1637,6 +1598,32 @@ mod tests {
         0x59, 0x5a,
     ];
 
+    fn get_test_input_v1() -> Vec<u8> {
+        let mut data: Vec<u8> = b"keramics xz decompression test vector. ".repeat(10);
+        data.extend_from_slice(&b"The quick brown fox jumps over the lazy dog. ".repeat(5));
+        data
+    }
+
+    fn calculate_crc32(data: &[u8]) -> u32 {
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(data);
+        crc32_context.finalize()
+    }
+
+    fn encode_variable_length_integer(mut value: u64, output: &mut Vec<u8>) {
+        loop {
+            let mut byte_value: u8 = (value & 0x7f) as u8;
+            value >>= 7;
+            if value != 0 {
+                byte_value |= 0x80;
+            }
+            output.push(byte_value);
+            if value == 0 {
+                break;
+            }
+        }
+    }
+
     fn decompress_test_data(test_data: &[u8], expected_data: &[u8]) -> Result<(), ErrorTrace> {
         let mut test_context: XzContext = XzContext::new();
         let mut uncompressed_data: Vec<u8> = vec![0; expected_data.len()];
@@ -1698,7 +1685,8 @@ mod tests {
 
     #[test]
     fn test_decompress_v1() -> Result<(), ErrorTrace> {
-        decompress_test_data(&TEST_DATA_V1, &TEST_INPUT_V1)
+        let expected_data: Vec<u8> = get_test_input_v1();
+        decompress_test_data(&TEST_DATA_V1, &expected_data)
     }
 
     #[test]
@@ -1726,21 +1714,21 @@ mod tests {
     #[test]
     fn test_decompress_v5a() -> Result<(), ErrorTrace> {
         let mut expected_data: Vec<u8> = vec![0xaa, 0x55, 0x11, 0x22, 0x33];
-        expected_data.extend_from_slice(&TEST_INPUT_V1);
+        expected_data.extend_from_slice(&get_test_input_v1());
         decompress_test_data(&TEST_DATA_V5A, &expected_data)
     }
 
     #[test]
     fn test_decompress_v5b() -> Result<(), ErrorTrace> {
         let mut expected_data: Vec<u8> = vec![0xde, 0xad, 0xbe, 0xef];
-        expected_data.extend_from_slice(&TEST_INPUT_V1);
+        expected_data.extend_from_slice(&get_test_input_v1());
         decompress_test_data(&TEST_DATA_V5B, &expected_data)
     }
 
     #[test]
     fn test_decompress_v5c() -> Result<(), ErrorTrace> {
         let mut expected_data: Vec<u8> = vec![0xaa, 0x55, 0x11, 0x22, 0x33];
-        expected_data.extend_from_slice(&TEST_INPUT_V1);
+        expected_data.extend_from_slice(&get_test_input_v1());
         decompress_test_data(&TEST_DATA_V5C, &expected_data)
     }
 
@@ -1832,11 +1820,11 @@ mod tests {
     #[test]
     fn test_read_variable_length_integer() -> Result<(), ErrorTrace> {
         let data: [u8; 4] = [0x05, 0x00, 0x85, 0x01];
-        let (value, offset) = read_variable_length_integer(&data, 0)?;
+        let (value, offset): (u64, usize) = read_variable_length_integer(&data, 0)?;
         assert_eq!(value, 5);
         assert_eq!(offset, 1);
 
-        let (value, offset) = read_variable_length_integer(&data, 2)?;
+        let (value, offset): (u64, usize) = read_variable_length_integer(&data, 2)?;
         assert_eq!(value, 133);
         assert_eq!(offset, 4);
 
@@ -1870,26 +1858,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    fn calculate_crc32(data: &[u8]) -> u32 {
-        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
-        crc32_context.update(data);
-        crc32_context.finalize()
-    }
-
-    fn encode_variable_length_integer(mut value: u64, output: &mut Vec<u8>) {
-        loop {
-            let mut byte_value: u8 = (value & 0x7f) as u8;
-            value >>= 7;
-            if value != 0 {
-                byte_value |= 0x80;
-            }
-            output.push(byte_value);
-            if value == 0 {
-                break;
-            }
-        }
-    }
-
     #[test]
     fn test_read_stream_header_with_nonzero_first_flags_byte() {
         let mut stream_header: XzStreamHeader = XzStreamHeader::new();
@@ -1904,7 +1872,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_block_header_errors() {
+    fn test_read_block_header_with_errors() {
         let mut block_header: XzBlockHeader = XzBlockHeader::new();
 
         // Empty data.
@@ -1988,9 +1956,9 @@ mod tests {
         assert!(block_header.read_data(&bad_padding).is_err());
 
         // Block header CRC32 mismatch.
-        let mut bad_crc: Vec<u8> = TEST_DATA_V1[12..24].to_vec();
-        bad_crc[11] ^= 0x01;
-        assert!(block_header.read_data(&bad_crc).is_err());
+        let mut bad_checksum: Vec<u8> = TEST_DATA_V1[12..24].to_vec();
+        bad_checksum[11] ^= 0x01;
+        assert!(block_header.read_data(&bad_checksum).is_err());
     }
 
     #[test]
@@ -2006,17 +1974,17 @@ mod tests {
     }
 
     #[test]
-    fn test_read_stream_footer_and_verify_errors() -> Result<(), ErrorTrace> {
+    fn test_read_stream_footer_with_errors() -> Result<(), ErrorTrace> {
         let mut stream_footer: XzStreamFooter = XzStreamFooter::new();
 
         // Data too short.
         assert!(stream_footer.read_data(&[0; 11]).is_err());
 
         // Checksum mismatch.
-        let mut bad_crc: Vec<u8> =
+        let mut bad_checksum: Vec<u8> =
             TEST_DATA_V1[TEST_DATA_V1.len() - XZ_STREAM_FOOTER_SIZE..].to_vec();
-        bad_crc[0] ^= 0x01;
-        assert!(stream_footer.read_data(&bad_crc).is_err());
+        bad_checksum[0] ^= 0x01;
+        assert!(stream_footer.read_data(&bad_checksum).is_err());
 
         // First stream flags byte non-zero with valid checksum.
         let mut bad_flags1: [u8; 12] = [
@@ -2080,10 +2048,11 @@ mod tests {
         let block_padding_size: usize = (4 - ((12 + unpadded_size) & 3)) as usize & 3;
         stream.resize(stream.len() + block_padding_size, 0x00);
 
-        let mut expected_data: Vec<u8> = Vec::with_capacity(TEST_INPUT_V1.len() * 3);
-        expected_data.extend_from_slice(&TEST_INPUT_V1);
-        expected_data.extend_from_slice(&TEST_INPUT_V1);
-        expected_data.extend_from_slice(&TEST_INPUT_V1);
+        let test_input_v1: Vec<u8> = get_test_input_v1();
+        let mut expected_data: Vec<u8> = Vec::with_capacity(test_input_v1.len() * 3);
+        expected_data.extend_from_slice(&test_input_v1);
+        expected_data.extend_from_slice(&test_input_v1);
+        expected_data.extend_from_slice(&test_input_v1);
 
         let block_checksum: u32 = calculate_crc32(&expected_data);
         stream.extend_from_slice(&block_checksum.to_le_bytes());
@@ -2145,20 +2114,20 @@ mod tests {
         assert_decompress_fails(&bad_block_padding);
 
         // Block CRC32 mismatch via decompress.
-        let mut bad_block_crc: Vec<u8> = TEST_DATA_V1.to_vec();
-        bad_block_crc[124] ^= 0x01;
-        assert_decompress_fails(&bad_block_crc);
+        let mut bad_block_checksum: Vec<u8> = TEST_DATA_V1.to_vec();
+        bad_block_checksum[124] ^= 0x01;
+        assert_decompress_fails(&bad_block_checksum);
 
         // Stored compressed size mismatch via decompress.
         let mut bad_stored_size: Vec<u8> = TEST_DATA_V5C.to_vec();
         bad_stored_size[14] = 0x6c;
-        let block_header_crc: u32 = calculate_crc32(&bad_stored_size[12..24]);
-        bad_stored_size[24..28].copy_from_slice(&block_header_crc.to_le_bytes());
+        let block_header_checksum: u32 = calculate_crc32(&bad_stored_size[12..24]);
+        bad_stored_size[24..28].copy_from_slice(&block_header_checksum.to_le_bytes());
         assert_decompress_fails(&bad_stored_size);
 
         // Output buffer larger than uncompressed data.
         let mut test_context: XzContext = XzContext::new();
-        let mut large_buffer: Vec<u8> = vec![0; TEST_INPUT_V1.len() + 10];
+        let mut large_buffer: Vec<u8> = vec![0; get_test_input_v1().len() + 10];
         assert!(
             test_context
                 .decompress(&TEST_DATA_V1, &mut large_buffer)
@@ -2183,7 +2152,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decompress_chunk_error_paths() -> Result<(), ErrorTrace> {
+    fn test_decompress_chunk_with_errors() -> Result<(), ErrorTrace> {
         DebugTrace::scope(|debug_trace: &mut DebugTraceScope| {
             let mut uncompressed_data: [u8; 16] = [0; 16];
 
@@ -2332,7 +2301,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_block_padding_index_and_checksum_errors() {
+    fn test_read_block_padding_and_index_with_errors() {
         // Block padding truncated.
         assert!(XzContext::read_block_padding(&[0x00, 0x00], 0, 0, 1).is_err());
 
@@ -2367,10 +2336,10 @@ mod tests {
         assert!(XzContext::read_index(&bad_index_padding, 0, &[]).is_err());
 
         // Index CRC32 mismatch.
-        let mut bad_index_crc: [u8; 8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-        let checksum: u32 = calculate_crc32(&bad_index_crc[0..4]) ^ 0x01;
-        bad_index_crc[4..8].copy_from_slice(&checksum.to_le_bytes());
-        assert!(XzContext::read_index(&bad_index_crc, 0, &[]).is_err());
+        let mut bad_index_checksum: [u8; 8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let checksum: u32 = calculate_crc32(&bad_index_checksum[0..4]) ^ 0x01;
+        bad_index_checksum[4..8].copy_from_slice(&checksum.to_le_bytes());
+        assert!(XzContext::read_index(&bad_index_checksum, 0, &[]).is_err());
     }
 
     #[test]
@@ -2378,7 +2347,8 @@ mod tests {
         let original_debug_output: bool = Mediator::current().debug_output;
         Mediator::new(true).make_current();
 
-        let result: Result<(), ErrorTrace> = decompress_test_data(&TEST_DATA_V1, &TEST_INPUT_V1);
+        let expected_data: Vec<u8> = get_test_input_v1();
+        let result: Result<(), ErrorTrace> = decompress_test_data(&TEST_DATA_V1, &expected_data);
 
         Mediator::new(original_debug_output).make_current();
 

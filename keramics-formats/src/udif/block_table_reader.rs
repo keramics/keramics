@@ -180,9 +180,9 @@ impl UdifBlockTableReader {
 mod tests {
     use super::*;
 
-    use super::super::block_table_entry::UdifBlockTableEntry;
+    use crate::udif::block_table_entry::UdifBlockTableEntry;
 
-    fn make_entry(
+    fn get_test_block_table_entry(
         entry_type: u32,
         start_sector: u64,
         number_of_sectors: u64,
@@ -206,12 +206,12 @@ mod tests {
         let block_table: UdifBlockTable = UdifBlockTable {
             start_sector: 0,
             entries: vec![
-                make_entry(0x7ffffffe, 0, 0, 0, 0),
-                make_entry(0x80000008, 0, 2, 0, 128),
-                make_entry(0x00000001, 2, 1, 128, 512),
-                make_entry(0x00000000, 3, 1, 0, 0),
-                make_entry(0x00000002, 4, 1, 0, 0),
-                make_entry(0xffffffff, 5, 0, 0, 0),
+                get_test_block_table_entry(0x7ffffffe, 0, 0, 0, 0),
+                get_test_block_table_entry(0x80000008, 0, 2, 0, 128),
+                get_test_block_table_entry(0x00000001, 2, 1, 128, 512),
+                get_test_block_table_entry(0x00000000, 3, 1, 0, 0),
+                get_test_block_table_entry(0x00000002, 4, 1, 0, 0),
+                get_test_block_table_entry(0xffffffff, 5, 0, 0, 0),
             ],
         };
         reader.process_block_table(&block_table)?;
@@ -224,7 +224,7 @@ mod tests {
     }
 
     #[test]
-    fn test_process_block_table_errors() {
+    fn test_process_block_table_with_errors() {
         // Start sector out of bounds.
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
         let block_table: UdifBlockTable = UdifBlockTable {
@@ -237,7 +237,7 @@ mod tests {
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
         let block_table: UdifBlockTable = UdifBlockTable {
             start_sector: 0,
-            entries: vec![make_entry(0x00000000, 1, 1, 0, 0)],
+            entries: vec![get_test_block_table_entry(0x00000000, 1, 1, 0, 0)],
         };
         assert!(reader.process_block_table(&block_table).is_err());
 
@@ -245,7 +245,7 @@ mod tests {
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
         let block_table: UdifBlockTable = UdifBlockTable {
             start_sector: 0,
-            entries: vec![make_entry(0x00000000, 0, 0, 0, 0)],
+            entries: vec![get_test_block_table_entry(0x00000000, 0, 0, 0, 0)],
         };
         assert!(reader.process_block_table(&block_table).is_err());
 
@@ -253,7 +253,7 @@ mod tests {
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
         let block_table: UdifBlockTable = UdifBlockTable {
             start_sector: 0,
-            entries: vec![make_entry(0x80000008, 0, 1, 4096, 16)],
+            entries: vec![get_test_block_table_entry(0x80000008, 0, 1, 4096, 16)],
         };
         assert!(reader.process_block_table(&block_table).is_err());
 
@@ -261,7 +261,7 @@ mod tests {
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
         let block_table: UdifBlockTable = UdifBlockTable {
             start_sector: 0,
-            entries: vec![make_entry(0x80000008, 0, 1, 4000, 100)],
+            entries: vec![get_test_block_table_entry(0x80000008, 0, 1, 4000, 100)],
         };
         assert!(reader.process_block_table(&block_table).is_err());
 
@@ -269,7 +269,7 @@ mod tests {
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
         let block_table: UdifBlockTable = UdifBlockTable {
             start_sector: 0,
-            entries: vec![make_entry(0x80000008, 0, 2049, 0, 100)],
+            entries: vec![get_test_block_table_entry(0x80000008, 0, 2049, 0, 100)],
         };
         assert!(reader.process_block_table(&block_table).is_err());
 
@@ -278,8 +278,8 @@ mod tests {
         let block_table: UdifBlockTable = UdifBlockTable {
             start_sector: 0,
             entries: vec![
-                make_entry(0x80000008, 0, 1, 0, 100),
-                make_entry(0x80000005, 1, 1, 100, 100),
+                get_test_block_table_entry(0x80000008, 0, 1, 0, 100),
+                get_test_block_table_entry(0x80000005, 1, 1, 100, 100),
             ],
         };
         assert!(reader.process_block_table(&block_table).is_err());
@@ -288,7 +288,7 @@ mod tests {
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
         let block_table: UdifBlockTable = UdifBlockTable {
             start_sector: 0,
-            entries: vec![make_entry(0x80000009, 0, 1, 0, 100)],
+            entries: vec![get_test_block_table_entry(0x80000009, 0, 1, 0, 100)],
         };
         assert!(reader.process_block_table(&block_table).is_err());
     }
