@@ -115,7 +115,7 @@ impl BdeBlockReader {
         );
         match self
             .encryption_context
-            .decrypt_sector_in_place(sector_physical_offset, &mut sector_data)
+            .decrypt_sector(sector_physical_offset, &mut sector_data)
         {
             Ok(_) => {}
             Err(mut error) => {
@@ -207,12 +207,21 @@ impl BlockReader for BdeBlockReader {
                             min(range_data_end_offset - data_offset, sector_remainder_size);
                         let data_end_offset: usize = data_offset + sector_read_size;
 
-                        self.read_cached_sector(
+                        match self.read_cached_sector(
                             sector_number,
                             sector_physical_offset,
                             sector_data_offset,
                             &mut data[data_offset..data_end_offset],
-                        )?;
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!("Unable to read cached sector: {}", sector_number)
+                                );
+                                return Err(error);
+                            }
+                        }
                         data_offset = data_end_offset;
                         current_offset += sector_read_size as u64;
                         sector_number += 1;
@@ -254,12 +263,21 @@ impl BlockReader for BdeBlockReader {
                     } else if full_sectors_count == 1 {
                         let data_end_offset: usize = data_offset + sector_size;
 
-                        self.read_cached_sector(
+                        match self.read_cached_sector(
                             sector_number,
                             sector_physical_offset,
                             0,
                             &mut data[data_offset..data_end_offset],
-                        )?;
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!("Unable to read cached sector: {}", sector_number)
+                                );
+                                return Err(error);
+                            }
+                        }
                         data_offset = data_end_offset;
                         current_offset += sector_size as u64;
                         sector_number += 1;
@@ -270,12 +288,21 @@ impl BlockReader for BdeBlockReader {
                         let sector_read_size: usize = range_data_end_offset - data_offset;
                         let data_end_offset: usize = range_data_end_offset;
 
-                        self.read_cached_sector(
+                        match self.read_cached_sector(
                             sector_number,
                             sector_physical_offset,
                             0,
                             &mut data[data_offset..data_end_offset],
-                        )?;
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!("Unable to read cached sector: {}", sector_number)
+                                );
+                                return Err(error);
+                            }
+                        }
                         data_offset = data_end_offset;
                         current_offset += sector_read_size as u64;
                     }

@@ -43,27 +43,8 @@ impl BdeEncryptionContext {
         }
     }
 
-    /// Decrypts a sector.
-    #[allow(dead_code)]
-    pub fn decrypt_sector(
-        &self,
-        sector_data_offset: u64,
-        encrypted_data: &[u8],
-        data: &mut [u8],
-    ) -> Result<(), ErrorTrace> {
-        if encrypted_data.len() > data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid data value too small"
-            ));
-        }
-        let encrypted_data_size: usize = encrypted_data.len();
-        data[0..encrypted_data_size].copy_from_slice(encrypted_data);
-
-        self.decrypt_sector_in_place(sector_data_offset, &mut data[0..encrypted_data_size])
-    }
-
     /// Decrypts a sector in place.
-    pub fn decrypt_sector_in_place(
+    pub fn decrypt_sector(
         &self,
         sector_data_offset: u64,
         data: &mut [u8],
@@ -187,7 +168,17 @@ impl BdeEncryptionContext {
         let mut sector_data_offset: u64 = first_sector_data_offset;
 
         for sector_data in data.chunks_exact_mut(sector_size) {
-            self.decrypt_sector_in_place(sector_data_offset, sector_data)?;
+            match self.decrypt_sector(sector_data_offset, sector_data) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    let sector_number: u64 = sector_data_offset / (sector_size as u64);
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to decrypt sector: {}", sector_number)
+                    );
+                    return Err(error);
+                }
+            }
             sector_data_offset += sector_size as u64;
         }
         Ok(())

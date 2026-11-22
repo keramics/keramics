@@ -63,7 +63,7 @@ impl PyVfsDataFork {
 #[pyo3(name = "VfsDataStream")]
 #[derive(Clone)]
 struct PyVfsDataStream {
-    /// Data steam.
+    /// Data stream.
     data_stream: DataStreamReference,
 }
 
@@ -673,7 +673,7 @@ impl PyVfsPath {
 #[pyo3(name = "VfsPathComponent")]
 #[derive(Clone)]
 struct PyVfsPathComponent {
-    /// Data steam.
+    /// Path component.
     path_component: Arc<PathComponent>,
 }
 
@@ -837,7 +837,18 @@ mod tests {
 
     #[test]
     fn test_vfs_type_from_py_vfs_type() {
-        let vfs_type: VfsType = VfsType::from(&PyVfsType::Apm);
-        assert_eq!(vfs_type, VfsType::Apm);
+        assert_eq!(VfsType::from(&PyVfsType::Apm), VfsType::Apm);
+        assert_eq!(VfsType::from(&PyVfsType::Ewf), VfsType::Ewf);
+        assert_eq!(VfsType::from(&PyVfsType::Ext), VfsType::Ext);
+        assert_eq!(VfsType::from(&PyVfsType::Fake), VfsType::Fake);
+        assert_eq!(VfsType::from(&PyVfsType::Fat), VfsType::Fat);
+        assert_eq!(VfsType::from(&PyVfsType::Gpt), VfsType::Gpt);
+        assert_eq!(VfsType::from(&PyVfsType::Mbr), VfsType::Mbr);
+        assert_eq!(VfsType::from(&PyVfsType::Os), VfsType::Os);
+        assert_eq!(VfsType::from(&PyVfsType::Qcow), VfsType::Qcow);
+        assert_eq!(VfsType::from(&PyVfsType::SparseImage), VfsType::SparseImage);
+        assert_eq!(VfsType::from(&PyVfsType::Udif), VfsType::Udif);
+        assert_eq!(VfsType::from(&PyVfsType::Vhd), VfsType::Vhd);
+        assert_eq!(VfsType::from(&PyVfsType::Vhdx), VfsType::Vhdx);
     }
 }
