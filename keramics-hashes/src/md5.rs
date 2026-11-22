@@ -18,6 +18,8 @@
 use std::cmp::min;
 use std::slice::ChunksExact;
 
+use keramics_types::bytes_to_u32_le;
+
 use super::traits::DigestHashContext;
 
 /// MD5 block size.
@@ -301,8 +303,10 @@ impl Md5Context {
         let mut values_32bit: [u32; 16] = [0; 16];
 
         // Break the block of data into 16 x 32-bit little-endian values
-        for (index, chunk) in data[0..MD5_BLOCK_SIZE].chunks_exact(4).enumerate() {
-            values_32bit[index] = u32::from_le_bytes(chunk.try_into().unwrap());
+        let mut data_offset: usize = 0;
+        for value_32bit in &mut values_32bit[0..16] {
+            *value_32bit = bytes_to_u32_le!(data, data_offset);
+            data_offset += 4;
         }
         // Calculate the hash values
         let mut block_hash0: u32 = hash_values[0];
@@ -404,8 +408,7 @@ impl DigestHashContext for Md5Context {
 
     /// Calculates the digest hash of the data.
     fn update(&mut self, data: &[u8]) {
-        let mut hash_values: [u32; 4] = [0; 4];
-        hash_values.copy_from_slice(&self.hash_values);
+        let mut hash_values: [u32; 4] = self.hash_values;
 
         let data_offset: usize = if self.block_offset == 0 {
             0
@@ -413,10 +416,11 @@ impl DigestHashContext for Md5Context {
             let remaining_block_size: usize = MD5_BLOCK_SIZE - self.block_offset;
             let data_end_offset: usize = min(remaining_block_size, data.len());
 
-            for byte_value in data[0..data_end_offset].iter() {
-                self.block[self.block_offset] = *byte_value;
-                self.block_offset += 1;
-            }
+            let block_end_offset: usize = self.block_offset + data_end_offset;
+            self.block[self.block_offset..block_end_offset]
+                .copy_from_slice(&data[0..data_end_offset]);
+            self.block_offset = block_end_offset;
+
             if self.block_offset == MD5_BLOCK_SIZE {
                 self.transform_block(&mut hash_values, &self.block);
 
@@ -432,13 +436,15 @@ impl DigestHashContext for Md5Context {
 
             self.number_of_bytes_hashed += MD5_BLOCK_SIZE as u64;
         }
-        self.hash_values.copy_from_slice(&hash_values);
+        self.hash_values = hash_values;
 
         let remainder: &[u8] = chunks.remainder();
+        let remainder_size: usize = remainder.len();
 
-        for byte_value in remainder.iter() {
-            self.block[self.block_offset] = *byte_value;
-            self.block_offset += 1;
+        if remainder_size > 0 {
+            let block_end_offset: usize = self.block_offset + remainder_size;
+            self.block[self.block_offset..block_end_offset].copy_from_slice(remainder);
+            self.block_offset = block_end_offset;
         }
     }
 }

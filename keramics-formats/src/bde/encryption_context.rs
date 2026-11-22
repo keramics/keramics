@@ -12,7 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_encryption::{AesContext, CryptCbc, CryptEcb};
+use keramics_encryption::{AesContext, CryptEcb};
 
 use super::cipher_context::BdeCipherContext;
 use super::diffuser::BdeDiffuser;
@@ -44,13 +44,30 @@ impl BdeEncryptionContext {
     }
 
     /// Decrypts a sector.
+    #[allow(dead_code)]
     pub fn decrypt_sector(
         &self,
         sector_data_offset: u64,
         encrypted_data: &[u8],
         data: &mut [u8],
     ) -> Result<(), ErrorTrace> {
-        let sector_number: u64 = sector_data_offset / (self.bytes_per_sector as u64);
+        if encrypted_data.len() > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid data value too small"
+            ));
+        }
+        let encrypted_data_size: usize = encrypted_data.len();
+        data[0..encrypted_data_size].copy_from_slice(encrypted_data);
+
+        self.decrypt_sector_in_place(sector_data_offset, &mut data[0..encrypted_data_size])
+    }
+
+    /// Decrypts a sector in place.
+    pub fn decrypt_sector_in_place(
+        &self,
+        sector_data_offset: u64,
+        data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
         let mut initialization_vector: [u8; 16] = [0; 16];
 
         match &self.cipher_context {
@@ -61,6 +78,8 @@ impl BdeEncryptionContext {
                 match aes_context.encrypt_ecb(&block_key_data, &mut initialization_vector) {
                     Ok(_) => {}
                     Err(mut error) => {
+                        let sector_number: u64 =
+                            sector_data_offset / (self.bytes_per_sector as u64);
                         keramics_core::error_trace_add_frame!(
                             error,
                             format!(
@@ -71,12 +90,26 @@ impl BdeEncryptionContext {
                         return Err(error);
                     }
                 }
-                let mut sector_key_data: [u8; 32] = [0; 32];
-
+                match aes_context.decrypt_cbc_in_place(&initialization_vector, data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        let sector_number: u64 =
+                            sector_data_offset / (self.bytes_per_sector as u64);
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to decrypt sector: {}", sector_number)
+                        );
+                        return Err(error);
+                    }
+                }
                 if let Some(diffuser_context) = &self.diffuser_context {
+                    let mut sector_key_data: [u8; 32] = [0; 32];
+
                     match diffuser_context.encrypt_ecb(&block_key_data, &mut sector_key_data) {
                         Ok(_) => {}
                         Err(mut error) => {
+                            let sector_number: u64 =
+                                sector_data_offset / (self.bytes_per_sector as u64);
                             keramics_core::error_trace_add_frame!(
                                 error,
                                 format!(
@@ -93,6 +126,8 @@ impl BdeEncryptionContext {
                     {
                         Ok(_) => {}
                         Err(mut error) => {
+                            let sector_number: u64 =
+                                sector_data_offset / (self.bytes_per_sector as u64);
                             keramics_core::error_trace_add_frame!(
                                 error,
                                 format!(
@@ -103,21 +138,11 @@ impl BdeEncryptionContext {
                             return Err(error);
                         }
                     }
-                }
-                match aes_context.decrypt_cbc(&initialization_vector, encrypted_data, data) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to decrypt sector: {}", sector_number)
-                        );
-                        return Err(error);
-                    }
-                }
-                if self.diffuser_context.is_some() {
                     match BdeDiffuser::decrypt(data) {
                         Ok(_) => {}
                         Err(mut error) => {
+                            let sector_number: u64 =
+                                sector_data_offset / (self.bytes_per_sector as u64);
                             keramics_core::error_trace_add_frame!(
                                 error,
                                 format!("Unable to diffuser decrypt sector: {}", sector_number)
@@ -134,9 +159,10 @@ impl BdeEncryptionContext {
                 }
             }
             BdeCipherContext::AesXts(xts_context) => {
+                let sector_number: u64 = sector_data_offset / (self.bytes_per_sector as u64);
                 initialization_vector[0..8].copy_from_slice(&sector_number.to_le_bytes());
 
-                match xts_context.decrypt_xts(&initialization_vector, encrypted_data, data) {
+                match xts_context.decrypt_xts_in_place(&initialization_vector, data) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -147,6 +173,22 @@ impl BdeEncryptionContext {
                     }
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Decrypts one or more contiguous sectors in place.
+    pub fn decrypt_sectors_in_place(
+        &self,
+        first_sector_data_offset: u64,
+        data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        let sector_size: usize = self.bytes_per_sector as usize;
+        let mut sector_data_offset: u64 = first_sector_data_offset;
+
+        for sector_data in data.chunks_exact_mut(sector_size) {
+            self.decrypt_sector_in_place(sector_data_offset, sector_data)?;
+            sector_data_offset += sector_size as u64;
         }
         Ok(())
     }

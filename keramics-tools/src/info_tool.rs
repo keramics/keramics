@@ -584,6 +584,34 @@ fn main() -> ExitCode {
     let info_tool: InfoTool =
         InfoTool::new(&arguments.encoding, arguments.contents, arguments.offset);
 
+    #[cfg(feature = "debug-trace")]
+    {
+        Mediator {
+            debug_output: arguments.debug,
+        }
+        .make_current();
+    }
+    let is_sparsebundle: bool = !arguments.contents
+        && (matches!(arguments.format, Some(FormatType::SparseBundle))
+            || (arguments.source.is_dir()
+                && arguments.source.extension() == Some("sparsebundle".as_ref())));
+
+    if is_sparsebundle {
+        let result: Result<(), ErrorTrace> = match arguments.command {
+            None => SparseBundleInfo::print_image(&arguments.source),
+            Some(_) => Err(keramics_core::error_trace_new!(format!(
+                "Unsupported format: {}",
+                FormatIdentifier::SparseBundle
+            ))),
+        };
+        return match result {
+            Ok(_) => ExitCode::SUCCESS,
+            Err(error) => {
+                println!("Unable to provide information about: {}\n{}", source, error);
+                ExitCode::FAILURE
+            }
+        };
+    }
     let data_stream: DataStreamReference =
         match info_tool.get_data_stream(&arguments.source, arguments.image_layer) {
             Ok(data_stream) => data_stream,
@@ -621,37 +649,21 @@ fn main() -> ExitCode {
         Some(FormatType::Vmdk) => FormatIdentifier::Vmdk,
         Some(FormatType::Volsnap) => FormatIdentifier::Volsnap,
         Some(FormatType::Xfs) => FormatIdentifier::Xfs,
-        None => {
-            if !arguments.contents
-                && arguments.source.is_dir()
-                && arguments.source.extension() == Some("sparsebundle".as_ref())
-            {
-                FormatIdentifier::SparseBundle
-            } else {
-                match info_tool.scan_for_formats(&data_stream) {
-                    Ok(Some(format_identifier)) => format_identifier,
-                    Ok(None) => {
-                        println!("No format signatures found");
-                        return ExitCode::FAILURE;
-                    }
-                    Err(error) => {
-                        println!(
-                            "Unable to scan data stream for format signatures with error:\n{}",
-                            error
-                        );
-                        return ExitCode::FAILURE;
-                    }
-                }
+        None => match info_tool.scan_for_formats(&data_stream) {
+            Ok(Some(format_identifier)) => format_identifier,
+            Ok(None) => {
+                println!("No format signatures found");
+                return ExitCode::FAILURE;
             }
-        }
+            Err(error) => {
+                println!(
+                    "Unable to scan data stream for format signatures with error:\n{}",
+                    error
+                );
+                return ExitCode::FAILURE;
+            }
+        },
     };
-    #[cfg(feature = "debug-trace")]
-    {
-        Mediator {
-            debug_output: arguments.debug,
-        }
-        .make_current();
-    }
     let result: Result<(), ErrorTrace> = match arguments.command {
         Some(Commands::Identifier(command_arguments)) => match &format_identifier {
             FormatIdentifier::Apfs => ApfsInfo::print_file_entry_by_identifier(
