@@ -112,7 +112,7 @@ mod tests {
             "vdh",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         byte_value_group.insert_signature(0x63, &signature);
 
@@ -127,7 +127,7 @@ mod tests {
             "vhd2",
             PatternType::BoundToStart,
             0,
-            "connectx".as_bytes(),
+            b"connectx",
         ));
         byte_value_group.insert_signature(0x63, &signature_other);
 
@@ -161,7 +161,7 @@ mod tests {
             "vdh",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         signature_group.append_signature(&signature);
 
@@ -172,7 +172,7 @@ mod tests {
             "vhd2",
             PatternType::BoundToStart,
             0,
-            "connectx".as_bytes(),
+            b"connectx",
         ));
         signature_group.append_signature(&signature_other);
 

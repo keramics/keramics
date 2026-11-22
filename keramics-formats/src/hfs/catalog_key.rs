@@ -159,7 +159,7 @@ mod tests {
             name,
             HfsString::ByteString(ByteString {
                 encoding: CharacterEncoding::MacRoman,
-                elements: vec![0x6f, 0x73, 0x78],
+                elements: b"osx".to_vec(),
             })
         );
         Ok(())

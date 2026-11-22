@@ -136,7 +136,7 @@ mod tests {
             "vdh",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         )));
         scan_tree.build(&signatures)?;
 
@@ -172,13 +172,13 @@ mod tests {
             "vhd1",
             PatternType::BoundToStart,
             56,
-            "connectx".as_bytes(),
+            b"connectx",
         )));
         signatures.push(Arc::new(Signature::new(
             "vhd2",
             PatternType::BoundToStart,
             8,
-            "conectix".as_bytes(),
+            b"conectix",
         )));
         scan_tree.build(&signatures).unwrap();
 
@@ -194,7 +194,7 @@ mod tests {
             "msiecf1",
             PatternType::BoundToStart,
             0,
-            "Client UrlCache MMF Ver ".as_bytes(),
+            b"Client UrlCache MMF Ver ",
         )));
         scan_tree.build(&signatures)?;
 
@@ -229,7 +229,7 @@ mod tests {
             "vhd1",
             PatternType::BoundToEnd,
             72,
-            "conectix".as_bytes(),
+            b"conectix",
         )));
         scan_tree.build(&signatures)?;
 
@@ -262,7 +262,7 @@ mod tests {
             "test1",
             PatternType::Unbound,
             0,
-            "example of unbounded pattern".as_bytes(),
+            b"example of unbounded pattern",
         )));
         scan_tree.build(&signatures)?;
 
@@ -295,13 +295,13 @@ mod tests {
                 "vhd1",
                 PatternType::BoundToStart,
                 0,
-                "conectix".as_bytes(),
+                b"conectix",
             )),
             Arc::new(Signature::new(
                 "vhd2",
                 PatternType::BoundToStart,
                 0,
-                "conectix".as_bytes(),
+                b"conectix",
             )),
         ];
         let result: Result<(), ErrorTrace> = scan_tree.build(&signatures);
@@ -317,19 +317,19 @@ mod tests {
                 "vhd_start",
                 PatternType::BoundToStart,
                 0,
-                "conectix".as_bytes(),
+                b"conectix",
             )),
             Arc::new(Signature::new(
                 "vhd_end",
                 PatternType::BoundToEnd,
                 72,
-                "conectix".as_bytes(),
+                b"conectix",
             )),
             Arc::new(Signature::new(
                 "vhd_unbound",
                 PatternType::Unbound,
                 0,
-                "conectix".as_bytes(),
+                b"conectix",
             )),
         ];
         scan_tree.build(&signatures)?;

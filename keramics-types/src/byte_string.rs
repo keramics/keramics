@@ -363,9 +363,7 @@ mod tests {
             test_byte_string,
             ByteString {
                 encoding: CharacterEncoding::Iso8859_1,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
+                elements: b"ASCII string".to_vec(),
             }
         );
 
@@ -387,9 +385,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Utf8,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
+                elements: b"ASCII string".to_vec(),
             }
         );
 
@@ -401,9 +397,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Iso8859_1,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
+                elements: b"ASCII string".to_vec(),
             }
         );
 
@@ -433,9 +427,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Iso8859_1,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
+                elements: b"ASCII string".to_vec(),
             }
         );
 
@@ -455,9 +447,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Utf8,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
+                elements: b"ASCII string".to_vec(),
             }
         );
 
@@ -468,9 +458,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Iso8859_1,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
+                elements: b"ASCII string".to_vec(),
             }
         );
 
@@ -493,9 +481,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Iso8859_1,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
+                elements: b"ASCII string".to_vec(),
             }
         );
 
@@ -521,9 +507,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Iso8859_1,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
+                elements: b"ASCII string".to_vec(),
             }
         );
 
@@ -599,9 +583,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Utf8,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67
-                ],
+                elements: b"ASCII string".to_vec(),
             }
         );
 
@@ -615,9 +597,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Utf8,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67
-                ],
+                elements: b"ASCII string".to_vec(),
             }
         );
     }
@@ -633,9 +613,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Utf8,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
+                elements: b"ASCII string".to_vec(),
             }
         );
 
@@ -649,9 +627,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Utf8,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
+                elements: b"ASCII string".to_vec(),
             }
         );
     }
@@ -664,9 +640,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Utf8,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
+                elements: b"ASCII string".to_vec(),
             }
         );
     }
@@ -680,9 +654,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Utf8,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
+                elements: b"ASCII string".to_vec(),
             }
         );
     }
@@ -712,9 +684,7 @@ mod tests {
     fn test_to_string() {
         let byte_string: ByteString = ByteString {
             encoding: CharacterEncoding::Iso8859_1,
-            elements: vec![
-                0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-            ],
+            elements: b"ASCII string".to_vec(),
         };
 
         let string: String = byte_string.to_string();

@@ -159,9 +159,7 @@ mod tests {
             name,
             ByteString {
                 encoding: CharacterEncoding::Ascii,
-                elements: vec![
-                    0x75, 0x73, 0x65, 0x72, 0x2e, 0x6d, 0x79, 0x78, 0x61, 0x74, 0x74, 0x72
-                ],
+                elements: b"user.myxattr".to_vec(),
             }
         );
         Ok(())

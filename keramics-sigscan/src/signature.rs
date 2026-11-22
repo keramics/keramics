@@ -139,7 +139,7 @@ mod tests {
     #[test]
     fn test_new() {
         let signature: Signature =
-            Signature::new("vdh", PatternType::BoundToStart, 56, "conectix".as_bytes());
+            Signature::new("vdh", PatternType::BoundToStart, 56, b"conectix");
 
         assert_eq!(signature.identifier.as_str(), "vdh");
         assert_eq!(signature.pattern_type, PatternType::BoundToStart);
@@ -169,17 +169,16 @@ mod tests {
     #[test]
     fn test_eq() {
         let signature1: Signature =
-            Signature::new("vdh1", PatternType::BoundToStart, 0, "conectix".as_bytes());
+            Signature::new("vdh1", PatternType::BoundToStart, 0, b"conectix");
         let signature2: Signature =
-            Signature::new("vdh2", PatternType::BoundToStart, 0, "conectix".as_bytes());
+            Signature::new("vdh2", PatternType::BoundToStart, 0, b"conectix");
         let signature3: Signature =
-            Signature::new("vdh3", PatternType::BoundToStart, 56, "conectix".as_bytes());
-        let signature4: Signature =
-            Signature::new("vdh4", PatternType::Unbound, 0, "conectix".as_bytes());
+            Signature::new("vdh3", PatternType::BoundToStart, 56, b"conectix");
+        let signature4: Signature = Signature::new("vdh4", PatternType::Unbound, 0, b"conectix");
         let signature5: Signature =
-            Signature::new("vdh5", PatternType::BoundToStart, 0, "connectx".as_bytes());
+            Signature::new("vdh5", PatternType::BoundToStart, 0, b"connectx");
         let signature6: Signature =
-            Signature::new("vdh6", PatternType::BoundToStart, 0, "conecti".as_bytes());
+            Signature::new("vdh6", PatternType::BoundToStart, 0, b"conecti");
 
         assert_eq!(signature1, signature2);
         assert_ne!(signature1, signature3);
@@ -223,10 +222,9 @@ mod tests {
 
     #[test]
     fn test_scan_buffer_with_bound_to_end() {
-        let signature: Signature =
-            Signature::new("vhd1", PatternType::BoundToEnd, 16, "conectix".as_bytes());
+        let signature: Signature = Signature::new("vhd1", PatternType::BoundToEnd, 16, b"conectix");
         let mut test_data: [u8; 32] = [0; 32];
-        test_data[16..24].copy_from_slice("conectix".as_bytes());
+        test_data[16..24].copy_from_slice(b"conectix");
 
         // Test match when data_offset is 32 and data_size is 64 (pattern at offset 48).
         assert!(signature.scan_buffer(32, 64, &test_data, 0, 32));
@@ -247,10 +245,9 @@ mod tests {
 
     #[test]
     fn test_scan_buffer_with_unbound() {
-        let signature: Signature =
-            Signature::new("test1", PatternType::Unbound, 0, "conectix".as_bytes());
+        let signature: Signature = Signature::new("test1", PatternType::Unbound, 0, b"conectix");
         let mut test_data: [u8; 32] = [0; 32];
-        test_data[8..16].copy_from_slice("conectix".as_bytes());
+        test_data[8..16].copy_from_slice(b"conectix");
 
         // Test match at buffer offset 8.
         assert!(signature.scan_buffer(0, 64, &test_data, 8, 32));

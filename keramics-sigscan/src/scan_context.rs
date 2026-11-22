@@ -297,7 +297,7 @@ mod tests {
             "msiecf1",
             PatternType::BoundToStart,
             0,
-            "Client UrlCache MMF Ver ".as_bytes(),
+            b"Client UrlCache MMF Ver ",
         ));
         scanner.build().unwrap();
 
@@ -334,7 +334,7 @@ mod tests {
             "msiecf1",
             PatternType::BoundToStart,
             0,
-            "Client UrlCache MMF Ver ".as_bytes(),
+            b"Client UrlCache MMF Ver ",
         ));
         scanner.build().unwrap();
 
@@ -346,7 +346,7 @@ mod tests {
 
     #[test]
     fn test_scan_buffer_with_bound_to_start_signature_at_different_offsets() {
-        let pattern: &[u8] = "conectix".as_bytes();
+        let pattern: &[u8] = b"conectix";
 
         let mut scanner: Scanner = Scanner::new();
         scanner.add_signature(Signature::new(
@@ -429,7 +429,7 @@ mod tests {
             "vhd1",
             PatternType::BoundToEnd,
             72,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.build().unwrap();
 
@@ -462,7 +462,7 @@ mod tests {
             "vhd1",
             PatternType::BoundToEnd,
             72,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.build().unwrap();
 
@@ -474,7 +474,7 @@ mod tests {
 
     #[test]
     fn test_scan_buffer_with_bound_to_end_signature_at_different_offsets() {
-        let pattern: &[u8] = "conectix".as_bytes();
+        let pattern: &[u8] = b"conectix";
 
         let mut scanner: Scanner = Scanner::new();
         scanner.add_signature(Signature::new(
@@ -541,7 +541,7 @@ mod tests {
             "test1",
             PatternType::Unbound,
             0,
-            "example of unbounded pattern".as_bytes(),
+            b"example of unbounded pattern",
         ));
         scanner.build().unwrap();
 
@@ -565,7 +565,7 @@ mod tests {
 
     #[test]
     fn test_scan_buffer_with_unbound_signature_at_different_offsets() {
-        let pattern: &[u8] = "conectix".as_bytes();
+        let pattern: &[u8] = b"conectix";
 
         let mut scanner: Scanner = Scanner::new();
         scanner.add_signature(Signature::new("test1", PatternType::Unbound, 0, pattern));
@@ -619,7 +619,7 @@ mod tests {
             "msiecf1",
             PatternType::BoundToStart,
             0,
-            "Client UrlCache MMF Ver ".as_bytes(),
+            b"Client UrlCache MMF Ver ",
         ));
         scanner.build().unwrap();
 
@@ -665,15 +665,14 @@ mod tests {
         scan_context.data_offset = 16;
 
         let start_signature: Signature =
-            Signature::new("start", PatternType::BoundToStart, 8, "abcd".as_bytes());
+            Signature::new("start", PatternType::BoundToStart, 8, b"abcd");
         assert_eq!(scan_context.get_signature_match_offset(&start_signature), 8);
 
-        let end_signature: Signature =
-            Signature::new("end", PatternType::BoundToEnd, 32, "abcd".as_bytes());
+        let end_signature: Signature = Signature::new("end", PatternType::BoundToEnd, 32, b"abcd");
         assert_eq!(scan_context.get_signature_match_offset(&end_signature), 96);
 
         let unbound_signature: Signature =
-            Signature::new("unbound", PatternType::Unbound, 0, "abcd".as_bytes());
+            Signature::new("unbound", PatternType::Unbound, 0, b"abcd");
         assert_eq!(
             scan_context.get_signature_match_offset(&unbound_signature),
             16
@@ -683,22 +682,12 @@ mod tests {
     #[test]
     fn test_scan_buffer_with_multiple_matching_unbound_signatures() {
         let mut scanner: Scanner = Scanner::new();
-        scanner.add_signature(Signature::new(
-            "short",
-            PatternType::Unbound,
-            0,
-            "cone".as_bytes(),
-        ));
-        scanner.add_signature(Signature::new(
-            "long",
-            PatternType::Unbound,
-            0,
-            "conectix".as_bytes(),
-        ));
+        scanner.add_signature(Signature::new("short", PatternType::Unbound, 0, b"cone"));
+        scanner.add_signature(Signature::new("long", PatternType::Unbound, 0, b"conectix"));
         scanner.build().unwrap();
 
         let mut data: [u8; 64] = [0; 64];
-        data[16..24].copy_from_slice("conectix".as_bytes());
+        data[16..24].copy_from_slice(b"conectix");
 
         let mut scan_context: ScanContext = ScanContext::new(&scanner, 64);
         scan_context.scan_buffer(&data);
@@ -715,29 +704,29 @@ mod tests {
             "vhd1",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.add_signature(Signature::new(
             "vhd2",
             PatternType::BoundToStart,
             0,
-            "connectx".as_bytes(),
+            b"connectx",
         ));
         scanner.add_signature(Signature::new(
             "vhd3",
             PatternType::BoundToStart,
             0,
-            "conectiz".as_bytes(),
+            b"conectiz",
         ));
         scanner.build().unwrap();
 
-        for (pattern, expected_id) in [
-            ("conectix", "vhd1"),
-            ("connectx", "vhd2"),
-            ("conectiz", "vhd3"),
+        for (pattern, expected_identifier) in [
+            (b"conectix", "vhd1"),
+            (b"connectx", "vhd2"),
+            (b"conectiz", "vhd3"),
         ] {
             let mut data: [u8; 32] = [0; 32];
-            data[0..8].copy_from_slice(pattern.as_bytes());
+            data[0..8].copy_from_slice(pattern);
 
             let mut scan_context: ScanContext = ScanContext::new(&scanner, 32);
             scan_context.scan_buffer(&data);
@@ -745,7 +734,7 @@ mod tests {
             assert_eq!(scan_context.results.len(), 1);
             assert_eq!(
                 scan_context.results.get(&0).unwrap().identifier.as_str(),
-                expected_id
+                expected_identifier
             );
         }
 
@@ -755,24 +744,24 @@ mod tests {
             "vhd1",
             PatternType::BoundToEnd,
             16,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.add_signature(Signature::new(
             "vhd2",
             PatternType::BoundToEnd,
             16,
-            "connectx".as_bytes(),
+            b"connectx",
         ));
         scanner.add_signature(Signature::new(
             "vhd3",
             PatternType::BoundToEnd,
             16,
-            "conectiz".as_bytes(),
+            b"conectiz",
         ));
         scanner.build().unwrap();
 
         let mut data: [u8; 128] = [0; 128];
-        data[112..120].copy_from_slice("conectiz".as_bytes());
+        data[112..120].copy_from_slice(b"conectiz");
 
         let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
         scan_context.scan_buffer(&data[0..64]);
@@ -787,31 +776,16 @@ mod tests {
 
         // Unbound multi-level scan tree with a partial match followed by all three signatures.
         let mut scanner: Scanner = Scanner::new();
-        scanner.add_signature(Signature::new(
-            "u1",
-            PatternType::Unbound,
-            0,
-            "conectix".as_bytes(),
-        ));
-        scanner.add_signature(Signature::new(
-            "u2",
-            PatternType::Unbound,
-            0,
-            "connectx".as_bytes(),
-        ));
-        scanner.add_signature(Signature::new(
-            "u3",
-            PatternType::Unbound,
-            0,
-            "conectiz".as_bytes(),
-        ));
+        scanner.add_signature(Signature::new("u1", PatternType::Unbound, 0, b"conectix"));
+        scanner.add_signature(Signature::new("u2", PatternType::Unbound, 0, b"connectx"));
+        scanner.add_signature(Signature::new("u3", PatternType::Unbound, 0, b"conectiz"));
         scanner.build().unwrap();
 
         let mut data: [u8; 128] = [0; 128];
-        data[0..8].copy_from_slice("coneXXXX".as_bytes());
-        data[24..32].copy_from_slice("conectix".as_bytes());
-        data[48..56].copy_from_slice("connectx".as_bytes());
-        data[72..80].copy_from_slice("conectiz".as_bytes());
+        data[0..8].copy_from_slice(b"coneXXXX");
+        data[24..32].copy_from_slice(b"conectix");
+        data[48..56].copy_from_slice(b"connectx");
+        data[72..80].copy_from_slice(b"conectiz");
 
         let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
         scan_context.scan_buffer(&data);
@@ -839,19 +813,19 @@ mod tests {
             "vhd1",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.add_signature(Signature::new(
             "vhd2",
             PatternType::BoundToStart,
             0,
-            "connectx".as_bytes(),
+            b"connectx",
         ));
         scanner.add_signature(Signature::new(
             "sig16",
             PatternType::BoundToStart,
             16,
-            "12345678".as_bytes(),
+            b"12345678",
         ));
         scanner.build().unwrap();
 
@@ -874,25 +848,25 @@ mod tests {
             "vhd1",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.add_signature(Signature::new(
             "vhd2",
             PatternType::BoundToStart,
             0,
-            "connectx".as_bytes(),
+            b"connectx",
         ));
         scanner.add_signature(Signature::new(
             "sig16",
             PatternType::BoundToStart,
             16,
-            "12345678".as_bytes(),
+            b"12345678",
         ));
         scanner.add_signature(Signature::new(
             "sig32",
             PatternType::BoundToStart,
             32,
-            "abcdefgh".as_bytes(),
+            b"abcdefgh",
         ));
         scanner.build().unwrap();
 

@@ -30,13 +30,11 @@ impl TablesPreprocessor {
         Self {}
     }
 
-    /// Preprocess Markdown tables.
-    fn preprocess_tables(&self, chapter: &mut Chapter) -> Result<String, Error> {
-        let mut options: Options = Options::empty();
-        options.insert(Options::ENABLE_TABLES);
-
-        let chapter_parser: Parser = Parser::new_ext(&chapter.content, options);
-
+    /// Preprocesses Markdown table events.
+    fn preprocess_events<'a>(
+        chapter_events: impl Iterator<Item = Event<'a>>,
+        capacity: usize,
+    ) -> Result<String, Error> {
         let mut events: Vec<Event> = Vec::new();
         let mut in_colspan: bool = false;
         let mut in_table: bool = false;
@@ -44,7 +42,7 @@ impl TablesPreprocessor {
         let mut table_html: Vec<String> = Vec::new();
 
         // Note that html::push_html() as used below will convert table body cells to <th> instead of <td>.
-        let mut chapter_iter = chapter_parser.into_iter().peekable();
+        let mut chapter_iter = chapter_events.peekable();
 
         while let Some(event) = chapter_iter.next() {
             match event {
@@ -137,8 +135,17 @@ impl TablesPreprocessor {
                 events.push(event);
             }
         }
-        let mut markdown_string: String = String::with_capacity(chapter.content.len());
+        let mut markdown_string: String = String::with_capacity(capacity);
         Ok(cmark(events.iter(), &mut markdown_string).map(|_| markdown_string)?)
+    }
+
+    /// Preprocess Markdown tables.
+    fn preprocess_tables(&self, chapter: &mut Chapter) -> Result<String, Error> {
+        let mut options: Options = Options::empty();
+        options.insert(Options::ENABLE_TABLES);
+
+        let chapter_parser: Parser = Parser::new_ext(&chapter.content, options);
+        Self::preprocess_events(chapter_parser, chapter.content.len())
     }
 }
 
@@ -171,9 +178,13 @@ pub fn handle_preprocessing(reader: impl Read) -> Result<String, Error> {
     serde_json::to_string(&processed_book).map_err(Error::msg)
 }
 
-fn main() -> ExitCode {
-    let mut arguments = env::args().skip(1);
-
+/// Runs the preprocessor command with the provided arguments and I/O streams.
+fn run_with_io<I, R, W>(mut arguments: I, reader: R, writer: &mut W) -> ExitCode
+where
+    I: Iterator<Item = String>,
+    R: Read,
+    W: Write,
+{
     match arguments.next().as_deref() {
         Some("supports") => {
             // Supports all renderers.
@@ -185,16 +196,14 @@ fn main() -> ExitCode {
         }
         None => {}
     }
-    let output: String = match handle_preprocessing(stdin()) {
+    let output: String = match handle_preprocessing(reader) {
         Ok(string) => string,
         Err(error) => {
             eprintln!("{}", error);
             return ExitCode::FAILURE;
         }
     };
-    let mut stdout = stdout();
-
-    match stdout.write_all(output.as_bytes()) {
+    match writer.write_all(output.as_bytes()) {
         Ok(_) => {}
         Err(error) => {
             eprintln!("{}", error);
@@ -204,14 +213,79 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
+fn main() -> ExitCode {
+    let mut standard_output = stdout();
+    run_with_io(env::args().skip(1), stdin(), &mut standard_output)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use std::io::{self, ErrorKind};
     use std::path::PathBuf;
 
     use mdbook_preprocessor::book::BookItem;
     use mdbook_preprocessor::config::Config;
+
+    /// Writer that always returns an I/O error.
+    struct FailingWriter {}
+
+    impl Write for FailingWriter {
+        fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
+            Err(io::Error::new(
+                ErrorKind::BrokenPipe,
+                "Simulated write error",
+            ))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// Returns a sample mdBook preprocessor JSON input string.
+    fn get_sample_input() -> &'static str {
+        concat!(
+            "[\n",
+            "    {\n",
+            "        \"root\": \".\",\n",
+            "        \"config\": {},\n",
+            "        \"renderer\": \"html\",\n",
+            "        \"mdbook_version\": \"0.5.2\"\n",
+            "    },\n",
+            "    {\n",
+            "        \"items\": [\n",
+            "            {\n",
+            "                \"Chapter\": {\n",
+            "                    \"name\": \"Characteristics\",\n",
+            "                    \"content\": \"",
+            "### Characteristics\\n\\n",
+            "| Characteristics | Description |\\n",
+            "| --- | --- |\\n| Byte order | big-endian |\\n",
+            "\",\n",
+            "                    \"path\": \"intro.md\",\n",
+            "                    \"sub_items\": [],\n",
+            "                    \"parent_names\": []\n",
+            "                }\n",
+            "            }\n",
+            "        ]\n",
+            "    }\n",
+            "]\n",
+        )
+    }
+
+    #[test]
+    fn test_preprocess_events_with_missing_next_event() {
+        let events: Vec<Event> = vec![
+            Event::Start(Tag::Table(Vec::new())),
+            Event::Start(Tag::TableCell),
+        ];
+        let result: Result<String, Error> =
+            TablesPreprocessor::preprocess_events(events.into_iter(), 0);
+
+        assert!(result.is_err());
+    }
 
     #[test]
     fn test_preprocess_tables() -> Result<(), Error> {
@@ -289,34 +363,29 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_preprocessing() -> Result<(), Error> {
-        let input: &str = concat!(
-            "[\n",
-            "    {\n",
-            "        \"root\": \".\",\n",
-            "        \"config\": {},\n",
-            "        \"renderer\": \"html\",\n",
-            "        \"mdbook_version\": \"0.5.2\"\n",
-            "    },\n",
-            "    {\n",
-            "        \"items\": [\n",
-            "            {\n",
-            "                \"Chapter\": {\n",
-            "                    \"name\": \"Characteristics\",\n",
-            "                    \"content\": \"",
-            "### Characteristics\\n\\n",
-            "| Characteristics | Description |\\n",
-            "| --- | --- |\\n| Byte order | big-endian |\\n",
-            "\",\n",
-            "                    \"path\": \"intro.md\",\n",
-            "                    \"sub_items\": [],\n",
-            "                    \"parent_names\": []\n",
-            "                }\n",
-            "            }\n",
-            "        ]\n",
-            "    }\n",
-            "]\n",
+    fn test_preprocess_tables_with_inline_html() -> Result<(), Error> {
+        let preprocessor: TablesPreprocessor = TablesPreprocessor::new();
+
+        let content: &str = concat!(
+            "| Key | Value |\n",
+            "| --- | --- |\n",
+            "| <b>Name</b> | `test` |\n",
         );
+        let mut chapter: Chapter = Chapter::new("test", content.to_string(), "test.md", vec![]);
+
+        let result: String = preprocessor.preprocess_tables(&mut chapter)?;
+
+        assert!(result.contains("<div class=\"table-wrapper\"><table>"));
+        assert!(result.contains("<b>"));
+        assert!(result.contains("<code>test</code>"));
+        assert!(result.contains("</table></div>"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_handle_preprocessing() -> Result<(), Error> {
+        let input: &str = get_sample_input();
         let result: String = handle_preprocessing(input.as_bytes())?;
         let output: Book = serde_json::from_str(&result)?;
         let mut sections = output.items.iter();
@@ -352,7 +421,7 @@ mod tests {
             PreprocessorContext::new(PathBuf::from("."), Config::default(), "html".to_string());
         let mut book: Book = Book::new();
 
-        let chapter: Chapter = Chapter::new(
+        let mut chapter: Chapter = Chapter::new(
             "Characteristics",
             concat!(
                 "### Characteristics\n",
@@ -363,10 +432,18 @@ mod tests {
                 "| Date and time values | N/A |\n"
             )
             .to_string(),
-            std::path::PathBuf::from("intro.md"),
+            PathBuf::from("intro.md"),
             vec![],
         );
+        let sub_chapter: Chapter = Chapter::new(
+            "Details",
+            "| Key | Value |\n| --- | --- |\n| A | B |\n".to_string(),
+            PathBuf::from("details.md"),
+            vec!["Characteristics".to_string()],
+        );
+        chapter.sub_items.push(BookItem::Chapter(sub_chapter));
         book.push_item(chapter);
+        book.push_item(BookItem::Separator);
 
         let preprocessor: TablesPreprocessor = TablesPreprocessor::new();
         let processed_book: Book = preprocessor.run(&context, book)?;
@@ -389,6 +466,18 @@ mod tests {
             assert_eq!(chapter.name, "Characteristics");
             assert_eq!(chapter.content, expected_content);
         }
+        let sub_book_item: &BookItem = chapters.next().unwrap();
+        if let BookItem::Chapter(sub_chapter) = sub_book_item {
+            assert_eq!(sub_chapter.name, "Details");
+            assert!(
+                sub_chapter
+                    .content
+                    .contains("<tr><td>A</td><td>B</td></tr>")
+            );
+        }
+        let separator_item: &BookItem = chapters.next().unwrap();
+        assert!(matches!(separator_item, BookItem::Separator));
+
         Ok(())
     }
 
@@ -399,5 +488,52 @@ mod tests {
         let result: Result<String, Error> = handle_preprocessing(input.as_bytes());
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_run_with_io() {
+        let mut output: Vec<u8> = Vec::new();
+        let exit_code: ExitCode = run_with_io(
+            vec!["supports".to_string(), "html".to_string()].into_iter(),
+            b"".as_slice(),
+            &mut output,
+        );
+        assert_eq!(exit_code, ExitCode::SUCCESS);
+        assert!(output.is_empty());
+
+        let mut output: Vec<u8> = Vec::new();
+        let exit_code: ExitCode = run_with_io(
+            vec!["unsupported".to_string()].into_iter(),
+            b"".as_slice(),
+            &mut output,
+        );
+        assert_eq!(exit_code, ExitCode::FAILURE);
+
+        let mut output: Vec<u8> = Vec::new();
+        let exit_code: ExitCode = run_with_io(
+            Vec::<String>::new().into_iter(),
+            b"invalid json".as_slice(),
+            &mut output,
+        );
+        assert_eq!(exit_code, ExitCode::FAILURE);
+
+        let sample_input: &str = get_sample_input();
+        let mut output: Vec<u8> = Vec::new();
+        let exit_code: ExitCode = run_with_io(
+            Vec::<String>::new().into_iter(),
+            sample_input.as_bytes(),
+            &mut output,
+        );
+        assert_eq!(exit_code, ExitCode::SUCCESS);
+        let output_string: String = String::from_utf8(output).unwrap();
+        assert!(output_string.contains("<div class=\\\"table-wrapper\\\">"));
+
+        let mut failing_writer: FailingWriter = FailingWriter {};
+        let exit_code: ExitCode = run_with_io(
+            Vec::<String>::new().into_iter(),
+            sample_input.as_bytes(),
+            &mut failing_writer,
+        );
+        assert_eq!(exit_code, ExitCode::FAILURE);
     }
 }

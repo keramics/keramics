@@ -1985,7 +1985,7 @@ mod tests {
             vfs_file_entry.get_extended_attribute_by_index(0)?;
         let expected_name: PathComponent = PathComponent::ByteString(ByteString {
             encoding: CharacterEncoding::Utf8,
-            elements: vec![109, 121, 120, 97, 116, 116, 114, 49],
+            elements: b"myxattr1".to_vec(),
         });
         assert_eq!(extended_attribute.get_name(), expected_name);
 
@@ -2006,7 +2006,7 @@ mod tests {
             .unwrap();
         let expected_name: PathComponent = PathComponent::ByteString(ByteString {
             encoding: CharacterEncoding::Utf8,
-            elements: vec![109, 121, 120, 97, 116, 116, 114, 49],
+            elements: b"myxattr1".to_vec(),
         });
         assert_eq!(extended_attribute.get_name(), expected_name);
 
