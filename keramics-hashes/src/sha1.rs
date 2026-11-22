@@ -28,7 +28,7 @@ const SHA1_BLOCK_SIZE: usize = 64;
 /// SHA-1 initial hash values.
 const SHA1_HASH_VALUES: [u32; 5] = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0];
 
-/// SHA-1 transform step for rounds 0 to 19
+/// SHA-1 transform step for rounds 0 to 19.
 macro_rules! sha1_transform_step1 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $value_32bit:expr) => {
         let initial_hash: u32 = ($block_hash1 & $block_hash2) | (!$block_hash1 & $block_hash3);
@@ -43,7 +43,7 @@ macro_rules! sha1_transform_step1 {
     };
 }
 
-/// SHA-1 transform step for rounds 20 to 39
+/// SHA-1 transform step for rounds 20 to 39.
 macro_rules! sha1_transform_step2 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $value_32bit:expr) => {
         let initial_hash: u32 = $block_hash1 ^ $block_hash2 ^ $block_hash3;
@@ -58,7 +58,7 @@ macro_rules! sha1_transform_step2 {
     };
 }
 
-/// SHA-1 transform step for rounds 40 to 59
+/// SHA-1 transform step for rounds 40 to 59.
 macro_rules! sha1_transform_step3 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $value_32bit:expr) => {
         let initial_hash: u32 = ($block_hash1 & $block_hash2)
@@ -75,7 +75,7 @@ macro_rules! sha1_transform_step3 {
     };
 }
 
-/// SHA-1 transform step for rounds 60 to 79
+/// SHA-1 transform step for rounds 60 to 79.
 macro_rules! sha1_transform_step4 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $value_32bit:expr) => {
         let initial_hash: u32 = $block_hash1 ^ $block_hash2 ^ $block_hash3;
@@ -90,7 +90,7 @@ macro_rules! sha1_transform_step4 {
     };
 }
 
-/// SHA-1 transform step for a group of 5 32-bit values for rounds 0 to 19
+/// SHA-1 transform step for a group of 5 32-bit values for rounds 0 to 19.
 macro_rules! sha1_transform_group_step1 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $values_32bit:expr, $index:expr) => {
         sha1_transform_step1!(
@@ -136,7 +136,7 @@ macro_rules! sha1_transform_group_step1 {
     };
 }
 
-/// SHA-1 transform step for a group of 5 32-bit values for rounds 20 to 39
+/// SHA-1 transform step for a group of 5 32-bit values for rounds 20 to 39.
 macro_rules! sha1_transform_group_step2 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $values_32bit:expr, $index:expr) => {
         sha1_transform_step2!(
@@ -182,7 +182,7 @@ macro_rules! sha1_transform_group_step2 {
     };
 }
 
-/// SHA-1 transform step for a group of 5 32-bit values for rounds 40 to 59
+/// SHA-1 transform step for a group of 5 32-bit values for rounds 40 to 59.
 macro_rules! sha1_transform_group_step3 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $values_32bit:expr, $index:expr) => {
         sha1_transform_step3!(
@@ -228,7 +228,7 @@ macro_rules! sha1_transform_group_step3 {
     };
 }
 
-/// SHA-1 transform step for a group of 5 32-bit values for rounds 60 to 79
+/// SHA-1 transform step for a group of 5 32-bit values for rounds 60 to 79.
 macro_rules! sha1_transform_group_step4 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $block_hash4:expr, $values_32bit:expr, $index:expr) => {
         sha1_transform_step4!(

@@ -374,7 +374,7 @@ impl LinuxLvmVolumeSystem {
         Ok(())
     }
 
-    /// Reads the volume group from the metadata area,
+    /// Reads the volume group from the metadata area.
     fn read_volume_group(
         &mut self,
         data_stream: &DataStreamReference,

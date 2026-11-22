@@ -14,7 +14,7 @@
 use keramics_formats::{Path, PathComponent};
 use keramics_types::Ucs2String;
 
-/// Windows path
+/// Windows path.
 pub struct WindowsPath {}
 
 impl WindowsPath {
@@ -38,7 +38,7 @@ impl WindowsPath {
         }
     }
 
-    /// Converts a [`&str`] containing a Windows path into a [`Path`]
+    /// Converts a [`&str`] containing a Windows path into a [`Path`].
     pub fn from_str(mut string: &str) -> Path {
         let components: Vec<PathComponent> = if string.is_empty() {
             vec![]

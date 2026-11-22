@@ -18,7 +18,7 @@ use keramics_types::bytes_to_u64_be;
 /// SHA-512 block size.
 const SHA512_BLOCK_SIZE: usize = 128;
 
-/// The first 64-bits of the fractional parts of the cube roots of the primes in [2, 409]
+/// The first 64-bits of the fractional parts of the cube roots of the primes in [2, 409].
 #[rustfmt::skip]
 const SHA512_PRIME_CUBE_ROOTS: [u64; 80] = [
     0x428a2f98d728ae22, 0x7137449123ef65cd, 0xb5c0fbcfec4d3b2f, 0xe9b5dba58189dbbc,

@@ -103,7 +103,7 @@ mod tests {
 
         let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
 
-        let _ = data_fork.get_data_stream()?;
+        _ = data_fork.get_data_stream()?;
 
         Ok(())
     }

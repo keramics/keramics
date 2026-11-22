@@ -458,7 +458,7 @@ impl ExtFileEntry {
         if self.inode.file_acl_block_number != 0 {
             let mut attributes_block: ExtAttributesBlock = ExtAttributesBlock::new(0);
 
-            let attributes_block_offset =
+            let attributes_block_offset: u64 =
                 self.inode.file_acl_block_number * (self.inode_table.block_size as u64);
 
             match attributes_block.read_at_position(

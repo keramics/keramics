@@ -88,7 +88,7 @@ impl MbrVolumeSystem {
     /// Reads the master and extended boot records.
     fn read_boot_records(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut boot_signature: [u8; 2] = [0; 2];
-        let mut master_boot_record = MbrMasterBootRecord::new();
+        let mut master_boot_record: MbrMasterBootRecord = MbrMasterBootRecord::new();
 
         match master_boot_record.read_at_position(data_stream, SeekFrom::Start(0)) {
             Ok(_) => {}
@@ -244,7 +244,7 @@ impl MbrVolumeSystem {
                 "More than 1024 partition entries not supported"
             ));
         }
-        let mut extended_boot_record = MbrExtendedBootRecord::new();
+        let mut extended_boot_record: MbrExtendedBootRecord = MbrExtendedBootRecord::new();
 
         match extended_boot_record.read_at_position(data_stream, SeekFrom::Start(offset)) {
             Ok(_) => {}

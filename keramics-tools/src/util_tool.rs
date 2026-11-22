@@ -318,7 +318,7 @@ impl UtilTool {
 }
 
 fn main() -> ExitCode {
-    let arguments = CommandLineArguments::parse();
+    let arguments: CommandLineArguments = CommandLineArguments::parse();
 
     match arguments.source.to_str() {
         Some(value) => value,

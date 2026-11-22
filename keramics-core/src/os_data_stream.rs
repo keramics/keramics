@@ -135,7 +135,7 @@ mod tests {
     fn test_open_os_data_stream() -> Result<(), ErrorTrace> {
         let path_string: String = get_test_data_path("directory/file.txt");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let _ = open_os_data_stream(&path_buf)?;
+        _ = open_os_data_stream(&path_buf)?;
 
         Ok(())
     }

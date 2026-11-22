@@ -81,7 +81,7 @@ const fn generate_forward_table0(forward_sbox: &[u8; 256]) -> [u32; 256] {
     while table_index < 256 {
         let byte_value: u32 = forward_sbox[table_index] as u32;
 
-        let substitution_value = if byte_value & 0x80 == 0 {
+        let substitution_value: u32 = if byte_value & 0x80 == 0 {
             (byte_value << 1) & 0xff
         } else {
             ((byte_value << 1) & 0xff) ^ 0x1b
@@ -136,7 +136,7 @@ const fn generate_reverse_sbox(forward_sbox: &[u8; 256]) -> [u8; 256] {
     reverse_sbox
 }
 
-/// Generates reverse table 0
+/// Generates reverse table 0.
 const fn generate_reverse_table0(
     powers_table: &[u8; 256],
     logs_table: &[u8; 256],
@@ -154,20 +154,20 @@ const fn generate_reverse_table0(
             let log_value: usize = logs_table[substitution_value as usize] as usize;
 
             // GF(2^8) multiplication by 11
-            let value1 = ((logs_table[11] as usize) + log_value) % 255;
-            let power_value1 = powers_table[value1] as u32;
+            let value1: usize = ((logs_table[11] as usize) + log_value) % 255;
+            let power_value1: u32 = powers_table[value1] as u32;
 
             // GF(2^8) multiplication by 13
-            let value2 = ((logs_table[13] as usize) + log_value) % 255;
-            let power_value2 = powers_table[value2] as u32;
+            let value2: usize = ((logs_table[13] as usize) + log_value) % 255;
+            let power_value2: u32 = powers_table[value2] as u32;
 
             // GF(2^8) multiplication by 9
-            let value3 = ((logs_table[9] as usize) + log_value) % 255;
-            let power_value3 = powers_table[value3] as u32;
+            let value3: usize = ((logs_table[9] as usize) + log_value) % 255;
+            let power_value3: u32 = powers_table[value3] as u32;
 
             // GF(2^8) multiplication by 14
-            let value4 = ((logs_table[14] as usize) + log_value) % 255;
-            let power_value4 = powers_table[value4] as u32;
+            let value4: usize = ((logs_table[14] as usize) + log_value) % 255;
+            let power_value4: u32 = powers_table[value4] as u32;
 
             reverse_value ^=
                 (((((power_value1 << 8) | power_value2) << 8) | power_value3) << 8) | power_value4;
@@ -1346,13 +1346,13 @@ impl CryptEcb for AesContext {
     }
 }
 
-/// Context for AES-CBC
+/// Context for AES-CBC.
 pub type AesCbcContext = CbcContext<AesContext, 16>;
 
-/// Context for AES-CCM
+/// Context for AES-CCM.
 pub type AesCcmContext = CcmContext<AesContext>;
 
-/// Context for AES-XTS
+/// Context for AES-XTS.
 pub type AesXtsContext = XtsContext<AesContext, 16>;
 
 #[cfg(test)]

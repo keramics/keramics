@@ -17,5 +17,5 @@ pub(crate) const LINUX_LVM_PHYSICAL_VOLUME_SIGNATURE: &[u8] = b"LABELONE";
 /// Linux Logical Volume Manager (LVM) physical volume label type indicator.
 pub(super) const LINUX_LVM_PHYSICAL_VOLUME_TYPE_INDICATOR: &[u8] = b"LVM2 001";
 
-/// Linux Logical Volume Manager (LVM) metadata area signature,
+/// Linux Logical Volume Manager (LVM) metadata area signature.
 pub(super) const LINUX_LVM_METADATA_AREA_SIGNATURE: &[u8] = b" LVM2 x[5A%r0N*>";

@@ -120,7 +120,7 @@ mod tests {
         let vfs_extended_attribute: VfsExtendedAttribute =
             VfsExtendedAttribute::Apfs(apfs_extended_attribute);
 
-        let _ = vfs_extended_attribute.get_data_stream();
+        _ = vfs_extended_attribute.get_data_stream();
 
         Ok(())
     }
@@ -179,7 +179,7 @@ mod tests {
         let vfs_extended_attribute: VfsExtendedAttribute =
             VfsExtendedAttribute::Ext(ext_extended_attribute);
 
-        let _ = vfs_extended_attribute.get_data_stream();
+        _ = vfs_extended_attribute.get_data_stream();
 
         Ok(())
     }
@@ -238,7 +238,7 @@ mod tests {
         let vfs_extended_attribute: VfsExtendedAttribute =
             VfsExtendedAttribute::Hfs(hfs_extended_attribute);
 
-        let _ = vfs_extended_attribute.get_data_stream();
+        _ = vfs_extended_attribute.get_data_stream();
 
         Ok(())
     }
@@ -296,7 +296,7 @@ mod tests {
         let vfs_extended_attribute: VfsExtendedAttribute =
             VfsExtendedAttribute::Xfs(xfs_extended_attribute);
 
-        let _ = vfs_extended_attribute.get_data_stream();
+        _ = vfs_extended_attribute.get_data_stream();
 
         Ok(())
     }

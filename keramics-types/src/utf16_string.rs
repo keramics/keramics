@@ -58,7 +58,7 @@ impl Utf16CharacterMappings {
 }
 
 impl From<&[(u32, u32)]> for Utf16CharacterMappings {
-    /// Converts a [`&[(u32, u32)]`] into a [`Utf16CharacterMappings`]
+    /// Converts a [`&[(u32, u32)]`] into a [`Utf16CharacterMappings`].
     #[inline(always)]
     fn from(mappings: &[(u32, u32)]) -> Self {
         Self {
@@ -319,7 +319,7 @@ impl Utf16String {
 }
 
 impl From<&[u16]> for Utf16String {
-    /// Converts a [`&[u16]`] into a [`Utf16String`]
+    /// Converts a [`&[u16]`] into a [`Utf16String`].
     fn from(slice: &[u16]) -> Self {
         let elements: &[u16] = match slice.iter().position(|utf16_value| *utf16_value == 0) {
             Some(slice_index) => &slice[0..slice_index],
@@ -332,7 +332,7 @@ impl From<&[u16]> for Utf16String {
 }
 
 impl From<&str> for Utf16String {
-    /// Converts a [`&str`] into a [`Utf16String`]
+    /// Converts a [`&str`] into a [`Utf16String`].
     fn from(string: &str) -> Self {
         Self {
             elements: string.encode_utf16().collect::<Vec<u16>>(),
@@ -341,7 +341,7 @@ impl From<&str> for Utf16String {
 }
 
 impl From<&String> for Utf16String {
-    /// Converts a [`&String`] into a [`Utf16String`]
+    /// Converts a [`&String`] into a [`Utf16String`].
     #[inline(always)]
     fn from(string: &String) -> Self {
         Self::from(string.as_str())
@@ -349,7 +349,7 @@ impl From<&String> for Utf16String {
 }
 
 impl PartialEq<&[u16]> for Utf16String {
-    /// Determines if a [`Utf16String`] is equal to a [`&[u16]`]
+    /// Determines if a [`Utf16String`] is equal to a [`&[u16]`].
     #[inline(always)]
     fn eq(&self, slice: &&[u16]) -> bool {
         self.elements == *slice
@@ -357,7 +357,7 @@ impl PartialEq<&[u16]> for Utf16String {
 }
 
 impl PartialEq<str> for Utf16String {
-    /// Determines if a [`Utf16String`] is equal to a [`str`]
+    /// Determines if a [`Utf16String`] is equal to a [`str`].
     #[inline(always)]
     fn eq(&self, string: &str) -> bool {
         self.elements == string.encode_utf16().collect::<Vec<u16>>()
@@ -365,7 +365,7 @@ impl PartialEq<str> for Utf16String {
 }
 
 impl PartialEq<&str> for Utf16String {
-    /// Determines if a [`Utf16String`] is equal to a [`&str`]
+    /// Determines if a [`Utf16String`] is equal to a [`&str`].
     #[inline(always)]
     fn eq(&self, string: &&str) -> bool {
         Self::eq(self, *string)

@@ -534,7 +534,7 @@ impl InfoTool {
 }
 
 fn main() -> ExitCode {
-    let arguments = CommandLineArguments::parse();
+    let arguments: CommandLineArguments = CommandLineArguments::parse();
 
     // TODO: add option to list supported formats
 

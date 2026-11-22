@@ -31,10 +31,10 @@ use keramics_types::Ucs2String;
 )]
 /// File Allocation Table (FAT) long name directory entry.
 pub struct FatLongNameDirectoryEntry {
-    /// Sequence number
+    /// Sequence number.
     pub sequence_number: u8,
 
-    /// Name
+    /// Name.
     pub name: Ucs2String,
 }
 

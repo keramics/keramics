@@ -80,7 +80,7 @@ impl HfsString {
 }
 
 impl From<&str> for HfsString {
-    /// Converts a [`&str`] into a [`HfsString`]
+    /// Converts a [`&str`] into a [`HfsString`].
     #[inline(always)]
     fn from(string: &str) -> Self {
         Self::Utf16String(Utf16String::from(string))

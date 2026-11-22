@@ -247,7 +247,7 @@ impl<'a> NtfsFileNameInfo<'a> {
 impl<'a> fmt::Display for NtfsFileNameInfo<'a> {
     /// Formats attribute information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        let name_spaces = HashMap::<u8, &'static str>::from([
+        let name_spaces: HashMap<u8, &'static str> = HashMap::from([
             (0, "POSIX"),
             (1, "Windows"),
             (2, "DOS"),

@@ -112,7 +112,7 @@ impl fmt::Display for VfsLocation {
 }
 
 impl From<&str> for VfsLocation {
-    /// Converts a [`&str`] into a [`VfsLocation`]
+    /// Converts a [`&str`] into a [`VfsLocation`].
     #[inline(always)]
     fn from(path_string: &str) -> Self {
         VfsLocation::Base {
@@ -123,7 +123,7 @@ impl From<&str> for VfsLocation {
 }
 
 impl From<&String> for VfsLocation {
-    /// Converts a [`&String`] into a [`VfsLocation`]
+    /// Converts a [`&String`] into a [`VfsLocation`].
     #[inline(always)]
     fn from(path_string: &String) -> Self {
         VfsLocation::Base {
@@ -134,7 +134,7 @@ impl From<&String> for VfsLocation {
 }
 
 impl From<&PathBuf> for VfsLocation {
-    /// Converts a [`&PathBuf`] into a [`VfsLocation`]
+    /// Converts a [`&PathBuf`] into a [`VfsLocation`].
     #[inline(always)]
     fn from(path_buf: &PathBuf) -> Self {
         VfsLocation::Base {

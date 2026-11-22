@@ -26,10 +26,10 @@ pub struct VdiFile {
     /// Data stream.
     data_stream: Option<DataStreamReference>,
 
-    /// Major format version
+    /// Major format version.
     major_format_version: u16,
 
-    /// Minor format version
+    /// Minor format version.
     minor_format_version: u16,
 
     /// Identifier.
@@ -248,8 +248,6 @@ mod tests {
 
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
-        use std::io::SeekFrom;
-
         let file: VdiFile = get_file()?;
 
         let data_stream: DataStreamReference = match file.get_data_stream() {

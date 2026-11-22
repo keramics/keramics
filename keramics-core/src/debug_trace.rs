@@ -112,10 +112,10 @@ impl DebugTrace {
     where
         F: FnOnce(&mut DebugTraceScope) -> Result<R, E>,
     {
-        let mediator = Mediator::current();
+        let mediator: Arc<Mediator> = Mediator::current();
         let debug_output: bool = mediator.debug_output;
 
-        let mut scope = DebugTraceScope {
+        let mut scope: DebugTraceScope = DebugTraceScope {
             mediator: &mediator,
             debug_output,
             output: if debug_output {
@@ -124,7 +124,7 @@ impl DebugTrace {
                 String::new()
             },
         };
-        let result = function(&mut scope);
+        let result: Result<R, E> = function(&mut scope);
 
         if debug_output && !scope.output.is_empty() {
             scope.mediator.debug_print(scope.output);
@@ -138,10 +138,10 @@ impl DebugTrace {
     where
         F: FnOnce(&DebugTraceStaticScope),
     {
-        let mediator = Mediator::current();
+        let mediator: Arc<Mediator> = Mediator::current();
 
         if mediator.debug_output {
-            let scope = DebugTraceStaticScope {
+            let scope: DebugTraceStaticScope = DebugTraceStaticScope {
                 mediator: &mediator,
             };
             function(&scope);
@@ -460,7 +460,7 @@ mod tests {
 
         let result: u64 = DebugTrace::scope(
             |scope: &mut DebugTraceScope<'_>| -> Result<u64, ErrorTrace> {
-                let _ = scope;
+                _ = scope;
                 Ok(0)
             },
         )?;

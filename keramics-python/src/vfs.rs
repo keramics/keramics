@@ -793,7 +793,7 @@ pub enum PyVfsType {
 }
 
 impl From<&PyVfsType> for VfsType {
-    /// Converts an [`&PyVfsType`] into a [`VfsType`]
+    /// Converts an [`&PyVfsType`] into a [`VfsType`].
     #[inline(always)]
     fn from(vfs_type: &PyVfsType) -> Self {
         match vfs_type {

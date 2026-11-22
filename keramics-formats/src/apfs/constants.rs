@@ -1461,7 +1461,7 @@ pub const APFS_UTF16_CASE_MAPPINGS: [(u32, u32); 1416] = [
     (0x0001e921, 0x0001e943),
 ];
 
-/// APFS file mode types
+/// APFS file mode types.
 pub const APFS_FILE_MODE_TYPE_FIFO: u16 = 0x1000;
 pub const APFS_FILE_MODE_TYPE_CHARACTER_DEVICE: u16 = 0x2000;
 pub const APFS_FILE_MODE_TYPE_DIRECTORY: u16 = 0x4000;

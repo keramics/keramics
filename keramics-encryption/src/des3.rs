@@ -493,7 +493,7 @@ impl CryptCbc for Des3Context {
     }
 }
 
-/// Context for DES3-CBC
+/// Context for DES3-CBC.
 pub type Des3CbcContext = CbcContext<Des3Context, 8>;
 
 #[cfg(test)]

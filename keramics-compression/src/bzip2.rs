@@ -29,7 +29,7 @@ use super::traits::Bitstream;
 /// Bzip2 data header signature.
 const BZIP2_DATA_HEADER_SIGNATURE: &[u8] = b"BZ";
 
-/// Bzip2 block size;
+/// Bzip2 block size.
 const BZIP2_BLOCK_SIZE: usize = 100000;
 
 /// Bitstream for bzip2 compressed data.
@@ -714,7 +714,7 @@ impl Bzip2Context {
         Ok(symbol_index + 2)
     }
 
-    /// Performs a Burrows-Wheeler transform
+    /// Performs a Burrows-Wheeler transform.
     fn reverse_burrows_wheeler_transform(
         &self,
         block_data: &[u8],

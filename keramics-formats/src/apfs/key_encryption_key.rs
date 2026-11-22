@@ -19,7 +19,7 @@ use super::wrapped_kek::ApfsWrappedKek;
 
 /// Apple File System (APFS) key encryption key (KEK).
 pub struct ApfsKeyEncryptionKey {
-    /// HMAC
+    /// HMAC.
     pub hmac: Vec<u8>,
 
     /// Wrapped KEK.

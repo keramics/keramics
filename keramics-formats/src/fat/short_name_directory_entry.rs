@@ -25,7 +25,7 @@ use super::short_name_directory_entry_fat32::Fat32ShortNameDirectoryEntry;
 #[derive(Clone)]
 /// File Allocation Table (FAT) short name directory entry.
 pub struct FatShortNameDirectoryEntry {
-    /// Name
+    /// Name.
     pub name: ByteString,
 
     /// File attribute flags.

@@ -95,7 +95,7 @@ impl VfsScanOptions {
                 return Err(keramics_core::error_trace_new!("Unsupported option: none"));
             }
             _ => {
-                let mut elements = Vec::new();
+                let mut elements: Vec<VfsScanOptionElement> = Vec::new();
 
                 for string_value in lowercase_string.split(',') {
                     let element: VfsScanOptionElement = match string_value.find("..") {

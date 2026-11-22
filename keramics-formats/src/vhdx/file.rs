@@ -63,7 +63,7 @@ pub struct VhdxFile {
     /// Block allocation table size.
     block_allocation_table_size: u32,
 
-    /// Number of entries per chunk;
+    /// Number of entries per chunk.
     entries_per_chunk: u64,
 
     /// Sector bitmap size.
@@ -144,7 +144,7 @@ impl VhdxFile {
         self.media_size
     }
 
-    /// Retrieves the parent file name
+    /// Retrieves the parent file name.
     pub fn get_parent_file_name(&self) -> Option<Ucs2String> {
         match &self.parent_name {
             Some(parent_name) => {

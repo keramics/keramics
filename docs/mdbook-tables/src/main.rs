@@ -12,7 +12,7 @@
  */
 
 use std::env;
-use std::io::{Read, Write, stdin, stdout};
+use std::io::{Read, Stdout, Write, stdin, stdout};
 use std::iter;
 use std::process::ExitCode;
 

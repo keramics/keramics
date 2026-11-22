@@ -43,10 +43,10 @@ pub struct DisplayPath {
     /// Character translation table.
     pub translation_table: HashMap<u32, &'static str>,
 
-    /// Volume or partition path type
+    /// Volume or partition path type.
     volume_path_type: DisplayPathType,
 
-    /// Output format
+    /// Output format.
     output_format: OutputFormat,
 }
 
@@ -512,7 +512,7 @@ mod tests {
 
     #[test]
     fn test_get_character_translation_table() {
-        let _ = DisplayPath::get_character_translation_table();
+        _ = DisplayPath::get_character_translation_table();
     }
 
     #[test]

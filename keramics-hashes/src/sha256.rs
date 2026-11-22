@@ -18,7 +18,7 @@
 use super::internal_sha256::InternalSha256Context;
 use super::traits::DigestHashContext;
 
-/// The first 32-bits of the fractional parts of the square roots of the primes in [2, 19]
+/// The first 32-bits of the fractional parts of the square roots of the primes in [2, 19].
 const SHA256_PRIME_SQUARE_ROOTS: [u32; 8] = [
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
 ];

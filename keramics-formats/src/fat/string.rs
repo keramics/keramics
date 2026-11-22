@@ -26,7 +26,7 @@ pub enum FatString {
 }
 
 impl From<&str> for FatString {
-    /// Converts a [`&str`] into a [`FatString`]
+    /// Converts a [`&str`] into a [`FatString`].
     #[inline(always)]
     fn from(string: &str) -> Self {
         Self::Ucs2String(Ucs2String::from(string))

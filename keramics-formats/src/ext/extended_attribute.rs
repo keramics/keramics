@@ -64,7 +64,7 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
         let test_struct: ExtExtendedAttribute = ExtExtendedAttribute::new(&test_name, data_stream);
 
-        let _ = test_struct.get_data_stream();
+        _ = test_struct.get_data_stream();
     }
 
     #[test]

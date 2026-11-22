@@ -21,6 +21,7 @@ use super::scan_tree_node::ScanTreeNode;
 use super::signature::Signature;
 use super::signature_table::SignatureTable;
 use super::skip_table::SkipTable;
+#[cfg(test)]
 use crate::scan_result::ScanResult;
 
 /// Signature scan tree.
@@ -102,7 +103,8 @@ impl ScanTree {
     }
 
     /// Scans a buffer for a matching scan object.
-    #[allow(dead_code)]
+    // Used for testing.
+    #[cfg(test)]
     pub(super) fn scan_buffer(
         &self,
         data_offset: u64,

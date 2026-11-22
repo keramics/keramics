@@ -13,7 +13,7 @@
 
 use keramics_datetime::DateTime;
 
-/// Copy in and out (CPIO) file record
+/// Copy in and out (CPIO) file record.
 pub struct CpioFileRecord {
     /// Inode number.
     pub inode_number: u32,
@@ -45,7 +45,7 @@ pub struct CpioFileRecord {
     /// Data size.
     pub data_size: u32,
 
-    /// Checksum
+    /// Checksum.
     pub checksum: u32,
 }
 

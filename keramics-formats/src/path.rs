@@ -184,7 +184,7 @@ impl Path {
 }
 
 impl From<&ByteString> for Path {
-    /// Converts a [`&ByteString`] into a [`Path`]
+    /// Converts a [`&ByteString`] into a [`Path`].
     fn from(byte_string: &ByteString) -> Self {
         let components: Vec<PathComponent> = if byte_string.is_empty() {
             vec![]
@@ -227,7 +227,7 @@ impl From<&ByteString> for Path {
 }
 
 impl From<&PathBuf> for Path {
-    /// Converts a [`&PathBuf`] into a [`Path`]
+    /// Converts a [`&PathBuf`] into a [`Path`].
     #[inline(always)]
     fn from(path_buf: &PathBuf) -> Self {
         let mut components: Vec<PathComponent> = Vec::new();
@@ -267,7 +267,7 @@ impl From<&PathBuf> for Path {
 }
 
 impl From<&str> for Path {
-    /// Converts a [`&str`] into a [`Path`]
+    /// Converts a [`&str`] into a [`Path`].
     fn from(string: &str) -> Self {
         let components: Vec<PathComponent> = if string.is_empty() {
             vec![]
@@ -309,7 +309,7 @@ impl From<&str> for Path {
 }
 
 impl From<&String> for Path {
-    /// Converts a [`&String`] into a [`Path`]
+    /// Converts a [`&String`] into a [`Path`].
     #[inline(always)]
     fn from(string: &String) -> Self {
         Self::from(string.as_str())
@@ -317,7 +317,7 @@ impl From<&String> for Path {
 }
 
 impl From<&[&str]> for Path {
-    /// Converts a [`&[&str]`] into a [`Path`]
+    /// Converts a [`&[&str]`] into a [`Path`].
     #[inline]
     fn from(strings: &[&str]) -> Self {
         let mut components: Vec<PathComponent> = Vec::new();
@@ -353,7 +353,7 @@ impl From<&[&str]> for Path {
 }
 
 impl From<&[String]> for Path {
-    /// Converts a [`&[String]`] into a [`Path`]
+    /// Converts a [`&[String]`] into a [`Path`].
     #[inline]
     fn from(strings: &[String]) -> Self {
         let mut components: Vec<PathComponent> = Vec::new();
@@ -389,7 +389,7 @@ impl From<&[String]> for Path {
 }
 
 impl From<&[PathComponent]> for Path {
-    /// Converts a [`Vec<PathComponent>`] into a [`Path`]
+    /// Converts a [`Vec<PathComponent>`] into a [`Path`].
     #[inline]
     fn from(path_components: &[PathComponent]) -> Self {
         Self::from(path_components.to_vec())
@@ -397,7 +397,7 @@ impl From<&[PathComponent]> for Path {
 }
 
 impl From<Vec<PathComponent>> for Path {
-    /// Converts a [`Vec<PathComponent>`] into a [`Path`]
+    /// Converts a [`Vec<PathComponent>`] into a [`Path`].
     #[inline]
     fn from(path_components: Vec<PathComponent>) -> Self {
         Self {
@@ -407,7 +407,7 @@ impl From<Vec<PathComponent>> for Path {
 }
 
 impl From<&Ucs2String> for Path {
-    /// Converts a [`&Ucs2String`] into a [`Path`]
+    /// Converts a [`&Ucs2String`] into a [`Path`].
     fn from(ucs2_string: &Ucs2String) -> Self {
         let components: Vec<PathComponent> = if ucs2_string.is_empty() {
             vec![]
@@ -450,7 +450,7 @@ impl From<&Ucs2String> for Path {
 }
 
 impl From<&Utf16String> for Path {
-    /// Converts a [`&Utf16String`] into a [`Path`]
+    /// Converts a [`&Utf16String`] into a [`Path`].
     fn from(utf16_string: &Utf16String) -> Self {
         let components: Vec<PathComponent> = if utf16_string.is_empty() {
             vec![]

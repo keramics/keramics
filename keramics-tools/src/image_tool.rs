@@ -1034,7 +1034,7 @@ impl ImageTool {
 }
 
 fn main() -> ExitCode {
-    let arguments = CommandLineArguments::parse();
+    let arguments: CommandLineArguments = CommandLineArguments::parse();
 
     let source_string: &str = match arguments.source.to_str() {
         Some(value) => value,
@@ -1288,7 +1288,7 @@ fn main() -> ExitCode {
 
             match data_stream.write() {
                 Ok(mut data_stream) => loop {
-                    let read_count = match data_stream.read(&mut data) {
+                    let read_count: usize = match data_stream.read(&mut data) {
                         Ok(read_count) => read_count,
                         Err(error) => {
                             println!(

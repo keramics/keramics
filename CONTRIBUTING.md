@@ -172,8 +172,7 @@ This project uses [mdBook](https://rust-lang.github.io/mdBook) and therefore req
 
 **Code style.**
 
-More details will be added at a later date but for now write your code closest to English natural
-language, for an international audience, as possible.
+See [STYLE_GUIDE.md](STYLE_GUIDE.md)
 
 ## Submitting a Pull Request (PR)
 

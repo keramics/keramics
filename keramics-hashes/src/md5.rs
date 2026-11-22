@@ -51,14 +51,14 @@ const MD5_BIT_SHIFTS: [u32; 64] = [
 /// [0, 15] => index
 /// [16, 31] => ( ( 5 x index ) + 1 ) mod 16
 /// [32, 47] => ( ( 3 x index ) + 5 ) mod 16
-/// [48, 63] => ( 7 x index ) mod 16
+/// [48, 63] => ( 7 x index ) mod 16.
 const MD5_VALUES_32BIT_INDEX: [usize; 64] = [
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 1, 6, 11, 0, 5, 10, 15, 4, 9, 14, 3, 8,
     13, 2, 7, 12, 5, 8, 11, 14, 1, 4, 7, 10, 13, 0, 3, 6, 9, 12, 15, 2, 0, 7, 14, 5, 12, 3, 10, 1,
     8, 15, 6, 13, 4, 11, 2, 9,
 ];
 
-/// MD5 transform step for rounds 0 to 15
+/// MD5 transform step for rounds 0 to 15.
 macro_rules! md5_transform_step1 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
         let initial_hash: u32 = ($block_hash1 & $block_hash2) | (!$block_hash1 & $block_hash3);
@@ -73,7 +73,7 @@ macro_rules! md5_transform_step1 {
     };
 }
 
-/// MD5 transform step for rounds 16 to 31
+/// MD5 transform step for rounds 16 to 31.
 macro_rules! md5_transform_step2 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
         let initial_hash: u32 = ($block_hash1 & $block_hash3) | ($block_hash2 & !$block_hash3);
@@ -88,7 +88,7 @@ macro_rules! md5_transform_step2 {
     };
 }
 
-/// MD5 transform step for rounds 32 to 47
+/// MD5 transform step for rounds 32 to 47.
 macro_rules! md5_transform_step3 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
         let initial_hash: u32 = $block_hash1 ^ $block_hash2 ^ $block_hash3;
@@ -103,7 +103,7 @@ macro_rules! md5_transform_step3 {
     };
 }
 
-/// MD5 transform step for rounds 48 to 63
+/// MD5 transform step for rounds 48 to 63.
 macro_rules! md5_transform_step4 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
         let initial_hash: u32 = $block_hash2 ^ ($block_hash1 | !$block_hash3);
@@ -118,7 +118,7 @@ macro_rules! md5_transform_step4 {
     };
 }
 
-/// MD5 transform step for a group of 4 32-bit values for rounds 0 to 15
+/// MD5 transform step for a group of 4 32-bit values for rounds 0 to 15.
 macro_rules! md5_transform_group_step1 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
         md5_transform_step1!(
@@ -156,7 +156,7 @@ macro_rules! md5_transform_group_step1 {
     };
 }
 
-/// MD5 transform step for a group of 4 32-bit values for rounds 16 to 31
+/// MD5 transform step for a group of 4 32-bit values for rounds 16 to 31.
 macro_rules! md5_transform_group_step2 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
         md5_transform_step2!(
@@ -194,7 +194,7 @@ macro_rules! md5_transform_group_step2 {
     };
 }
 
-/// MD5 transform step for a group of 4 32-bit values for rounds 32 to 47
+/// MD5 transform step for a group of 4 32-bit values for rounds 32 to 47.
 macro_rules! md5_transform_group_step3 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
         md5_transform_step3!(
@@ -232,7 +232,7 @@ macro_rules! md5_transform_group_step3 {
     };
 }
 
-/// MD5 transform step for a group of 4 32-bit values for rounds 48 to 63
+/// MD5 transform step for a group of 4 32-bit values for rounds 48 to 63.
 macro_rules! md5_transform_group_step4 {
     ($block_hash0:expr, $block_hash1:expr, $block_hash2:expr, $block_hash3:expr, $values_32bit:expr, $index:expr) => {
         md5_transform_step4!(

@@ -94,7 +94,7 @@ mod tests {
         let data_stream: DataStreamReference = ext_file_entry.get_data_stream()?.unwrap();
         let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
 
-        let _ = vfs_data_fork.get_data_stream()?;
+        _ = vfs_data_fork.get_data_stream()?;
 
         Ok(())
     }
@@ -145,7 +145,7 @@ mod tests {
         let hfs_fork: HfsFork = hfs_file_entry.get_data_fork()?.unwrap();
         let vfs_data_fork: VfsDataFork = VfsDataFork::Hfs(hfs_fork);
 
-        let _ = vfs_data_fork.get_data_stream()?;
+        _ = vfs_data_fork.get_data_stream()?;
 
         Ok(())
     }
@@ -202,7 +202,7 @@ mod tests {
         let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
         let vfs_data_fork: VfsDataFork = VfsDataFork::Ntfs(data_fork);
 
-        let _ = vfs_data_fork.get_data_stream()?;
+        _ = vfs_data_fork.get_data_stream()?;
 
         Ok(())
     }
