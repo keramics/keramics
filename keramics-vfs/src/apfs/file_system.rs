@@ -318,6 +318,27 @@ mod tests {
             apfs_file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_none());
 
+        assert!(
+            apfs_file_system
+                .get_file_entry_by_path(&Path::from("apfs1"))?
+                .is_none()
+        );
+        assert!(
+            apfs_file_system
+                .get_file_entry_by_path(&Path::from("/apfs1/bogus"))?
+                .is_none()
+        );
+        assert!(
+            apfs_file_system
+                .get_file_entry_by_path(&Path::from("/apfs99"))?
+                .is_none()
+        );
+        assert!(
+            apfs_file_system
+                .get_file_entry_by_path(&Path::from(""))?
+                .is_none()
+        );
+
         Ok(())
     }
 
@@ -346,8 +367,38 @@ mod tests {
 
         assert_eq!(apfs_file_system.number_of_volumes, 1);
 
+        // Test error cases: missing parent, missing data stream, invalid data, and shared Arc.
+        let mut test_file_system: ApfsContainerFileSystem = ApfsContainerFileSystem::new();
+        let result: Result<(), ErrorTrace> = test_file_system.open(None, &parent_vfs_location);
+        assert!(result.is_err());
+
+        let missing_path: String = get_test_data_path("directory/bogus.txt");
+        let missing_location: VfsLocation = VfsLocation::from(&missing_path);
+        let result: Result<(), ErrorTrace> =
+            test_file_system.open(Some(&parent_file_system), &missing_location);
+        assert!(result.is_err());
+
+        let text_path: String = get_test_data_path("directory/file.txt");
+        let text_location: VfsLocation = VfsLocation::from(&text_path);
+        let result: Result<(), ErrorTrace> =
+            test_file_system.open(Some(&parent_file_system), &text_location);
+        assert!(result.is_err());
+
+        let _root_entry: ApfsContainerFileEntry = apfs_file_system.get_root_file_entry();
+        let result: Result<(), ErrorTrace> =
+            apfs_file_system.open(Some(&parent_file_system), &parent_vfs_location);
+        assert!(result.is_err());
+
+        // Test opening an encrypted APFS container volume.
+        let mut encrypted_file_system: ApfsContainerFileSystem = ApfsContainerFileSystem::new();
+        let encrypted_path: String = get_test_data_path("apfs/apfs_encrypted.raw");
+        let encrypted_location: VfsLocation = VfsLocation::from(&encrypted_path);
+        encrypted_file_system.open(Some(&parent_file_system), &encrypted_location)?;
+        let path: Path = Path::from("/apfs1");
+        let result: Option<ApfsContainerFileEntry> =
+            encrypted_file_system.get_file_entry_by_path(&path)?;
+        assert!(result.is_some());
+
         Ok(())
     }
-
-    // TODO: add tests for open_container
 }

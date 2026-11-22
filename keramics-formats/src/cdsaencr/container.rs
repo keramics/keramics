@@ -69,6 +69,9 @@ pub struct CdsaEncrContainer {
     /// Encryption context.
     pub(crate) encryption_context: Option<CdsaEncrEncryptionContext>,
 
+    /// Unlocked key data (block key followed by HMAC key).
+    key_data: Vec<u8>,
+
     /// Value to indicate the container is locked.
     is_locked: bool,
 
@@ -92,6 +95,7 @@ impl CdsaEncrContainer {
             hmac_key_size: 0,
             key_protectors: Vec::new(),
             encryption_context: None,
+            key_data: Vec::new(),
             is_locked: true,
             size: 0,
         }
@@ -134,6 +138,15 @@ impl CdsaEncrContainer {
     /// Retrieves the format version.
     pub fn get_format_version(&self) -> u32 {
         self.format_version
+    }
+
+    /// Retrieves the unlocked key data.
+    pub fn get_key_data(&self) -> Option<&[u8]> {
+        if self.is_locked || self.key_data.is_empty() {
+            None
+        } else {
+            Some(&self.key_data)
+        }
     }
 
     /// Determines if the container is locked.
@@ -498,10 +511,15 @@ impl CdsaEncrContainer {
                         return Err(error);
                     }
                 };
+            let mut key_data: Vec<u8> = Vec::with_capacity(block_key.len() + hmac_key.len());
+            key_data.extend_from_slice(&block_key);
+            key_data.extend_from_slice(&hmac_key);
+
             self.encryption_context = Some(CdsaEncrEncryptionContext {
                 cipher_context,
                 hmac_context,
             });
+            self.key_data = key_data;
             self.is_locked = false;
         }
         Ok(!self.is_locked)
@@ -642,12 +660,27 @@ mod tests {
         container.read_data_stream(&data_stream)?;
 
         assert_eq!(container.is_locked, true);
+        assert!(container.get_key_data().is_none());
 
         let credentials: Vec<CdsaEncrCredential> =
             vec![CdsaEncrCredential::Passphrase(b"KeRaMiCs".to_vec())];
         container.unlock(&credentials)?;
 
         assert_eq!(container.is_locked, false);
+
+        let key_data: Vec<u8> = container.get_key_data().unwrap().to_vec();
+        let identifier: Vec<u8> = container.get_container_identifier().to_be_bytes().to_vec();
+
+        // Verify the unlocked key data can unlock a new container without key derivation.
+        let mut second_container: CdsaEncrContainer = CdsaEncrContainer::new();
+        second_container.read_data_stream(&data_stream)?;
+
+        let key_data_credentials: Vec<CdsaEncrCredential> = vec![CdsaEncrCredential::KeyData {
+            identifier,
+            data: key_data,
+        }];
+        second_container.unlock(&key_data_credentials)?;
+        assert_eq!(second_container.is_locked, false);
 
         Ok(())
     }

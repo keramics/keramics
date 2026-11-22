@@ -63,26 +63,60 @@ impl BdeBlockReader {
         }
     }
 
+    /// Reads a partial or cached single sector into the output buffer.
+    fn read_cached_sector(
+        &mut self,
+        sector_number: u64,
+        sector_physical_offset: u64,
+        sector_data_offset: usize,
+        output: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        if !self.sector_cache.contains(&sector_number) {
+            let sector_data: Vec<u8> = match self.read_sector(sector_number, sector_physical_offset)
+            {
+                Ok(data) => data,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to read sector: {}", sector_number)
+                    );
+                    return Err(error);
+                }
+            };
+            self.sector_cache.insert(sector_number, sector_data);
+        }
+        let sector_data: &[u8] = match self.sector_cache.get(&sector_number) {
+            Some(data) => data,
+            None => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unable to retrieve sector: {} from cache",
+                    sector_number
+                )));
+            }
+        };
+        let sector_data_end_offset: usize = sector_data_offset + output.len();
+        output.copy_from_slice(&sector_data[sector_data_offset..sector_data_end_offset]);
+
+        Ok(())
+    }
+
     /// Reads and decrypts a sector.
     fn read_sector(
         &mut self,
         sector_number: u64,
         sector_physical_offset: u64,
     ) -> Result<Vec<u8>, ErrorTrace> {
-        let mut encrypted_data: Vec<u8> = vec![0; self.bytes_per_sector as usize];
+        let mut sector_data: Vec<u8> = vec![0; self.bytes_per_sector as usize];
 
         keramics_core::data_stream_read_exact_at_position!(
             &self.data_stream,
-            &mut encrypted_data,
+            &mut sector_data,
             SeekFrom::Start(sector_physical_offset)
         );
-        let mut sector_data: Vec<u8> = vec![0; self.bytes_per_sector as usize];
-
-        match self.encryption_context.decrypt_sector(
-            sector_physical_offset,
-            &encrypted_data,
-            &mut sector_data,
-        ) {
+        match self
+            .encryption_context
+            .decrypt_sector(sector_physical_offset, &mut sector_data)
+        {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -154,58 +188,123 @@ impl BlockReader for BdeBlockReader {
 
             match block_range.range_type {
                 BdeBlockRangeType::Encrypted => {
+                    let sector_size: usize = self.bytes_per_sector as usize;
                     let range_data_end_offset: usize = data_offset + range_read_size;
 
-                    let mut sector_number: u64 = current_offset / (self.bytes_per_sector as u64);
-                    let sector_logical_offset: u64 = sector_number * (self.bytes_per_sector as u64);
-                    let mut sector_data_offset: usize =
+                    let mut sector_number: u64 = current_offset / (sector_size as u64);
+                    let sector_logical_offset: u64 = sector_number * (sector_size as u64);
+                    let sector_data_offset: usize =
                         (current_offset - sector_logical_offset) as usize;
 
                     let mut sector_physical_offset: u64 = (block_range.physical_offset
                         + range_relative_offset)
                         - (sector_data_offset as u64);
-                    let mut sector_remainder_size: usize =
-                        (self.bytes_per_sector as usize) - sector_data_offset;
 
-                    while data_offset < range_data_end_offset {
-                        if !self.sector_cache.contains(&sector_number) {
-                            let sector_data: Vec<u8> =
-                                match self.read_sector(sector_number, sector_physical_offset) {
-                                    Ok(data) => data,
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            format!("Unable to read sector: {}", sector_number)
-                                        );
-                                        return Err(error);
-                                    }
-                                };
-                            self.sector_cache.insert(sector_number, sector_data);
-                        }
-                        let sector_data: &[u8] = match self.sector_cache.get(&sector_number) {
-                            Some(data) => data,
-                            None => {
-                                return Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to retrieve sector: {} from cache",
-                                    sector_number
-                                )));
-                            }
-                        };
+                    // Handle a leading unaligned partial sector via the sector cache.
+                    if sector_data_offset > 0 {
+                        let sector_remainder_size: usize = sector_size - sector_data_offset;
                         let sector_read_size: usize =
-                            min(read_size - data_offset, sector_remainder_size);
-
+                            min(range_data_end_offset - data_offset, sector_remainder_size);
                         let data_end_offset: usize = data_offset + sector_read_size;
-                        let sector_data_end_offset: usize = sector_data_offset + sector_read_size;
 
-                        data[data_offset..data_end_offset].copy_from_slice(
-                            &sector_data[sector_data_offset..sector_data_end_offset],
-                        );
+                        match self.read_cached_sector(
+                            sector_number,
+                            sector_physical_offset,
+                            sector_data_offset,
+                            &mut data[data_offset..data_end_offset],
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!("Unable to read cached sector: {}", sector_number)
+                                );
+                                return Err(error);
+                            }
+                        }
                         data_offset = data_end_offset;
                         current_offset += sector_read_size as u64;
                         sector_number += 1;
-                        sector_physical_offset += self.bytes_per_sector as u64;
-                        sector_data_offset = 0;
-                        sector_remainder_size = self.bytes_per_sector as usize;
+                        sector_physical_offset += sector_size as u64;
+                    }
+                    // Batch-read and decrypt contiguous full sectors directly into the output buffer.
+                    let remaining_range_size: usize = range_data_end_offset - data_offset;
+                    let full_sectors_count: usize = remaining_range_size / sector_size;
+
+                    if full_sectors_count > 1 {
+                        let full_sectors_size: usize = full_sectors_count * sector_size;
+                        let data_end_offset: usize = data_offset + full_sectors_size;
+
+                        keramics_core::data_stream_read_exact_at_position!(
+                            &self.data_stream,
+                            &mut data[data_offset..data_end_offset],
+                            SeekFrom::Start(sector_physical_offset)
+                        );
+                        match self.encryption_context.decrypt_sectors_in_place(
+                            sector_physical_offset,
+                            &mut data[data_offset..data_end_offset],
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable to decrypt sectors starting at: {}",
+                                        sector_number
+                                    )
+                                );
+                                return Err(error);
+                            }
+                        }
+                        data_offset = data_end_offset;
+                        current_offset += full_sectors_size as u64;
+                        sector_number += full_sectors_count as u64;
+                        sector_physical_offset += full_sectors_size as u64;
+                    } else if full_sectors_count == 1 {
+                        let data_end_offset: usize = data_offset + sector_size;
+
+                        match self.read_cached_sector(
+                            sector_number,
+                            sector_physical_offset,
+                            0,
+                            &mut data[data_offset..data_end_offset],
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!("Unable to read cached sector: {}", sector_number)
+                                );
+                                return Err(error);
+                            }
+                        }
+                        data_offset = data_end_offset;
+                        current_offset += sector_size as u64;
+                        sector_number += 1;
+                        sector_physical_offset += sector_size as u64;
+                    }
+                    // Handle a trailing partial sector via the sector cache.
+                    if data_offset < range_data_end_offset {
+                        let sector_read_size: usize = range_data_end_offset - data_offset;
+                        let data_end_offset: usize = range_data_end_offset;
+
+                        match self.read_cached_sector(
+                            sector_number,
+                            sector_physical_offset,
+                            0,
+                            &mut data[data_offset..data_end_offset],
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!("Unable to read cached sector: {}", sector_number)
+                                );
+                                return Err(error);
+                            }
+                        }
+                        data_offset = data_end_offset;
+                        current_offset += sector_read_size as u64;
                     }
                 }
                 BdeBlockRangeType::InFile => {

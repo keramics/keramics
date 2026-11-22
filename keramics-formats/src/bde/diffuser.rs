@@ -12,6 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
+use keramics_types::bytes_to_u32_le;
 
 /// BitLocker Drive Encryption (BDE) diffuser.
 pub struct BdeDiffuser {}
@@ -19,23 +20,46 @@ pub struct BdeDiffuser {}
 impl BdeDiffuser {
     /// Decrypts the data using Diffuser-A and B.
     pub fn decrypt(data: &mut [u8]) -> Result<(), ErrorTrace> {
-        let data_size = data.len();
+        let data_size: usize = data.len();
 
         if data_size < 32 || !data_size.is_multiple_of(4) {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        let mut values_32bit: Vec<u32> = data
-            .chunks_exact(4)
-            .map(|chunk| u32::from_le_bytes(chunk.try_into().unwrap()))
-            .collect();
+        let number_of_values: usize = data_size / 4;
 
-        Self::decrypt_b(&mut values_32bit);
-        Self::decrypt_a(&mut values_32bit);
+        if number_of_values <= 1024 {
+            let mut values_32bit: [u32; 1024] = [0; 1024];
+            let values_slice: &mut [u32] = &mut values_32bit[0..number_of_values];
 
-        data.chunks_exact_mut(4)
-            .zip(values_32bit.iter())
-            .for_each(|(chunk, &value_32bit)| chunk.copy_from_slice(&value_32bit.to_le_bytes()));
+            let mut data_offset: usize = 0;
+            for value_32bit in values_slice.iter_mut() {
+                *value_32bit = bytes_to_u32_le!(data, data_offset);
+                data_offset += 4;
+            }
+            Self::decrypt_b(values_slice);
+            Self::decrypt_a(values_slice);
 
+            let mut data_offset: usize = 0;
+            for value_32bit in values_slice.iter() {
+                data[data_offset..data_offset + 4].copy_from_slice(&value_32bit.to_le_bytes());
+                data_offset += 4;
+            }
+        } else {
+            let mut values_32bit: Vec<u32> = Vec::with_capacity(number_of_values);
+            let mut data_offset: usize = 0;
+            while data_offset < data_size {
+                values_32bit.push(bytes_to_u32_le!(data, data_offset));
+                data_offset += 4;
+            }
+            Self::decrypt_b(&mut values_32bit);
+            Self::decrypt_a(&mut values_32bit);
+
+            let mut data_offset: usize = 0;
+            for value_32bit in values_32bit.iter() {
+                data[data_offset..data_offset + 4].copy_from_slice(&value_32bit.to_le_bytes());
+                data_offset += 4;
+            }
+        }
         Ok(())
     }
 

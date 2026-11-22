@@ -13,10 +13,11 @@
 # under the License.
 
 import os
+import shutil
+import tempfile
 
 import pytest
 
-from pykeramics import datetime
 from pykeramics import vfs
 
 
@@ -74,6 +75,30 @@ class TestDataStream(TestClass):
         assert len(data) == 1
         assert data == b"\n"
 
+        # Test read error when the backing image file is truncated.
+        if os.name == "posix":
+            with tempfile.TemporaryDirectory() as temporary_directory:
+                image_path = os.path.join(temporary_directory, "ext2.qcow")
+                shutil.copyfile(self.get_test_data_path("qcow/ext2.qcow"), image_path)
+
+                resolver = vfs.VfsResolver()
+                os_location = vfs.VfsLocation.new_base_from_string(
+                    vfs.VfsType.OS, image_path
+                )
+                qcow_location = os_location.new_with_layer_from_string(
+                    vfs.VfsType.QCOW, "/qcow1"
+                )
+                qcow_stream = resolver.get_data_stream_by_location_and_name(
+                    qcow_location, None
+                )
+                assert qcow_stream is not None
+
+                with open(image_path, "wb"):
+                    pass
+
+                with pytest.raises(RuntimeError):
+                    _ = qcow_stream.read(4096)
+
     def test_seek(self):
         data_stream = self.get_data_stream("/testdir1/testfile1")
 
@@ -82,14 +107,26 @@ class TestDataStream(TestClass):
         offset = data_stream.seek(8, whence=os.SEEK_SET)
         assert offset == 8
 
+        offset = data_stream.seek(-4, whence=os.SEEK_CUR)
+        assert offset == 4
+
+        offset = data_stream.seek(-1, whence=os.SEEK_END)
+        assert offset == 8
+
         with pytest.raises(ValueError):
             _ = data_stream.seek(-1, whence=os.SEEK_SET)
 
         with pytest.raises(ValueError):
             _ = data_stream.seek(0, whence=99)
 
+        with pytest.raises(RuntimeError):
+            _ = data_stream.seek(-100, whence=os.SEEK_CUR)
 
-class TestDataStream(TestClass):
+        with pytest.raises(RuntimeError):
+            _ = data_stream.seek(-100, whence=os.SEEK_END)
+
+
+class TestExtendedAttribute(TestClass):
     def get_extended_attribute(self, path):
         resolver = vfs.VfsResolver()
 
@@ -111,6 +148,18 @@ class TestDataStream(TestClass):
 
         assert extended_attribute is not None
         assert extended_attribute.name.to_string() == "security.selinux"
+
+    def test_get_data_stream(self):
+        extended_attribute = self.get_extended_attribute("/testdir1/testfile1")
+
+        assert extended_attribute is not None
+
+        data_stream = extended_attribute.get_data_stream()
+        assert data_stream is not None
+        assert data_stream.get_size() > 0
+
+        data = data_stream.read(data_stream.get_size())
+        assert len(data) == data_stream.get_size()
 
 
 class TestFileEntry(TestClass):
@@ -147,6 +196,51 @@ class TestFileEntry(TestClass):
         assert file_entry.size == 9
         assert file_entry.symbolic_link_target is None
 
+        directory_entry = self.get_file_entry("/testdir1")
+        assert directory_entry is not None
+        assert directory_entry.file_type == vfs.VfsFileType.DIRECTORY
+
+        block_device_entry = self.get_file_entry("/testdir1/blockdev1")
+        assert block_device_entry is not None
+        assert block_device_entry.file_type == vfs.VfsFileType.BLOCK_DEVICE
+        assert block_device_entry.device_identifier == 6201
+
+        character_device_entry = self.get_file_entry("/testdir1/chardev1")
+        assert character_device_entry is not None
+        assert character_device_entry.file_type == vfs.VfsFileType.CHARACTER_DEVICE
+        assert character_device_entry.device_identifier == 3396
+
+        named_pipe_entry = self.get_file_entry("/testdir1/pipe1")
+        assert named_pipe_entry is not None
+        assert named_pipe_entry.file_type == vfs.VfsFileType.NAMED_PIPE
+
+        symbolic_link_entry = self.get_file_entry("/file_symboliclink1")
+        assert symbolic_link_entry is not None
+        assert symbolic_link_entry.file_type == vfs.VfsFileType.SYMBOLIC_LINK
+        assert (
+            symbolic_link_entry.symbolic_link_target.to_string()
+            == "/mnt/keramics/testdir1/testfile1"
+        )
+
+        root_entry = self.get_file_entry("/")
+        assert root_entry is not None
+        assert root_entry.name is None
+
+        # Test getters that return None for timestamps on a FAT root directory.
+        resolver = vfs.VfsResolver()
+        os_path_string = self.get_test_data_path("fat/fat12.raw")
+        os_location = vfs.VfsLocation.new_base_from_string(
+            vfs.VfsType.OS, os_path_string
+        )
+        fat_root_location = os_location.new_with_layer_from_string(vfs.VfsType.FAT, "/")
+        fat_root_entry = resolver.get_file_entry_by_location(fat_root_location)
+        assert fat_root_entry is not None
+        assert fat_root_entry.access_time is None
+        assert fat_root_entry.change_time is None
+        assert fat_root_entry.creation_time is None
+        assert fat_root_entry.modification_time is None
+        assert fat_root_entry.name is None
+
     def test_get_data_stream(self):
         file_entry = self.get_file_entry("/testdir1/testfile1")
 
@@ -156,8 +250,34 @@ class TestFileEntry(TestClass):
 
         assert data_stream is not None
 
+        directory_entry = self.get_file_entry("/testdir1")
+
+        assert directory_entry is not None
+        assert directory_entry.get_data_stream() is None
+
+        if os.name == "posix" and os.geteuid() != 0:
+            with tempfile.TemporaryDirectory() as temporary_directory:
+                unreadable_file = os.path.join(temporary_directory, "unreadable.txt")
+                with open(unreadable_file, "wb") as file_object:
+                    file_object.write(b"test")
+                os.chmod(unreadable_file, 0o000)
+                try:
+                    resolver = vfs.VfsResolver()
+                    os_location = vfs.VfsLocation.new_base_from_string(
+                        vfs.VfsType.OS, unreadable_file
+                    )
+                    unreadable_entry = resolver.get_file_entry_by_location(os_location)
+                    assert unreadable_entry is not None
+                    with pytest.raises(RuntimeError):
+                        _ = unreadable_entry.get_data_stream()
+                finally:
+                    os.chmod(unreadable_file, 0o600)
+
     def test_get_number_of_extended_attributes(self):
-        file_entry = self.get_file_entry("/testdir1")
+        directory_entry = self.get_file_entry("/testdir1")
+
+        assert directory_entry is not None
+        assert directory_entry.get_number_of_extended_attributes() == 1
 
         file_entry = self.get_file_entry("/testdir1/testfile1")
 
@@ -202,6 +322,23 @@ class TestFileEntry(TestClass):
 
         number_of_sub_file_entries = file_entry.get_number_of_sub_file_entries()
         assert number_of_sub_file_entries == 0
+
+        if os.name == "posix" and os.geteuid() != 0:
+            with tempfile.TemporaryDirectory() as temporary_directory:
+                unreadable_directory = os.path.join(temporary_directory, "unreadable")
+                os.mkdir(unreadable_directory)
+                os.chmod(unreadable_directory, 0o000)
+                try:
+                    resolver = vfs.VfsResolver()
+                    os_location = vfs.VfsLocation.new_base_from_string(
+                        vfs.VfsType.OS, unreadable_directory
+                    )
+                    unreadable_entry = resolver.get_file_entry_by_location(os_location)
+                    assert unreadable_entry is not None
+                    with pytest.raises(RuntimeError):
+                        _ = unreadable_entry.get_number_of_sub_file_entries()
+                finally:
+                    os.chmod(unreadable_directory, 0o700)
 
     def test_get_sub_file_entry_by_index(self):
         file_entry = self.get_file_entry("/testdir1")
@@ -290,6 +427,15 @@ class TestFileSystem(TestClass):
         path = vfs.VfsPath.from_string("/testdir1/bogus")
         assert not file_system.file_entry_exists(path)
 
+        resolver = vfs.VfsResolver()
+        os_location = vfs.VfsLocation.new_base_from_string(
+            vfs.VfsType.OS, self.get_test_data_path("directory")
+        )
+        os_file_system = resolver.open_file_system(os_location)
+        invalid_path = vfs.VfsPath.from_string("\0")
+        with pytest.raises(RuntimeError):
+            _ = os_file_system.file_entry_exists(invalid_path)
+
     def test_get_file_entry_by_path(self):
         file_system = self.get_file_system()
 
@@ -303,6 +449,15 @@ class TestFileSystem(TestClass):
         file_entry = file_system.get_file_entry_by_path(path)
         assert file_entry is None
 
+        resolver = vfs.VfsResolver()
+        os_location = vfs.VfsLocation.new_base_from_string(
+            vfs.VfsType.OS, self.get_test_data_path("directory")
+        )
+        os_file_system = resolver.open_file_system(os_location)
+        invalid_path = vfs.VfsPath.from_string("\0")
+        with pytest.raises(RuntimeError):
+            _ = os_file_system.get_file_entry_by_path(invalid_path)
+
     def test_get_root_file_entry(self):
         file_system = self.get_file_system()
 
@@ -314,7 +469,21 @@ class TestFileSystem(TestClass):
 
 class TestFileType(TestClass):
     def test_hash(self):
-        hash(vfs.VfsFileType.FILE)
+        file_types = [
+            vfs.VfsFileType.BLOCK_DEVICE,
+            vfs.VfsFileType.CHARACTER_DEVICE,
+            vfs.VfsFileType.DEVICE,
+            vfs.VfsFileType.DIRECTORY,
+            vfs.VfsFileType.FILE,
+            vfs.VfsFileType.NAMED_PIPE,
+            vfs.VfsFileType.SOCKET,
+            vfs.VfsFileType.SYMBOLIC_LINK,
+            vfs.VfsFileType.WHITEOUT,
+        ]
+        for file_type in file_types:
+            assert isinstance(hash(file_type), int)
+        assert vfs.VfsFileType.FILE == vfs.VfsFileType.FILE
+        assert vfs.VfsFileType.FILE != vfs.VfsFileType.DIRECTORY
 
 
 class TestLocation(TestClass):
@@ -325,6 +494,25 @@ class TestLocation(TestClass):
         )
 
         assert os_location is not None
+
+        for vfs_type in [
+            vfs.VfsType.APM,
+            vfs.VfsType.EWF,
+            vfs.VfsType.EXT,
+            vfs.VfsType.FAKE,
+            vfs.VfsType.FAT,
+            vfs.VfsType.GPT,
+            vfs.VfsType.MBR,
+            vfs.VfsType.OS,
+            vfs.VfsType.QCOW,
+            vfs.VfsType.SPARSE_IMAGE,
+            vfs.VfsType.UDIF,
+            vfs.VfsType.VHD,
+            vfs.VfsType.VHDX,
+        ]:
+            location = vfs.VfsLocation.new_base_from_string(vfs_type, "/")
+            assert location is not None
+            assert location.parent is None
 
     def test_new_with_layer_from_string(self):
         os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
@@ -361,6 +549,8 @@ class TestLocation(TestClass):
             vfs.VfsType.QCOW, "/qcow1"
         )
 
+        assert os_location.parent is None
+        assert os_location.path is not None
         assert qcow_location.path is not None
         assert qcow_location.parent is not None
 
@@ -418,6 +608,10 @@ class TestPath(TestClass):
 
         file_name = os_path.get_file_name()
         assert file_name is not None
+        assert file_name.to_string() == "ext2.qcow2"
+
+        root_path = vfs.VfsPath.from_string("/")
+        assert root_path.get_file_name() is None
 
     def test_is_relative(self):
         os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
@@ -425,11 +619,17 @@ class TestPath(TestClass):
 
         assert os_path.is_relative() is False
 
+        relative_path = vfs.VfsPath.from_string("qcow/ext2.qcow2")
+        assert relative_path.is_relative() is True
+
     def test_is_root(self):
         os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
         os_path = vfs.VfsPath.from_string(os_path_string)
 
         assert os_path.is_root() is False
+
+        root_path = vfs.VfsPath.from_string("/")
+        assert root_path.is_root() is True
 
     def test_to_string(self):
         os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
@@ -470,12 +670,30 @@ class TestResolver(TestClass):
 
         assert data_stream is not None
 
+        data_stream_name = vfs.VfsPathComponent.from_string("bogus")
+        data_stream = resolver.get_data_stream_by_location_and_name(
+            ext_location, data_stream_name
+        )
+
+        assert data_stream is None
+
         ext_location = qcow_location.new_with_layer_from_string(
             vfs.VfsType.EXT, "/bogus"
         )
         data_stream = resolver.get_data_stream_by_location_and_name(ext_location, None)
 
         assert data_stream is None
+
+        missing_os_location = vfs.VfsLocation.new_base_from_string(
+            vfs.VfsType.OS, self.get_test_data_path("nonexistent.qcow2")
+        )
+        invalid_qcow_location = missing_os_location.new_with_layer_from_string(
+            vfs.VfsType.QCOW, "/qcow1"
+        )
+        with pytest.raises(RuntimeError):
+            _ = resolver.get_data_stream_by_location_and_name(
+                invalid_qcow_location, None
+            )
 
     def test_get_file_entry_by_location(self):
         resolver = vfs.VfsResolver()
@@ -501,6 +719,40 @@ class TestResolver(TestClass):
 
         assert file_entry is None
 
+        missing_os_location = vfs.VfsLocation.new_base_from_string(
+            vfs.VfsType.OS, self.get_test_data_path("nonexistent.qcow2")
+        )
+        invalid_qcow_location = missing_os_location.new_with_layer_from_string(
+            vfs.VfsType.QCOW, "/qcow1"
+        )
+        with pytest.raises(RuntimeError):
+            _ = resolver.get_file_entry_by_location(invalid_qcow_location)
+
+        # Test resolving across additional supported VFS layer types.
+        for relative_path, vfs_type, layer_path in [
+            ("apm/apm.dmg", vfs.VfsType.APM, "/apm1"),
+            ("ewf/ext2.E01", vfs.VfsType.EWF, "/ewf1"),
+            ("fat/fat12.raw", vfs.VfsType.FAT, "/testdir1/testfile1"),
+            ("gpt/gpt.raw", vfs.VfsType.GPT, "/gpt1"),
+            ("mbr/mbr.raw", vfs.VfsType.MBR, "/mbr1"),
+            (
+                "sparseimage/hfsplus.sparseimage",
+                vfs.VfsType.SPARSE_IMAGE,
+                "/sparseimage1",
+            ),
+            ("udif/hfsplus_zlib.dmg", vfs.VfsType.UDIF, "/udif1"),
+            ("vhd/ext2.vhd", vfs.VfsType.VHD, "/vhd1"),
+            ("vhdx/ext2.vhdx", vfs.VfsType.VHDX, "/vhdx1"),
+        ]:
+            base_location = vfs.VfsLocation.new_base_from_string(
+                vfs.VfsType.OS, self.get_test_data_path(relative_path)
+            )
+            layer_location = base_location.new_with_layer_from_string(
+                vfs_type, layer_path
+            )
+            layer_file_entry = resolver.get_file_entry_by_location(layer_location)
+            assert layer_file_entry is not None
+
     def test_open_file_system(self):
         resolver = vfs.VfsResolver()
 
@@ -518,7 +770,34 @@ class TestResolver(TestClass):
 
         assert file_system is not None
 
+        missing_os_location = vfs.VfsLocation.new_base_from_string(
+            vfs.VfsType.OS, self.get_test_data_path("nonexistent.qcow2")
+        )
+        invalid_qcow_location = missing_os_location.new_with_layer_from_string(
+            vfs.VfsType.QCOW, "/qcow1"
+        )
+        with pytest.raises(RuntimeError):
+            _ = resolver.open_file_system(invalid_qcow_location)
+
 
 class TestType(TestClass):
     def test_hash(self):
-        hash(vfs.VfsType.APM)
+        vfs_types = [
+            vfs.VfsType.APM,
+            vfs.VfsType.EWF,
+            vfs.VfsType.EXT,
+            vfs.VfsType.FAKE,
+            vfs.VfsType.FAT,
+            vfs.VfsType.GPT,
+            vfs.VfsType.MBR,
+            vfs.VfsType.OS,
+            vfs.VfsType.QCOW,
+            vfs.VfsType.SPARSE_IMAGE,
+            vfs.VfsType.UDIF,
+            vfs.VfsType.VHD,
+            vfs.VfsType.VHDX,
+        ]
+        for vfs_type in vfs_types:
+            assert isinstance(hash(vfs_type), int)
+        assert vfs.VfsType.APM == vfs.VfsType.APM
+        assert vfs.VfsType.APM != vfs.VfsType.EXT

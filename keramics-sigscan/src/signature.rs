@@ -127,7 +127,7 @@ impl fmt::Debug for Signature {
             .field("pattern_type", &self.pattern_type)
             .field("pattern_offset", &self.pattern_offset)
             .field("pattern", &pattern_string)
-            .field("pattern_size", &self.pattern_offset)
+            .field("pattern_size", &self.pattern_size)
             .finish()
     }
 }
@@ -152,6 +152,21 @@ mod tests {
     }
 
     #[test]
+    fn test_debug() {
+        let signature: Signature = Signature::new(
+            "qcow3",
+            PatternType::BoundToStart,
+            56,
+            &[0x51, 0x46, 0x49, 0xfb, 0x00, 0x00, 0x00, 0x03],
+        );
+
+        assert_eq!(
+            format!("{:?}", signature),
+            "Signature { identifier: \"qcow3\", pattern_type: BoundToStart, pattern_offset: 56, pattern: \"QFI\\\\xfb\\\\x00\\\\x00\\\\x00\\\\x03\", pattern_size: 8 }"
+        );
+    }
+
+    #[test]
     fn test_eq() {
         let signature1: Signature =
             Signature::new("vdh1", PatternType::BoundToStart, 0, "conectix".as_bytes());
@@ -163,11 +178,14 @@ mod tests {
             Signature::new("vdh4", PatternType::Unbound, 0, "conectix".as_bytes());
         let signature5: Signature =
             Signature::new("vdh5", PatternType::BoundToStart, 0, "connectx".as_bytes());
+        let signature6: Signature =
+            Signature::new("vdh6", PatternType::BoundToStart, 0, "conecti".as_bytes());
 
         assert_eq!(signature1, signature2);
         assert_ne!(signature1, signature3);
         assert_ne!(signature1, signature4);
         assert_ne!(signature1, signature5);
+        assert_ne!(signature1, signature6);
     }
 
     #[test]
@@ -201,5 +219,65 @@ mod tests {
         // Test no match.
         let result: bool = signature.scan_buffer(0, 64, &test_data, 0, 8);
         assert_eq!(result, false);
+    }
+
+    #[test]
+    fn test_scan_buffer_with_bound_to_end() {
+        let signature: Signature =
+            Signature::new("vhd1", PatternType::BoundToEnd, 16, "conectix".as_bytes());
+        let mut test_data: [u8; 32] = [0; 32];
+        test_data[16..24].copy_from_slice("conectix".as_bytes());
+
+        // Test match when data_offset is 32 and data_size is 64 (pattern at offset 48).
+        assert!(signature.scan_buffer(32, 64, &test_data, 0, 32));
+
+        // Test pattern_offset larger than data_size.
+        assert!(!signature.scan_buffer(0, 8, &test_data, 0, 32));
+
+        // Test pattern_offset before data_offset.
+        assert!(!signature.scan_buffer(56, 64, &test_data, 0, 32));
+
+        // Test buffer too small for pattern.
+        assert!(!signature.scan_buffer(32, 64, &test_data, 0, 20));
+
+        // Test no match.
+        let empty_data: [u8; 32] = [0; 32];
+        assert!(!signature.scan_buffer(32, 64, &empty_data, 0, 32));
+    }
+
+    #[test]
+    fn test_scan_buffer_with_unbound() {
+        let signature: Signature =
+            Signature::new("test1", PatternType::Unbound, 0, "conectix".as_bytes());
+        let mut test_data: [u8; 32] = [0; 32];
+        test_data[8..16].copy_from_slice("conectix".as_bytes());
+
+        // Test match at buffer offset 8.
+        assert!(signature.scan_buffer(0, 64, &test_data, 8, 32));
+
+        // Test no match at buffer offset 0.
+        assert!(!signature.scan_buffer(0, 64, &test_data, 0, 32));
+
+        // Test buffer too small for pattern from buffer offset 28.
+        assert!(!signature.scan_buffer(0, 64, &test_data, 28, 32));
+    }
+
+    #[test]
+    fn test_scan_buffer_with_debug_output() {
+        let original_debug_output: bool = Mediator::current().debug_output;
+        Mediator::new(true).make_current();
+
+        let signature: Signature = Signature::new(
+            "qcow3",
+            PatternType::BoundToStart,
+            0,
+            &[0x51, 0x46, 0x49, 0xfb, 0x00, 0x00, 0x00, 0x03],
+        );
+        let test_data: [u8; 8] = [0x51, 0x46, 0x49, 0xfb, 0x00, 0x00, 0x00, 0x03];
+
+        let result: bool = signature.scan_buffer(0, 64, &test_data, 0, 8);
+        assert!(result);
+
+        Mediator::new(original_debug_output).make_current();
     }
 }

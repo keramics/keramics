@@ -38,6 +38,9 @@ pub(super) struct ScanTree {
     /// Root node.
     pub root_node: ScanTreeNode,
 
+    /// Signatures matching the pattern type.
+    pub(super) signatures: Vec<Arc<Signature>>,
+
     /// Skip table.
     pub skip_table: SkipTable,
 }
@@ -50,16 +53,20 @@ impl ScanTree {
             range_start_offset: 0,
             range_end_offset: 0,
             root_node: ScanTreeNode::new(),
+            signatures: Vec::new(),
             skip_table: SkipTable::new(),
         }
     }
 
     /// Builds the scan tree.
     pub fn build(&mut self, signatures: &[Arc<Signature>]) -> Result<(), ErrorTrace> {
+        self.signatures.clear();
+
         for signature in signatures.iter() {
             if signature.pattern_type != self.pattern_type {
                 continue;
             }
+            self.signatures.push(Arc::clone(signature));
             self.range_start_offset = min(signature.pattern_offset, self.range_start_offset);
             self.range_end_offset = max(
                 signature.pattern_offset + signature.pattern_size,
@@ -276,6 +283,60 @@ mod tests {
             ScanResult::Signature(signature) => assert_eq!(signature.identifier.as_str(), "test1"),
             _ => panic!("Incorrect scan result type"),
         }
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_with_duplicate_signatures() {
+        let mut scan_tree: ScanTree = ScanTree::new(PatternType::BoundToStart);
+
+        let signatures: Vec<Arc<Signature>> = vec![
+            Arc::new(Signature::new(
+                "vhd1",
+                PatternType::BoundToStart,
+                0,
+                "conectix".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "vhd2",
+                PatternType::BoundToStart,
+                0,
+                "conectix".as_bytes(),
+            )),
+        ];
+        let result: Result<(), ErrorTrace> = scan_tree.build(&signatures);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_with_mixed_pattern_types() -> Result<(), ErrorTrace> {
+        let mut scan_tree: ScanTree = ScanTree::new(PatternType::BoundToStart);
+
+        let signatures: Vec<Arc<Signature>> = vec![
+            Arc::new(Signature::new(
+                "vhd_start",
+                PatternType::BoundToStart,
+                0,
+                "conectix".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "vhd_end",
+                PatternType::BoundToEnd,
+                72,
+                "conectix".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "vhd_unbound",
+                PatternType::Unbound,
+                0,
+                "conectix".as_bytes(),
+            )),
+        ];
+        scan_tree.build(&signatures)?;
+
+        assert_eq!(scan_tree.get_spanning_range(), (0, 8));
+        assert_eq!(scan_tree.root_node.scan_objects.len(), 1);
+
         Ok(())
     }
 }

@@ -386,6 +386,25 @@ mod tests {
     use super::*;
 
     use crate::constants::UNICODE_CASE_MAPPINGS;
+    use keramics_encodings::CharacterEncoding;
+
+    #[test]
+    fn test_utf16_character_mappings() {
+        let mut mappings: Utf16CharacterMappings = Utf16CharacterMappings::new();
+        assert_eq!(mappings.len(), 0);
+        assert_eq!(mappings.get_code_point(&0x0041), 0x0041);
+
+        mappings.add(0x0041, 0x0061);
+        assert_eq!(mappings.len(), 1);
+        assert_eq!(mappings.get_code_point(&0x0041), 0x0061);
+        assert_eq!(mappings.get_code_point(&0x0042), 0x0042);
+
+        let mappings: Utf16CharacterMappings =
+            Utf16CharacterMappings::from(UNICODE_CASE_MAPPINGS.as_slice());
+        assert_eq!(mappings.len(), UNICODE_CASE_MAPPINGS.len());
+        assert_eq!(mappings.get_code_point(&0x0041), 0x0061);
+        assert_eq!(mappings.get_code_point(&0x0061), 0x0061);
+    }
 
     #[test]
     fn test_new_with_case_folding() -> Result<(), ErrorTrace> {
@@ -405,10 +424,69 @@ mod tests {
                 ],
             }
         );
+
+        // Test with a supplementary plane code point.
+        let utf16_string: Utf16String = Utf16String::from("\u{1e900}");
+        let test_string: Utf16String = utf16_string.new_with_case_folding(&mappings)?;
+        assert_eq!(
+            test_string,
+            Utf16String {
+                elements: vec![0xd83a, 0xdd22],
+            }
+        );
+
+        // Test with an invalid UTF-16 string.
+        let utf16_string: Utf16String = Utf16String {
+            elements: vec![0xd800],
+        };
+        let result: Result<Utf16String, ErrorTrace> = utf16_string.new_with_case_folding(&mappings);
+        assert!(result.is_err());
+
         Ok(())
     }
 
-    // TODO: add tests for decode
+    #[test]
+    fn test_decode() -> Result<(), ErrorTrace> {
+        let utf16_string: Utf16String = Utf16String::from("UTF-16 string");
+
+        let code_points: Vec<u32> = utf16_string.decode()?;
+        assert_eq!(
+            code_points,
+            vec![
+                0x0055, 0x0054, 0x0046, 0x002d, 0x0031, 0x0036, 0x0020, 0x0073, 0x0074, 0x0072,
+                0x0069, 0x006e, 0x0067,
+            ]
+        );
+
+        // Test with a surrogate pair.
+        let utf16_string: Utf16String = Utf16String {
+            elements: vec![0xd83d, 0xde00],
+        };
+        let code_points: Vec<u32> = utf16_string.decode()?;
+        assert_eq!(code_points, vec![0x0001f600]);
+
+        // Test with a missing low surrogate.
+        let utf16_string: Utf16String = Utf16String {
+            elements: vec![0xd800],
+        };
+        let result: Result<Vec<u32>, ErrorTrace> = utf16_string.decode();
+        assert!(result.is_err());
+
+        // Test with a low surrogate value out of bounds.
+        let utf16_string: Utf16String = Utf16String {
+            elements: vec![0xd800, 0x0041],
+        };
+        let result: Result<Vec<u32>, ErrorTrace> = utf16_string.decode();
+        assert!(result.is_err());
+
+        let utf16_string: Utf16String = Utf16String {
+            elements: vec![0xd800, 0xe000],
+        };
+        let result: Result<Vec<u32>, ErrorTrace> = utf16_string.decode();
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     #[test]
     fn test_from_be_bytes() {
@@ -427,6 +505,15 @@ mod tests {
                 ]
             }
         );
+
+        // Test with a trailing null character.
+        let test_data: [u8; 30] = [
+            0x00, 0x55, 0x00, 0x54, 0x00, 0x46, 0x00, 0x2d, 0x00, 0x31, 0x00, 0x36, 0x00, 0x20,
+            0x00, 0x73, 0x00, 0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x00,
+            0x00, 0x00,
+        ];
+        let utf16_string: Utf16String = Utf16String::from_be_bytes(&test_data);
+        assert_eq!(utf16_string, "UTF-16 string");
     }
 
     #[test]
@@ -443,6 +530,25 @@ mod tests {
                 ],
             }
         );
+
+        // Test with a supplementary plane code point.
+        let byte_string: ByteString = ByteString::from("\u{1f600}");
+        let utf16_string: Utf16String = Utf16String::from_byte_string(&byte_string)?;
+        assert_eq!(
+            utf16_string,
+            Utf16String {
+                elements: vec![0xd83d, 0xde00],
+            }
+        );
+
+        // Test with an invalid byte sequence.
+        let byte_string: ByteString = ByteString {
+            encoding: CharacterEncoding::Utf8,
+            elements: vec![0xff],
+        };
+        let result: Result<Utf16String, ErrorTrace> = Utf16String::from_byte_string(&byte_string);
+        assert!(result.is_err());
+
         Ok(())
     }
 
@@ -464,6 +570,27 @@ mod tests {
                 ],
             }
         );
+
+        // Test with a supplementary plane code point.
+        let byte_string: ByteString = ByteString::from("\u{1e900}");
+        let utf16_string: Utf16String =
+            Utf16String::from_byte_string_with_case_folding(&byte_string, &mappings)?;
+        assert_eq!(
+            utf16_string,
+            Utf16String {
+                elements: vec![0xd83a, 0xdd22],
+            }
+        );
+
+        // Test with an invalid byte sequence.
+        let byte_string: ByteString = ByteString {
+            encoding: CharacterEncoding::Utf8,
+            elements: vec![0xff],
+        };
+        let result: Result<Utf16String, ErrorTrace> =
+            Utf16String::from_byte_string_with_case_folding(&byte_string, &mappings);
+        assert!(result.is_err());
+
         Ok(())
     }
 
@@ -484,9 +611,46 @@ mod tests {
                 ]
             }
         );
+
+        // Test with a trailing null character.
+        let test_data: [u8; 30] = [
+            0x55, 0x00, 0x54, 0x00, 0x46, 0x00, 0x2d, 0x00, 0x31, 0x00, 0x36, 0x00, 0x20, 0x00,
+            0x73, 0x00, 0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x00, 0x00,
+            0x00, 0x00,
+        ];
+        let utf16_string: Utf16String = Utf16String::from_le_bytes(&test_data);
+        assert_eq!(utf16_string, "UTF-16 string");
     }
 
-    // TODO: add test_from_string_with_case_folding
+    #[test]
+    fn test_from_string_with_case_folding() {
+        let mappings: Utf16CharacterMappings =
+            Utf16CharacterMappings::from(UNICODE_CASE_MAPPINGS.as_slice());
+
+        let utf16_string: Utf16String =
+            Utf16String::from_string_with_case_folding("UTF-16 string", &mappings);
+
+        assert_eq!(
+            utf16_string,
+            Utf16String {
+                elements: vec![
+                    0x0075, 0x0074, 0x0066, 0x002d, 0x0031, 0x0036, 0x0020, 0x0073, 0x0074, 0x0072,
+                    0x0069, 0x006e, 0x0067,
+                ],
+            }
+        );
+
+        // Test with a supplementary plane code point.
+        let utf16_string: Utf16String =
+            Utf16String::from_string_with_case_folding("\u{1e900}", &mappings);
+
+        assert_eq!(
+            utf16_string,
+            Utf16String {
+                elements: vec![0xd83a, 0xdd22],
+            }
+        );
+    }
 
     #[test]
     fn test_from_ucs2_string() {
@@ -522,6 +686,21 @@ mod tests {
                 ],
             }
         );
+
+        // Test mapping a BMP code point to a supplementary plane code point.
+        let mut custom_mappings: Utf16CharacterMappings = Utf16CharacterMappings::new();
+        custom_mappings.add(0x0041, 0x0001f600);
+
+        let ucs2_string: Ucs2String = Ucs2String::from("A");
+        let utf16_string: Utf16String =
+            Utf16String::from_ucs2_string_with_case_folding(&ucs2_string, &custom_mappings);
+
+        assert_eq!(
+            utf16_string,
+            Utf16String {
+                elements: vec![0xd83d, 0xde00],
+            }
+        );
     }
 
     #[test]
@@ -542,8 +721,57 @@ mod tests {
         assert_eq!(utf16_string.len(), 13);
     }
 
-    // TODO: add tests for read_data_be
-    // TODO: add tests for read_data_le
+    #[test]
+    fn test_read_data_be() {
+        let test_data: [u8; 30] = [
+            0x00, 0x55, 0x00, 0x54, 0x00, 0x46, 0x00, 0x2d, 0x00, 0x31, 0x00, 0x36, 0x00, 0x20,
+            0x00, 0x73, 0x00, 0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x00,
+            0x00, 0x00,
+        ];
+        let mut utf16_string: Utf16String = Utf16String::new();
+        utf16_string.read_data_be(&test_data);
+
+        assert_eq!(
+            utf16_string,
+            Utf16String {
+                elements: vec![
+                    0x0055, 0x0054, 0x0046, 0x002d, 0x0031, 0x0036, 0x0020, 0x0073, 0x0074, 0x0072,
+                    0x0069, 0x006e, 0x0067,
+                ],
+            }
+        );
+
+        // Test without a trailing null character.
+        let mut utf16_string: Utf16String = Utf16String::new();
+        utf16_string.read_data_be(&test_data[..26]);
+        assert_eq!(utf16_string, "UTF-16 string");
+    }
+
+    #[test]
+    fn test_read_data_le() {
+        let test_data: [u8; 30] = [
+            0x55, 0x00, 0x54, 0x00, 0x46, 0x00, 0x2d, 0x00, 0x31, 0x00, 0x36, 0x00, 0x20, 0x00,
+            0x73, 0x00, 0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x00, 0x00,
+            0x00, 0x00,
+        ];
+        let mut utf16_string: Utf16String = Utf16String::new();
+        utf16_string.read_data_le(&test_data);
+
+        assert_eq!(
+            utf16_string,
+            Utf16String {
+                elements: vec![
+                    0x0055, 0x0054, 0x0046, 0x002d, 0x0031, 0x0036, 0x0020, 0x0073, 0x0074, 0x0072,
+                    0x0069, 0x006e, 0x0067,
+                ],
+            }
+        );
+
+        // Test without a trailing null character.
+        let mut utf16_string: Utf16String = Utf16String::new();
+        utf16_string.read_data_le(&test_data[..26]);
+        assert_eq!(utf16_string, "UTF-16 string");
+    }
 
     #[test]
     fn test_from_u16_slice() {
@@ -562,6 +790,10 @@ mod tests {
                 ],
             }
         );
+
+        // Test without a trailing null character.
+        let utf16_string: Utf16String = Utf16String::from(&test_data[..13]);
+        assert_eq!(utf16_string, "UTF-16 string");
     }
 
     #[test]
@@ -604,6 +836,7 @@ mod tests {
             0x006e, 0x0067,
         ];
         assert!(utf16_string.eq(&test_array.as_slice()));
+        assert!(!utf16_string.eq(&[0x0041u16].as_slice()));
     }
 
     #[test]
@@ -612,6 +845,8 @@ mod tests {
 
         assert!(utf16_string.eq("UTF-16 string"));
         assert!(utf16_string.eq(&"UTF-16 string"));
+        assert!(!utf16_string.eq("other"));
+        assert!(!utf16_string.eq(&"other"));
     }
 
     #[test]
@@ -625,5 +860,13 @@ mod tests {
 
         let string: String = utf16_string.to_string();
         assert_eq!(string, "UTF-16 string");
+
+        // Test with a surrogate pair.
+        let utf16_string: Utf16String = Utf16String {
+            elements: vec![0xd83d, 0xde00],
+        };
+
+        let string: String = utf16_string.to_string();
+        assert_eq!(string, "\u{1f600}");
     }
 }

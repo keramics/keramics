@@ -94,4 +94,96 @@ impl DataStreamWriter {
     }
 }
 
-// TODO: add tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::env;
+    use std::fs;
+    use std::io::SeekFrom;
+    use std::process;
+    use std::sync::{Arc, RwLock};
+
+    use keramics_core::{DataStream, open_fake_data_stream};
+
+    /// Data stream that always fails to read.
+    struct FailingDataStream {}
+
+    impl DataStream for FailingDataStream {
+        /// Retrieves the current position.
+        fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
+            Ok(0)
+        }
+
+        /// Retrieves the size of the data.
+        fn get_size(&mut self) -> Result<u64, ErrorTrace> {
+            Ok(16)
+        }
+
+        /// Reads data at the current position.
+        fn read(&mut self, _buf: &mut [u8]) -> Result<usize, ErrorTrace> {
+            Err(keramics_core::error_trace_new!("Forced read failure"))
+        }
+
+        /// Sets the current position of the data.
+        fn seek(&mut self, _pos: SeekFrom) -> Result<u64, ErrorTrace> {
+            Ok(0)
+        }
+    }
+
+    #[test]
+    fn test_write_data_stream() -> Result<(), ErrorTrace> {
+        let mut temporary_path: PathBuf = env::temp_dir();
+        temporary_path.push(format!("keramics_writer_test_{}.bin", process::id()));
+
+        let test_data: Vec<u8> = (0..70000usize).map(|index| (index % 251) as u8).collect();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut data_stream_writer: DataStreamWriter = DataStreamWriter::new();
+        assert_eq!(data_stream_writer.number_of_streams_written, 0);
+
+        data_stream_writer.write_data_stream(&data_stream, &temporary_path)?;
+        assert_eq!(data_stream_writer.number_of_streams_written, 1);
+
+        let written_data: Vec<u8> = fs::read(&temporary_path).unwrap();
+        assert_eq!(written_data, test_data);
+
+        // Test with an empty data stream.
+        let empty_stream: DataStreamReference = open_fake_data_stream(&[]);
+        data_stream_writer.write_data_stream(&empty_stream, &temporary_path)?;
+        assert_eq!(data_stream_writer.number_of_streams_written, 2);
+        assert!(fs::read(&temporary_path).unwrap().is_empty());
+
+        _ = fs::remove_file(&temporary_path);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_write_data_stream_errors() {
+        let mut data_stream_writer: DataStreamWriter = DataStreamWriter::new();
+        let data_stream: DataStreamReference = open_fake_data_stream(b"hello");
+
+        let invalid_path: PathBuf = PathBuf::from("/nonexistent_keramics_dir_12345/out.bin");
+        let result: Result<(), ErrorTrace> =
+            data_stream_writer.write_data_stream(&data_stream, &invalid_path);
+        assert!(result.is_err());
+        assert_eq!(data_stream_writer.number_of_streams_written, 0);
+
+        let mut temporary_path: PathBuf = env::temp_dir();
+        temporary_path.push(format!("keramics_writer_fail_test_{}.bin", process::id()));
+
+        let mut failing_data_stream: FailingDataStream = FailingDataStream {};
+        assert_eq!(failing_data_stream.get_offset().unwrap(), 0);
+        assert_eq!(failing_data_stream.get_size().unwrap(), 16);
+        assert_eq!(failing_data_stream.seek(SeekFrom::Start(0)).unwrap(), 0);
+
+        let failing_stream: DataStreamReference = Arc::new(RwLock::new(failing_data_stream));
+        let result: Result<(), ErrorTrace> =
+            data_stream_writer.write_data_stream(&failing_stream, &temporary_path);
+        assert!(result.is_err());
+        assert_eq!(data_stream_writer.number_of_streams_written, 0);
+
+        _ = fs::remove_file(&temporary_path);
+    }
+}

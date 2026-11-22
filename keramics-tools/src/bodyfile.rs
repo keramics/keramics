@@ -126,13 +126,40 @@ impl Bodyfile {
 mod tests {
     use super::*;
 
+    use std::io::SeekFrom;
+    use std::sync::{Arc, RwLock};
     use std::time::SystemTime;
 
-    use keramics_core::{DataStreamReference, open_fake_data_stream};
+    use keramics_core::{DataStream, DataStreamReference, open_fake_data_stream};
     use keramics_datetime::{
         ApfsTime, FatDate, FatTimeDate, FatTimeDate10Ms, Filetime, HfsTime, PosixTime32,
         PosixTime64Ns, XfsBigtime,
     };
+
+    /// Data stream that always fails to read.
+    struct FailingDataStream {}
+
+    impl DataStream for FailingDataStream {
+        /// Retrieves the current position.
+        fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
+            Ok(0)
+        }
+
+        /// Retrieves the size of the data.
+        fn get_size(&mut self) -> Result<u64, ErrorTrace> {
+            Ok(10)
+        }
+
+        /// Reads data at the current position.
+        fn read(&mut self, _buf: &mut [u8]) -> Result<usize, ErrorTrace> {
+            Err(keramics_core::error_trace_new!("Read error"))
+        }
+
+        /// Sets the current position of the data.
+        fn seek(&mut self, _pos: SeekFrom) -> Result<u64, ErrorTrace> {
+            Ok(0)
+        }
+    }
 
     #[test]
     fn test_calculate_md5() -> Result<(), ErrorTrace> {
@@ -166,6 +193,10 @@ mod tests {
         let date_time: DateTime = DateTime::Filetime(Filetime::new(0x01cb3a623d0a17ce));
         let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;
         assert_eq!(timestamp, "1281647191.5468750");
+
+        let date_time: DateTime = DateTime::Filetime(Filetime::new(1));
+        let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;
+        assert_eq!(timestamp, "-11644473599.9999999");
 
         let date_time: DateTime = DateTime::PosixTime32(PosixTime32::new(1281643591));
         let timestamp: String = Bodyfile::format_as_timestamp(Some(&date_time))?;
@@ -215,5 +246,17 @@ mod tests {
         let fake_time: SystemTime = SystemTime::now();
         let date_time: DateTime = DateTime::FakeTime(fake_time);
         assert!(Bodyfile::format_as_timestamp(Some(&date_time)).is_err());
+    }
+
+    #[test]
+    fn test_calculate_md5_with_read_error() {
+        let mut failing_data_stream: FailingDataStream = FailingDataStream {};
+        assert_eq!(failing_data_stream.get_offset().unwrap(), 0);
+        assert_eq!(failing_data_stream.get_size().unwrap(), 10);
+        assert_eq!(failing_data_stream.seek(SeekFrom::Start(0)).unwrap(), 0);
+
+        let data_stream: DataStreamReference = Arc::new(RwLock::new(failing_data_stream));
+        let result: Result<String, ErrorTrace> = Bodyfile::calculate_md5(&data_stream);
+        assert!(result.is_err());
     }
 }

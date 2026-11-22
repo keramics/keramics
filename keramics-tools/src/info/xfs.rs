@@ -691,8 +691,8 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_core::open_os_data_stream;
-    use keramics_datetime::{PosixTime32, PosixTime64Ns};
+    use keramics_core::{open_fake_data_stream, open_os_data_stream};
+    use keramics_datetime::{HfsTime, PosixTime32, PosixTime64Ns};
 
     use crate::assert_lines_eq;
 
@@ -719,6 +719,10 @@ mod tests {
         let test_struct: XfsDateTimeInfo = XfsDateTimeInfo::new(&date_time);
         let string: String = test_struct.to_string();
         assert_eq!(string, NOT_SET_VALUE);
+
+        let date_time: DateTime = DateTime::HfsTime(HfsTime::new(0));
+        let test_struct: XfsDateTimeInfo = XfsDateTimeInfo::new(&date_time);
+        assert_eq!(test_struct.to_string(), "Unsupported date time");
     }
 
     #[test]
@@ -792,14 +796,20 @@ mod tests {
     #[test]
     fn test_incompatible_feature_status_flags_information_fmt() -> Result<(), ErrorTrace> {
         let test_struct: XfsIncompatibleFeatureFlagsInfo =
-            XfsIncompatibleFeatureFlagsInfo::new(0x000000e3);
+            XfsIncompatibleFeatureFlagsInfo::new(0x000007ff);
 
         let expected_string: &str = concat!(
             "        0x00000001: (XFS_SB_FEAT_INCOMPAT_FTYPE)\n",
             "        0x00000002: (XFS_SB_FEAT_INCOMPAT_SPINODES)\n",
+            "        0x00000004: (XFS_SB_FEAT_INCOMPAT_META_UUID)\n",
+            "        0x00000008: (XFS_SB_FEAT_INCOMPAT_BIGTIME)\n",
+            "        0x00000010: (XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR)\n",
             "        0x00000020: (XFS_SB_FEAT_INCOMPAT_NREXT64)\n",
             "        0x00000040: (XFS_SB_FEAT_INCOMPAT_EXCHRANGE)\n",
             "        0x00000080: (XFS_SB_FEAT_INCOMPAT_PARENT)\n",
+            "        0x00000100: (XFS_SB_FEAT_INCOMPAT_METADIR)\n",
+            "        0x00000200: (XFS_SB_FEAT_INCOMPAT_ZONED)\n",
+            "        0x00000400: (XFS_SB_FEAT_INCOMPAT_ZONE_GAPS)\n",
         );
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
@@ -824,11 +834,41 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_file_system
-    // TODO: add tests for print_file_entry
-    // TODO: add tests for print_file_entry_by_identifier
-    // TODO: add tests for print_file_entry_by_path
-    // TODO: add tests for print_file_system
-    // TODO: add tests for print_hierarchy
-    // TODO: add tests for print_hierarchy_file_entry
+    #[test]
+    fn test_print_methods() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/xfs/xfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+
+        XfsInfo::print_file_system(&data_stream, Some(&CharacterEncoding::Utf8))?;
+        XfsInfo::print_file_entry_by_identifier(&data_stream, 16133, None)?;
+        assert!(
+            XfsInfo::print_file_entry_by_identifier(&data_stream, u32::MAX as u64 + 1, None)
+                .is_err()
+        );
+        XfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/testfile1"), None)?;
+        XfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/xattr1"), None)?;
+        XfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/blockdev1"), None)?;
+        XfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/file_symboliclink1"), None)?;
+        assert!(
+            XfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/nonexistent"), None)
+                .is_err()
+        );
+
+        XfsInfo::print_hierarchy(&data_stream, None, None)?;
+        XfsInfo::print_hierarchy(&data_stream, None, Some(&String::from("/testdir1")))?;
+        assert!(
+            XfsInfo::print_hierarchy(&data_stream, None, Some(&String::from("/nonexistent")))
+                .is_err()
+        );
+
+        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
+        assert!(XfsInfo::print_file_system(&invalid_stream, None).is_err());
+        assert!(XfsInfo::print_file_entry_by_identifier(&invalid_stream, 1, None).is_err());
+        assert!(
+            XfsInfo::print_file_entry_by_path(&invalid_stream, &Path::from("/"), None).is_err()
+        );
+        assert!(XfsInfo::print_hierarchy(&invalid_stream, None, None).is_err());
+
+        Ok(())
+    }
 }

@@ -228,6 +228,20 @@ mod tests {
         );
         assert_eq!(file_entry.get_file_type(), VfsFileType::File);
 
+        // Drain the remaining entries to verify termination.
+        let mut entry_count: usize = 1;
+        for result in vfs_finder {
+            _ = result?;
+            entry_count += 1;
+        }
+        assert!(entry_count > 1);
+
+        // Test with an unopened file system where get_root_file_entry returns None or Err.
+        let empty_ntfs: VfsFileSystem = VfsFileSystem::Ntfs(NtfsFileSystem::new());
+        let mut empty_finder: VfsFinder<'_> = VfsFinder::new(&empty_ntfs);
+        let result: Option<Result<(VfsFileEntry, Path), ErrorTrace>> = empty_finder.next();
+        assert!(result.is_none() || result.unwrap().is_err());
+
         Ok(())
     }
 }

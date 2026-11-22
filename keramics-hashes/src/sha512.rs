@@ -26,6 +26,7 @@ const SHA512_PRIME_SQUARE_ROOTS: [u64; 8] = [
 ];
 
 /// Context for calculating a SHA-512 hash.
+#[derive(Clone)]
 pub struct Sha512Context {
     /// Internal context.
     internal_context: InternalSha512Context,
@@ -45,6 +46,12 @@ impl DigestHashContext for Sha512Context {
     /// Finalizes the digest hash calculation.
     fn finalize(&mut self) -> Vec<u8> {
         self.internal_context.finalize(&SHA512_PRIME_SQUARE_ROOTS)
+    }
+
+    /// Finalizes the digest hash calculation into a fixed-size output buffer.
+    fn finalize_into(&mut self, output: &mut [u8]) {
+        self.internal_context
+            .finalize_into(&SHA512_PRIME_SQUARE_ROOTS, &mut output[0..64]);
     }
 
     /// Calculates the digest hash of the data.

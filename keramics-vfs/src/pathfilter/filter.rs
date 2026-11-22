@@ -248,6 +248,10 @@ mod tests {
             Path::from("/Windows/System32/winevt/Logs/Application.evtx"),
             None,
         ));
+        path_filter.add_signature(PathFilterSignature::new(
+            Path::from("/Library/Caches/com.apple.Safari"),
+            Some(PathComponent::from("Rsrc")),
+        ));
         path_filter.build()?;
 
         let path: Path = Path::from("/windows/system32/winevt/logs/application.evtx");
@@ -257,6 +261,37 @@ mod tests {
         let path: Path = Path::from("/windows/system32/winevt/logs/security.evtx");
         let result: bool = path_filter.is_match(&path, None)?;
         assert_eq!(result, false);
+
+        let path: Path = Path::from("/library/caches/com.apple.safari");
+        let data_fork_name: PathComponent = PathComponent::from("rsrc");
+        let result: bool = path_filter.is_match(&path, Some(&data_fork_name))?;
+        assert_eq!(result, true);
+
+        // Test error paths when case folding fails on path or data fork name.
+        let invalid_path: Path = Path::from("/\u{1f600}");
+        assert!(path_filter.is_match(&invalid_path, None).is_err());
+
+        let invalid_fork_name: PathComponent = PathComponent::from("\u{1f600}");
+        assert!(
+            path_filter
+                .is_match(&path, Some(&invalid_fork_name))
+                .is_err()
+        );
+
+        // Test build error when signature case folding fails.
+        let mut invalid_filter: PathFilter = PathFilter::new();
+        let mappings: PathCharacterMappings = PathCharacterMappings::Ucs2(Arc::new(
+            Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice()),
+        ));
+        invalid_filter.set_case_folding(mappings);
+        invalid_filter.add_signature(PathFilterSignature::new(Path::from("/\u{1f600}"), None));
+        assert!(invalid_filter.build().is_err());
+
+        // Test build error when prefix scan tree fails (duplicate signatures).
+        let mut duplicate_filter: PathFilter = PathFilter::new();
+        duplicate_filter.add_signature(PathFilterSignature::new(Path::from("/a/b"), None));
+        duplicate_filter.add_signature(PathFilterSignature::new(Path::from("/a/b"), None));
+        assert!(duplicate_filter.build().is_err());
 
         Ok(())
     }

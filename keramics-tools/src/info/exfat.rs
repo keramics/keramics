@@ -385,8 +385,8 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_core::open_os_data_stream;
-    use keramics_datetime::{FatTimeDate, FatTimeDate10Ms};
+    use keramics_core::{open_fake_data_stream, open_os_data_stream};
+    use keramics_datetime::{FatTimeDate, FatTimeDate10Ms, PosixTime32};
 
     use crate::assert_lines_eq;
 
@@ -418,6 +418,10 @@ mod tests {
         let test_struct: ExFatDateTimeInfo = ExFatDateTimeInfo::new(&date_time);
         let string: String = test_struct.to_string();
         assert_eq!(string, NOT_SET_VALUE);
+
+        let date_time: DateTime = DateTime::PosixTime32(PosixTime32::new(0));
+        let test_struct: ExFatDateTimeInfo = ExFatDateTimeInfo::new(&date_time);
+        assert_eq!(test_struct.to_string(), "Unsupported date time");
     }
 
     #[test]
@@ -465,6 +469,34 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_file_system
-    // TODO: add tests for print_file_system
+    #[test]
+    fn test_print_methods() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/exfat/exfat.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+
+        ExFatInfo::print_file_system(&data_stream)?;
+        ExFatInfo::print_file_entry_by_identifier(&data_stream, 0x00201c00)?;
+        assert!(
+            ExFatInfo::print_file_entry_by_identifier(&data_stream, u32::MAX as u64 + 1).is_err()
+        );
+
+        ExFatInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/testfile1"))?;
+        assert!(
+            ExFatInfo::print_file_entry_by_path(&data_stream, &Path::from("/nonexistent")).is_err()
+        );
+
+        ExFatInfo::print_hierarchy(&data_stream, None)?;
+        ExFatInfo::print_hierarchy(&data_stream, Some(&String::from("/testdir1")))?;
+        assert!(
+            ExFatInfo::print_hierarchy(&data_stream, Some(&String::from("/nonexistent"))).is_err()
+        );
+
+        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
+        assert!(ExFatInfo::print_file_system(&invalid_stream).is_err());
+        assert!(ExFatInfo::print_file_entry_by_identifier(&invalid_stream, 0).is_err());
+        assert!(ExFatInfo::print_file_entry_by_path(&invalid_stream, &Path::from("/")).is_err());
+        assert!(ExFatInfo::print_hierarchy(&invalid_stream, None).is_err());
+
+        Ok(())
+    }
 }

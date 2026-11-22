@@ -63,9 +63,9 @@ impl<T: CryptEcb, const BLOCK_SIZE: usize> XtsContext<T, BLOCK_SIZE> {
                 "Invalid data value too small"
             ));
         }
-        let mut block_data: Vec<u8> = vec![0; BLOCK_SIZE];
-        let mut encrypted_tweak_value: Vec<u8> = vec![0; BLOCK_SIZE];
-        let mut encrypted_tweak_value_copy: Vec<u8> = vec![0; BLOCK_SIZE];
+        let mut block_data: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+        let mut encrypted_tweak_value: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+        let mut encrypted_tweak_value_copy: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
 
         match self
             .tweak_context
@@ -172,6 +172,132 @@ impl<T: CryptEcb, const BLOCK_SIZE: usize> XtsContext<T, BLOCK_SIZE> {
         Ok(())
     }
 
+    /// Decrypts data in place using XTS mode.
+    pub fn decrypt_xts_in_place(
+        &self,
+        tweak_value: &[u8],
+        data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        let tweak_value_size: usize = tweak_value.len();
+
+        if tweak_value_size < BLOCK_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid tweak value size value too small"
+            ));
+        }
+        let data_size: usize = data.len();
+
+        if data_size < BLOCK_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid encrypted data size value too small"
+            ));
+        }
+        let mut block_data: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+        let mut encrypted_tweak_value: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+        let mut encrypted_tweak_value_copy: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+
+        match self
+            .tweak_context
+            .encrypt_ecb(&tweak_value[0..BLOCK_SIZE], &mut encrypted_tweak_value)
+        {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to encrypt tweak value");
+                return Err(error);
+            }
+        }
+        let mut data_offset: usize = 0;
+        let mut remaining_data_size: usize = data_size;
+
+        while remaining_data_size >= BLOCK_SIZE {
+            if remaining_data_size < BLOCK_SIZE + BLOCK_SIZE && remaining_data_size != BLOCK_SIZE {
+                encrypted_tweak_value_copy.copy_from_slice(&encrypted_tweak_value);
+
+                let mut carry_bit: u8 = 0;
+                for tweak_byte in encrypted_tweak_value.iter_mut() {
+                    let byte_value: u8 = (*tweak_byte << 1) | carry_bit;
+                    carry_bit = *tweak_byte >> 7;
+                    *tweak_byte = byte_value;
+                }
+                if carry_bit > 0 {
+                    encrypted_tweak_value[0] ^= 0x87;
+                }
+            }
+            let data_end_offset: usize = data_offset + BLOCK_SIZE;
+
+            block_data.copy_from_slice(&data[data_offset..data_end_offset]);
+
+            for (data_byte, tweak_byte) in block_data.iter_mut().zip(&encrypted_tweak_value) {
+                *data_byte ^= tweak_byte;
+            }
+            match self
+                .context
+                .decrypt_ecb(&block_data, &mut data[data_offset..data_end_offset])
+            {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decrypt block data");
+                    return Err(error);
+                }
+            }
+            for (data_byte, tweak_byte) in data[data_offset..data_end_offset]
+                .iter_mut()
+                .zip(&encrypted_tweak_value)
+            {
+                *data_byte ^= tweak_byte;
+            }
+            remaining_data_size -= BLOCK_SIZE;
+
+            let mut carry_bit: u8 = 0;
+            for tweak_byte in encrypted_tweak_value.iter_mut() {
+                let byte_value: u8 = (*tweak_byte << 1) | carry_bit;
+                carry_bit = *tweak_byte >> 7;
+                *tweak_byte = byte_value;
+            }
+            if carry_bit > 0 {
+                encrypted_tweak_value[0] ^= 0x87;
+            }
+            data_offset = data_end_offset;
+        }
+        if remaining_data_size > 0 {
+            encrypted_tweak_value.copy_from_slice(&encrypted_tweak_value_copy);
+
+            let previous_block_offset: usize = data_offset - BLOCK_SIZE;
+            let previous_block_end_offset: usize = previous_block_offset + remaining_data_size;
+            let final_block_offset: usize = data_offset;
+
+            block_data[0..remaining_data_size].copy_from_slice(&data[final_block_offset..]);
+            block_data[remaining_data_size..]
+                .copy_from_slice(&data[previous_block_end_offset..final_block_offset]);
+
+            data.copy_within(
+                previous_block_offset..previous_block_end_offset,
+                final_block_offset,
+            );
+
+            for (data_byte, tweak_byte) in block_data.iter_mut().zip(&encrypted_tweak_value) {
+                *data_byte ^= tweak_byte;
+            }
+            match self.context.decrypt_ecb(
+                &block_data,
+                &mut data[previous_block_offset..final_block_offset],
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decrypt block data");
+                    return Err(error);
+                }
+            }
+            for (data_byte, tweak_byte) in data[previous_block_offset..final_block_offset]
+                .iter_mut()
+                .zip(&encrypted_tweak_value)
+            {
+                *data_byte ^= tweak_byte;
+            }
+        }
+        Ok(())
+    }
+
     /// Encrypts data using XTS (XEX-based tweaked-codebook mode with ciphertext stealing) mode.
     pub fn encrypt_xts(
         &self,
@@ -198,8 +324,8 @@ impl<T: CryptEcb, const BLOCK_SIZE: usize> XtsContext<T, BLOCK_SIZE> {
                 "Invalid encrypted data value too small"
             ));
         }
-        let mut block_data: Vec<u8> = vec![0; BLOCK_SIZE];
-        let mut encrypted_tweak_value: Vec<u8> = vec![0; BLOCK_SIZE];
+        let mut block_data: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
+        let mut encrypted_tweak_value: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
 
         match self
             .tweak_context

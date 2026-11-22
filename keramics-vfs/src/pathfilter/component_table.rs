@@ -246,7 +246,12 @@ impl ComponentTable {
         match self.component_groups.get_mut(&component_index) {
             Some(components_group) => components_group.insert_component(path_component, path),
             None => {
-                self.smallest_component_index = min(component_index, self.smallest_component_index);
+                if self.component_groups.is_empty() {
+                    self.smallest_component_index = component_index;
+                } else {
+                    self.smallest_component_index =
+                        min(component_index, self.smallest_component_index);
+                }
 
                 let mut components_group: ComponentGroup = ComponentGroup::new(component_index);
                 components_group.insert_component(path_component, path);
@@ -485,7 +490,7 @@ mod tests {
 
         assert_eq!(component_table.component_groups.len(), 1);
         assert_eq!(component_table.signatures.len(), 1);
-        assert_eq!(component_table.smallest_component_index, 0);
+        assert_eq!(component_table.smallest_component_index, 1);
 
         let component_group: &ComponentGroup = &component_table.component_groups[&1];
         assert_eq!(
@@ -729,7 +734,7 @@ mod tests {
         component_table.insert_component(3, &PathComponent::from("testfile1"), &signature);
 
         assert_eq!(component_table.component_groups.len(), 1);
-        assert_eq!(component_table.smallest_component_index, 0);
+        assert_eq!(component_table.smallest_component_index, 3);
 
         let component_group: &ComponentGroup = &component_table.component_groups[&3];
         assert_eq!(component_group.path_groups.len(), 1);
@@ -749,7 +754,7 @@ mod tests {
         component_table.insert_component(1, &PathComponent::from("testdir1"), &signature);
 
         assert_eq!(component_table.component_groups.len(), 2);
-        assert_eq!(component_table.smallest_component_index, 0);
+        assert_eq!(component_table.smallest_component_index, 1);
     }
 
     #[test]

@@ -396,6 +396,9 @@ mod tests {
             file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
 
+        let volume_entry: VolsnapFileEntry = get_volume_file_entry(&volsnap_shadow_storage)?;
+        assert!(volume_entry.get_sub_file_entry_by_index(0).is_err());
+
         Ok(())
     }
 

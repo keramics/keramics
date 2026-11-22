@@ -185,7 +185,7 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::{Arc, RwLock};
 
-    use keramics_core::open_os_data_stream;
+    use keramics_core::{open_fake_data_stream, open_os_data_stream};
     use keramics_formats::RangeStream;
     use keramics_formats::vhd::VhdFile;
 
@@ -231,6 +231,10 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_encrypted_volume
-    // TODO: add tests for print_encrypted_volume
+    #[test]
+    fn test_print_encrypted_volume_error() {
+        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
+        let result: Result<(), ErrorTrace> = BdeInfo::print_encrypted_volume(&invalid_stream);
+        assert!(result.is_err());
+    }
 }

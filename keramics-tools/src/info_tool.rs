@@ -437,13 +437,31 @@ impl InfoTool {
             let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
-                    credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                }
+                let cdsaencr_credential: CdsaEncrCredential = match vfs_credential {
+                    VfsCredential::KeyData { identifier, data } => CdsaEncrCredential::KeyData {
+                        identifier: identifier.clone(),
+                        data: data.clone(),
+                    },
+                    VfsCredential::Passphrase(passphrase) => {
+                        CdsaEncrCredential::Passphrase(passphrase.clone())
+                    }
+                    _ => continue,
+                };
+                credentials.push(cdsaencr_credential);
             }
             match cdsaencr_container.unlock(&credentials) {
                 Ok(false) => {}
                 Ok(true) => {
+                    if let Some(key_data) = cdsaencr_container.get_key_data() {
+                        let identifier: Vec<u8> = cdsaencr_container
+                            .get_container_identifier()
+                            .to_be_bytes()
+                            .to_vec();
+                        _ = credential_store.add_credential(VfsCredential::KeyData {
+                            identifier,
+                            data: key_data.to_vec(),
+                        });
+                    }
                     let container_data_stream: DataStreamReference =
                         match cdsaencr_container.get_data_stream() {
                             Some(data_stream) => data_stream,
@@ -566,6 +584,34 @@ fn main() -> ExitCode {
     let info_tool: InfoTool =
         InfoTool::new(&arguments.encoding, arguments.contents, arguments.offset);
 
+    #[cfg(feature = "debug-trace")]
+    {
+        Mediator {
+            debug_output: arguments.debug,
+        }
+        .make_current();
+    }
+    let is_sparsebundle: bool = !arguments.contents
+        && (matches!(arguments.format, Some(FormatType::SparseBundle))
+            || (arguments.source.is_dir()
+                && arguments.source.extension() == Some("sparsebundle".as_ref())));
+
+    if is_sparsebundle {
+        let result: Result<(), ErrorTrace> = match arguments.command {
+            None => SparseBundleInfo::print_image(&arguments.source),
+            Some(_) => Err(keramics_core::error_trace_new!(format!(
+                "Unsupported format: {}",
+                FormatIdentifier::SparseBundle
+            ))),
+        };
+        return match result {
+            Ok(_) => ExitCode::SUCCESS,
+            Err(error) => {
+                println!("Unable to provide information about: {}\n{}", source, error);
+                ExitCode::FAILURE
+            }
+        };
+    }
     let data_stream: DataStreamReference =
         match info_tool.get_data_stream(&arguments.source, arguments.image_layer) {
             Ok(data_stream) => data_stream,
@@ -603,37 +649,21 @@ fn main() -> ExitCode {
         Some(FormatType::Vmdk) => FormatIdentifier::Vmdk,
         Some(FormatType::Volsnap) => FormatIdentifier::Volsnap,
         Some(FormatType::Xfs) => FormatIdentifier::Xfs,
-        None => {
-            if !arguments.contents
-                && arguments.source.is_dir()
-                && arguments.source.extension() == Some("sparsebundle".as_ref())
-            {
-                FormatIdentifier::SparseBundle
-            } else {
-                match info_tool.scan_for_formats(&data_stream) {
-                    Ok(Some(format_identifier)) => format_identifier,
-                    Ok(None) => {
-                        println!("No format signatures found");
-                        return ExitCode::FAILURE;
-                    }
-                    Err(error) => {
-                        println!(
-                            "Unable to scan data stream for format signatures with error:\n{}",
-                            error
-                        );
-                        return ExitCode::FAILURE;
-                    }
-                }
+        None => match info_tool.scan_for_formats(&data_stream) {
+            Ok(Some(format_identifier)) => format_identifier,
+            Ok(None) => {
+                println!("No format signatures found");
+                return ExitCode::FAILURE;
             }
-        }
+            Err(error) => {
+                println!(
+                    "Unable to scan data stream for format signatures with error:\n{}",
+                    error
+                );
+                return ExitCode::FAILURE;
+            }
+        },
     };
-    #[cfg(feature = "debug-trace")]
-    {
-        Mediator {
-            debug_output: arguments.debug,
-        }
-        .make_current();
-    }
     let result: Result<(), ErrorTrace> = match arguments.command {
         Some(Commands::Identifier(command_arguments)) => match &format_identifier {
             FormatIdentifier::Apfs => ApfsInfo::print_file_entry_by_identifier(
@@ -806,5 +836,297 @@ fn main() -> ExitCode {
             println!("Unable to provide information about: {}\n{}", source, error);
             ExitCode::FAILURE
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_all_encodings() {
+        let encodings: [Option<EncodingType>; 34] = [
+            None,
+            Some(EncodingType::Ascii),
+            Some(EncodingType::Iso8859_1),
+            Some(EncodingType::Iso8859_2),
+            Some(EncodingType::Iso8859_3),
+            Some(EncodingType::Iso8859_4),
+            Some(EncodingType::Iso8859_5),
+            Some(EncodingType::Iso8859_6),
+            Some(EncodingType::Iso8859_7),
+            Some(EncodingType::Iso8859_8),
+            Some(EncodingType::Iso8859_9),
+            Some(EncodingType::Iso8859_10),
+            Some(EncodingType::Iso8859_11),
+            Some(EncodingType::Iso8859_13),
+            Some(EncodingType::Iso8859_14),
+            Some(EncodingType::Iso8859_15),
+            Some(EncodingType::Iso8859_16),
+            Some(EncodingType::Koi8R),
+            Some(EncodingType::Koi8U),
+            Some(EncodingType::Utf8),
+            Some(EncodingType::Windows874),
+            Some(EncodingType::Windows932),
+            Some(EncodingType::Windows936),
+            Some(EncodingType::Windows949),
+            Some(EncodingType::Windows950),
+            Some(EncodingType::Windows1250),
+            Some(EncodingType::Windows1251),
+            Some(EncodingType::Windows1252),
+            Some(EncodingType::Windows1253),
+            Some(EncodingType::Windows1254),
+            Some(EncodingType::Windows1255),
+            Some(EncodingType::Windows1256),
+            Some(EncodingType::Windows1257),
+            Some(EncodingType::Windows1258),
+        ];
+        for encoding in encodings.iter() {
+            let info_tool: InfoTool = InfoTool::new(encoding, false, 0);
+            assert_eq!(info_tool.character_encoding.is_some(), encoding.is_some());
+        }
+    }
+
+    #[test]
+    fn test_check_scan_results() -> Result<(), ErrorTrace> {
+        let info_tool: InfoTool = InfoTool::new(&None, false, 0);
+
+        // Test with empty and single scan results.
+        let empty_results: HashSet<FormatIdentifier> = HashSet::new();
+        assert_eq!(info_tool.check_scan_results(&empty_results)?, None);
+
+        let single_result: HashSet<FormatIdentifier> = HashSet::from([FormatIdentifier::Ext]);
+        assert_eq!(
+            info_tool.check_scan_results(&single_result)?,
+            Some(FormatIdentifier::Ext)
+        );
+
+        // Test BDE signature disambiguation.
+        let bde_fat: HashSet<FormatIdentifier> =
+            HashSet::from([FormatIdentifier::Bde, FormatIdentifier::Fat]);
+        assert_eq!(
+            info_tool.check_scan_results(&bde_fat)?,
+            Some(FormatIdentifier::Bde)
+        );
+        let bde_ntfs: HashSet<FormatIdentifier> =
+            HashSet::from([FormatIdentifier::Bde, FormatIdentifier::Ntfs]);
+        assert!(info_tool.check_scan_results(&bde_ntfs).is_err());
+
+        // Test UDIF signature disambiguation.
+        let udif_hfs: HashSet<FormatIdentifier> =
+            HashSet::from([FormatIdentifier::Udif, FormatIdentifier::Hfs]);
+        assert_eq!(
+            info_tool.check_scan_results(&udif_hfs)?,
+            Some(FormatIdentifier::Udif)
+        );
+        let udif_unknown: HashSet<FormatIdentifier> =
+            HashSet::from([FormatIdentifier::Udif, FormatIdentifier::Unknown]);
+        assert!(info_tool.check_scan_results(&udif_unknown).is_err());
+        let udif_vhd: HashSet<FormatIdentifier> =
+            HashSet::from([FormatIdentifier::Udif, FormatIdentifier::Vhd]);
+        assert!(info_tool.check_scan_results(&udif_vhd).is_err());
+
+        // Test VHD signature disambiguation.
+        let vhd_ntfs: HashSet<FormatIdentifier> =
+            HashSet::from([FormatIdentifier::Vhd, FormatIdentifier::Ntfs]);
+        assert_eq!(
+            info_tool.check_scan_results(&vhd_ntfs)?,
+            Some(FormatIdentifier::Vhd)
+        );
+        let vhd_unknown: HashSet<FormatIdentifier> =
+            HashSet::from([FormatIdentifier::Vhd, FormatIdentifier::Unknown]);
+        assert!(info_tool.check_scan_results(&vhd_unknown).is_err());
+        let vhd_vhdx: HashSet<FormatIdentifier> =
+            HashSet::from([FormatIdentifier::Vhd, FormatIdentifier::Vhdx]);
+        assert!(info_tool.check_scan_results(&vhd_vhdx).is_err());
+
+        // Test volsnap signature disambiguation.
+        let volsnap_ntfs: HashSet<FormatIdentifier> =
+            HashSet::from([FormatIdentifier::Volsnap, FormatIdentifier::Ntfs]);
+        assert_eq!(
+            info_tool.check_scan_results(&volsnap_ntfs)?,
+            Some(FormatIdentifier::Volsnap)
+        );
+        let volsnap_fat: HashSet<FormatIdentifier> =
+            HashSet::from([FormatIdentifier::Volsnap, FormatIdentifier::Fat]);
+        assert!(info_tool.check_scan_results(&volsnap_fat).is_err());
+
+        // Test unresolvable multiple signatures.
+        let ext_fat: HashSet<FormatIdentifier> =
+            HashSet::from([FormatIdentifier::Ext, FormatIdentifier::Fat]);
+        assert!(info_tool.check_scan_results(&ext_fat).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_data_stream_file_name_resolver_and_scan() -> Result<(), ErrorTrace> {
+        let info_tool: InfoTool = InfoTool::new(&None, false, 0);
+        let ext_path: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+
+        let file_name: PathComponent = info_tool.get_file_name(&ext_path)?;
+        assert_eq!(file_name, PathComponent::from("ext2.raw"));
+        assert!(info_tool.get_file_name(&PathBuf::from("/")).is_err());
+
+        let data_stream: DataStreamReference = info_tool.get_data_stream(&ext_path, 0)?;
+        let _file_resolver: FileResolverReference =
+            info_tool.get_file_resolver(&ext_path, &data_stream);
+        assert_eq!(
+            info_tool.scan_for_formats(&data_stream)?,
+            Some(FormatIdentifier::Ext)
+        );
+
+        // Test MBR fallback scan.
+        let mbr_path: PathBuf = PathBuf::from("../test_data/mbr/mbr.raw");
+        let mbr_stream: DataStreamReference = info_tool.get_data_stream(&mbr_path, 0)?;
+        assert_eq!(
+            info_tool.scan_for_formats(&mbr_stream)?,
+            Some(FormatIdentifier::Mbr)
+        );
+
+        // Test locked Mac OS Encrypted Encoding container scan.
+        let encrypted_path: PathBuf = PathBuf::from("../test_data/udif/hfsplus_aes256.dmg");
+        let encrypted_stream: DataStreamReference =
+            info_tool.get_data_stream(&encrypted_path, 0)?;
+        assert_eq!(
+            info_tool.scan_for_formats(&encrypted_stream)?,
+            Some(FormatIdentifier::CdsaEncr)
+        );
+
+        // Test with no format signature.
+        let plain_path: PathBuf = PathBuf::from("../test_data/directory/file.txt");
+        let plain_stream: DataStreamReference = info_tool.get_data_stream(&plain_path, 0)?;
+        assert_eq!(info_tool.scan_for_formats(&plain_stream)?, None);
+
+        // Test with a non-zero offset.
+        let offset_tool: InfoTool = InfoTool::new(&None, false, 4);
+        let offset_stream: DataStreamReference = offset_tool.get_data_stream(&plain_path, 0)?;
+        assert!(offset_stream.write().unwrap().get_size()? > 0);
+
+        // Test contents mode on a VHD image.
+        let contents_tool: InfoTool = InfoTool::new(&None, true, 0);
+        let vhd_path: PathBuf = PathBuf::from("../test_data/vhd/ext2.vhd");
+        let vhd_contents_stream: DataStreamReference =
+            contents_tool.get_data_stream(&vhd_path, 0)?;
+        let _file_resolver: FileResolverReference =
+            contents_tool.get_file_resolver(&vhd_path, &vhd_contents_stream);
+        assert_eq!(
+            contents_tool.scan_for_formats(&vhd_contents_stream)?,
+            Some(FormatIdentifier::Ext)
+        );
+
+        // Test error cases with a nonexistent file.
+        let missing_path: PathBuf = PathBuf::from("../test_data/nonexistent_file.raw");
+        assert!(info_tool.get_data_stream(&missing_path, 0).is_err());
+        assert!(contents_tool.get_data_stream(&missing_path, 0).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_formats_all_formats() -> Result<(), ErrorTrace> {
+        let info_tool: InfoTool = InfoTool::new(&None, false, 0);
+
+        let format_cases: [(&str, FormatIdentifier); 32] = [
+            ("../test_data/apfs/apfs.raw", FormatIdentifier::Apfs),
+            ("../test_data/apm/apm.dmg", FormatIdentifier::Apm),
+            (
+                "../test_data/bsdlabel/bsdlabel.raw",
+                FormatIdentifier::BsdDiskLabel,
+            ),
+            ("../test_data/ewf/ext2.E01", FormatIdentifier::Ewf),
+            ("../test_data/exfat/exfat.raw", FormatIdentifier::ExFat),
+            ("../test_data/ext/ext2.raw", FormatIdentifier::Ext),
+            ("../test_data/ext/ext3.raw", FormatIdentifier::Ext),
+            ("../test_data/ext/ext4.raw", FormatIdentifier::Ext),
+            ("../test_data/fat/fat12.raw", FormatIdentifier::Fat),
+            ("../test_data/gpt/gpt.raw", FormatIdentifier::Gpt),
+            ("../test_data/hfs/hfs.raw", FormatIdentifier::Hfs),
+            ("../test_data/hfs/hfsplus.raw", FormatIdentifier::Hfs),
+            (
+                "../test_data/hfs/hfs_wrapped_hfsplus.raw",
+                FormatIdentifier::Hfs,
+            ),
+            ("../test_data/linuxlvm/lvm2.raw", FormatIdentifier::LinuxLvm),
+            ("../test_data/luksde/luks1.raw", FormatIdentifier::Luks),
+            ("../test_data/luksde/luks2.raw", FormatIdentifier::Luks),
+            ("../test_data/mbr/mbr.raw", FormatIdentifier::Mbr),
+            ("../test_data/ntfs/ntfs.raw", FormatIdentifier::Ntfs),
+            (
+                "../test_data/pdi/hfsplus.hdd/DiskDescriptor.xml",
+                FormatIdentifier::Pdi,
+            ),
+            ("../test_data/qcow/ext2.qcow", FormatIdentifier::Qcow),
+            ("../test_data/qcow/ext2.qcow2", FormatIdentifier::Qcow),
+            ("../test_data/qcow/ext2_zlib.qcow2", FormatIdentifier::Qcow),
+            (
+                "../test_data/qcow/ext2_aes128.qcow2",
+                FormatIdentifier::Qcow,
+            ),
+            (
+                "../test_data/sgilabel/sgilabel.raw",
+                FormatIdentifier::SgiDiskLabel,
+            ),
+            (
+                "../test_data/sparseimage/hfsplus.sparseimage",
+                FormatIdentifier::SparseImage,
+            ),
+            (
+                "../test_data/sparseimage/hfsplus_aes128.sparseimage",
+                FormatIdentifier::CdsaEncr,
+            ),
+            ("../test_data/udif/hfsplus_zlib.dmg", FormatIdentifier::Udif),
+            (
+                "../test_data/udif/hfsplus_aes256.dmg",
+                FormatIdentifier::CdsaEncr,
+            ),
+            ("../test_data/vdi/ext2.vdi", FormatIdentifier::Vdi),
+            ("../test_data/vhd/ext2.vhd", FormatIdentifier::Vhd),
+            ("../test_data/vhdx/ext2.vhdx", FormatIdentifier::Vhdx),
+            ("../test_data/vmdk/ext2.vmdk", FormatIdentifier::Vmdk),
+        ];
+        for (path, expected_format) in format_cases {
+            let path_buf: PathBuf = PathBuf::from(path);
+            let data_stream: DataStreamReference = info_tool.get_data_stream(&path_buf, 0)?;
+            let detected_format: Option<FormatIdentifier> =
+                info_tool.scan_for_formats(&data_stream)?;
+
+            assert_eq!(
+                detected_format,
+                Some(expected_format),
+                "Unexpected detected format for {}",
+                path
+            );
+        }
+
+        let xfs_path: PathBuf = PathBuf::from("../test_data/xfs/xfs.raw");
+        let xfs_stream: DataStreamReference = info_tool.get_data_stream(&xfs_path, 0)?;
+        assert_eq!(
+            info_tool.scan_for_formats(&xfs_stream)?,
+            Some(FormatIdentifier::Xfs)
+        );
+
+        // Test contents mode auto-detection across storage media images.
+        let contents_tool: InfoTool = InfoTool::new(&None, true, 0);
+        let contents_cases: [(&str, FormatIdentifier); 3] = [
+            ("../test_data/qcow/fat16.qcow2", FormatIdentifier::Fat),
+            ("../test_data/qcow/fat32.qcow2", FormatIdentifier::Fat),
+            ("../test_data/vhd/ext2.vhd", FormatIdentifier::Ext),
+        ];
+        for (path, expected_format) in contents_cases {
+            let path_buf: PathBuf = PathBuf::from(path);
+            let data_stream: DataStreamReference = contents_tool.get_data_stream(&path_buf, 0)?;
+            let detected_format: Option<FormatIdentifier> =
+                contents_tool.scan_for_formats(&data_stream)?;
+
+            assert_eq!(
+                detected_format,
+                Some(expected_format),
+                "Unexpected contents format for {}",
+                path
+            );
+        }
+
+        Ok(())
     }
 }

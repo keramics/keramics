@@ -175,9 +175,17 @@ impl UdifFileSystem {
             let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
-                    credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                }
+                let cdsaencr_credential: CdsaEncrCredential = match vfs_credential {
+                    VfsCredential::KeyData { identifier, data } => CdsaEncrCredential::KeyData {
+                        identifier: identifier.clone(),
+                        data: data.clone(),
+                    },
+                    VfsCredential::Passphrase(passphrase) => {
+                        CdsaEncrCredential::Passphrase(passphrase.clone())
+                    }
+                    _ => continue,
+                };
+                credentials.push(cdsaencr_credential);
             }
             match image.unlock(&credentials) {
                 Ok(_) => {}

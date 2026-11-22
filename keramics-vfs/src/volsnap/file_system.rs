@@ -315,6 +315,27 @@ mod tests {
         let result: Option<VolsnapFileEntry> = volsnap_file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_none());
 
+        assert!(
+            volsnap_file_system
+                .get_file_entry_by_path(&Path::from("volsnap1"))?
+                .is_none()
+        );
+        assert!(
+            volsnap_file_system
+                .get_file_entry_by_path(&Path::from("/volsnap1/bogus"))?
+                .is_none()
+        );
+        assert!(
+            volsnap_file_system
+                .get_file_entry_by_path(&Path::from("/volsnap99"))?
+                .is_none()
+        );
+        assert!(
+            volsnap_file_system
+                .get_file_entry_by_path(&Path::from(""))?
+                .is_none()
+        );
+
         Ok(())
     }
 
@@ -365,6 +386,27 @@ mod tests {
 
         volsnap_file_system.open(Some(&mbr_file_system), &mbr_vfs_location)?;
         assert_eq!(volsnap_file_system.number_of_snapshots, 2);
+
+        // Test error cases: missing parent, root path without file name, invalid data, and shared Arc.
+        let mut test_file_system: VolsnapFileSystem = VolsnapFileSystem::new();
+        let result: Result<(), ErrorTrace> = test_file_system.open(None, &mbr_vfs_location);
+        assert!(result.is_err());
+
+        let root_location: VfsLocation = VfsLocation::from("/");
+        let result: Result<(), ErrorTrace> =
+            test_file_system.open(Some(&os_file_system), &root_location);
+        assert!(result.is_err());
+
+        let text_path: String = get_test_data_path("directory/file.txt");
+        let text_location: VfsLocation = VfsLocation::from(&text_path);
+        let result: Result<(), ErrorTrace> =
+            test_file_system.open(Some(&os_file_system), &text_location);
+        assert!(result.is_err());
+
+        let _root_entry: VolsnapFileEntry = volsnap_file_system.get_root_file_entry();
+        let result: Result<(), ErrorTrace> =
+            volsnap_file_system.open(Some(&mbr_file_system), &mbr_vfs_location);
+        assert!(result.is_err());
 
         Ok(())
     }

@@ -162,6 +162,14 @@ mod tests {
             vfs_context.get_data_stream_by_location_and_name(&vfs_location, None)?;
         assert!(result.is_none());
 
+        // Unsupported VFS type fails to open file system.
+        let fake_location: VfsLocation = VfsLocation::new_base(&VfsType::Fake, Path::from("/"));
+        assert!(
+            vfs_context
+                .get_data_stream_by_location_and_name(&fake_location, None)
+                .is_err()
+        );
+
         Ok(())
     }
 
@@ -179,6 +187,14 @@ mod tests {
         let result: Option<VfsFileEntry> = vfs_context.get_file_entry_by_location(&vfs_location)?;
         assert!(result.is_none());
 
+        // Unsupported VFS type fails to open file system.
+        let fake_location: VfsLocation = VfsLocation::new_base(&VfsType::Fake, Path::from("/"));
+        assert!(
+            vfs_context
+                .get_file_entry_by_location(&fake_location)
+                .is_err()
+        );
+
         Ok(())
     }
 
@@ -191,6 +207,22 @@ mod tests {
             vfs_context.open_file_system(&vfs_location)?;
 
         assert!(matches!(*vfs_file_system, VfsFileSystem::Os { .. }));
+
+        // Unsupported VfsType::Fake.
+        let fake_location: VfsLocation = VfsLocation::new_base(&VfsType::Fake, Path::from("/"));
+        assert!(vfs_context.open_file_system(&fake_location).is_err());
+
+        // Invalid parent file system.
+        let child_location: VfsLocation =
+            fake_location.new_with_layer(&VfsType::Ext, Path::from("/"));
+        assert!(vfs_context.open_file_system(&child_location).is_err());
+
+        // Valid parent but invalid image content.
+        let path_string: String = get_test_data_path("directory/file.txt");
+        let os_location: VfsLocation = VfsLocation::from(&path_string);
+        let invalid_ext_location: VfsLocation =
+            os_location.new_with_layer(&VfsType::Ext, Path::from("/"));
+        assert!(vfs_context.open_file_system(&invalid_ext_location).is_err());
 
         Ok(())
     }

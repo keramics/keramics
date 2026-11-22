@@ -1139,7 +1139,8 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_core::open_os_data_stream;
+    use keramics_core::{open_fake_data_stream, open_os_data_stream};
+    use keramics_formats::ntfs::NtfsAttributeListEntry;
 
     use crate::assert_lines_eq;
 
@@ -1151,10 +1152,26 @@ mod tests {
 
     #[test]
     fn test_file_attribute_flags_information_fmt() {
-        let test_struct: NtfsFileAttributeFlagsInfo = NtfsFileAttributeFlagsInfo::new(0x00000020);
+        let test_struct: NtfsFileAttributeFlagsInfo = NtfsFileAttributeFlagsInfo::new(0x20017fff);
 
-        let expected_string: &str =
-            "        0x00000020: Should be archived (FILE_ATTRIBUTE_ARCHIVE)\n";
+        let expected_string: &str = concat!(
+            "        0x00000001: Is read-only (FILE_ATTRIBUTE_READ_ONLY)\n",
+            "        0x00000002: Is hidden (FILE_ATTRIBUTE_HIDDEN)\n",
+            "        0x00000004: Is system (FILE_ATTRIBUTE_SYSTEM)\n",
+            "        0x00000010: Is directory (FILE_ATTRIBUTE_DIRECTORY)\n",
+            "        0x00000020: Should be archived (FILE_ATTRIBUTE_ARCHIVE)\n",
+            "        0x00000040: Is device (FILE_ATTRIBUTE_DEVICE)\n",
+            "        0x00000080: Is normal (FILE_ATTRIBUTE_NORMAL)\n",
+            "        0x00000100: Is temporary (FILE_ATTRIBUTE_TEMPORARY)\n",
+            "        0x00000200: Is a sparse file (FILE_ATTRIBUTE_SPARSE_FILE)\n",
+            "        0x00000400: Is a reparse point or symbolic link (FILE_ATTRIBUTE_FLAG_REPARSE_POINT)\n",
+            "        0x00000800: Is compressed (FILE_ATTRIBUTE_COMPRESSED)\n",
+            "        0x00001000: Is offline (FILE_ATTRIBUTE_OFFLINE)\n",
+            "        0x00002000: Content should not be indexed (FILE_ATTRIBUTE_NOT_CONTENT_INDEXED)\n",
+            "        0x00004000: Is encrypted (FILE_ATTRIBUTE_ENCRYPTED)\n",
+            "        0x00010000: Is virtual (FILE_ATTRIBUTE_VIRTUAL)\n",
+            "        0x20000000: UNKNOWN (Is index view)\n",
+        );
 
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
@@ -1219,22 +1236,93 @@ mod tests {
 
     #[test]
     fn test_volume_flags_information_fmt() {
-        let test_struct: NtfsVolumeFlagsInfo = NtfsVolumeFlagsInfo::new(0x0001);
+        let test_struct: NtfsVolumeFlagsInfo = NtfsVolumeFlagsInfo::new(0xc03f);
 
-        let expected_string: &str = "        0x0001: Is dirty (VOLUME_IS_DIRTY)\n";
+        let expected_string: &str = concat!(
+            "        0x0001: Is dirty (VOLUME_IS_DIRTY)\n",
+            "        0x0002: Re-size journal ($LogFile) (VOLUME_RESIZE_LOG_FILE)\n",
+            "        0x0004: Mounted on Windows NT 4 (VOLUME_MOUNTED_ON_NT4)\n",
+            "        0x0008: Is dirty (VOLUME_IS_DIRTY)\n",
+            "        0x0010: Delete USN in progress (VOLUME_DELETE_USN_UNDERWAY)\n",
+            "        0x0020: Repair object identifiers (VOLUME_REPAIR_OBJECT_ID)\n",
+            "        0x4000: chkdsk in progress (VOLUME_CHKDSK_UNDERWAY)\n",
+            "        0x8000: Modified by chkdsk (VOLUME_MODIFIED_BY_CHKDSK)\n",
+        );
 
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
     }
 
-    // TODO: add tests for NtfsVolumeInformationInfo
+    #[test]
+    fn test_attribute_list_information_fmt() {
+        let mut attribute_list: NtfsAttributeList = NtfsAttributeList::new();
+        let mut entry1: NtfsAttributeListEntry = NtfsAttributeListEntry::new();
+        entry1.attribute_type = NTFS_ATTRIBUTE_TYPE_DATA;
+        entry1.file_reference = 0x0001_0000_0000_0042;
+        attribute_list.entries.push(entry1);
 
-    // TODO: add tests for open_file_system
-    // TODO: add tests for print_attribute
-    // TODO: add tests for print_file_entry_by_identifier
-    // TODO: add tests for print_file_entry_by_path
-    // TODO: add tests for print_file_system
-    // TODO: add tests for print_hierarchy
-    // TODO: add tests for print_hierarchy_file_entry
-    // TODO: add tests for print_hierarchy_file_entry_as_path
+        let mut entry2: NtfsAttributeListEntry = NtfsAttributeListEntry::new();
+        entry2.attribute_type = 0xdeadbeef;
+        entry2.file_reference = 0x0002_0000_0000_0005;
+        attribute_list.entries.push(entry2);
+
+        let test_struct: NtfsAttributeListInfo = NtfsAttributeListInfo::new(&attribute_list);
+        let string: String = test_struct.to_string();
+        assert!(string.contains("Number of entries\t\t\t\t: 2"));
+        assert!(string.contains("$DATA (0x00000080) with file reference: 66-1"));
+        assert!(string.contains("0xdeadbeef with file reference: 5-2"));
+    }
+
+    #[test]
+    fn test_lookup_tables_and_print_methods() -> Result<(), ErrorTrace> {
+        assert_eq!(
+            NtfsAttributeListInfo::get_attribute_type_string(&NTFS_ATTRIBUTE_TYPE_DATA),
+            Some("$DATA")
+        );
+        assert_eq!(
+            NtfsAttributeListInfo::get_attribute_type_string(&0xffffffff),
+            None
+        );
+        assert_eq!(
+            NtfsInfo::get_attribute_type_string(&NTFS_ATTRIBUTE_TYPE_FILE_NAME),
+            Some("$FILE_NAME")
+        );
+        assert_eq!(NtfsInfo::get_attribute_type_string(&0xffffffff), None);
+        assert_eq!(
+            NtfsInfo::get_reparse_tag_string(&0xa000000c),
+            Some("IO_REPARSE_TAG_SYMLINK")
+        );
+        assert_eq!(NtfsInfo::get_reparse_tag_string(&0x12345678), None);
+
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+
+        NtfsInfo::print_file_system(&data_stream)?;
+        NtfsInfo::print_file_entry_by_identifier(&data_stream, 0)?;
+        NtfsInfo::print_file_entry_by_identifier(&data_stream, 3)?;
+        NtfsInfo::print_file_entry_by_identifier(&data_stream, 5)?;
+        NtfsInfo::print_file_entry_by_identifier(&data_stream, 66)?;
+        assert!(
+            NtfsInfo::print_file_entry_by_identifier(&data_stream, u32::MAX as u64 + 1).is_err()
+        );
+
+        NtfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/testfile1"))?;
+        assert!(
+            NtfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/nonexistent")).is_err()
+        );
+
+        NtfsInfo::print_hierarchy(&data_stream, None)?;
+        NtfsInfo::print_hierarchy(&data_stream, Some(&String::from("/testdir1")))?;
+        assert!(
+            NtfsInfo::print_hierarchy(&data_stream, Some(&String::from("/nonexistent"))).is_err()
+        );
+
+        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
+        assert!(NtfsInfo::print_file_system(&invalid_stream).is_err());
+        assert!(NtfsInfo::print_file_entry_by_identifier(&invalid_stream, 0).is_err());
+        assert!(NtfsInfo::print_file_entry_by_path(&invalid_stream, &Path::from("/")).is_err());
+        assert!(NtfsInfo::print_hierarchy(&invalid_stream, None).is_err());
+
+        Ok(())
+    }
 }

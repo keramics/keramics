@@ -107,3 +107,79 @@ impl VfsScanNode {
         self.is_locked
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_locked_sub_node() {
+        let vfs_location: VfsLocation = VfsLocation::from("/test.dmg");
+        let mut scan_node: VfsScanNode = VfsScanNode::new(vfs_location);
+
+        assert!(scan_node.is_empty());
+        assert!(!scan_node.is_locked());
+
+        scan_node.add_locked_sub_node(&VfsType::Udif);
+
+        assert!(!scan_node.is_empty());
+        assert_eq!(scan_node.sub_nodes.len(), 1);
+        assert_eq!(scan_node.sub_nodes[0].get_type(), &VfsType::Udif);
+        assert!(scan_node.sub_nodes[0].is_locked());
+        assert!(scan_node.sub_nodes[0].is_empty());
+    }
+
+    #[test]
+    fn test_get_location() {
+        let vfs_location: VfsLocation = VfsLocation::from("/test.raw");
+        let scan_node: VfsScanNode = VfsScanNode::new(vfs_location.clone());
+
+        assert_eq!(scan_node.get_location(), &vfs_location);
+    }
+
+    #[test]
+    fn test_is_file_system() {
+        for vfs_type in [
+            VfsType::Apfs,
+            VfsType::ExFat,
+            VfsType::Ext,
+            VfsType::Fat,
+            VfsType::Hfs,
+            VfsType::Ntfs,
+            VfsType::Xfs,
+        ] {
+            let vfs_location: VfsLocation = VfsLocation::new_base(&vfs_type, Path::from("/"));
+            let scan_node: VfsScanNode = VfsScanNode::new(vfs_location);
+            assert!(scan_node.is_file_system());
+        }
+
+        for vfs_type in [
+            VfsType::ApfsContainer,
+            VfsType::Apm,
+            VfsType::Bde,
+            VfsType::Ewf,
+            VfsType::Fake,
+            VfsType::Gpt,
+            VfsType::LinuxLvm,
+            VfsType::Luksde,
+            VfsType::Mbr,
+            VfsType::Os,
+            VfsType::Pdi,
+            VfsType::Qcow,
+            VfsType::SgiDiskLabel,
+            VfsType::SparseBundle,
+            VfsType::SparseImage,
+            VfsType::SplitRaw,
+            VfsType::Udif,
+            VfsType::Vdi,
+            VfsType::Vhd,
+            VfsType::Vhdx,
+            VfsType::Vmdk,
+            VfsType::Volsnap,
+        ] {
+            let vfs_location: VfsLocation = VfsLocation::new_base(&vfs_type, Path::from("/"));
+            let scan_node: VfsScanNode = VfsScanNode::new(vfs_location);
+            assert!(!scan_node.is_file_system());
+        }
+    }
+}

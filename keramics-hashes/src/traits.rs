@@ -21,6 +21,12 @@ pub trait DigestHashContext {
     /// Finalizes the digest hash calculation.
     fn finalize(&mut self) -> Vec<u8>;
 
+    /// Finalizes the digest hash calculation into a fixed-size output buffer.
+    fn finalize_into(&mut self, output: &mut [u8]) {
+        let hash: Vec<u8> = self.finalize();
+        output[0..hash.len()].copy_from_slice(&hash);
+    }
+
     /// Calculates the digest hash of the data.
     fn update(&mut self, data: &[u8]);
 }

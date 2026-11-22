@@ -237,4 +237,64 @@ mod tests {
         let signature: &Arc<Signature> = scan_context.results.get(&80).unwrap();
         assert_eq!(signature.identifier.as_str(), "test1");
     }
+
+    #[test]
+    fn test_build_with_duplicate_header_signatures() {
+        let mut scanner: Scanner = Scanner::new();
+        scanner.add_signature(Signature::new(
+            "vhd1",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        ));
+        scanner.add_signature(Signature::new(
+            "vhd2",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        ));
+
+        let result: Result<(), ErrorTrace> = scanner.build();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_with_duplicate_footer_signatures() {
+        let mut scanner: Scanner = Scanner::new();
+        scanner.add_signature(Signature::new(
+            "vhd1",
+            PatternType::BoundToEnd,
+            72,
+            "conectix".as_bytes(),
+        ));
+        scanner.add_signature(Signature::new(
+            "vhd2",
+            PatternType::BoundToEnd,
+            72,
+            "conectix".as_bytes(),
+        ));
+
+        let result: Result<(), ErrorTrace> = scanner.build();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_with_duplicate_unbound_signatures() {
+        let mut scanner: Scanner = Scanner::new();
+        scanner.add_signature(Signature::new(
+            "test1",
+            PatternType::Unbound,
+            0,
+            "conectix".as_bytes(),
+        ));
+        scanner.add_signature(Signature::new(
+            "test2",
+            PatternType::Unbound,
+            0,
+            "conectix".as_bytes(),
+        ));
+
+        let result: Result<(), ErrorTrace> = scanner.build();
+        assert!(result.is_err());
+    }
 }

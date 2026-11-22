@@ -82,10 +82,10 @@ struct PyFatDate {
 #[pymethods]
 impl PyFatDate {
     #[getter]
-    pub fn timestamp(&self) -> PyResult<u32> {
+    pub fn timestamp(&self) -> PyResult<u64> {
         let seconds: u32 = self.fat_date.get_number_of_seconds();
 
-        Ok(seconds * 100)
+        Ok((seconds as u64) * 100)
     }
 }
 
@@ -99,10 +99,10 @@ struct PyFatTimeDate {
 #[pymethods]
 impl PyFatTimeDate {
     #[getter]
-    pub fn timestamp(&self) -> PyResult<u32> {
+    pub fn timestamp(&self) -> PyResult<u64> {
         let seconds: u32 = self.fat_time_date.get_number_of_seconds();
 
-        Ok(seconds * 100)
+        Ok((seconds as u64) * 100)
     }
 }
 
@@ -116,10 +116,10 @@ struct PyFatTimeDate10Ms {
 #[pymethods]
 impl PyFatTimeDate10Ms {
     #[getter]
-    pub fn timestamp(&self) -> PyResult<u32> {
+    pub fn timestamp(&self) -> PyResult<u64> {
         let (seconds, fraction): (u32, u32) = self.fat_time_date.get_number_of_seconds();
 
-        Ok((seconds * 100) + fraction)
+        Ok(((seconds as u64) * 100) + (fraction as u64))
     }
 }
 

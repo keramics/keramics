@@ -106,6 +106,19 @@ mod tests {
         assert_eq!(skip_table.smallest_pattern_size, 8);
         assert_eq!(skip_table.skip_values.get(&0x63), Some(3).as_ref());
         assert_eq!(skip_table.smallest_skip_value, 1);
+
+        // Test with multiple signatures of differing sizes.
+        let mut skip_table: SkipTable = SkipTable::new();
+        signatures.push(Arc::new(Signature::new(
+            "udif",
+            PatternType::BoundToEnd,
+            512,
+            "koly".as_bytes(),
+        )));
+        skip_table.fill(&signatures);
+
+        assert_eq!(skip_table.smallest_pattern_size, 4);
+        assert_eq!(skip_table.smallest_skip_value, 1);
     }
 
     #[test]

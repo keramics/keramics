@@ -121,14 +121,19 @@ mod tests {
         let mut directory_entries: OsDirectoryEntries = OsDirectoryEntries::new();
 
         assert_eq!(directory_entries.entries.len(), 0);
-        assert_eq!(directory_entries.is_read, false);
+        assert_eq!(directory_entries.is_read(), false);
 
         let path_string: String = get_test_data_path("directory");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         directory_entries.read(&path_buf)?;
 
         assert_eq!(directory_entries.entries.len(), 2);
-        assert_eq!(directory_entries.is_read, true);
+        assert_eq!(directory_entries.is_read(), true);
+
+        let mut missing_entries: OsDirectoryEntries = OsDirectoryEntries::new();
+        let path_string: String = get_test_data_path("directory/bogus");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        assert!(missing_entries.read(&path_buf).is_err());
 
         Ok(())
     }

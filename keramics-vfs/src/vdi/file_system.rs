@@ -206,6 +206,7 @@ mod tests {
         vdi_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(vdi_file_system.number_of_layers, 1);
+        assert_eq!(vdi_file_system.get_bytes_per_sector()?, 512);
 
         Ok(())
     }

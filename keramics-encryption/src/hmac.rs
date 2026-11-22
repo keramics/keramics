@@ -41,18 +41,30 @@ pub type HmacSha512Context = HmacContext<Sha512Context, 128, 64>;
 
 /// Context for HMAC.
 #[derive(Clone)]
-pub struct HmacContext<T: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize> {
+pub struct HmacContext<
+    T: DigestHashContext + Clone,
+    const BLOCK_SIZE: usize,
+    const HASH_SIZE: usize,
+> {
     /// Digest hash context.
     digest_context: T,
+
+    /// Precomputed inner digest hash context.
+    inner_digest_context: T,
+
+    /// Precomputed outer digest hash context.
+    outer_digest_context: T,
 }
 
-impl<T: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize>
+impl<T: DigestHashContext + Clone, const BLOCK_SIZE: usize, const HASH_SIZE: usize>
     HmacContext<T, BLOCK_SIZE, HASH_SIZE>
 {
     /// Creates a new context.
     pub fn new() -> Self {
         Self {
             digest_context: T::new(),
+            inner_digest_context: T::new(),
+            outer_digest_context: T::new(),
         }
     }
 
@@ -68,6 +80,31 @@ impl<T: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize>
                 "Invalid HMAC value too small"
             ));
         }
+        self.set_key(key);
+        self.calculate_hmac_with_key(data, hmac)
+    }
+
+    /// Calculates a HMAC using the previously configured key.
+    pub fn calculate_hmac_with_key(&self, data: &[u8], hmac: &mut [u8]) -> Result<(), ErrorTrace> {
+        if hmac.len() < HASH_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid HMAC value too small"
+            ));
+        }
+        let mut inner_hash: [u8; HASH_SIZE] = [0; HASH_SIZE];
+        let mut inner_context: T = self.inner_digest_context.clone();
+        inner_context.update(data);
+        inner_context.finalize_into(&mut inner_hash);
+
+        let mut outer_context: T = self.outer_digest_context.clone();
+        outer_context.update(&inner_hash);
+        outer_context.finalize_into(&mut hmac[0..HASH_SIZE]);
+
+        Ok(())
+    }
+
+    /// Sets the key and precomputes the inner and outer digest hash states.
+    pub fn set_key(&mut self, key: &[u8]) {
         let key_size: usize = key.len();
         let mut key_data: [u8; BLOCK_SIZE] = [0; BLOCK_SIZE];
 
@@ -75,9 +112,8 @@ impl<T: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize>
             key_data[0..key_size].copy_from_slice(key);
         } else {
             self.digest_context.update(key);
-            let key_hash: Vec<u8> = self.digest_context.finalize();
-
-            key_data[0..HASH_SIZE].copy_from_slice(&key_hash);
+            self.digest_context
+                .finalize_into(&mut key_data[0..HASH_SIZE]);
         }
         let mut inner_padding: [u8; BLOCK_SIZE] = [0x36; BLOCK_SIZE];
 
@@ -89,16 +125,11 @@ impl<T: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize>
         for (padding_byte, key_byte) in outer_padding.iter_mut().zip(key_data.iter()) {
             *padding_byte ^= *key_byte;
         }
-        self.digest_context.update(&inner_padding);
-        self.digest_context.update(data);
-        let inner_hash: Vec<u8> = self.digest_context.finalize();
+        self.inner_digest_context = T::new();
+        self.inner_digest_context.update(&inner_padding);
 
-        self.digest_context.update(&outer_padding);
-        self.digest_context.update(&inner_hash);
-        let outer_hash: Vec<u8> = self.digest_context.finalize();
-        hmac[0..HASH_SIZE].copy_from_slice(&outer_hash);
-
-        Ok(())
+        self.outer_digest_context = T::new();
+        self.outer_digest_context.update(&outer_padding);
     }
 }
 
@@ -576,6 +607,34 @@ mod tests {
                 test_number + 1
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_key_and_calculate_hmac_with_key() -> Result<(), ErrorTrace> {
+        let mut hmac_context: HmacSha1Context = HmacSha1Context::new();
+        hmac_context.set_key(b"Jefe");
+
+        let mut hmac1: [u8; 20] = [0; 20];
+        hmac_context.calculate_hmac_with_key(b"what do ya want for nothing?", &mut hmac1)?;
+
+        let mut hmac2: [u8; 20] = [0; 20];
+        hmac_context.calculate_hmac_with_key(b"what do ya want for nothing?", &mut hmac2)?;
+
+        assert_eq!(hmac1, hmac2);
+        assert_eq!(
+            hmac1,
+            [
+                0xef, 0xfc, 0xdf, 0x6a, 0xe5, 0xeb, 0x2f, 0xa2, 0xd2, 0x74, 0x16, 0xd5, 0xf1, 0x84,
+                0xdf, 0x9c, 0x25, 0x9a, 0x7c, 0x79,
+            ]
+        );
+
+        let mut short_buffer: [u8; 4] = [0; 4];
+        let result: Result<(), ErrorTrace> =
+            hmac_context.calculate_hmac_with_key(b"data", &mut short_buffer);
+        assert!(result.is_err());
+
         Ok(())
     }
 }

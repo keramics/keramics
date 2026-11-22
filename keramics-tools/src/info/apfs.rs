@@ -944,8 +944,8 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_core::open_os_data_stream;
-    use keramics_datetime::ApfsTime;
+    use keramics_core::{open_fake_data_stream, open_os_data_stream};
+    use keramics_datetime::{ApfsTime, PosixTime32};
 
     use crate::assert_lines_eq;
 
@@ -992,6 +992,10 @@ mod tests {
         let test_struct: ApfsTimeInfo = ApfsTimeInfo::new(&date_time);
         let string: String = test_struct.to_string();
         assert_eq!(string, NOT_SET_VALUE);
+
+        let date_time: DateTime = DateTime::PosixTime32(PosixTime32::new(0));
+        let test_struct: ApfsTimeInfo = ApfsTimeInfo::new(&date_time);
+        assert_eq!(test_struct.to_string(), "Unsupported date time");
     }
 
     #[test]
@@ -1052,6 +1056,64 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_container
-    // TODO: add tests for print_container
+    #[test]
+    fn test_flags_and_print_methods() -> Result<(), ErrorTrace> {
+        let container_features: String = ApfsContainerFeatureFlagsInfo::new(0x3).to_string();
+        assert!(container_features.contains("NX_FEATURE_DEFRAG"));
+        assert!(container_features.contains("NX_FEATURE_LCFD"));
+
+        let container_incompatible_features: String =
+            ApfsContainerIncompatibilityFeatureFlagsInfo::new(0x103).to_string();
+        assert!(container_incompatible_features.contains("NX_INCOMPAT_VERSION1"));
+        assert!(container_incompatible_features.contains("NX_INCOMPAT_VERSION2"));
+        assert!(container_incompatible_features.contains("NX_INCOMPAT_FUSION"));
+
+        let volume_features: String = ApfsVolumeFeatureFlagsInfo::new(0x1f).to_string();
+        assert!(volume_features.contains("APFS_FEATURE_DEFRAG_PRERELEASE"));
+        assert!(volume_features.contains("APFS_FEATURE_HARDLINK_MAP_RECORDS"));
+        assert!(volume_features.contains("APFS_FEATURE_DEFRAG"));
+        assert!(volume_features.contains("APFS_FEATURE_STRICTATIME"));
+        assert!(volume_features.contains("APFS_FEATURE_VOLGRP_SYSTEM_INO_SPACE"));
+
+        let volume_incompatible_features: String =
+            ApfsVolumeIncompatibilityFeatureFlagsInfo::new(0x7f).to_string();
+        assert!(volume_incompatible_features.contains("APFS_INCOMPAT_CASE_INSENSITIVE"));
+        assert!(volume_incompatible_features.contains("APFS_INCOMPAT_DATALESS_SNAPS"));
+        assert!(volume_incompatible_features.contains("APFS_INCOMPAT_ENC_ROLLED"));
+        assert!(volume_incompatible_features.contains("APFS_INCOMPAT_NORMALIZATION_INSENSITIVE"));
+        assert!(volume_incompatible_features.contains("APFS_INCOMPAT_INCOMPLETE_RESTORE"));
+        assert!(volume_incompatible_features.contains("APFS_INCOMPAT_SEALED_VOLUME"));
+        assert!(volume_incompatible_features.contains("APFS_INCOMPAT_RESERVED_40"));
+
+        let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+
+        ApfsInfo::print_container(&data_stream)?;
+        ApfsInfo::print_file_entry_by_identifier(&data_stream, 0, 18)?;
+        ApfsInfo::print_file_entry_by_identifier(&data_stream, 1, 18)?;
+        assert!(ApfsInfo::print_file_entry_by_identifier(&data_stream, 99, 18).is_err());
+        assert!(ApfsInfo::print_file_entry_by_identifier(&data_stream, 1, 999999).is_err());
+
+        ApfsInfo::print_file_entry_by_path(&data_stream, 0, &Path::from("/testdir1/testfile1"))?;
+        ApfsInfo::print_file_entry_by_path(&data_stream, 1, &Path::from("/testdir1/xattr1"))?;
+        assert!(ApfsInfo::print_file_entry_by_path(&data_stream, 99, &Path::from("/")).is_err());
+        assert!(
+            ApfsInfo::print_file_entry_by_path(&data_stream, 1, &Path::from("/nonexistent"))
+                .is_err()
+        );
+
+        ApfsInfo::print_hierarchy(&data_stream, 0, &DisplayPathType::Index, None)?;
+        ApfsInfo::print_hierarchy(&data_stream, 1, &DisplayPathType::Identifier, None)?;
+        ApfsInfo::print_hierarchy(&data_stream, 2, &DisplayPathType::Index, None)?;
+
+        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
+        assert!(ApfsInfo::print_container(&invalid_stream).is_err());
+        assert!(ApfsInfo::print_file_entry_by_identifier(&invalid_stream, 0, 1).is_err());
+        assert!(ApfsInfo::print_file_entry_by_path(&invalid_stream, 0, &Path::from("/")).is_err());
+        assert!(
+            ApfsInfo::print_hierarchy(&invalid_stream, 0, &DisplayPathType::Index, None).is_err()
+        );
+
+        Ok(())
+    }
 }

@@ -799,9 +799,19 @@ fn main() -> ExitCode {
 mod tests {
     use super::*;
 
-    use std::io::Cursor;
+    use std::io::{Cursor, Error as IoError, Result as IoResult};
 
     use keramics_core::{DataStreamReference, open_fake_data_stream};
+
+    /// Reader that always fails to read.
+    struct FailingReader {}
+
+    impl Read for FailingReader {
+        /// Reads data into the buffer.
+        fn read(&mut self, _buf: &mut [u8]) -> IoResult<usize> {
+            Err(IoError::other("read failure"))
+        }
+    }
 
     fn get_test_data() -> Vec<u8> {
         vec![
@@ -826,25 +836,56 @@ mod tests {
     #[test]
     fn test_calculate_hash_from_data_stream() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let hash_tool: HashTool = HashTool::new(
-            &DigestHashType::Md5,
-            &DisplayPathType::Index,
-            false,
-            &OutputFormat::Text,
-            true,
-        );
-        let md5: String = hash_tool.calculate_hash_from_data_stream(&data_stream)?;
-        assert_eq!(md5, "f19106bcf25fa9cabc1b5ac91c726001");
-
+        for (hash_type, expected_len) in [
+            (DigestHashType::Md5, 32usize),
+            (DigestHashType::Sha1, 40usize),
+            (DigestHashType::Sha224, 56usize),
+            (DigestHashType::Sha256, 64usize),
+            (DigestHashType::Sha512, 128usize),
+        ] {
+            let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+            let hash_tool: HashTool = HashTool::new(
+                &hash_type,
+                &DisplayPathType::Index,
+                false,
+                &OutputFormat::Text,
+                true,
+            );
+            let hash: String = hash_tool.calculate_hash_from_data_stream(&data_stream)?;
+            assert_eq!(hash.len(), expected_len);
+            if matches!(hash_type, DigestHashType::Md5) {
+                assert_eq!(hash, "f19106bcf25fa9cabc1b5ac91c726001");
+            }
+        }
         Ok(())
     }
 
     #[test]
     fn test_calculate_hash_from_reader() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let mut reader: Cursor<&[u8]> = Cursor::new(&test_data);
+
+        for (hash_type, expected_len) in [
+            (DigestHashType::Md5, 32usize),
+            (DigestHashType::Sha1, 40usize),
+            (DigestHashType::Sha224, 56usize),
+            (DigestHashType::Sha256, 64usize),
+            (DigestHashType::Sha512, 128usize),
+        ] {
+            let mut reader: Cursor<&[u8]> = Cursor::new(&test_data);
+            let hash_tool: HashTool = HashTool::new(
+                &hash_type,
+                &DisplayPathType::Index,
+                false,
+                &OutputFormat::Text,
+                true,
+            );
+            let hash: String = hash_tool.calculate_hash_from_reader(&mut reader)?;
+            assert_eq!(hash.len(), expected_len);
+            if matches!(hash_type, DigestHashType::Md5) {
+                assert_eq!(hash, "f19106bcf25fa9cabc1b5ac91c726001");
+            }
+        }
 
         let hash_tool: HashTool = HashTool::new(
             &DigestHashType::Md5,
@@ -853,11 +894,101 @@ mod tests {
             &OutputFormat::Text,
             true,
         );
-        let md5: String = hash_tool.calculate_hash_from_reader(&mut reader)?;
-        assert_eq!(md5, "f19106bcf25fa9cabc1b5ac91c726001");
+        let mut failing_reader: FailingReader = FailingReader {};
+        let result: Result<String, ErrorTrace> =
+            hash_tool.calculate_hash_from_reader(&mut failing_reader);
+        assert!(result.is_err());
 
         Ok(())
     }
 
-    // TODO: add more tests
+    #[test]
+    fn test_scan_and_hash_scan_nodes() -> Result<(), ErrorTrace> {
+        let hash_tool: HashTool = HashTool::new(
+            &DigestHashType::Md5,
+            &DisplayPathType::Index,
+            true,
+            &OutputFormat::Text,
+            true,
+        );
+
+        // Test with an ext2 file system.
+        let path: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+        let vfs_location: VfsLocation = VfsLocation::from(&path);
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        hash_tool.scan_for_file_systems(&vfs_location, 0, None, None, &mut scan_context)?;
+        let root_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
+        hash_tool.calculate_hash_from_scan_node(root_node)?;
+        hash_tool.calculate_hash_from_scan_node_with_path(
+            root_node,
+            &Path::from("/testdir1/testfile1"),
+            None,
+        )?;
+        hash_tool.calculate_hash_from_scan_node_with_path(
+            root_node,
+            &Path::from("/does_not_exist"),
+            None,
+        )?;
+
+        // Test with an NTFS file system in text and dfImageTools formats.
+        let ntfs_path: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let ntfs_location: VfsLocation = VfsLocation::from(&ntfs_path);
+        let mut ntfs_context: VfsScanContext = VfsScanContext::new();
+        hash_tool.scan_for_file_systems(&ntfs_location, 0, None, None, &mut ntfs_context)?;
+        let ntfs_root: &VfsScanNode = ntfs_context.root_node.as_ref().unwrap();
+        hash_tool.calculate_hash_from_scan_node(ntfs_root)?;
+
+        let dfimagetools_hash_tool: HashTool = HashTool::new(
+            &DigestHashType::Sha256,
+            &DisplayPathType::Identifier,
+            false,
+            &OutputFormat::DfImageTools,
+            false,
+        );
+        dfimagetools_hash_tool.calculate_hash_from_scan_node(ntfs_root)?;
+
+        // Test with GPT partitions option and error cases.
+        let gpt_path: PathBuf = PathBuf::from("../test_data/gpt/gpt.raw");
+        let gpt_location: VfsLocation = VfsLocation::from(&gpt_path);
+        let mut gpt_context: VfsScanContext = VfsScanContext::new();
+        let partitions: String = String::from("1");
+        hash_tool.scan_for_file_systems(
+            &gpt_location,
+            0,
+            Some(&partitions),
+            None,
+            &mut gpt_context,
+        )?;
+
+        let unsupported_partitions: String = String::from("none");
+        let mut error_context: VfsScanContext = VfsScanContext::new();
+        let result: Result<(), ErrorTrace> = hash_tool.scan_for_file_systems(
+            &gpt_location,
+            0,
+            Some(&unsupported_partitions),
+            None,
+            &mut error_context,
+        );
+        assert!(result.is_err());
+
+        let unsupported_volumes: String = String::from("none");
+        let result: Result<(), ErrorTrace> = hash_tool.scan_for_file_systems(
+            &gpt_location,
+            0,
+            None,
+            Some(&unsupported_volumes),
+            &mut error_context,
+        );
+        assert!(result.is_err());
+
+        // Test with a non-filesystem scan node.
+        let file_path: PathBuf = PathBuf::from("../test_data/directory/file.txt");
+        let file_location: VfsLocation = VfsLocation::from(&file_path);
+        let mut file_context: VfsScanContext = VfsScanContext::new();
+        hash_tool.scan_for_file_systems(&file_location, 0, None, None, &mut file_context)?;
+        let file_root: &VfsScanNode = file_context.root_node.as_ref().unwrap();
+        hash_tool.calculate_hash_from_scan_node(file_root)?;
+
+        Ok(())
+    }
 }

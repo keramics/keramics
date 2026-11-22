@@ -253,8 +253,8 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for PdiSnapshotInfo
-
-    // TODO: add tests for open_image
-    // TODO: add tests for print_image
+    #[test]
+    fn test_print_image_error() {
+        assert!(PdiInfo::print_image(&PathBuf::from("../test_data/directory/file.txt")).is_err());
+    }
 }

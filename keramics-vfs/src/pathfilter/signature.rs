@@ -68,4 +68,67 @@ impl PathFilterSignature {
     }
 }
 
-// TODO: add tests for new_with_case_folding
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::sync::Arc;
+
+    use keramics_types::constants::UCS2_CASE_MAPPINGS;
+    use keramics_types::{Ucs2CharacterMappings, Ucs2String};
+
+    #[test]
+    fn test_new_with_case_folding() -> Result<(), ErrorTrace> {
+        let mappings: PathCharacterMappings = PathCharacterMappings::Ucs2(Arc::new(
+            Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice()),
+        ));
+
+        let signature: PathFilterSignature = PathFilterSignature::new(
+            Path::from("/Library/Caches"),
+            Some(PathComponent::from("rsrc")),
+        );
+        let folded_signature: PathFilterSignature = signature.new_with_case_folding(&mappings)?;
+        assert_eq!(
+            folded_signature.path,
+            Path {
+                components: vec![
+                    PathComponent::Root,
+                    PathComponent::Ucs2String(Ucs2String::from("LIBRARY")),
+                    PathComponent::Ucs2String(Ucs2String::from("CACHES")),
+                ]
+            }
+        );
+        assert_eq!(
+            folded_signature.data_fork_name,
+            Some(PathComponent::Ucs2String(Ucs2String::from("RSRC")))
+        );
+
+        // Test without a data fork name.
+        let signature: PathFilterSignature =
+            PathFilterSignature::new(Path::from("/Library/Caches"), None);
+        let folded_signature: PathFilterSignature = signature.new_with_case_folding(&mappings)?;
+        assert_eq!(folded_signature.data_fork_name, None);
+
+        // Test with a path outside the UCS-2 range.
+        let invalid_path_signature: PathFilterSignature =
+            PathFilterSignature::new(Path::from("/\u{1f600}"), None);
+        assert!(
+            invalid_path_signature
+                .new_with_case_folding(&mappings)
+                .is_err()
+        );
+
+        // Test with a data fork name outside the UCS-2 range.
+        let invalid_fork_signature: PathFilterSignature = PathFilterSignature::new(
+            Path::from("/Library/Caches"),
+            Some(PathComponent::from("\u{1f600}")),
+        );
+        assert!(
+            invalid_fork_signature
+                .new_with_case_folding(&mappings)
+                .is_err()
+        );
+
+        Ok(())
+    }
+}

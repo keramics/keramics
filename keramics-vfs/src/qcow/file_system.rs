@@ -200,6 +200,33 @@ mod tests {
         let result: Option<QcowFileEntry> = qcow_file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_none());
 
+        assert!(
+            qcow_file_system
+                .get_file_entry_by_path(&Path::from("qcow1"))?
+                .is_none()
+        );
+        assert!(
+            qcow_file_system
+                .get_file_entry_by_path(&Path::from("/qcow1/bogus"))?
+                .is_none()
+        );
+        assert!(
+            qcow_file_system
+                .get_file_entry_by_path(&Path::from("/qcow99"))?
+                .is_none()
+        );
+        assert!(
+            qcow_file_system
+                .get_file_entry_by_path(&Path::from(""))?
+                .is_none()
+        );
+
+        // Layer file entry has no sub file entries.
+        let layer_entry: QcowFileEntry = qcow_file_system
+            .get_file_entry_by_path(&Path::from("/qcow1"))?
+            .unwrap();
+        assert!(layer_entry.get_sub_file_entry_by_index(0).is_err());
+
         Ok(())
     }
 
@@ -224,6 +251,28 @@ mod tests {
         qcow_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(qcow_file_system.number_of_layers, 1);
+        assert_eq!(qcow_file_system.get_bytes_per_sector()?, 512);
+
+        // Test error cases: missing parent, root path without file name, invalid data, and shared Arc.
+        let mut test_file_system: QcowFileSystem = QcowFileSystem::new();
+        let result: Result<(), ErrorTrace> = test_file_system.open(None, &parent_vfs_location);
+        assert!(result.is_err());
+
+        let root_location: VfsLocation = VfsLocation::from("/");
+        let result: Result<(), ErrorTrace> =
+            test_file_system.open(Some(&parent_file_system), &root_location);
+        assert!(result.is_err());
+
+        let text_path: String = get_test_data_path("directory/file.txt");
+        let text_location: VfsLocation = VfsLocation::from(&text_path);
+        let result: Result<(), ErrorTrace> =
+            test_file_system.open(Some(&parent_file_system), &text_location);
+        assert!(result.is_err());
+
+        let _root_entry: QcowFileEntry = qcow_file_system.get_root_file_entry();
+        let result: Result<(), ErrorTrace> =
+            qcow_file_system.open(Some(&parent_file_system), &parent_vfs_location);
+        assert!(result.is_err());
 
         Ok(())
     }

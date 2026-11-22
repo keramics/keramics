@@ -59,10 +59,7 @@ impl CdsaEncrCipherContext {
 /// Mac OS Encrypted Encoding (cdsaencr) HMAC context.
 #[derive(Clone)]
 pub enum CdsaEncrHmacContext {
-    HmacSha1 {
-        key: Vec<u8>,
-        context: HmacSha1Context,
-    },
+    HmacSha1 { context: HmacSha1Context },
     None,
 }
 
@@ -70,9 +67,9 @@ impl CdsaEncrHmacContext {
     /// Calculates a HMAC.
     pub fn calculate_hmac(&mut self, data: &[u8]) -> Result<Vec<u8>, ErrorTrace> {
         match self {
-            CdsaEncrHmacContext::HmacSha1 { key, context } => {
+            CdsaEncrHmacContext::HmacSha1 { context } => {
                 let mut hmac: Vec<u8> = vec![0; 20];
-                context.calculate_hmac(key, data, &mut hmac)?;
+                context.calculate_hmac_with_key(data, &mut hmac)?;
                 Ok(hmac)
             }
             CdsaEncrHmacContext::None => Err(keramics_core::error_trace_new!("Not implemented")),
@@ -172,10 +169,12 @@ impl CdsaEncrEncryption {
         key: &[u8],
     ) -> Result<Option<CdsaEncrHmacContext>, ErrorTrace> {
         match hmac_method {
-            91 => Ok(Some(CdsaEncrHmacContext::HmacSha1 {
-                key: key.to_vec(),
-                context: HmacSha1Context::new(),
-            })),
+            91 => {
+                let mut context: HmacSha1Context = HmacSha1Context::new();
+                context.set_key(key);
+
+                Ok(Some(CdsaEncrHmacContext::HmacSha1 { context }))
+            }
             _ => Ok(None),
         }
     }

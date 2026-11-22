@@ -666,13 +666,31 @@ impl VfsScanner {
             let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
-                    credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                }
+                let cdsaencr_credential: CdsaEncrCredential = match vfs_credential {
+                    VfsCredential::KeyData { identifier, data } => CdsaEncrCredential::KeyData {
+                        identifier: identifier.clone(),
+                        data: data.clone(),
+                    },
+                    VfsCredential::Passphrase(passphrase) => {
+                        CdsaEncrCredential::Passphrase(passphrase.clone())
+                    }
+                    _ => continue,
+                };
+                credentials.push(cdsaencr_credential);
             }
             match cdsaencr_container.unlock(&credentials) {
                 Ok(false) => {}
                 Ok(true) => {
+                    if let Some(key_data) = cdsaencr_container.get_key_data() {
+                        let identifier: Vec<u8> = cdsaencr_container
+                            .get_container_identifier()
+                            .to_be_bytes()
+                            .to_vec();
+                        _ = credential_store.add_credential(VfsCredential::KeyData {
+                            identifier,
+                            data: key_data.to_vec(),
+                        });
+                    }
                     let container_data_stream: DataStreamReference =
                         match cdsaencr_container.get_data_stream() {
                             Some(data_stream) => data_stream,
@@ -2445,7 +2463,335 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add test for volsnap
+    #[test]
+    fn test_get_vfs_type() {
+        let mappings: [(FormatIdentifier, Option<VfsType>); 27] = [
+            (FormatIdentifier::Apfs, Some(VfsType::ApfsContainer)),
+            (FormatIdentifier::Apm, Some(VfsType::Apm)),
+            (FormatIdentifier::Bde, Some(VfsType::Bde)),
+            (FormatIdentifier::Ewf, Some(VfsType::Ewf)),
+            (FormatIdentifier::ExFat, Some(VfsType::ExFat)),
+            (FormatIdentifier::Ext, Some(VfsType::Ext)),
+            (FormatIdentifier::Fat, Some(VfsType::Fat)),
+            (FormatIdentifier::Gpt, Some(VfsType::Gpt)),
+            (FormatIdentifier::Hfs, Some(VfsType::Hfs)),
+            (FormatIdentifier::LinuxLvm, Some(VfsType::LinuxLvm)),
+            (FormatIdentifier::Luks, Some(VfsType::Luksde)),
+            (FormatIdentifier::Mbr, Some(VfsType::Mbr)),
+            (FormatIdentifier::Ntfs, Some(VfsType::Ntfs)),
+            (FormatIdentifier::Pdi, Some(VfsType::Pdi)),
+            (FormatIdentifier::Qcow, Some(VfsType::Qcow)),
+            (FormatIdentifier::SgiDiskLabel, Some(VfsType::SgiDiskLabel)),
+            (FormatIdentifier::SparseBundle, Some(VfsType::SparseBundle)),
+            (FormatIdentifier::SparseImage, Some(VfsType::SparseImage)),
+            (FormatIdentifier::SplitRaw, Some(VfsType::SplitRaw)),
+            (FormatIdentifier::Udif, Some(VfsType::Udif)),
+            (FormatIdentifier::Vdi, Some(VfsType::Vdi)),
+            (FormatIdentifier::Vhd, Some(VfsType::Vhd)),
+            (FormatIdentifier::Vhdx, Some(VfsType::Vhdx)),
+            (FormatIdentifier::Vmdk, Some(VfsType::Vmdk)),
+            (FormatIdentifier::Volsnap, Some(VfsType::Volsnap)),
+            (FormatIdentifier::Xfs, Some(VfsType::Xfs)),
+            (FormatIdentifier::CdsaEncr, None),
+        ];
 
-    // TODO: add tests for scan_for_volume_system_sub_nodes
+        for (format_identifier, expected_vfs_type) in mappings {
+            assert_eq!(
+                VfsScanner::get_vfs_type(&format_identifier),
+                expected_vfs_type
+            );
+        }
+    }
+
+    #[test]
+    fn test_scan_with_errors_and_edge_cases() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+        let scan_options: VfsScanOptions = VfsScanOptions::new();
+
+        // Missing file entry.
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let path_string: String = get_test_data_path("directory/bogus.txt");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        assert!(
+            format_scanner
+                .scan(&scan_options, &mut scan_context, &vfs_location)
+                .is_err()
+        );
+
+        // Unsupported file system type.
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let vfs_location: VfsLocation = VfsLocation::new_base(&VfsType::Fake, Path::from("/"));
+        assert!(
+            format_scanner
+                .scan(&scan_options, &mut scan_context, &vfs_location)
+                .is_err()
+        );
+
+        // Directory without sparsebundle extension.
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let path_string: String = get_test_data_path("directory");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
+        let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
+        assert_eq!(scan_node.get_type(), &VfsType::Os);
+        assert!(scan_node.is_empty());
+
+        // Root directory has no file name.
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let vfs_location: VfsLocation = VfsLocation::from("/");
+        assert!(
+            format_scanner
+                .scan(&scan_options, &mut scan_context, &vfs_location)
+                .is_err()
+        );
+
+        // Symbolic link is an unsupported file type.
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let path_string: String = get_test_data_path("directory/symbolic_link");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        assert!(
+            format_scanner
+                .scan(&scan_options, &mut scan_context, &vfs_location)
+                .is_err()
+        );
+
+        // Plain text file without recognized format.
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let path_string: String = get_test_data_path("directory/file.txt");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
+        let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
+        assert!(scan_node.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_with_storage_media_images() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+        let scan_options: VfsScanOptions = VfsScanOptions::new();
+
+        let test_cases: [(&str, VfsType); 11] = [
+            ("ewf/ext2.E01", VfsType::Ewf),
+            ("pdi/hfsplus.hdd/DiskDescriptor.xml", VfsType::Pdi),
+            ("qcow/ext2.qcow2", VfsType::Qcow),
+            ("qcow/ext2_aes128.qcow2", VfsType::Qcow),
+            ("sparseimage/hfsplus.sparseimage", VfsType::SparseImage),
+            ("splitraw/ext2.raw.000", VfsType::SplitRaw),
+            ("udif/hfsplus_zlib.dmg", VfsType::Udif),
+            ("vdi/ext2.vdi", VfsType::Vdi),
+            ("vhd/ext2.vhd", VfsType::Vhd),
+            ("vhdx/ext2.vhdx", VfsType::Vhdx),
+            ("vmdk/ext2.vmdk", VfsType::Vmdk),
+        ];
+
+        for (relative_path, expected_type) in test_cases {
+            let mut scan_context: VfsScanContext = VfsScanContext::new();
+            let path_string: String = get_test_data_path(relative_path);
+            let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+            format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
+
+            let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
+            assert_eq!(scan_node.get_type(), &VfsType::Os);
+            assert_eq!(scan_node.sub_nodes.len(), 1);
+            assert_eq!(scan_node.sub_nodes[0].get_type(), &expected_type);
+        }
+
+        // Test scanning a differential VHD with an image_layer option.
+        let mut layer_scan_options: VfsScanOptions = VfsScanOptions::new();
+        layer_scan_options.image_layer = 2;
+
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let path_string: String = get_test_data_path("vhd/ntfs-differential.vhd");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        format_scanner.scan(&layer_scan_options, &mut scan_context, &vfs_location)?;
+
+        let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
+        assert_eq!(scan_node.sub_nodes.len(), 1);
+        assert_eq!(scan_node.sub_nodes[0].get_type(), &VfsType::Vhd);
+        assert_eq!(scan_node.sub_nodes[0].sub_nodes.len(), 1);
+
+        // Test encrypted UDIF (CdsaEncr) image scan.
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let path_string: String = get_test_data_path("udif/hfsplus_aes256.dmg");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
+
+        let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
+        assert_eq!(scan_node.sub_nodes.len(), 1);
+        assert_eq!(scan_node.sub_nodes[0].get_type(), &VfsType::Udif);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_with_volume_systems_and_file_systems() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+        let scan_options: VfsScanOptions = VfsScanOptions::new();
+
+        let test_cases: [(&str, VfsType); 12] = [
+            ("apm/apm.dmg", VfsType::Apm),
+            ("apfs/apfs_encrypted.raw", VfsType::ApfsContainer),
+            ("linuxlvm/lvm2.raw", VfsType::LinuxLvm),
+            ("luksde/luks1.raw", VfsType::Luksde),
+            ("mbr/mbr.raw", VfsType::Mbr),
+            ("sgilabel/sgilabel.raw", VfsType::SgiDiskLabel),
+            ("exfat/exfat.raw", VfsType::ExFat),
+            ("ext/ext2.raw", VfsType::Ext),
+            ("fat/fat12.raw", VfsType::Fat),
+            ("hfs/hfsplus.raw", VfsType::Hfs),
+            ("ntfs/ntfs.raw", VfsType::Ntfs),
+            ("xfs/xfs.raw", VfsType::Xfs),
+        ];
+
+        for (relative_path, expected_type) in test_cases {
+            let mut scan_context: VfsScanContext = VfsScanContext::new();
+            let path_string: String = get_test_data_path(relative_path);
+            let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+            format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
+
+            let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
+            assert_eq!(scan_node.get_type(), &VfsType::Os);
+            assert_eq!(scan_node.sub_nodes.len(), 1);
+            assert_eq!(scan_node.sub_nodes[0].get_type(), &expected_type);
+        }
+
+        // Test BDE inside VHD + MBR.
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let path_string: String = get_test_data_path("bde/bde_aes128.vhd");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
+
+        let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
+        let vhd_node: &VfsScanNode = &scan_node.sub_nodes[0];
+        assert_eq!(vhd_node.get_type(), &VfsType::Vhd);
+        let mbr_node: &VfsScanNode = &vhd_node.sub_nodes[0].sub_nodes[0];
+        assert_eq!(mbr_node.get_type(), &VfsType::Mbr);
+        let bde_node: &VfsScanNode = &mbr_node.sub_nodes[0].sub_nodes[0];
+        assert_eq!(bde_node.get_type(), &VfsType::Bde);
+
+        // Test volsnap inside VHD + MBR.
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let path_string: String = get_test_data_path("volsnap/volsnap.vhd");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
+
+        let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
+        let vhd_node: &VfsScanNode = &scan_node.sub_nodes[0];
+        assert_eq!(vhd_node.get_type(), &VfsType::Vhd);
+        let mbr_node: &VfsScanNode = &vhd_node.sub_nodes[0].sub_nodes[0];
+        assert_eq!(mbr_node.get_type(), &VfsType::Mbr);
+        let mbr1_node: &VfsScanNode = &mbr_node.sub_nodes[0];
+        assert_eq!(mbr1_node.sub_nodes.len(), 2);
+        assert_eq!(mbr1_node.sub_nodes[0].get_type(), &VfsType::Ntfs);
+        assert_eq!(mbr1_node.sub_nodes[1].get_type(), &VfsType::Volsnap);
+        assert_eq!(mbr1_node.sub_nodes[1].sub_nodes.len(), 2);
+
+        // Test volume filter options with APFS and Linux LVM.
+        let mut filtered_options: VfsScanOptions = VfsScanOptions::new();
+        filtered_options.parse_volumes("99")?;
+
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let path_string: String = get_test_data_path("apfs/apfs.raw");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        format_scanner.scan(&filtered_options, &mut scan_context, &vfs_location)?;
+        let apfs_node: &VfsScanNode = &scan_context.root_node.as_ref().unwrap().sub_nodes[0];
+        assert!(apfs_node.sub_nodes.is_empty());
+
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let path_string: String = get_test_data_path("linuxlvm/lvm2.raw");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        format_scanner.scan(&filtered_options, &mut scan_context, &vfs_location)?;
+        let lvm_node: &VfsScanNode = &scan_context.root_node.as_ref().unwrap().sub_nodes[0];
+        assert!(lvm_node.sub_nodes.is_empty());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_format_edge_cases() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+        let vfs_file_system: VfsFileSystemReference = get_file_system()?;
+
+        // Missing data stream.
+        let path_string: String = get_test_data_path("directory/bogus.txt");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        assert!(
+            format_scanner
+                .scan_for_format(&vfs_file_system, &vfs_location)
+                .is_err()
+        );
+
+        // Unsupported VFS location type.
+        let path_string: String = get_test_data_path("ext/ext2.raw");
+        let os_vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        let ext_vfs_location: VfsLocation =
+            os_vfs_location.new_with_layer(&VfsType::Ext, Path::from("/testdir1/testfile1"));
+        assert!(
+            format_scanner
+                .scan_for_format(&vfs_file_system, &ext_vfs_location)
+                .is_err()
+        );
+
+        // Zero layers in scan_for_storage_media_image_sub_nodes.
+        let scan_options: VfsScanOptions = VfsScanOptions::new();
+        let mut scan_node: VfsScanNode = VfsScanNode::new(os_vfs_location.clone());
+        format_scanner.scan_for_storage_media_image_sub_nodes(
+            &scan_options,
+            &os_vfs_location,
+            &mut scan_node,
+            "/vhd",
+            0,
+        )?;
+        assert!(scan_node.is_empty());
+
+        // Unsupported VfsType::Fake in scan_sub_node.
+        let fake_location: VfsLocation = VfsLocation::new_base(&VfsType::Fake, Path::from("/"));
+        let mut fake_node: VfsScanNode = VfsScanNode::new(fake_location.clone());
+        assert!(
+            format_scanner
+                .scan_sub_node(
+                    &scan_options,
+                    &vfs_file_system,
+                    &fake_location,
+                    &mut fake_node
+                )
+                .is_err()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_volume_system_format_additional() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        // LUKS volume system.
+        let path_string: String = get_test_data_path("luksde/luks1.raw");
+        let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
+        assert_eq!(
+            format_scanner.scan_for_volume_system_format(&data_stream)?,
+            Some(FormatIdentifier::Luks)
+        );
+
+        // Excluded file systems return None.
+        for relative_path in ["exfat/exfat.raw", "fat/fat12.raw", "ntfs/ntfs.raw"] {
+            let path_string: String = get_test_data_path(relative_path);
+            let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
+            assert_eq!(
+                format_scanner.scan_for_volume_system_format(&data_stream)?,
+                None
+            );
+        }
+
+        // Plain file returns None.
+        let path_string: String = get_test_data_path("directory/file.txt");
+        let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
+        assert_eq!(
+            format_scanner.scan_for_volume_system_format(&data_stream)?,
+            None
+        );
+
+        Ok(())
+    }
 }

@@ -115,12 +115,35 @@ impl FileResolver for RangeFileResolver {
 mod tests {
     use super::*;
 
+    use std::ffi::OsString;
     use std::path::PathBuf;
+
+    use keramics_core::open_fake_data_stream;
+    use keramics_types::{ByteString, Ucs2String, Utf16String};
+
+    #[test]
+    fn test_get_path() {
+        let base_path: PathBuf = PathBuf::from("../test_data");
+        let file_resolver: RangeFileResolver = RangeFileResolver::new(base_path, 0, None);
+
+        let components: [PathComponent; 8] = [
+            PathComponent::Root,
+            PathComponent::ByteString(ByteString::from("a")),
+            PathComponent::Current,
+            PathComponent::OsString(OsString::from("b")),
+            PathComponent::Parent,
+            PathComponent::String(String::from("c")),
+            PathComponent::Ucs2String(Ucs2String::from("d")),
+            PathComponent::Utf16String(Utf16String::from("e")),
+        ];
+        let path: PathBuf = file_resolver.get_path(&components);
+        assert!(path.ends_with("e"));
+    }
 
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data");
-        let file_resolver: RangeFileResolver = RangeFileResolver::new(path_buf, 0, None);
+        let file_resolver: RangeFileResolver = RangeFileResolver::new(path_buf.clone(), 0, None);
 
         let path_components: [PathComponent; 2] = [
             PathComponent::from("directory"),
@@ -129,6 +152,29 @@ mod tests {
         let data_stream: Option<DataStreamReference> =
             file_resolver.get_data_stream(&path_components)?;
         assert!(data_stream.is_some());
+
+        // Test with a nonexistent path.
+        let missing_components: [PathComponent; 1] = [PathComponent::from("does_not_exist.bin")];
+        let result: Option<DataStreamReference> =
+            file_resolver.get_data_stream(&missing_components)?;
+        assert!(result.is_none());
+
+        // Test with an invalid path containing a NUL byte.
+        let invalid_components: [PathComponent; 1] = [PathComponent::from("bad\0path")];
+        let result: Result<Option<DataStreamReference>, ErrorTrace> =
+            file_resolver.get_data_stream(&invalid_components);
+        assert!(result.is_err());
+
+        // Test with a provided data stream and non-zero range offset.
+        let fake_stream: DataStreamReference = open_fake_data_stream(b"0123456789abcdef");
+        let range_resolver: RangeFileResolver =
+            RangeFileResolver::new(path_buf, 4, Some(&fake_stream));
+        let range_stream: DataStreamReference =
+            range_resolver.get_data_stream(&path_components)?.unwrap();
+        let mut data: [u8; 4] = [0; 4];
+        let read_count: usize = range_stream.write().unwrap().read(&mut data)?;
+        assert_eq!(read_count, 4);
+        assert_eq!(&data, b"4567");
 
         Ok(())
     }

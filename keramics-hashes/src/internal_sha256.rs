@@ -31,6 +31,7 @@ const SHA256_PRIME_CUBE_ROOTS: [u32; 64] = [
 ];
 
 /// Context for calculating a SHA-224 and SHA-256 hash.
+#[derive(Clone)]
 pub struct InternalSha256Context {
     /// Hash values.
     pub hash_values: [u32; 8],
@@ -58,6 +59,13 @@ impl InternalSha256Context {
 
     /// Finalizes the digest hash calculation.
     pub fn finalize(&mut self, prime_square_roots: &[u32]) -> Vec<u8> {
+        let mut hash: [u8; 32] = [0; 32];
+        self.finalize_into(prime_square_roots, &mut hash);
+        hash.to_vec()
+    }
+
+    /// Finalizes the digest hash calculation into a fixed-size output buffer.
+    pub fn finalize_into(&mut self, prime_square_roots: &[u32], output: &mut [u8]) {
         let bit_size: u64 = (self.number_of_bytes_hashed + self.block_offset as u64) * 8;
 
         // Add padding with a size of 56 mod 64
@@ -76,18 +84,14 @@ impl InternalSha256Context {
 
             self.hash_values.copy_from_slice(&hash_values);
         }
-        let hash: Vec<u8> = self
-            .hash_values
-            .iter()
-            .flat_map(|hash_value| hash_value.to_be_bytes())
-            .collect::<Vec<u8>>();
-
+        let number_of_words: usize = output.len() / 4;
+        for (index, hash_value) in self.hash_values[0..number_of_words].iter().enumerate() {
+            let offset: usize = index * 4;
+            output[offset..offset + 4].copy_from_slice(&hash_value.to_be_bytes());
+        }
         self.hash_values.copy_from_slice(prime_square_roots);
         self.number_of_bytes_hashed = 0;
         self.block_offset = 0;
-        self.block.fill(0);
-
-        hash
     }
 
     /// Calculates the hash of a block of data.

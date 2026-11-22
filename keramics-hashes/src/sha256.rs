@@ -24,6 +24,7 @@ const SHA256_PRIME_SQUARE_ROOTS: [u32; 8] = [
 ];
 
 /// Context for calculating a SHA-256 hash.
+#[derive(Clone)]
 pub struct Sha256Context {
     /// Internal context.
     internal_context: InternalSha256Context,
@@ -43,6 +44,12 @@ impl DigestHashContext for Sha256Context {
     /// Finalizes the digest hash calculation.
     fn finalize(&mut self) -> Vec<u8> {
         self.internal_context.finalize(&SHA256_PRIME_SQUARE_ROOTS)
+    }
+
+    /// Finalizes the digest hash calculation into a fixed-size output buffer.
+    fn finalize_into(&mut self, output: &mut [u8]) {
+        self.internal_context
+            .finalize_into(&SHA256_PRIME_SQUARE_ROOTS, &mut output[0..32]);
     }
 
     /// Calculates the digest hash of the data.
