@@ -93,7 +93,7 @@ mod tests {
             "vdh",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         assert_eq!(scanner.signatures.len(), 1);
     }
@@ -106,7 +106,7 @@ mod tests {
             "vdh",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.build()?;
 
@@ -123,19 +123,19 @@ mod tests {
             "vhd_header",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.add_signature(Signature::new(
             "vhd_footer",
             PatternType::BoundToEnd,
             72,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.add_signature(Signature::new(
             "vhd_unbound",
             PatternType::Unbound,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.build()?;
 
@@ -187,19 +187,19 @@ mod tests {
             "msiecf1",
             PatternType::BoundToStart,
             0,
-            "Client UrlCache MMF Ver ".as_bytes(),
+            b"Client UrlCache MMF Ver ",
         ));
         scanner.add_signature(Signature::new(
             "vhd1",
             PatternType::BoundToEnd,
             72,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.add_signature(Signature::new(
             "test1",
             PatternType::Unbound,
             0,
-            "example of unbounded pattern".as_bytes(),
+            b"example of unbounded pattern",
         ));
         scanner.build().unwrap();
 
@@ -245,13 +245,13 @@ mod tests {
             "vhd1",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.add_signature(Signature::new(
             "vhd2",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
 
         let result: Result<(), ErrorTrace> = scanner.build();
@@ -265,13 +265,13 @@ mod tests {
             "vhd1",
             PatternType::BoundToEnd,
             72,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.add_signature(Signature::new(
             "vhd2",
             PatternType::BoundToEnd,
             72,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
 
         let result: Result<(), ErrorTrace> = scanner.build();
@@ -285,13 +285,13 @@ mod tests {
             "test1",
             PatternType::Unbound,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
         scanner.add_signature(Signature::new(
             "test2",
             PatternType::Unbound,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ));
 
         let result: Result<(), ErrorTrace> = scanner.build();

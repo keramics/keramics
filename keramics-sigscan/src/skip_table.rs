@@ -99,7 +99,7 @@ mod tests {
             "vdh",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         )));
         skip_table.fill(&signatures);
 
@@ -113,7 +113,7 @@ mod tests {
             "udif",
             PatternType::BoundToEnd,
             512,
-            "koly".as_bytes(),
+            b"koly",
         )));
         skip_table.fill(&signatures);
 
@@ -132,7 +132,7 @@ mod tests {
             "vdh",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         )));
         skip_table.fill(&signatures);
 

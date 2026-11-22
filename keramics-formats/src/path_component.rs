@@ -949,7 +949,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Iso8859_1,
-                elements: vec![0x74, 0x65, 0x73, 0x74]
+                elements: b"test".to_vec(),
             }
         );
 
@@ -960,7 +960,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Iso8859_1,
-                elements: vec![0x74, 0x65, 0x73, 0x74]
+                elements: b"test".to_vec(),
             }
         );
 
@@ -982,7 +982,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Iso8859_1,
-                elements: vec![0x74, 0x65, 0x73, 0x74]
+                elements: b"test".to_vec(),
             }
         );
 
@@ -993,7 +993,7 @@ mod tests {
             byte_string,
             ByteString {
                 encoding: CharacterEncoding::Iso8859_1,
-                elements: vec![0x74, 0x65, 0x73, 0x74]
+                elements: b"test".to_vec(),
             }
         );
 

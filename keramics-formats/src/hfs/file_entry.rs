@@ -1098,7 +1098,7 @@ mod tests {
         let name: Option<&HfsString> = hfs_file_entry.get_name();
         let expected_name: HfsString = HfsString::ByteString(ByteString {
             encoding: CharacterEncoding::MacRoman,
-            elements: vec![116, 101, 115, 116, 102, 105, 108, 101, 49],
+            elements: b"testfile1".to_vec(),
         });
         assert_eq!(name, Some(expected_name).as_ref());
 
@@ -1319,7 +1319,7 @@ mod tests {
         let name: Option<&HfsString> = sub_file_entry.get_name();
         let expected_name: HfsString = HfsString::ByteString(ByteString {
             encoding: CharacterEncoding::MacRoman,
-            elements: vec![116, 101, 115, 116, 102, 105, 108, 101, 49],
+            elements: b"testfile1".to_vec(),
         });
         assert_eq!(name, Some(expected_name).as_ref());
 

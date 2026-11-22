@@ -287,7 +287,7 @@ mod tests {
             "vdh",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         )));
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
 
@@ -327,13 +327,13 @@ mod tests {
             "vhd1",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         )));
         signatures.push(Arc::new(Signature::new(
             "vhd2",
             PatternType::BoundToStart,
             0,
-            "connectx".as_bytes(),
+            b"connectx",
         )));
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
 
@@ -374,7 +374,7 @@ mod tests {
             "vdh",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         )));
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
 
@@ -420,19 +420,19 @@ mod tests {
                 "vhd1",
                 PatternType::BoundToStart,
                 0,
-                "conectix".as_bytes(),
+                b"conectix",
             )),
             Arc::new(Signature::new(
                 "vhd2",
                 PatternType::BoundToStart,
                 0,
-                "connectx".as_bytes(),
+                b"connectx",
             )),
             Arc::new(Signature::new(
                 "vhd3",
                 PatternType::BoundToStart,
                 0,
-                "conectiz".as_bytes(),
+                b"conectiz",
             )),
         ];
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
@@ -463,25 +463,25 @@ mod tests {
                 "vhd1",
                 PatternType::BoundToStart,
                 0,
-                "conectix".as_bytes(),
+                b"conectix",
             )),
             Arc::new(Signature::new(
                 "vhd2",
                 PatternType::BoundToStart,
                 0,
-                "connectx".as_bytes(),
+                b"connectx",
             )),
             Arc::new(Signature::new(
                 "sig3",
                 PatternType::BoundToStart,
                 16,
-                "12345678".as_bytes(),
+                b"12345678",
             )),
             Arc::new(Signature::new(
                 "sig4",
                 PatternType::BoundToStart,
                 32,
-                "abcdefgh".as_bytes(),
+                b"abcdefgh",
             )),
         ];
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
@@ -512,7 +512,7 @@ mod tests {
             "vhd1",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ))];
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
         let offsets_to_ignore: Vec<usize> = Vec::new();
@@ -536,18 +536,8 @@ mod tests {
         let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
 
         let signatures: Vec<Arc<Signature>> = vec![
-            Arc::new(Signature::new(
-                "dup1",
-                PatternType::BoundToStart,
-                0,
-                "ab".as_bytes(),
-            )),
-            Arc::new(Signature::new(
-                "dup2",
-                PatternType::BoundToStart,
-                0,
-                "ab".as_bytes(),
-            )),
+            Arc::new(Signature::new("dup1", PatternType::BoundToStart, 0, b"ab")),
+            Arc::new(Signature::new("dup2", PatternType::BoundToStart, 0, b"ab")),
         ];
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
         let offsets_to_ignore: Vec<usize> = Vec::new();
@@ -564,24 +554,9 @@ mod tests {
         let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
 
         let signatures: Vec<Arc<Signature>> = vec![
-            Arc::new(Signature::new(
-                "sig1",
-                PatternType::BoundToStart,
-                0,
-                "a".as_bytes(),
-            )),
-            Arc::new(Signature::new(
-                "sig2",
-                PatternType::BoundToStart,
-                16,
-                "b".as_bytes(),
-            )),
-            Arc::new(Signature::new(
-                "sig3",
-                PatternType::BoundToStart,
-                16,
-                "c".as_bytes(),
-            )),
+            Arc::new(Signature::new("sig1", PatternType::BoundToStart, 0, b"a")),
+            Arc::new(Signature::new("sig2", PatternType::BoundToStart, 16, b"b")),
+            Arc::new(Signature::new("sig3", PatternType::BoundToStart, 16, b"c")),
         ];
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
         let offsets_to_ignore: Vec<usize> = vec![16];
@@ -602,19 +577,19 @@ mod tests {
                 "vhd1",
                 PatternType::BoundToStart,
                 0,
-                "conectix".as_bytes(),
+                b"conectix",
             )),
             Arc::new(Signature::new(
                 "vhd2",
                 PatternType::BoundToStart,
                 0,
-                "connectx".as_bytes(),
+                b"connectx",
             )),
             Arc::new(Signature::new(
                 "vhd3",
                 PatternType::BoundToStart,
                 0,
-                "conectiz".as_bytes(),
+                b"conectiz",
             )),
         ];
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
@@ -635,13 +610,13 @@ mod tests {
                 "vhd0",
                 PatternType::BoundToStart,
                 0,
-                "conectix".as_bytes(),
+                b"conectix",
             )),
             Arc::new(Signature::new(
                 "sig16",
                 PatternType::BoundToStart,
                 16,
-                "12345678".as_bytes(),
+                b"12345678",
             )),
         ];
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
@@ -710,7 +685,7 @@ mod tests {
             "vhd",
             PatternType::BoundToStart,
             0,
-            "conectix".as_bytes(),
+            b"conectix",
         ))];
         let mut table1: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
         let offsets_to_ignore: Vec<usize> = Vec::new();
@@ -736,13 +711,13 @@ mod tests {
                 "vhd",
                 PatternType::BoundToStart,
                 0,
-                "conectix".as_bytes(),
+                b"conectix",
             )),
             Arc::new(Signature::new(
                 "sig16",
                 PatternType::BoundToStart,
                 16,
-                "12345678".as_bytes(),
+                b"12345678",
             )),
         ];
         let mut table2: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
