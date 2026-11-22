@@ -1876,76 +1876,61 @@ mod tests {
         let mut block_header: XzBlockHeader = XzBlockHeader::new();
 
         // Empty data.
-        assert!(block_header.read_data(&[]).is_err());
+        let result: Result<(), ErrorTrace> = block_header.read_data(&[]);
+        assert!(result.is_err());
 
         // Header size byte 0x00 (4 bytes < minimum 8).
-        assert!(block_header.read_data(&[0x00, 0x00, 0x00, 0x00]).is_err());
+        let result: Result<(), ErrorTrace> = block_header.read_data(&[0x00, 0x00, 0x00, 0x00]);
+        assert!(result.is_err());
 
         // Data shorter than declared header size.
-        assert!(block_header.read_data(&[0x01, 0x00, 0x00, 0x00]).is_err());
+        let result: Result<(), ErrorTrace> = block_header.read_data(&[0x01, 0x00, 0x00, 0x00]);
+        assert!(result.is_err());
 
         // Reserved block flags bits set.
-        assert!(
-            block_header
-                .read_data(&[0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            block_header.read_data(&[0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert!(result.is_err());
 
         // Invalid compressed size variable-length integer.
-        assert!(
-            block_header
-                .read_data(&[0x01, 0x40, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00])
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            block_header.read_data(&[0x01, 0x40, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert!(result.is_err());
 
         // Invalid uncompressed size variable-length integer.
-        assert!(
-            block_header
-                .read_data(&[0x01, 0x80, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00])
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            block_header.read_data(&[0x01, 0x80, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert!(result.is_err());
 
         // Unsupported number of filters (2).
-        assert!(
-            block_header
-                .read_data(&[0x01, 0x01, 0x21, 0x01, 0x0c, 0x00, 0x00, 0x00])
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            block_header.read_data(&[0x01, 0x01, 0x21, 0x01, 0x0c, 0x00, 0x00, 0x00]);
+        assert!(result.is_err());
 
         // Data offset reaches header size before filter list.
-        assert!(
-            block_header
-                .read_data(&[0x01, 0xc0, 0x81, 0x81, 0x01, 0x81, 0x81, 0x01])
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            block_header.read_data(&[0x01, 0xc0, 0x81, 0x81, 0x01, 0x81, 0x81, 0x01]);
+        assert!(result.is_err());
 
         // Invalid filter identifier variable-length integer.
-        assert!(
-            block_header
-                .read_data(&[0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00])
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            block_header.read_data(&[0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert!(result.is_err());
 
         // Invalid properties size variable-length integer.
-        assert!(
-            block_header
-                .read_data(&[0x01, 0x00, 0x21, 0x80, 0x00, 0x00, 0x00, 0x00])
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            block_header.read_data(&[0x01, 0x00, 0x21, 0x80, 0x00, 0x00, 0x00, 0x00]);
+        assert!(result.is_err());
 
         // Filter properties extend beyond header size.
-        assert!(
-            block_header
-                .read_data(&[0x01, 0x00, 0x21, 0x05, 0x00, 0x00, 0x00, 0x00])
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            block_header.read_data(&[0x01, 0x00, 0x21, 0x05, 0x00, 0x00, 0x00, 0x00]);
+        assert!(result.is_err());
 
         // Filter data overlaps the 4-byte header CRC32 field (header_size = 8, data_offset = 5).
-        assert!(
-            block_header
-                .read_data(&[0x01, 0x00, 0x21, 0x01, 0x0c, 0x00, 0x00, 0x00])
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            block_header.read_data(&[0x01, 0x00, 0x21, 0x01, 0x0c, 0x00, 0x00, 0x00]);
+        assert!(result.is_err());
 
         // Non-zero byte in block header padding.
         let mut bad_padding: [u8; 12] = [
@@ -1953,12 +1938,14 @@ mod tests {
         ];
         let checksum: u32 = calculate_crc32(&bad_padding[0..8]);
         bad_padding[8..12].copy_from_slice(&checksum.to_le_bytes());
-        assert!(block_header.read_data(&bad_padding).is_err());
+        let result: Result<(), ErrorTrace> = block_header.read_data(&bad_padding);
+        assert!(result.is_err());
 
         // Block header CRC32 mismatch.
         let mut bad_checksum: Vec<u8> = TEST_DATA_V1[12..24].to_vec();
         bad_checksum[11] ^= 0x01;
-        assert!(block_header.read_data(&bad_checksum).is_err());
+        let result: Result<(), ErrorTrace> = block_header.read_data(&bad_checksum);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1967,8 +1954,10 @@ mod tests {
         block_header.read_data(&TEST_DATA_V5C[12..])?;
 
         block_header.verify_stored_sizes(109, 620)?;
-        assert!(block_header.verify_stored_sizes(108, 620).is_err());
-        assert!(block_header.verify_stored_sizes(109, 619).is_err());
+        let result: Result<(), ErrorTrace> = block_header.verify_stored_sizes(108, 620);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> = block_header.verify_stored_sizes(109, 619);
+        assert!(result.is_err());
 
         Ok(())
     }
@@ -1984,7 +1973,8 @@ mod tests {
         let mut bad_checksum: Vec<u8> =
             TEST_DATA_V1[TEST_DATA_V1.len() - XZ_STREAM_FOOTER_SIZE..].to_vec();
         bad_checksum[0] ^= 0x01;
-        assert!(stream_footer.read_data(&bad_checksum).is_err());
+        let result: Result<(), ErrorTrace> = stream_footer.read_data(&bad_checksum);
+        assert!(result.is_err());
 
         // First stream flags byte non-zero with valid checksum.
         let mut bad_flags1: [u8; 12] = [
@@ -1992,7 +1982,8 @@ mod tests {
         ];
         let checksum: u32 = calculate_crc32(&bad_flags1[4..10]);
         bad_flags1[0..4].copy_from_slice(&checksum.to_le_bytes());
-        assert!(stream_footer.read_data(&bad_flags1).is_err());
+        let result: Result<(), ErrorTrace> = stream_footer.read_data(&bad_flags1);
+        assert!(result.is_err());
 
         // Reserved upper bits of second stream flags byte set with valid checksum.
         let mut bad_flags2: [u8; 12] = [
@@ -2000,7 +1991,8 @@ mod tests {
         ];
         let checksum: u32 = calculate_crc32(&bad_flags2[4..10]);
         bad_flags2[0..4].copy_from_slice(&checksum.to_le_bytes());
-        assert!(stream_footer.read_data(&bad_flags2).is_err());
+        let result: Result<(), ErrorTrace> = stream_footer.read_data(&bad_flags2);
+        assert!(result.is_err());
 
         // Unsupported footer signature with valid checksum.
         let mut bad_signature: [u8; 12] = [
@@ -2008,15 +2000,14 @@ mod tests {
         ];
         let checksum: u32 = calculate_crc32(&bad_signature[4..10]);
         bad_signature[0..4].copy_from_slice(&checksum.to_le_bytes());
-        assert!(stream_footer.read_data(&bad_signature).is_err());
+        let result: Result<(), ErrorTrace> = stream_footer.read_data(&bad_signature);
+        assert!(result.is_err());
 
         // Index size mismatch in verify_stream.
         stream_footer.read_data(&TEST_DATA_V1[TEST_DATA_V1.len() - XZ_STREAM_FOOTER_SIZE..])?;
-        assert!(
-            stream_footer
-                .verify_stream(16, XZ_CHECKSUM_TYPE_CRC32)
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            stream_footer.verify_stream(16, XZ_CHECKSUM_TYPE_CRC32);
+        assert!(result.is_err());
 
         Ok(())
     }
@@ -2128,27 +2119,21 @@ mod tests {
         // Output buffer larger than uncompressed data.
         let mut test_context: XzContext = XzContext::new();
         let mut large_buffer: Vec<u8> = vec![0; get_test_input_v1().len() + 10];
-        assert!(
-            test_context
-                .decompress(&TEST_DATA_V1, &mut large_buffer)
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&TEST_DATA_V1, &mut large_buffer);
+        assert!(result.is_err());
 
         // Output buffer too small for LZMA chunk.
         let mut small_buffer: Vec<u8> = vec![0; 10];
-        assert!(
-            test_context
-                .decompress(&TEST_DATA_V1, &mut small_buffer)
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&TEST_DATA_V1, &mut small_buffer);
+        assert!(result.is_err());
 
         // Output buffer too small for uncompressed chunk.
         let mut tiny_buffer: Vec<u8> = vec![0; 1];
-        assert!(
-            test_context
-                .decompress(&TEST_DATA_V5A, &mut tiny_buffer)
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&TEST_DATA_V5A, &mut tiny_buffer);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -2164,100 +2149,90 @@ mod tests {
             let mut need_dictionary_reset: bool = true;
             let mut lzma_decoder: Option<LzmaDecoder> = None;
 
-            assert!(
-                XzContext::decompress_lzma_chunk(
-                    debug_trace,
-                    &[0x00, 0x00, 0x00],
-                    &mut data_offset,
-                    &mut uncompressed_data,
-                    16,
-                    &mut uncompressed_data_offset,
-                    &mut dictionary_start_offset,
-                    0xe0,
-                    &mut need_properties,
-                    &mut need_dictionary_reset,
-                    &mut lzma_decoder,
-                )
-                .is_err()
+            let result: Result<(), ErrorTrace> = XzContext::decompress_lzma_chunk(
+                debug_trace,
+                &[0x00, 0x00, 0x00],
+                &mut data_offset,
+                &mut uncompressed_data,
+                16,
+                &mut uncompressed_data_offset,
+                &mut dictionary_start_offset,
+                0xe0,
+                &mut need_properties,
+                &mut need_dictionary_reset,
+                &mut lzma_decoder,
             );
+            assert!(result.is_err());
 
             // LZMA chunk: truncated properties byte.
             data_offset = 0;
-            assert!(
-                XzContext::decompress_lzma_chunk(
-                    debug_trace,
-                    &[0x00, 0x00, 0x00, 0x00],
-                    &mut data_offset,
-                    &mut uncompressed_data,
-                    16,
-                    &mut uncompressed_data_offset,
-                    &mut dictionary_start_offset,
-                    0xe0,
-                    &mut need_properties,
-                    &mut need_dictionary_reset,
-                    &mut lzma_decoder,
-                )
-                .is_err()
+            let result: Result<(), ErrorTrace> = XzContext::decompress_lzma_chunk(
+                debug_trace,
+                &[0x00, 0x00, 0x00, 0x00],
+                &mut data_offset,
+                &mut uncompressed_data,
+                16,
+                &mut uncompressed_data_offset,
+                &mut dictionary_start_offset,
+                0xe0,
+                &mut need_properties,
+                &mut need_dictionary_reset,
+                &mut lzma_decoder,
             );
+            assert!(result.is_err());
 
             // LZMA chunk: invalid properties byte.
             data_offset = 0;
-            assert!(
-                XzContext::decompress_lzma_chunk(
-                    debug_trace,
-                    &[0x00, 0x00, 0x00, 0x00, 0xe1],
-                    &mut data_offset,
-                    &mut uncompressed_data,
-                    16,
-                    &mut uncompressed_data_offset,
-                    &mut dictionary_start_offset,
-                    0xe0,
-                    &mut need_properties,
-                    &mut need_dictionary_reset,
-                    &mut lzma_decoder,
-                )
-                .is_err()
+            let result: Result<(), ErrorTrace> = XzContext::decompress_lzma_chunk(
+                debug_trace,
+                &[0x00, 0x00, 0x00, 0x00, 0xe1],
+                &mut data_offset,
+                &mut uncompressed_data,
+                16,
+                &mut uncompressed_data_offset,
+                &mut dictionary_start_offset,
+                0xe0,
+                &mut need_properties,
+                &mut need_dictionary_reset,
+                &mut lzma_decoder,
             );
+            assert!(result.is_err());
 
             // LZMA chunk: state reset (0xa0) with no decoder defined.
             data_offset = 0;
             need_properties = false;
             need_dictionary_reset = false;
-            assert!(
-                XzContext::decompress_lzma_chunk(
-                    debug_trace,
-                    &[0x00, 0x00, 0x00, 0x00, 0x00],
-                    &mut data_offset,
-                    &mut uncompressed_data,
-                    16,
-                    &mut uncompressed_data_offset,
-                    &mut dictionary_start_offset,
-                    0xa0,
-                    &mut need_properties,
-                    &mut need_dictionary_reset,
-                    &mut lzma_decoder,
-                )
-                .is_err()
+            let result: Result<(), ErrorTrace> = XzContext::decompress_lzma_chunk(
+                debug_trace,
+                &[0x00, 0x00, 0x00, 0x00, 0x00],
+                &mut data_offset,
+                &mut uncompressed_data,
+                16,
+                &mut uncompressed_data_offset,
+                &mut dictionary_start_offset,
+                0xa0,
+                &mut need_properties,
+                &mut need_dictionary_reset,
+                &mut lzma_decoder,
             );
+            assert!(result.is_err());
 
             // LZMA chunk: continuation (0x80) with no decoder defined.
             data_offset = 0;
-            assert!(
-                XzContext::decompress_lzma_chunk(
-                    debug_trace,
-                    &[0x00, 0x00, 0x00, 0x00, 0x00],
-                    &mut data_offset,
-                    &mut uncompressed_data,
-                    16,
-                    &mut uncompressed_data_offset,
-                    &mut dictionary_start_offset,
-                    0x80,
-                    &mut need_properties,
-                    &mut need_dictionary_reset,
-                    &mut lzma_decoder,
-                )
-                .is_err()
+            let result: Result<(), ErrorTrace> = XzContext::decompress_lzma_chunk(
+                debug_trace,
+                &[0x00, 0x00, 0x00, 0x00, 0x00],
+                &mut data_offset,
+                &mut uncompressed_data,
+                16,
+                &mut uncompressed_data_offset,
+                &mut dictionary_start_offset,
+                0x80,
+                &mut need_properties,
+                &mut need_dictionary_reset,
+                &mut lzma_decoder,
             );
+            assert!(result.is_err());
 
             // Uncompressed chunk: invalid control byte after dictionary reset.
             let mut stream: Vec<u8> = TEST_DATA_V1[0..24].to_vec();
@@ -2266,35 +2241,31 @@ mod tests {
 
             // Uncompressed chunk: truncated size field.
             data_offset = 0;
-            assert!(
-                XzContext::decompress_uncompressed_chunk(
-                    &[0x00],
-                    &mut data_offset,
-                    &mut uncompressed_data,
-                    16,
-                    &mut uncompressed_data_offset,
-                    &mut dictionary_start_offset,
-                    0x01,
-                    &mut need_dictionary_reset,
-                )
-                .is_err()
+            let result: Result<(), ErrorTrace> = XzContext::decompress_uncompressed_chunk(
+                &[0x00],
+                &mut data_offset,
+                &mut uncompressed_data,
+                16,
+                &mut uncompressed_data_offset,
+                &mut dictionary_start_offset,
+                0x01,
+                &mut need_dictionary_reset,
             );
+            assert!(result.is_err());
 
             // Uncompressed chunk: truncated payload data.
             data_offset = 0;
-            assert!(
-                XzContext::decompress_uncompressed_chunk(
-                    &[0x00, 0x05, 0xaa],
-                    &mut data_offset,
-                    &mut uncompressed_data,
-                    16,
-                    &mut uncompressed_data_offset,
-                    &mut dictionary_start_offset,
-                    0x01,
-                    &mut need_dictionary_reset,
-                )
-                .is_err()
+            let result: Result<(), ErrorTrace> = XzContext::decompress_uncompressed_chunk(
+                &[0x00, 0x05, 0xaa],
+                &mut data_offset,
+                &mut uncompressed_data,
+                16,
+                &mut uncompressed_data_offset,
+                &mut dictionary_start_offset,
+                0x01,
+                &mut need_dictionary_reset,
             );
+            assert!(result.is_err());
 
             Ok(())
         })
@@ -2303,43 +2274,55 @@ mod tests {
     #[test]
     fn test_read_block_padding_and_index_with_errors() {
         // Block padding truncated.
-        assert!(XzContext::read_block_padding(&[0x00, 0x00], 0, 0, 1).is_err());
+        let result: Result<usize, ErrorTrace> =
+            XzContext::read_block_padding(&[0x00, 0x00], 0, 0, 1);
+        assert!(result.is_err());
 
         // Block checksum truncated.
-        assert!(
-            XzContext::verify_block_checksum(XZ_CHECKSUM_TYPE_CRC32, &[0x00, 0x00], 0, &[])
-                .is_err()
-        );
+        let result: Result<usize, ErrorTrace> =
+            XzContext::verify_block_checksum(XZ_CHECKSUM_TYPE_CRC32, &[0x00, 0x00], 0, &[]);
+        assert!(result.is_err());
 
         // Index offset at end of data.
-        assert!(XzContext::read_index(&[], 0, &[]).is_err());
+        let result: Result<usize, ErrorTrace> = XzContext::read_index(&[], 0, &[]);
+        assert!(result.is_err());
 
         // Invalid index indicator byte.
-        assert!(XzContext::read_index(&[0x01, 0x00], 0, &[]).is_err());
+        let result: Result<usize, ErrorTrace> = XzContext::read_index(&[0x01, 0x00], 0, &[]);
+        assert!(result.is_err());
 
         // Invalid number of records variable-length integer.
-        assert!(XzContext::read_index(&[0x00, 0x80, 0x00], 0, &[]).is_err());
+        let result: Result<usize, ErrorTrace> = XzContext::read_index(&[0x00, 0x80, 0x00], 0, &[]);
+        assert!(result.is_err());
 
         // Number of records mismatch.
-        assert!(XzContext::read_index(&[0x00, 0x02], 0, &[(16, 10)]).is_err());
+        let result: Result<usize, ErrorTrace> =
+            XzContext::read_index(&[0x00, 0x02], 0, &[(16, 10)]);
+        assert!(result.is_err());
 
         // Invalid stored uncompressed size variable-length integer.
-        assert!(XzContext::read_index(&[0x00, 0x01, 0x10, 0x80, 0x00], 0, &[(16, 10)]).is_err());
+        let result: Result<usize, ErrorTrace> =
+            XzContext::read_index(&[0x00, 0x01, 0x10, 0x80, 0x00], 0, &[(16, 10)]);
+        assert!(result.is_err());
 
         // Truncated index padding / checksum.
-        assert!(XzContext::read_index(&[0x00, 0x01, 0x10, 0x0a, 0x00], 0, &[(16, 10)]).is_err());
+        let result: Result<usize, ErrorTrace> =
+            XzContext::read_index(&[0x00, 0x01, 0x10, 0x0a, 0x00], 0, &[(16, 10)]);
+        assert!(result.is_err());
 
         // Non-zero byte in index padding.
         let mut bad_index_padding: [u8; 8] = [0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00];
         let checksum: u32 = calculate_crc32(&bad_index_padding[0..4]);
         bad_index_padding[4..8].copy_from_slice(&checksum.to_le_bytes());
-        assert!(XzContext::read_index(&bad_index_padding, 0, &[]).is_err());
+        let result: Result<usize, ErrorTrace> = XzContext::read_index(&bad_index_padding, 0, &[]);
+        assert!(result.is_err());
 
         // Index CRC32 mismatch.
         let mut bad_index_checksum: [u8; 8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
         let checksum: u32 = calculate_crc32(&bad_index_checksum[0..4]) ^ 0x01;
         bad_index_checksum[4..8].copy_from_slice(&checksum.to_le_bytes());
-        assert!(XzContext::read_index(&bad_index_checksum, 0, &[]).is_err());
+        let result: Result<usize, ErrorTrace> = XzContext::read_index(&bad_index_checksum, 0, &[]);
+        assert!(result.is_err());
     }
 
     #[test]

@@ -260,7 +260,9 @@ mod tests {
         // File entry missing its data stream returns an error.
         let mut invalid_file_entry: FakeFileEntry = FakeFileEntry::new_file("empty.txt", &[]);
         invalid_file_entry.data_stream = None;
-        assert!(invalid_file_entry.get_data_stream().is_err());
+        let result: Result<Option<DataStreamReference>, ErrorTrace> =
+            invalid_file_entry.get_data_stream();
+        assert!(result.is_err());
 
         Ok(())
     }

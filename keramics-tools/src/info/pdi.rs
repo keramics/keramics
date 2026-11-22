@@ -255,6 +255,8 @@ mod tests {
 
     #[test]
     fn test_print_image_error() {
-        assert!(PdiInfo::print_image(&PathBuf::from("../test_data/directory/file.txt")).is_err());
+        let result: Result<(), ErrorTrace> =
+            PdiInfo::print_image(&PathBuf::from("../test_data/directory/file.txt"));
+        assert!(result.is_err());
     }
 }

@@ -841,33 +841,34 @@ mod tests {
 
         XfsInfo::print_file_system(&data_stream, Some(&CharacterEncoding::Utf8))?;
         XfsInfo::print_file_entry_by_identifier(&data_stream, 16133, None)?;
-        assert!(
-            XfsInfo::print_file_entry_by_identifier(&data_stream, u32::MAX as u64 + 1, None)
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            XfsInfo::print_file_entry_by_identifier(&data_stream, u32::MAX as u64 + 1, None);
+        assert!(result.is_err());
         XfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/testfile1"), None)?;
         XfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/xattr1"), None)?;
         XfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/blockdev1"), None)?;
         XfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/file_symboliclink1"), None)?;
-        assert!(
-            XfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/nonexistent"), None)
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            XfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/nonexistent"), None);
+        assert!(result.is_err());
 
         XfsInfo::print_hierarchy(&data_stream, None, None)?;
         XfsInfo::print_hierarchy(&data_stream, None, Some(&String::from("/testdir1")))?;
-        assert!(
-            XfsInfo::print_hierarchy(&data_stream, None, Some(&String::from("/nonexistent")))
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            XfsInfo::print_hierarchy(&data_stream, None, Some(&String::from("/nonexistent")));
+        assert!(result.is_err());
 
         let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
-        assert!(XfsInfo::print_file_system(&invalid_stream, None).is_err());
-        assert!(XfsInfo::print_file_entry_by_identifier(&invalid_stream, 1, None).is_err());
-        assert!(
-            XfsInfo::print_file_entry_by_path(&invalid_stream, &Path::from("/"), None).is_err()
-        );
-        assert!(XfsInfo::print_hierarchy(&invalid_stream, None, None).is_err());
+        let result: Result<(), ErrorTrace> = XfsInfo::print_file_system(&invalid_stream, None);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            XfsInfo::print_file_entry_by_identifier(&invalid_stream, 1, None);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            XfsInfo::print_file_entry_by_path(&invalid_stream, &Path::from("/"), None);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> = XfsInfo::print_hierarchy(&invalid_stream, None, None);
+        assert!(result.is_err());
 
         Ok(())
     }

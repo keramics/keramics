@@ -2512,20 +2512,16 @@ mod tests {
         let mut scan_context: VfsScanContext = VfsScanContext::new();
         let path_string: String = get_test_data_path("directory/bogus.txt");
         let vfs_location: VfsLocation = VfsLocation::from(&path_string);
-        assert!(
-            format_scanner
-                .scan(&scan_options, &mut scan_context, &vfs_location)
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            format_scanner.scan(&scan_options, &mut scan_context, &vfs_location);
+        assert!(result.is_err());
 
         // Unsupported file system type.
         let mut scan_context: VfsScanContext = VfsScanContext::new();
         let vfs_location: VfsLocation = VfsLocation::new_base(&VfsType::Fake, Path::from("/"));
-        assert!(
-            format_scanner
-                .scan(&scan_options, &mut scan_context, &vfs_location)
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            format_scanner.scan(&scan_options, &mut scan_context, &vfs_location);
+        assert!(result.is_err());
 
         // Directory without sparsebundle extension.
         let mut scan_context: VfsScanContext = VfsScanContext::new();
@@ -2539,21 +2535,17 @@ mod tests {
         // Root directory has no file name.
         let mut scan_context: VfsScanContext = VfsScanContext::new();
         let vfs_location: VfsLocation = VfsLocation::from("/");
-        assert!(
-            format_scanner
-                .scan(&scan_options, &mut scan_context, &vfs_location)
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            format_scanner.scan(&scan_options, &mut scan_context, &vfs_location);
+        assert!(result.is_err());
 
         // Symbolic link is an unsupported file type.
         let mut scan_context: VfsScanContext = VfsScanContext::new();
         let path_string: String = get_test_data_path("directory/symbolic_link");
         let vfs_location: VfsLocation = VfsLocation::from(&path_string);
-        assert!(
-            format_scanner
-                .scan(&scan_options, &mut scan_context, &vfs_location)
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            format_scanner.scan(&scan_options, &mut scan_context, &vfs_location);
+        assert!(result.is_err());
 
         // Plain text file without recognized format.
         let mut scan_context: VfsScanContext = VfsScanContext::new();
@@ -2716,22 +2708,18 @@ mod tests {
         // Missing data stream.
         let path_string: String = get_test_data_path("directory/bogus.txt");
         let vfs_location: VfsLocation = VfsLocation::from(&path_string);
-        assert!(
-            format_scanner
-                .scan_for_format(&vfs_file_system, &vfs_location)
-                .is_err()
-        );
+        let result: Result<Option<FormatIdentifier>, ErrorTrace> =
+            format_scanner.scan_for_format(&vfs_file_system, &vfs_location);
+        assert!(result.is_err());
 
         // Unsupported VFS location type.
         let path_string: String = get_test_data_path("ext/ext2.raw");
         let os_vfs_location: VfsLocation = VfsLocation::from(&path_string);
         let ext_vfs_location: VfsLocation =
             os_vfs_location.new_with_layer(&VfsType::Ext, Path::from("/testdir1/testfile1"));
-        assert!(
-            format_scanner
-                .scan_for_format(&vfs_file_system, &ext_vfs_location)
-                .is_err()
-        );
+        let result: Result<Option<FormatIdentifier>, ErrorTrace> =
+            format_scanner.scan_for_format(&vfs_file_system, &ext_vfs_location);
+        assert!(result.is_err());
 
         // Zero layers in scan_for_storage_media_image_sub_nodes.
         let scan_options: VfsScanOptions = VfsScanOptions::new();
@@ -2748,16 +2736,13 @@ mod tests {
         // Unsupported VfsType::Fake in scan_sub_node.
         let fake_location: VfsLocation = VfsLocation::new_base(&VfsType::Fake, Path::from("/"));
         let mut fake_node: VfsScanNode = VfsScanNode::new(fake_location.clone());
-        assert!(
-            format_scanner
-                .scan_sub_node(
-                    &scan_options,
-                    &vfs_file_system,
-                    &fake_location,
-                    &mut fake_node
-                )
-                .is_err()
+        let result: Result<(), ErrorTrace> = format_scanner.scan_sub_node(
+            &scan_options,
+            &vfs_file_system,
+            &fake_location,
+            &mut fake_node,
         );
+        assert!(result.is_err());
 
         Ok(())
     }

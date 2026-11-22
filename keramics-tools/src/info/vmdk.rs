@@ -249,7 +249,10 @@ mod tests {
 
     #[test]
     fn test_print_image_errors() {
-        assert!(VmdkInfo::print_image(&PathBuf::from("/")).is_err());
-        assert!(VmdkInfo::print_image(&PathBuf::from("../test_data/directory/file.txt")).is_err());
+        let result: Result<(), ErrorTrace> = VmdkInfo::print_image(&PathBuf::from("/"));
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            VmdkInfo::print_image(&PathBuf::from("../test_data/directory/file.txt"));
+        assert!(result.is_err());
     }
 }

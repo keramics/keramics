@@ -110,7 +110,8 @@ mod tests {
 
         // Path containing a NUL byte fails with an OS error.
         let invalid_path: Path = Path::from("\0");
-        assert!(OsFileSystem::file_entry_exists(&invalid_path).is_err());
+        let result: Result<bool, ErrorTrace> = OsFileSystem::file_entry_exists(&invalid_path);
+        assert!(result.is_err());
 
         Ok(())
     }
@@ -139,7 +140,9 @@ mod tests {
 
         // Path containing a NUL byte fails with an OS error.
         let invalid_path: Path = Path::from("\0");
-        assert!(OsFileSystem::get_file_entry_by_path(&invalid_path).is_err());
+        let result: Result<Option<OsFileEntry>, ErrorTrace> =
+            OsFileSystem::get_file_entry_by_path(&invalid_path);
+        assert!(result.is_err());
 
         Ok(())
     }

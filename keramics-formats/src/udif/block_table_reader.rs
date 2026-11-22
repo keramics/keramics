@@ -231,7 +231,8 @@ mod tests {
             start_sector: 1,
             entries: Vec::new(),
         };
-        assert!(reader.process_block_table(&block_table).is_err());
+        let result: Result<(), ErrorTrace> = reader.process_block_table(&block_table);
+        assert!(result.is_err());
 
         // Entry start sector out of bounds.
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
@@ -239,7 +240,8 @@ mod tests {
             start_sector: 0,
             entries: vec![get_test_block_table_entry(0x00000000, 1, 1, 0, 0)],
         };
-        assert!(reader.process_block_table(&block_table).is_err());
+        let result: Result<(), ErrorTrace> = reader.process_block_table(&block_table);
+        assert!(result.is_err());
 
         // Number of sectors is zero.
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
@@ -247,7 +249,8 @@ mod tests {
             start_sector: 0,
             entries: vec![get_test_block_table_entry(0x00000000, 0, 0, 0, 0)],
         };
-        assert!(reader.process_block_table(&block_table).is_err());
+        let result: Result<(), ErrorTrace> = reader.process_block_table(&block_table);
+        assert!(result.is_err());
 
         // Data offset out of bounds.
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
@@ -255,7 +258,8 @@ mod tests {
             start_sector: 0,
             entries: vec![get_test_block_table_entry(0x80000008, 0, 1, 4096, 16)],
         };
-        assert!(reader.process_block_table(&block_table).is_err());
+        let result: Result<(), ErrorTrace> = reader.process_block_table(&block_table);
+        assert!(result.is_err());
 
         // Data size out of bounds.
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
@@ -263,7 +267,8 @@ mod tests {
             start_sector: 0,
             entries: vec![get_test_block_table_entry(0x80000008, 0, 1, 4000, 100)],
         };
-        assert!(reader.process_block_table(&block_table).is_err());
+        let result: Result<(), ErrorTrace> = reader.process_block_table(&block_table);
+        assert!(result.is_err());
 
         // Compressed entry number of sectors > 2048.
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
@@ -271,7 +276,8 @@ mod tests {
             start_sector: 0,
             entries: vec![get_test_block_table_entry(0x80000008, 0, 2049, 0, 100)],
         };
-        assert!(reader.process_block_table(&block_table).is_err());
+        let result: Result<(), ErrorTrace> = reader.process_block_table(&block_table);
+        assert!(result.is_err());
 
         // Mixed compression methods (LZMA followed by zlib).
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
@@ -282,7 +288,8 @@ mod tests {
                 get_test_block_table_entry(0x80000005, 1, 1, 100, 100),
             ],
         };
-        assert!(reader.process_block_table(&block_table).is_err());
+        let result: Result<(), ErrorTrace> = reader.process_block_table(&block_table);
+        assert!(result.is_err());
 
         // Unsupported entry type.
         let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
@@ -290,6 +297,7 @@ mod tests {
             start_sector: 0,
             entries: vec![get_test_block_table_entry(0x80000009, 0, 1, 0, 100)],
         };
-        assert!(reader.process_block_table(&block_table).is_err());
+        let result: Result<(), ErrorTrace> = reader.process_block_table(&block_table);
+        assert!(result.is_err());
     }
 }

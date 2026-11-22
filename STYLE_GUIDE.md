@@ -136,6 +136,14 @@ match self.encryption_context.decrypt_sector(sector_physical_offset, &mut sector
   * `test_<method_name>`
   * `test_<method_name>_with_<condition>` (for example,
     `test_read_data_with_unsupported_data_size`)
+* When asserting that a call returns an error, split the function call and the `.is_err()` check
+  across separate lines by storing the return value in a local variable named `result`:
+
+```rust
+let result: Result<(), ErrorTrace> = test_struct.read_data(&test_data);
+assert!(result.is_err());
+```
+
 * Gate test-only helper methods on production types with `#[cfg(test)]` and an inline comment
   (`// Used for testing.`) instead of `#[allow(dead_code)]`.
 * Store deterministic test fixtures under `test_data/<format>/` and resolve paths via crate-level

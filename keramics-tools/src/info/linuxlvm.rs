@@ -316,6 +316,8 @@ mod tests {
             FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
         let file_name: PathComponent = PathComponent::from("file.txt");
 
-        assert!(LinuxLvmInfo::print_volume_system(&file_resolver, &file_name).is_err());
+        let result: Result<(), ErrorTrace> =
+            LinuxLvmInfo::print_volume_system(&file_resolver, &file_name);
+        assert!(result.is_err());
     }
 }

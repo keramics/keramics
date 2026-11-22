@@ -188,7 +188,9 @@ mod tests {
         assert!(result.is_err());
 
         let partition_entry: ApmFileEntry = get_partition_file_entry(&apm_volume_system)?;
-        assert!(partition_entry.get_sub_file_entry_by_index(0).is_err());
+        let result: Result<ApmFileEntry, ErrorTrace> =
+            partition_entry.get_sub_file_entry_by_index(0);
+        assert!(result.is_err());
 
         Ok(())
     }

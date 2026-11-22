@@ -3186,28 +3186,22 @@ mod tests {
 
         // Unopened APFS returns an error for get_root_file_entry, file_entry_exists, and get_file_entry_by_path.
         let unopened_apfs: VfsFileSystem = VfsFileSystem::new(&VfsType::Apfs);
-        assert!(unopened_apfs.get_root_file_entry().is_err());
-        assert!(unopened_apfs.file_entry_exists(&Path::from("/")).is_err());
-        assert!(
-            unopened_apfs
-                .get_file_entry_by_path(&Path::from("/"))
-                .is_err()
-        );
-        assert!(
-            unopened_apfs
-                .get_file_entry_by_location(&VfsLocation::new_base(&VfsType::Apfs, Path::from("/")))
-                .is_err()
-        );
-        assert!(
-            unopened_apfs
-                .get_data_stream_by_path(&Path::from("/"))
-                .is_err()
-        );
-        assert!(
-            unopened_apfs
-                .get_data_stream_by_path_and_name(&Path::from("/"), None)
-                .is_err()
-        );
+        let result: Result<Option<VfsFileEntry>, ErrorTrace> = unopened_apfs.get_root_file_entry();
+        assert!(result.is_err());
+        let result: Result<bool, ErrorTrace> = unopened_apfs.file_entry_exists(&Path::from("/"));
+        assert!(result.is_err());
+        let result: Result<Option<VfsFileEntry>, ErrorTrace> =
+            unopened_apfs.get_file_entry_by_path(&Path::from("/"));
+        assert!(result.is_err());
+        let result: Result<Option<VfsFileEntry>, ErrorTrace> = unopened_apfs
+            .get_file_entry_by_location(&VfsLocation::new_base(&VfsType::Apfs, Path::from("/")));
+        assert!(result.is_err());
+        let result: Result<Option<DataStreamReference>, ErrorTrace> =
+            unopened_apfs.get_data_stream_by_path(&Path::from("/"));
+        assert!(result.is_err());
+        let result: Result<Option<DataStreamReference>, ErrorTrace> =
+            unopened_apfs.get_data_stream_by_path_and_name(&Path::from("/"), None);
+        assert!(result.is_err());
 
         Ok(())
     }

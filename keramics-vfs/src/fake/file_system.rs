@@ -189,7 +189,8 @@ mod tests {
         assert_eq!(file_type, VfsFileType::Directory);
 
         fake_file_system.paths.clear();
-        assert!(fake_file_system.get_root_file_entry().is_err());
+        let result: Result<Arc<FakeFileEntry>, ErrorTrace> = fake_file_system.get_root_file_entry();
+        assert!(result.is_err());
 
         Ok(())
     }

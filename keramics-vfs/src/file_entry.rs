@@ -11707,15 +11707,19 @@ mod tests {
     fn test_get_data_fork_by_index_and_fake_data_forks() -> Result<(), ErrorTrace> {
         // ApfsContainer always returns an error.
         let mut apfs_container_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
-        assert!(apfs_container_entry.get_data_fork_by_index(0).is_err());
+        let result: Result<VfsDataFork, ErrorTrace> =
+            apfs_container_entry.get_data_fork_by_index(0);
+        assert!(result.is_err());
 
         // Test ext file and directory.
         let mut ext_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
         assert!(ext_file_entry.get_data_fork_by_index(0).is_ok());
-        assert!(ext_file_entry.get_data_fork_by_index(1).is_err());
+        let result: Result<VfsDataFork, ErrorTrace> = ext_file_entry.get_data_fork_by_index(1);
+        assert!(result.is_err());
 
         let mut ext_directory_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
-        assert!(ext_directory_entry.get_data_fork_by_index(0).is_err());
+        let result: Result<VfsDataFork, ErrorTrace> = ext_directory_entry.get_data_fork_by_index(0);
+        assert!(result.is_err());
 
         // Test fake file and directory.
         let mut fake_file_entry: VfsFileEntry = get_fake_file_entry();
@@ -11725,18 +11729,22 @@ mod tests {
         let mut fake_directory_entry: VfsFileEntry =
             VfsFileEntry::Fake(Arc::new(FakeFileEntry::new_directory("dir")));
         assert_eq!(fake_directory_entry.get_number_of_data_forks()?, 0);
-        assert!(fake_directory_entry.get_data_fork_by_index(0).is_err());
+        let result: Result<VfsDataFork, ErrorTrace> =
+            fake_directory_entry.get_data_fork_by_index(0);
+        assert!(result.is_err());
 
         // Test HFS file with data fork.
         let mut hfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
         assert_eq!(hfs_file_entry.get_number_of_data_forks()?, 1);
         let data_fork: VfsDataFork = hfs_file_entry.get_data_fork_by_index(0)?;
         assert_eq!(data_fork.get_name(), None);
-        assert!(hfs_file_entry.get_data_fork_by_index(1).is_err());
+        let result: Result<VfsDataFork, ErrorTrace> = hfs_file_entry.get_data_fork_by_index(1);
+        assert!(result.is_err());
 
         // Test NTFS out-of-bounds data fork index.
         let mut ntfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/$UpCase")?;
-        assert!(ntfs_file_entry.get_data_fork_by_index(99).is_err());
+        let result: Result<VfsDataFork, ErrorTrace> = ntfs_file_entry.get_data_fork_by_index(99);
+        assert!(result.is_err());
 
         Ok(())
     }

@@ -269,14 +269,13 @@ mod tests {
 
         // Test error paths when case folding fails on path or data fork name.
         let invalid_path: Path = Path::from("/\u{1f600}");
-        assert!(path_filter.is_match(&invalid_path, None).is_err());
+        let result: Result<bool, ErrorTrace> = path_filter.is_match(&invalid_path, None);
+        assert!(result.is_err());
 
         let invalid_fork_name: PathComponent = PathComponent::from("\u{1f600}");
-        assert!(
-            path_filter
-                .is_match(&path, Some(&invalid_fork_name))
-                .is_err()
-        );
+        let result: Result<bool, ErrorTrace> =
+            path_filter.is_match(&path, Some(&invalid_fork_name));
+        assert!(result.is_err());
 
         // Test build error when signature case folding fails.
         let mut invalid_filter: PathFilter = PathFilter::new();
@@ -285,13 +284,15 @@ mod tests {
         ));
         invalid_filter.set_case_folding(mappings);
         invalid_filter.add_signature(PathFilterSignature::new(Path::from("/\u{1f600}"), None));
-        assert!(invalid_filter.build().is_err());
+        let result: Result<(), ErrorTrace> = invalid_filter.build();
+        assert!(result.is_err());
 
         // Test build error when prefix scan tree fails (duplicate signatures).
         let mut duplicate_filter: PathFilter = PathFilter::new();
         duplicate_filter.add_signature(PathFilterSignature::new(Path::from("/a/b"), None));
         duplicate_filter.add_signature(PathFilterSignature::new(Path::from("/a/b"), None));
-        assert!(duplicate_filter.build().is_err());
+        let result: Result<(), ErrorTrace> = duplicate_filter.build();
+        assert!(result.is_err());
 
         Ok(())
     }

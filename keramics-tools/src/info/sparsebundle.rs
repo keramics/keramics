@@ -174,6 +174,8 @@ mod tests {
 
     #[test]
     fn test_print_image_error() {
-        assert!(SparseBundleInfo::print_image(&PathBuf::from("../test_data/directory")).is_err());
+        let result: Result<(), ErrorTrace> =
+            SparseBundleInfo::print_image(&PathBuf::from("../test_data/directory"));
+        assert!(result.is_err());
     }
 }
