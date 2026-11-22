@@ -359,10 +359,14 @@ impl OsFileEntry {
         )));
         let file_attributes: u32 = file_metadata.file_attributes();
 
-        self.file_type = match file_attributes & 0x000000f0 {
-            0x00000010 => VfsFileType::Directory,
-            0x00000040 => VfsFileType::Device,
-            _ => VfsFileType::File,
+        self.file_type = if file_metadata.file_type().is_symlink() {
+            VfsFileType::SymbolicLink
+        } else if (file_attributes & 0x00000010) != 0 {
+            VfsFileType::Directory
+        } else if (file_attributes & 0x00000040) != 0 {
+            VfsFileType::Device
+        } else {
+            VfsFileType::File
         };
         self.modification_time = Some(DateTime::Filetime(Filetime::new(
             file_metadata.last_write_time(),
@@ -484,6 +488,12 @@ mod tests {
 
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::File);
+
+        let directory_entry: OsFileEntry = get_os_file_entry("directory")?;
+        assert_eq!(directory_entry.get_file_type(), VfsFileType::Directory);
+
+        let symlink_entry: OsFileEntry = get_os_file_entry("directory/symbolic_link")?;
+        assert_eq!(symlink_entry.get_file_type(), VfsFileType::SymbolicLink);
 
         Ok(())
     }
