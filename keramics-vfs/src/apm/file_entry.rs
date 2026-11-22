@@ -187,6 +187,24 @@ mod tests {
         let result: Result<ApmFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
 
+        let partition_entry: ApmFileEntry = get_partition_file_entry(&apm_volume_system)?;
+        assert!(partition_entry.get_sub_file_entry_by_index(0).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_identifier_and_partition_number() -> Result<(), ErrorTrace> {
+        let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
+
+        let root_entry: ApmFileEntry = get_root_file_entry(&apm_volume_system);
+        assert!(root_entry.get_identifier().is_none());
+        assert_eq!(root_entry.get_partition_number(), None);
+
+        let partition_entry: ApmFileEntry = get_partition_file_entry(&apm_volume_system)?;
+        assert!(partition_entry.get_identifier().is_none());
+        assert_eq!(partition_entry.get_partition_number(), Some(2));
+
         Ok(())
     }
 

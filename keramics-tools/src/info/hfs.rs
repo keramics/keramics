@@ -533,8 +533,8 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_core::open_os_data_stream;
-    use keramics_datetime::HfsTime;
+    use keramics_core::{open_fake_data_stream, open_os_data_stream};
+    use keramics_datetime::{HfsTime, PosixTime32};
 
     use crate::assert_lines_eq;
 
@@ -560,6 +560,10 @@ mod tests {
         let test_struct: HfsTimeInfo = HfsTimeInfo::new(&HfsFormat::HfsPlus, &date_time);
         let string: String = test_struct.to_string();
         assert_eq!(string, NOT_SET_VALUE);
+
+        let date_time: DateTime = DateTime::PosixTime32(PosixTime32::new(0));
+        let test_struct: HfsTimeInfo = HfsTimeInfo::new(&HfsFormat::HfsPlus, &date_time);
+        assert_eq!(test_struct.to_string(), "Unsupported date time");
     }
 
     #[test]
@@ -612,10 +616,44 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_file_system
-    // TODO: add tests for print_file_entry_by_identifier
-    // TODO: add tests for print_file_entry_by_path
-    // TODO: add tests for print_file_system
-    // TODO: add tests for print_hierarchy
-    // TODO: add tests for print_hierarchy_file_entry
+    #[test]
+    fn test_print_methods() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/hfs/hfsplus.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+
+        HfsInfo::print_file_system(&data_stream)?;
+        HfsInfo::print_file_entry_by_identifier(&data_stream, 20)?;
+        assert!(
+            HfsInfo::print_file_entry_by_identifier(&data_stream, u32::MAX as u64 + 1).is_err()
+        );
+        assert!(HfsInfo::print_file_entry_by_identifier(&data_stream, 999999).is_err());
+
+        HfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/testfile1"))?;
+        HfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/xattr1"))?;
+        HfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/file_symboliclink1"))?;
+
+        let hfs_stream: DataStreamReference =
+            open_os_data_stream(&PathBuf::from("../test_data/hfs/hfs.raw"))?;
+        HfsInfo::print_file_system(&hfs_stream)?;
+        let wrapped_stream: DataStreamReference =
+            open_os_data_stream(&PathBuf::from("../test_data/hfs/hfs_wrapped_hfsplus.raw"))?;
+        HfsInfo::print_file_system(&wrapped_stream)?;
+        assert!(
+            HfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/nonexistent")).is_err()
+        );
+
+        HfsInfo::print_hierarchy(&data_stream, None)?;
+        HfsInfo::print_hierarchy(&data_stream, Some(&String::from("/testdir1")))?;
+        assert!(
+            HfsInfo::print_hierarchy(&data_stream, Some(&String::from("/nonexistent"))).is_err()
+        );
+
+        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
+        assert!(HfsInfo::print_file_system(&invalid_stream).is_err());
+        assert!(HfsInfo::print_file_entry_by_identifier(&invalid_stream, 2).is_err());
+        assert!(HfsInfo::print_file_entry_by_path(&invalid_stream, &Path::from("/")).is_err());
+        assert!(HfsInfo::print_hierarchy(&invalid_stream, None).is_err());
+
+        Ok(())
+    }
 }

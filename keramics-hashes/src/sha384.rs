@@ -26,6 +26,7 @@ const SHA384_PRIME_SQUARE_ROOTS: [u64; 8] = [
 ];
 
 /// Context for calculating a SHA-384 hash.
+#[derive(Clone)]
 pub struct Sha384Context {
     /// Internal context.
     internal_context: InternalSha512Context,
@@ -44,9 +45,15 @@ impl DigestHashContext for Sha384Context {
 
     /// Finalizes the digest hash calculation.
     fn finalize(&mut self) -> Vec<u8> {
-        let mut hash: Vec<u8> = self.internal_context.finalize(&SHA384_PRIME_SQUARE_ROOTS);
-        hash.drain(48..64);
-        hash
+        let mut hash: [u8; 48] = [0; 48];
+        self.finalize_into(&mut hash);
+        hash.to_vec()
+    }
+
+    /// Finalizes the digest hash calculation into a fixed-size output buffer.
+    fn finalize_into(&mut self, output: &mut [u8]) {
+        self.internal_context
+            .finalize_into(&SHA384_PRIME_SQUARE_ROOTS, &mut output[0..48]);
     }
 
     /// Calculates the digest hash of the data.

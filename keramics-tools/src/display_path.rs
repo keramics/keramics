@@ -424,7 +424,7 @@ mod tests {
     use super::*;
 
     use keramics_formats::Path;
-    use keramics_types::{ByteString, Ucs2String};
+    use keramics_types::{ByteString, Ucs2String, Utf16String};
 
     #[test]
     fn test_escape_path() {
@@ -465,10 +465,20 @@ mod tests {
         assert_eq!(escaped_string, "test");
 
         let test_path_component: PathComponent = PathComponent::from(Ucs2String {
-            elements: vec![0x0074, 0x0065, 0x0073, 0x0074, 0xd800],
+            elements: vec![0x0074, 0x0065, 0x0073, 0x0074, 0x003a, 0xd800],
         });
         let escaped_string: String = display_path.escape_path_component(&test_path_component);
-        assert_eq!(escaped_string, "test\\U0000d800");
+        assert_eq!(escaped_string, "test\\:\\U0000d800");
+
+        let test_path_component: PathComponent =
+            PathComponent::from(Utf16String::from("utf16:name"));
+        let escaped_string: String = display_path.escape_path_component(&test_path_component);
+        assert_eq!(escaped_string, "utf16\\:name");
+
+        let invalid_byte_string: ByteString = ByteString::from(&[0xffu8][..]);
+        let test_path_component: PathComponent = PathComponent::from(invalid_byte_string);
+        let escaped_string: String = display_path.escape_path_component(&test_path_component);
+        assert!(!escaped_string.is_empty());
     }
 
     #[test]
@@ -523,6 +533,149 @@ mod tests {
 
         let test_path: String = display_path.get_path(&gpt_vfs_location)?;
         assert_eq!(test_path, String::from("/p1"));
+
+        // Test dfImageTools output format for GPT.
+        display_path.set_output_format(&OutputFormat::DfImageTools);
+        let test_path: String = display_path.get_path(&gpt_vfs_location)?;
+        assert_eq!(test_path, String::from("/p1"));
+
+        // Test APM display path.
+        let apm_os_location: VfsLocation = VfsLocation::from("../test_data/apm/apm.dmg");
+        let apm_location: VfsLocation =
+            apm_os_location.new_with_layer(&VfsType::Apm, Path::from("/apm1"));
+        assert_eq!(display_path.get_path(&apm_location)?, "/p1");
+
+        // Test MBR display path.
+        let mbr_os_location: VfsLocation = VfsLocation::from("../test_data/mbr/mbr.raw");
+        let mbr_location: VfsLocation =
+            mbr_os_location.new_with_layer(&VfsType::Mbr, Path::from("/mbr1"));
+        assert_eq!(display_path.get_path(&mbr_location)?, "/p1");
+        display_path.set_volume_path_type(&DisplayPathType::Identifier);
+        assert_eq!(display_path.get_path(&mbr_location)?, "/mbr1");
+
+        // Test SGI disklabel display path.
+        display_path.set_volume_path_type(&DisplayPathType::Index);
+        let sgi_os_location: VfsLocation = VfsLocation::from("../test_data/sgilabel/sgilabel.raw");
+        let sgi_location: VfsLocation =
+            sgi_os_location.new_with_layer(&VfsType::SgiDiskLabel, Path::from("/sgilabel1"));
+        assert_eq!(display_path.get_path(&sgi_location)?, "/p1");
+
+        // Test APFS container with identifier and index path types.
+        display_path.set_volume_path_type(&DisplayPathType::Identifier);
+        let apfs_os_location: VfsLocation = VfsLocation::from("../test_data/apfs/apfs.raw");
+        let apfs_location: VfsLocation =
+            apfs_os_location.new_with_layer(&VfsType::ApfsContainer, Path::from("/apfs1"));
+        assert_eq!(
+            display_path.get_path(&apfs_location)?,
+            "/apfs{33d13da9-f1c8-4d2a-b9c7-71ab9dbe5fe2}"
+        );
+        display_path.set_volume_path_type(&DisplayPathType::Index);
+        assert_eq!(display_path.get_path(&apfs_location)?, "/apfs1");
+
+        // Test Linux LVM with identifier path type.
+        display_path.set_volume_path_type(&DisplayPathType::Identifier);
+        let lvm_os_location: VfsLocation = VfsLocation::from("../test_data/linuxlvm/lvm2.raw");
+        let lvm_location: VfsLocation =
+            lvm_os_location.new_with_layer(&VfsType::LinuxLvm, Path::from("/lvm1"));
+        let lvm_path: String = display_path.get_path(&lvm_location)?;
+        assert!(lvm_path.starts_with("/lvm{"));
+
+        // Test non-partition layer in dfImageTools and text output formats.
+        let vhd_os_location: VfsLocation = VfsLocation::from("../test_data/vhd/ext2.vhd");
+        let vhd_location: VfsLocation =
+            vhd_os_location.new_with_layer(&VfsType::Vhd, Path::from("/vhd1"));
+        assert_eq!(display_path.get_path(&vhd_location)?, "");
+        display_path.set_output_format(&OutputFormat::Text);
+        assert_eq!(display_path.get_path(&vhd_location)?, "/vhd1");
+
+        // Test missing file entry and error cases.
+        let missing_gpt: VfsLocation =
+            os_vfs_location.new_with_layer(&VfsType::Gpt, Path::from("/gpt99"));
+        let result: Result<String, ErrorTrace> = display_path.get_path(&missing_gpt);
+        assert!(result.is_err());
+
+        let invalid_parent: VfsLocation =
+            missing_gpt.new_with_layer(&VfsType::Ext, Path::from("/"));
+        let result: Result<String, ErrorTrace> = display_path.get_path(&invalid_parent);
+        assert!(result.is_err());
+        display_path.set_output_format(&OutputFormat::DfImageTools);
+        let result: Result<String, ErrorTrace> = display_path.get_path(&invalid_parent);
+        assert!(result.is_err());
+
+        let bad_os_location: VfsLocation = VfsLocation::from("../test_data/nonexistent.raw");
+        let bad_gpt: VfsLocation =
+            bad_os_location.new_with_layer(&VfsType::Gpt, Path::from("/gpt1"));
+        let result: Result<String, ErrorTrace> = display_path.get_path(&bad_gpt);
+        assert!(result.is_err());
+
+        // Test get_path_component directly for PDI, VHD, VHDX, and root fallback entries.
+        display_path.set_volume_path_type(&DisplayPathType::Identifier);
+        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+
+        let pdi_location: VfsLocation =
+            VfsLocation::from("../test_data/pdi/hfsplus.hdd/DiskDescriptor.xml")
+                .new_with_layer(&VfsType::Pdi, Path::from("/pdi1"));
+        let pdi_entry: VfsFileEntry = vfs_resolver
+            .get_file_entry_by_location(&pdi_location)?
+            .unwrap();
+        assert!(
+            display_path
+                .get_path_component(&Path::from("/pdi1"), &pdi_entry)
+                .starts_with("/pdi{")
+        );
+
+        let vhd_layer_location: VfsLocation = VfsLocation::from("../test_data/vhd/ext2.vhd")
+            .new_with_layer(&VfsType::Vhd, Path::from("/vhd1"));
+        let vhd_entry: VfsFileEntry = vfs_resolver
+            .get_file_entry_by_location(&vhd_layer_location)?
+            .unwrap();
+        assert!(
+            display_path
+                .get_path_component(&Path::from("/vhd1"), &vhd_entry)
+                .starts_with("/vhd{")
+        );
+
+        let vhdx_location: VfsLocation = VfsLocation::from("../test_data/vhdx/ext2.vhdx")
+            .new_with_layer(&VfsType::Vhdx, Path::from("/vhdx1"));
+        let vhdx_entry: VfsFileEntry = vfs_resolver
+            .get_file_entry_by_location(&vhdx_location)?
+            .unwrap();
+        assert!(
+            display_path
+                .get_path_component(&Path::from("/vhdx1"), &vhdx_entry)
+                .starts_with("/vhdx{")
+        );
+
+        // Test root entries without identifier or partition number.
+        let gpt_root: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, Path::from("/"));
+        let gpt_root_entry: VfsFileEntry =
+            vfs_resolver.get_file_entry_by_location(&gpt_root)?.unwrap();
+        assert_eq!(
+            display_path.get_path_component(&Path::from("/gpt1"), &gpt_root_entry),
+            "/p1"
+        );
+        display_path.set_volume_path_type(&DisplayPathType::Index);
+        assert_eq!(
+            display_path.get_path_component(&Path::from("/gpt1"), &gpt_root_entry),
+            "/p1"
+        );
+
+        let mbr_root: VfsLocation = mbr_os_location.new_with_layer(&VfsType::Mbr, Path::from("/"));
+        let mbr_root_entry: VfsFileEntry =
+            vfs_resolver.get_file_entry_by_location(&mbr_root)?.unwrap();
+        assert_eq!(
+            display_path.get_path_component(&Path::from("/mbr1"), &mbr_root_entry),
+            "/p1"
+        );
+
+        let sgi_root: VfsLocation =
+            sgi_os_location.new_with_layer(&VfsType::SgiDiskLabel, Path::from("/"));
+        let sgi_root_entry: VfsFileEntry =
+            vfs_resolver.get_file_entry_by_location(&sgi_root)?.unwrap();
+        assert_eq!(
+            display_path.get_path_component(&Path::from("/sgilabel1"), &sgi_root_entry),
+            "/p1"
+        );
 
         Ok(())
     }

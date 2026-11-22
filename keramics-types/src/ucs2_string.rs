@@ -379,6 +379,44 @@ mod tests {
     use super::*;
 
     use crate::constants::UCS2_CASE_MAPPINGS;
+    use keramics_encodings::CharacterEncoding;
+
+    #[test]
+    fn test_ucs2_character_mappings() {
+        let mut mappings: Ucs2CharacterMappings = Ucs2CharacterMappings::new();
+        assert_eq!(mappings.len(), 0);
+        assert_eq!(mappings.get(&0x0061), 0x0061);
+
+        mappings.add(0x0061, 0x0041);
+        assert_eq!(mappings.len(), 1);
+        assert_eq!(mappings.get(&0x0061), 0x0041);
+        assert_eq!(mappings.get(&0x0062), 0x0062);
+
+        let mappings: Ucs2CharacterMappings =
+            Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice());
+        assert_eq!(mappings.len(), UCS2_CASE_MAPPINGS.len());
+        assert_eq!(mappings.get(&0x0061), 0x0041);
+        assert_eq!(mappings.get(&0x0041), 0x0041);
+    }
+
+    #[test]
+    fn test_append() {
+        let mut ucs2_string: Ucs2String = Ucs2String::from("UCS-2");
+        let mut other_string: Ucs2String = Ucs2String::from(" string");
+
+        ucs2_string.append(&mut other_string);
+
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069,
+                    0x006e, 0x0067,
+                ],
+            }
+        );
+        assert!(other_string.is_empty());
+    }
 
     #[test]
     fn test_new_with_case_folding() {
@@ -400,7 +438,19 @@ mod tests {
         );
     }
 
-    // TODO: add tests for decode
+    #[test]
+    fn test_decode() {
+        let ucs2_string: Ucs2String = Ucs2String::from("UCS-2 string");
+
+        let code_points: Vec<u32> = ucs2_string.decode();
+        assert_eq!(
+            code_points,
+            vec![
+                0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069,
+                0x006e, 0x0067,
+            ]
+        );
+    }
 
     #[test]
     fn test_from_be_bytes() {
@@ -419,6 +469,10 @@ mod tests {
                 ],
             }
         );
+
+        // Test without a trailing null character.
+        let ucs2_string: Ucs2String = Ucs2String::from_be_bytes(&test_data[..24]);
+        assert_eq!(ucs2_string, "UCS-2 string");
     }
 
     #[test]
@@ -435,6 +489,20 @@ mod tests {
                 ],
             }
         );
+
+        // Test with a code point outside of the UCS-2 range.
+        let byte_string: ByteString = ByteString::from("\u{1f600}");
+        let result: Result<Ucs2String, ErrorTrace> = Ucs2String::from_byte_string(&byte_string);
+        assert!(result.is_err());
+
+        // Test with an invalid byte sequence.
+        let byte_string: ByteString = ByteString {
+            encoding: CharacterEncoding::Utf8,
+            elements: vec![0xff],
+        };
+        let result: Result<Ucs2String, ErrorTrace> = Ucs2String::from_byte_string(&byte_string);
+        assert!(result.is_err());
+
         Ok(())
     }
 
@@ -456,6 +524,22 @@ mod tests {
                 ],
             }
         );
+
+        // Test with a code point outside of the UCS-2 range.
+        let byte_string: ByteString = ByteString::from("\u{1f600}");
+        let result: Result<Ucs2String, ErrorTrace> =
+            Ucs2String::from_byte_string_with_case_folding(&byte_string, &mappings);
+        assert!(result.is_err());
+
+        // Test with an invalid byte sequence.
+        let byte_string: ByteString = ByteString {
+            encoding: CharacterEncoding::Utf8,
+            elements: vec![0xff],
+        };
+        let result: Result<Ucs2String, ErrorTrace> =
+            Ucs2String::from_byte_string_with_case_folding(&byte_string, &mappings);
+        assert!(result.is_err());
+
         Ok(())
     }
 
@@ -476,6 +560,10 @@ mod tests {
                 ],
             }
         );
+
+        // Test without a trailing null character.
+        let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data[..24]);
+        assert_eq!(ucs2_string, "UCS-2 string");
     }
 
     #[test]
@@ -495,6 +583,12 @@ mod tests {
                 ],
             }
         );
+
+        // Test with a code point outside of the UCS-2 range.
+        let result: Result<Ucs2String, ErrorTrace> =
+            Ucs2String::from_string_with_case_folding("\u{1f600}", &mappings);
+        assert!(result.is_err());
+
         Ok(())
     }
 
@@ -512,6 +606,19 @@ mod tests {
                 ],
             }
         );
+
+        // Test with an invalid UTF-16 string.
+        let utf16_string: Utf16String = Utf16String {
+            elements: vec![0xd800],
+        };
+        let result: Result<Ucs2String, ErrorTrace> = Ucs2String::from_utf16_string(&utf16_string);
+        assert!(result.is_err());
+
+        // Test with a code point outside of the UCS-2 range.
+        let utf16_string: Utf16String = Utf16String::from("\u{1f600}");
+        let result: Result<Ucs2String, ErrorTrace> = Ucs2String::from_utf16_string(&utf16_string);
+        assert!(result.is_err());
+
         Ok(())
     }
 
@@ -533,6 +640,21 @@ mod tests {
                 ],
             }
         );
+
+        // Test with an invalid UTF-16 string.
+        let utf16_string: Utf16String = Utf16String {
+            elements: vec![0xd800],
+        };
+        let result: Result<Ucs2String, ErrorTrace> =
+            Ucs2String::from_utf16_string_with_case_folding(&utf16_string, &mappings);
+        assert!(result.is_err());
+
+        // Test with a code point outside of the UCS-2 range.
+        let utf16_string: Utf16String = Utf16String::from("\u{1f600}");
+        let result: Result<Ucs2String, ErrorTrace> =
+            Ucs2String::from_utf16_string_with_case_folding(&utf16_string, &mappings);
+        assert!(result.is_err());
+
         Ok(())
     }
 
@@ -554,8 +676,55 @@ mod tests {
         assert_eq!(ucs2_string.len(), 12);
     }
 
-    // TODO: add tests for read_data_be
-    // TODO: add tests for read_data_le
+    #[test]
+    fn test_read_data_be() {
+        let test_data: [u8; 28] = [
+            0x00, 0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x32, 0x00, 0x20, 0x00, 0x73,
+            0x00, 0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let mut ucs2_string: Ucs2String = Ucs2String::new();
+        ucs2_string.read_data_be(&test_data);
+
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069,
+                    0x006e, 0x0067,
+                ],
+            }
+        );
+
+        // Test without a trailing null character.
+        let mut ucs2_string: Ucs2String = Ucs2String::new();
+        ucs2_string.read_data_be(&test_data[..24]);
+        assert_eq!(ucs2_string, "UCS-2 string");
+    }
+
+    #[test]
+    fn test_read_data_le() {
+        let test_data: [u8; 28] = [
+            0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x32, 0x00, 0x20, 0x00, 0x73, 0x00,
+            0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let mut ucs2_string: Ucs2String = Ucs2String::new();
+        ucs2_string.read_data_le(&test_data);
+
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069,
+                    0x006e, 0x0067,
+                ],
+            }
+        );
+
+        // Test without a trailing null character.
+        let mut ucs2_string: Ucs2String = Ucs2String::new();
+        ucs2_string.read_data_le(&test_data[..24]);
+        assert_eq!(ucs2_string, "UCS-2 string");
+    }
 
     #[test]
     fn test_from_u16_slice() {
@@ -574,6 +743,10 @@ mod tests {
                 ],
             }
         );
+
+        // Test without a trailing null character.
+        let ucs2_string: Ucs2String = Ucs2String::from(&test_data[..12]);
+        assert_eq!(ucs2_string, "UCS-2 string");
     }
 
     #[test]
@@ -616,6 +789,7 @@ mod tests {
             0x0067,
         ];
         assert!(ucs2_string.eq(&test_array.as_slice()));
+        assert!(!ucs2_string.eq(&[0x0041u16].as_slice()));
     }
 
     #[test]
@@ -624,6 +798,8 @@ mod tests {
 
         assert!(ucs2_string.eq("UCS-2 string"));
         assert!(ucs2_string.eq(&"UCS-2 string"));
+        assert!(!ucs2_string.eq("other"));
+        assert!(!ucs2_string.eq(&"other"));
     }
 
     #[test]
@@ -647,5 +823,11 @@ mod tests {
 
         let string: String = ucs2_string.to_string();
         assert_eq!(string, "UCS-\\{d800} string");
+
+        // Test escaping a backslash character.
+        let ucs2_string: Ucs2String = Ucs2String::from("UCS-2\\string");
+
+        let string: String = ucs2_string.to_string();
+        assert_eq!(string, "UCS-2\\\\string");
     }
 }

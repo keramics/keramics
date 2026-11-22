@@ -152,6 +152,7 @@ mod tests {
 
         let partition_number: Option<usize> = file_entry.get_partition_number();
         assert_eq!(partition_number, Some(1));
+        assert!(file_entry.get_identifier().is_none());
 
         Ok(())
     }

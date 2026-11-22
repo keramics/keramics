@@ -250,4 +250,31 @@ mod tests {
         let scan_result: Option<&PathFilterSignature> = scan_tree.scan_path(&path);
         assert!(scan_result.is_none());
     }
+
+    #[test]
+    fn test_scan_path_with_varying_path_lengths() -> Result<(), ErrorTrace> {
+        let mut scan_tree: ScanTree = ScanTree::new(ScanTreeType::Prefix);
+
+        let signatures: Vec<Arc<PathFilterSignature>> = vec![
+            Arc::new(PathFilterSignature::new(Path::from("/a"), None)),
+            Arc::new(PathFilterSignature::new(Path::from("/b"), None)),
+            Arc::new(PathFilterSignature::new(Path::from("/c/d/e/f"), None)),
+            Arc::new(PathFilterSignature::new(Path::from("/c/d/g/h"), None)),
+            Arc::new(PathFilterSignature::new(Path::from("/c/d/i/j"), None)),
+        ];
+        scan_tree.build(&signatures)?;
+
+        for expected_path in ["/a", "/b", "/c/d/e/f", "/c/d/g/h", "/c/d/i/j"] {
+            let path: Path = Path::from(expected_path);
+            let scan_result: Option<&PathFilterSignature> = scan_tree.scan_path(&path);
+            assert_eq!(scan_result.map(|signature| &signature.path), Some(&path));
+        }
+
+        // Shorter path missing the checked component index falls through to default_scan_object.
+        assert!(scan_tree.scan_path(&Path::from("/x")).is_none());
+        // Path with an unrecognized component at the checked index falls through to default_scan_object.
+        assert!(scan_tree.scan_path(&Path::from("/c/d/unknown/z")).is_none());
+
+        Ok(())
+    }
 }

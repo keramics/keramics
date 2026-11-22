@@ -908,8 +908,8 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_core::open_os_data_stream;
-    use keramics_datetime::{PosixTime32, PosixTime64Ns};
+    use keramics_core::{open_fake_data_stream, open_os_data_stream};
+    use keramics_datetime::{HfsTime, PosixTime32, PosixTime64Ns};
 
     use crate::assert_lines_eq;
 
@@ -922,12 +922,19 @@ mod tests {
     #[test]
     fn test_compatible_feature_status_flags_information_fmt() -> Result<(), ErrorTrace> {
         let test_struct: ExtCompatibleFeatureFlagsInfo =
-            ExtCompatibleFeatureFlagsInfo::new(0x00000038);
+            ExtCompatibleFeatureFlagsInfo::new(0x00001e3f);
 
         let expected_string: &str = concat!(
+            "        0x00000001: Pre-allocate directory blocks (EXT2_COMPAT_PREALLOC)\n",
+            "        0x00000002: Has AFS server inodes (EXT2_FEATURE_COMPAT_IMAGIC_INODES)\n",
+            "        0x00000004: Has journal (EXT3_FEATURE_COMPAT_HAS_JOURNAL)\n",
             "        0x00000008: Has extended attributes (EXT2_FEATURE_COMPAT_EXT_ATTR)\n",
             "        0x00000010: Is resizable (EXT2_FEATURE_COMPAT_RESIZE_INO)\n",
             "        0x00000020: Has indexed directories (EXT2_FEATURE_COMPAT_DIR_INDEX)\n",
+            "        0x00000200: Has sparse superblock version 2 (EXT4_FEATURE_COMPAT_SPARSE_SUPER2)\n",
+            "        0x00000400: (EXT4_FEATURE_COMPAT_FAST_COMMIT)\n",
+            "        0x00000800: (EXT4_FEATURE_COMPAT_STABLE_INODES)\n",
+            "        0x00001000: Has orphan file (EXT4_FEATURE_COMPAT_ORPHAN_FILE)\n",
         );
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
@@ -952,6 +959,10 @@ mod tests {
         let test_struct: ExtDateTimeInfo = ExtDateTimeInfo::new(&date_time);
         let string: String = test_struct.to_string();
         assert_eq!(string, NOT_SET_VALUE);
+
+        let date_time: DateTime = DateTime::HfsTime(HfsTime::new(0));
+        let test_struct: ExtDateTimeInfo = ExtDateTimeInfo::new(&date_time);
+        assert_eq!(test_struct.to_string(), "Unsupported date time");
     }
 
     #[test]
@@ -1026,13 +1037,25 @@ mod tests {
     #[test]
     fn test_incompatible_feature_status_flags_information_fmt() -> Result<(), ErrorTrace> {
         let test_struct: ExtIncompatibleFeatureFlagsInfo =
-            ExtIncompatibleFeatureFlagsInfo::new(0x00000002);
+            ExtIncompatibleFeatureFlagsInfo::new(0x0003f7df);
 
-        let expected_string: &str = concat!(
-            "        0x00000002: Directory entry has file type (EXT2_FEATURE_INCOMPAT_FILETYPE)\n",
-        );
         let string: String = test_struct.to_string();
-        assert_lines_eq!(string.as_str(), expected_string);
+        assert!(string.contains("EXT2_FEATURE_INCOMPAT_COMPRESSION"));
+        assert!(string.contains("EXT2_FEATURE_INCOMPAT_FILETYPE"));
+        assert!(string.contains("EXT3_FEATURE_INCOMPAT_RECOVER"));
+        assert!(string.contains("EXT3_FEATURE_INCOMPAT_JOURNAL_DEV"));
+        assert!(string.contains("EXT2_FEATURE_INCOMPAT_META_BG"));
+        assert!(string.contains("EXT4_FEATURE_INCOMPAT_EXTENTS"));
+        assert!(string.contains("EXT4_FEATURE_INCOMPAT_64BIT"));
+        assert!(string.contains("EXT4_FEATURE_INCOMPAT_MMP"));
+        assert!(string.contains("EXT4_FEATURE_INCOMPAT_FLEX_BG"));
+        assert!(string.contains("EXT4_FEATURE_INCOMPAT_EA_INODE"));
+        assert!(string.contains("EXT4_FEATURE_INCOMPAT_DIRDATA"));
+        assert!(string.contains("EXT4_FEATURE_INCOMPAT_CSUM_SEED"));
+        assert!(string.contains("EXT4_FEATURE_INCOMPAT_LARGEDIR"));
+        assert!(string.contains("EXT4_FEATURE_INCOMPAT_INLINE_DATA"));
+        assert!(string.contains("EXT4_FEATURE_INCOMPAT_ENCRYPT"));
+        assert!(string.contains("EXT4_FEATURE_INCOMPAT_CASEFOLD"));
 
         Ok(())
     }
@@ -1040,23 +1063,67 @@ mod tests {
     #[test]
     fn test_read_only_compatible_feature_status_flags_information_fmt() -> Result<(), ErrorTrace> {
         let test_struct: ExtReadOnlyCompatibleFeatureFlagsInfo =
-            ExtReadOnlyCompatibleFeatureFlagsInfo::new(0x00000003);
+            ExtReadOnlyCompatibleFeatureFlagsInfo::new(0x0001ffff);
 
-        let expected_string: &str = concat!(
-            "        0x00000001: Has sparse superblocks and group descriptor tables (EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER)\n",
-            "        0x00000002: Contains large files (EXT2_FEATURE_RO_COMPAT_LARGE_FILE)\n",
-        );
         let string: String = test_struct.to_string();
-        assert_lines_eq!(string.as_str(), expected_string);
+        assert!(string.contains("EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER"));
+        assert!(string.contains("EXT2_FEATURE_RO_COMPAT_LARGE_FILE"));
+        assert!(string.contains("EXT2_FEATURE_RO_COMPAT_BTREE_DIR"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_HUGE_FILE"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_GDT_CSUM"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_DIR_NLINK"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_EXTRA_ISIZE"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_HAS_SNAPSHOT"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_QUOTA"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_BIGALLOC"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_METADATA_CSUM"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_REPLICA"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_READONLY"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_PROJECT"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_SHARED_BLOCKS"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_VERITY"));
+        assert!(string.contains("EXT4_FEATURE_RO_COMPAT_ORPHAN_PRESENT"));
 
         Ok(())
     }
 
-    // TODO: add tests for open_file_system
-    // TODO: add tests for print_file_entry
-    // TODO: add tests for print_file_entry_by_identifier
-    // TODO: add tests for print_file_entry_by_path
-    // TODO: add tests for print_file_system
-    // TODO: add tests for print_hierarchy
-    // TODO: add tests for print_hierarchy_file_entry
+    #[test]
+    fn test_print_methods() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext4.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+
+        ExtInfo::print_file_system(&data_stream, Some(&CharacterEncoding::Utf8))?;
+        ExtInfo::print_file_entry_by_identifier(&data_stream, 2, None)?;
+        assert!(
+            ExtInfo::print_file_entry_by_identifier(&data_stream, u32::MAX as u64 + 1, None)
+                .is_err()
+        );
+        assert!(ExtInfo::print_file_entry_by_identifier(&data_stream, 99999, None).is_err());
+
+        ExtInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/testfile1"), None)?;
+        ExtInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/xattr1"), None)?;
+        ExtInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/blockdev1"), None)?;
+        ExtInfo::print_file_entry_by_path(&data_stream, &Path::from("/file_symboliclink1"), None)?;
+        assert!(
+            ExtInfo::print_file_entry_by_path(&data_stream, &Path::from("/nonexistent"), None)
+                .is_err()
+        );
+
+        ExtInfo::print_hierarchy(&data_stream, None, None)?;
+        ExtInfo::print_hierarchy(&data_stream, None, Some(&String::from("/testdir1")))?;
+        assert!(
+            ExtInfo::print_hierarchy(&data_stream, None, Some(&String::from("/nonexistent")))
+                .is_err()
+        );
+
+        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
+        assert!(ExtInfo::print_file_system(&invalid_stream, None).is_err());
+        assert!(ExtInfo::print_file_entry_by_identifier(&invalid_stream, 2, None).is_err());
+        assert!(
+            ExtInfo::print_file_entry_by_path(&invalid_stream, &Path::from("/"), None).is_err()
+        );
+        assert!(ExtInfo::print_hierarchy(&invalid_stream, None, None).is_err());
+
+        Ok(())
+    }
 }

@@ -40,7 +40,11 @@ pub type Pbkdf2HmacSha384Context = Pbkdf2Context<Sha384Context, 128, 48>;
 pub type Pbkdf2HmacSha512Context = Pbkdf2Context<Sha512Context, 128, 64>;
 
 /// Context for PBKDF2 key derivation.
-pub struct Pbkdf2Context<H: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize> {
+pub struct Pbkdf2Context<
+    H: DigestHashContext + Clone,
+    const BLOCK_SIZE: usize,
+    const HASH_SIZE: usize,
+> {
     /// HMAC context.
     hmac_context: HmacContext<H, BLOCK_SIZE, HASH_SIZE>,
 
@@ -51,7 +55,7 @@ pub struct Pbkdf2Context<H: DigestHashContext, const BLOCK_SIZE: usize, const HA
     number_of_iterations: usize,
 }
 
-impl<H: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize>
+impl<H: DigestHashContext + Clone, const BLOCK_SIZE: usize, const HASH_SIZE: usize>
     Pbkdf2Context<H, BLOCK_SIZE, HASH_SIZE>
 {
     /// Creates a new context.
@@ -70,6 +74,8 @@ impl<H: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize>
                 "Invalid context - number of iterations value out of bounds"
             ));
         }
+        self.hmac_context.set_key(password);
+
         let mut hash_buffer1: [u8; HASH_SIZE] = [0; HASH_SIZE];
         let mut hash_buffer2: [u8; HASH_SIZE] = [0; HASH_SIZE];
 
@@ -87,7 +93,7 @@ impl<H: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize>
 
             match self
                 .hmac_context
-                .calculate_hmac(password, &data_buffer, &mut hash_buffer1)
+                .calculate_hmac_with_key(&data_buffer, &mut hash_buffer1)
             {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -100,7 +106,7 @@ impl<H: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize>
             for _ in 1..self.number_of_iterations {
                 match self
                     .hmac_context
-                    .calculate_hmac(password, &hash_buffer1, &mut hash_buffer2)
+                    .calculate_hmac_with_key(&hash_buffer1, &mut hash_buffer2)
                 {
                     Ok(_) => {}
                     Err(mut error) => {
@@ -121,7 +127,7 @@ impl<H: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize>
 
             match self
                 .hmac_context
-                .calculate_hmac(password, &data_buffer, &mut hash_buffer1)
+                .calculate_hmac_with_key(&data_buffer, &mut hash_buffer1)
             {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -134,7 +140,7 @@ impl<H: DigestHashContext, const BLOCK_SIZE: usize, const HASH_SIZE: usize>
             for _ in 1..self.number_of_iterations {
                 match self
                     .hmac_context
-                    .calculate_hmac(password, &hash_buffer1, &mut hash_buffer2)
+                    .calculate_hmac_with_key(&hash_buffer1, &mut hash_buffer2)
                 {
                     Ok(_) => {}
                     Err(mut error) => {

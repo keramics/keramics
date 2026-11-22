@@ -305,6 +305,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_new() {
+        let byte_string: ByteString = ByteString::new();
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Utf8,
+                elements: vec![],
+            }
+        );
+    }
+
+    #[test]
+    fn test_new_with_encoding() {
+        let byte_string: ByteString = ByteString::new_with_encoding(&CharacterEncoding::Iso8859_1);
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Iso8859_1,
+                elements: vec![],
+            }
+        );
+    }
+
+    #[test]
     fn test_decode() -> Result<(), ErrorTrace> {
         let byte_string: ByteString = ByteString::from("ASCII string");
 
@@ -315,12 +339,24 @@ mod tests {
                 0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
             ]
         );
+
+        // Test with an invalid byte sequence.
+        let byte_string: ByteString = ByteString {
+            encoding: CharacterEncoding::Ascii,
+            elements: vec![0x80],
+        };
+        let result: Result<Vec<u32>, ErrorTrace> = byte_string.decode();
+        assert!(result.is_err());
+
         Ok(())
     }
 
     #[test]
     fn test_encode() -> Result<(), ErrorTrace> {
         let byte_string: ByteString = ByteString::from("ASCII string");
+
+        let test_byte_string: ByteString = byte_string.encode(&CharacterEncoding::Utf8)?;
+        assert_eq!(test_byte_string, byte_string);
 
         let test_byte_string: ByteString = byte_string.encode(&CharacterEncoding::Iso8859_1)?;
         assert_eq!(
@@ -332,6 +368,13 @@ mod tests {
                 ]
             }
         );
+
+        // Test with a character that cannot be encoded in the target encoding.
+        let byte_string: ByteString = ByteString::from("\u{0100}");
+        let result: Result<ByteString, ErrorTrace> =
+            byte_string.encode(&CharacterEncoding::Iso8859_1);
+        assert!(result.is_err());
+
         Ok(())
     }
 
@@ -363,6 +406,20 @@ mod tests {
                 ]
             }
         );
+
+        // Test with an invalid source byte string.
+        let invalid_byte_string: ByteString = ByteString {
+            encoding: CharacterEncoding::Utf8,
+            elements: vec![0xff],
+        };
+        let result: Result<(), ErrorTrace> = byte_string.extend(&invalid_byte_string);
+        assert!(result.is_err());
+
+        // Test with a source byte string containing a character unsupported by the target encoding.
+        let unsupported_byte_string: ByteString = ByteString::from("\u{0100}");
+        let result: Result<(), ErrorTrace> = byte_string.extend(&unsupported_byte_string);
+        assert!(result.is_err());
+
         Ok(())
     }
 
@@ -381,6 +438,11 @@ mod tests {
                 ]
             }
         );
+
+        // Test with a code point unsupported by the encoding.
+        let result: Result<(), ErrorTrace> = byte_string.extend_from_codepoints(&[0x0100]);
+        assert!(result.is_err());
+
         Ok(())
     }
 
@@ -411,18 +473,91 @@ mod tests {
                 ]
             }
         );
+
+        // Test with a character unsupported by the encoding.
+        let result: Result<ByteString, ErrorTrace> =
+            ByteString::from_string_with_encoding(&CharacterEncoding::Iso8859_1, "\u{0100}");
+        assert!(result.is_err());
+
         Ok(())
     }
 
-    // TODO: add tests for from_ucs2_string_with_encoding
-    // TODO: add tests for from_utf16_string_with_encoding
+    #[test]
+    fn test_from_ucs2_string_with_encoding() -> Result<(), ErrorTrace> {
+        let encoding: CharacterEncoding = CharacterEncoding::Iso8859_1;
+        let ucs2_string: Ucs2String = Ucs2String::from("ASCII string");
+        let byte_string: ByteString =
+            ByteString::from_ucs2_string_with_encoding(&encoding, &ucs2_string)?;
+
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Iso8859_1,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
+
+        // Test with a code point unsupported by the encoding.
+        let ucs2_string: Ucs2String = Ucs2String {
+            elements: vec![0x0100],
+        };
+        let result: Result<ByteString, ErrorTrace> =
+            ByteString::from_ucs2_string_with_encoding(&encoding, &ucs2_string);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_utf16_string_with_encoding() -> Result<(), ErrorTrace> {
+        let encoding: CharacterEncoding = CharacterEncoding::Iso8859_1;
+        let utf16_string: Utf16String = Utf16String::from("ASCII string");
+        let byte_string: ByteString =
+            ByteString::from_utf16_string_with_encoding(&encoding, &utf16_string)?;
+
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Iso8859_1,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
+
+        // Test with an invalid UTF-16 string.
+        let utf16_string: Utf16String = Utf16String {
+            elements: vec![0xd800],
+        };
+        let result: Result<ByteString, ErrorTrace> =
+            ByteString::from_utf16_string_with_encoding(&encoding, &utf16_string);
+        assert!(result.is_err());
+
+        // Test with a code point unsupported by the encoding.
+        let utf16_string: Utf16String = Utf16String {
+            elements: vec![0x0100],
+        };
+        let result: Result<ByteString, ErrorTrace> =
+            ByteString::from_utf16_string_with_encoding(&encoding, &utf16_string);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_character_decoder() -> Result<(), ErrorTrace> {
         let byte_string: ByteString =
             ByteString::from_string_with_encoding(&CharacterEncoding::Iso8859_1, "ASCII")?;
 
-        let _ = byte_string.get_character_decoder();
+        let mut decoder: CharacterDecoder = byte_string.get_character_decoder();
+        assert_eq!(decoder.next(), Some(Ok(vec![0x41])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x53])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x43])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x49])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x49])));
+        assert_eq!(decoder.next(), None);
 
         Ok(())
     }
@@ -469,12 +604,44 @@ mod tests {
                 ],
             }
         );
+
+        // Test without a trailing null byte.
+        let mut byte_string: ByteString = ByteString::new();
+        let test_data: [u8; 12] = [
+            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+        ];
+        byte_string.read_data(&test_data);
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Utf8,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67
+                ],
+            }
+        );
     }
 
     #[test]
     fn test_from_u8_slice() {
         let test_data: [u8; 14] = [
             0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
+        ];
+        let byte_string: ByteString = ByteString::from(test_data.as_slice());
+
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Utf8,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
+
+        // Test without a trailing null byte.
+        let test_data: [u8; 12] = [
+            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
         ];
         let byte_string: ByteString = ByteString::from(test_data.as_slice());
 
@@ -528,6 +695,7 @@ mod tests {
             0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
         ];
         assert!(byte_string.eq(&test_array.as_slice()));
+        assert!(!byte_string.eq(&b"other".as_slice()));
     }
 
     #[test]
@@ -536,6 +704,8 @@ mod tests {
 
         assert!(byte_string.eq("ASCII string"));
         assert!(byte_string.eq(&"ASCII string"));
+        assert!(!byte_string.eq("other"));
+        assert!(!byte_string.eq(&"other"));
     }
 
     #[test]
@@ -549,5 +719,20 @@ mod tests {
 
         let string: String = byte_string.to_string();
         assert_eq!(string, "ASCII string");
+
+        // Test escaping a backslash character.
+        let byte_string: ByteString = ByteString::from("ASCII\\string");
+
+        let string: String = byte_string.to_string();
+        assert_eq!(string, "ASCII\\\\string");
+
+        // Test with an invalid byte sequence.
+        let byte_string: ByteString = ByteString {
+            encoding: CharacterEncoding::Ascii,
+            elements: vec![0x80],
+        };
+
+        let string: String = byte_string.to_string();
+        assert!(string.contains("Unable to decode ASCII: 0x80 as Unicode"));
     }
 }

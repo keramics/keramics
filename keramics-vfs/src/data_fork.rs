@@ -140,10 +140,10 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_hfs() -> Result<(), ErrorTrace> {
-        let hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+        let mut hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
 
-        let data_stream: DataStreamReference = hfs_file_entry.get_data_stream()?.unwrap();
-        let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
+        let hfs_fork: HfsFork = hfs_file_entry.get_data_fork()?.unwrap();
+        let vfs_data_fork: VfsDataFork = VfsDataFork::Hfs(hfs_fork);
 
         let _ = vfs_data_fork.get_data_stream()?;
 
@@ -152,13 +152,19 @@ mod tests {
 
     #[test]
     fn test_get_name_with_hfs() -> Result<(), ErrorTrace> {
-        let hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+        let mut hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
 
-        let data_stream: DataStreamReference = hfs_file_entry.get_data_stream()?.unwrap();
-        let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
+        let hfs_fork: HfsFork = hfs_file_entry.get_data_fork()?.unwrap();
+        let vfs_data_fork: VfsDataFork = VfsDataFork::Hfs(hfs_fork);
 
         let name: Option<PathComponent> = vfs_data_fork.get_name();
         assert_eq!(name, None);
+
+        let resource_fork: HfsFork = hfs_file_entry.get_resource_fork()?.unwrap();
+        let vfs_data_fork: VfsDataFork = VfsDataFork::Hfs(resource_fork);
+
+        let name: Option<PathComponent> = vfs_data_fork.get_name();
+        assert_eq!(name, Some(PathComponent::from("rsrc")));
 
         Ok(())
     }

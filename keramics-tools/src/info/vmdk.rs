@@ -247,6 +247,9 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_image
-    // TODO: add tests for print_image
+    #[test]
+    fn test_print_image_errors() {
+        assert!(VmdkInfo::print_image(&PathBuf::from("/")).is_err());
+        assert!(VmdkInfo::print_image(&PathBuf::from("../test_data/directory/file.txt")).is_err());
+    }
 }

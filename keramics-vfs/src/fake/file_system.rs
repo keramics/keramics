@@ -121,6 +121,11 @@ mod tests {
         let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file("file.txt", &test_data);
         fake_file_system.add_file_entry(path, fake_file_entry)?;
 
+        // Adding a duplicate root file entry returns an error.
+        let result: Result<(), ErrorTrace> =
+            fake_file_system.add_file_entry(Path::from("/"), FakeFileEntry::new_root());
+        assert!(result.is_err());
+
         Ok(())
     }
 
@@ -176,12 +181,15 @@ mod tests {
 
     #[test]
     fn test_get_root_file_entry() -> Result<(), ErrorTrace> {
-        let fake_file_system: FakeFileSystem = get_file_system()?;
+        let mut fake_file_system: FakeFileSystem = get_file_system()?;
 
         let fake_file_entry: Arc<FakeFileEntry> = fake_file_system.get_root_file_entry()?;
 
         let file_type: VfsFileType = fake_file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
+
+        fake_file_system.paths.clear();
+        assert!(fake_file_system.get_root_file_entry().is_err());
 
         Ok(())
     }

@@ -309,6 +309,13 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_volume_system
-    // TODO: add tests for print_volume_system
+    #[test]
+    fn test_print_volume_system_error() {
+        let path_buf: PathBuf = PathBuf::from("../test_data/directory");
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
+        let file_name: PathComponent = PathComponent::from("file.txt");
+
+        assert!(LinuxLvmInfo::print_volume_system(&file_resolver, &file_name).is_err());
+    }
 }

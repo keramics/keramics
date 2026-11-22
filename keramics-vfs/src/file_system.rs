@@ -3106,7 +3106,210 @@ mod tests {
 
     // Other tests.
 
-    // TODO: add test for get_data_stream_by_path_and_name
+    #[test]
+    fn test_get_type() {
+        for vfs_type in [
+            VfsType::Apfs,
+            VfsType::ApfsContainer,
+            VfsType::Apm,
+            VfsType::Bde,
+            VfsType::Ewf,
+            VfsType::ExFat,
+            VfsType::Ext,
+            VfsType::Fake,
+            VfsType::Fat,
+            VfsType::Gpt,
+            VfsType::Hfs,
+            VfsType::LinuxLvm,
+            VfsType::Luksde,
+            VfsType::Mbr,
+            VfsType::Ntfs,
+            VfsType::Os,
+            VfsType::Pdi,
+            VfsType::Qcow,
+            VfsType::SgiDiskLabel,
+            VfsType::SparseBundle,
+            VfsType::SparseImage,
+            VfsType::SplitRaw,
+            VfsType::Udif,
+            VfsType::Vdi,
+            VfsType::Vhd,
+            VfsType::Vhdx,
+            VfsType::Vmdk,
+            VfsType::Volsnap,
+            VfsType::Xfs,
+        ] {
+            let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&vfs_type);
+            assert_eq!(vfs_file_system.get_type(), vfs_type);
+        }
+    }
 
-    // TODO: add tests for get_root_file_entry
+    #[test]
+    fn test_get_root_file_entry() -> Result<(), ErrorTrace> {
+        let file_systems: Vec<VfsFileSystem> = vec![
+            get_apfs_file_system()?,
+            get_apfs_container_file_system()?,
+            get_apm_file_system()?,
+            get_bde_file_system()?,
+            get_ewf_file_system()?,
+            get_exfat_file_system()?,
+            get_ext_file_system()?,
+            get_fake_file_system()?,
+            get_fat_file_system()?,
+            get_gpt_file_system()?,
+            get_hfs_file_system()?,
+            get_linuxlvm_file_system()?,
+            get_luksde_file_system()?,
+            get_mbr_file_system()?,
+            get_ntfs_file_system()?,
+            VfsFileSystem::new(&VfsType::Os),
+            get_pdi_file_system()?,
+            get_qcow_file_system()?,
+            get_sgilabel_file_system()?,
+            get_sparsebundle_file_system()?,
+            get_sparseimage_file_system()?,
+            get_splitraw_file_system()?,
+            get_udif_file_system()?,
+            get_vdi_file_system()?,
+            get_vhd_file_system()?,
+            get_vhdx_file_system()?,
+            get_vmdk_file_system()?,
+            get_volsnap_file_system()?,
+            get_xfs_file_system()?,
+        ];
+
+        for vfs_file_system in file_systems {
+            let root_entry: Option<VfsFileEntry> = vfs_file_system.get_root_file_entry()?;
+            assert!(root_entry.is_some());
+            assert!(root_entry.unwrap().is_root_directory());
+        }
+
+        // Unopened APFS returns an error for get_root_file_entry, file_entry_exists, and get_file_entry_by_path.
+        let unopened_apfs: VfsFileSystem = VfsFileSystem::new(&VfsType::Apfs);
+        assert!(unopened_apfs.get_root_file_entry().is_err());
+        assert!(unopened_apfs.file_entry_exists(&Path::from("/")).is_err());
+        assert!(
+            unopened_apfs
+                .get_file_entry_by_path(&Path::from("/"))
+                .is_err()
+        );
+        assert!(
+            unopened_apfs
+                .get_file_entry_by_location(&VfsLocation::new_base(&VfsType::Apfs, Path::from("/")))
+                .is_err()
+        );
+        assert!(
+            unopened_apfs
+                .get_data_stream_by_path(&Path::from("/"))
+                .is_err()
+        );
+        assert!(
+            unopened_apfs
+                .get_data_stream_by_path_and_name(&Path::from("/"), None)
+                .is_err()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_path_and_name() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ntfs_file_system()?;
+
+        let path: Path = Path::from("/$UpCase");
+        assert!(
+            vfs_file_system
+                .get_data_stream_by_path_and_name(&path, None)?
+                .is_some()
+        );
+        let stream_name: PathComponent = PathComponent::from("$Info");
+        assert!(
+            vfs_file_system
+                .get_data_stream_by_path_and_name(&path, Some(&stream_name))?
+                .is_some()
+        );
+        assert!(
+            vfs_file_system
+                .get_data_stream_by_path_and_name(&Path::from("/bogus"), None)?
+                .is_none()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_errors() -> Result<(), ErrorTrace> {
+        let os_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let missing_path: String = get_test_data_path("directory/bogus.txt");
+        let missing_location: VfsLocation = VfsLocation::from(&missing_path);
+        let text_path: String = get_test_data_path("directory/file.txt");
+        let text_location: VfsLocation = VfsLocation::from(&text_path);
+
+        // Test Os and Fake rejecting a parent file system.
+        let mut os_file_system_instance: VfsFileSystem = VfsFileSystem::new(&VfsType::Os);
+        let result: Result<(), ErrorTrace> =
+            os_file_system_instance.open(Some(&os_file_system), &text_location);
+        assert!(result.is_err());
+
+        let mut fake_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Fake);
+        let result: Result<(), ErrorTrace> =
+            fake_file_system.open(Some(&os_file_system), &text_location);
+        assert!(result.is_err());
+
+        // Test file systems requiring a parent file system rejecting None, missing data streams, and invalid data.
+        for vfs_type in [
+            VfsType::Apfs,
+            VfsType::ExFat,
+            VfsType::Ext,
+            VfsType::Fat,
+            VfsType::Hfs,
+            VfsType::Ntfs,
+            VfsType::Xfs,
+        ] {
+            let mut file_system: VfsFileSystem = VfsFileSystem::new(&vfs_type);
+            let result: Result<(), ErrorTrace> = file_system.open(None, &text_location);
+            assert!(result.is_err());
+
+            let mut file_system: VfsFileSystem = VfsFileSystem::new(&vfs_type);
+            let result: Result<(), ErrorTrace> =
+                file_system.open(Some(&os_file_system), &missing_location);
+            assert!(result.is_err());
+
+            let mut file_system: VfsFileSystem = VfsFileSystem::new(&vfs_type);
+            let result: Result<(), ErrorTrace> =
+                file_system.open(Some(&os_file_system), &text_location);
+            assert!(result.is_err());
+        }
+
+        // Test APFS opened from APFS container root entry (not a volume).
+        let apfs_container: VfsFileSystemReference =
+            VfsFileSystemReference::new(get_apfs_container_file_system()?);
+        let mut apfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Apfs);
+        let root_location: VfsLocation =
+            VfsLocation::new_base(&VfsType::ApfsContainer, Path::from("/"));
+        let result: Result<(), ErrorTrace> =
+            apfs_file_system.open(Some(&apfs_container), &root_location);
+        assert!(result.is_err());
+
+        // Test error propagation from get_file_entry_by_path.
+        let unopened_apfs: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Apfs));
+        for vfs_type in [
+            VfsType::Apfs,
+            VfsType::ExFat,
+            VfsType::Ext,
+            VfsType::Fat,
+            VfsType::Hfs,
+            VfsType::Ntfs,
+            VfsType::Xfs,
+        ] {
+            let mut file_system: VfsFileSystem = VfsFileSystem::new(&vfs_type);
+            let result: Result<(), ErrorTrace> =
+                file_system.open(Some(&unopened_apfs), &text_location);
+            assert!(result.is_err());
+        }
+
+        Ok(())
+    }
 }

@@ -170,6 +170,10 @@ mod tests {
     fn test_parse_scan_options_group() -> Result<(), ErrorTrace> {
         let mut test_struct: VfsScanOptions = VfsScanOptions::new();
 
+        let scan_options_group: VfsScanOptionGroup = test_struct.parse_scan_options_group("")?;
+        assert_eq!(scan_options_group, VfsScanOptionGroup::NotSet);
+        assert!(!scan_options_group.contains_index(1));
+
         let scan_options_group: VfsScanOptionGroup = test_struct.parse_scan_options_group("all")?;
         assert_eq!(scan_options_group, VfsScanOptionGroup::All);
 
@@ -181,6 +185,9 @@ mod tests {
                 VfsScanOptionElement::Index(5)
             ])
         );
+        assert!(scan_options_group.contains_index(1));
+        assert!(scan_options_group.contains_index(5));
+        assert!(!scan_options_group.contains_index(2));
 
         test_struct.parse_partitions("1..5")?;
         assert_eq!(
@@ -188,7 +195,16 @@ mod tests {
             VfsScanOptionGroup::Elements(vec![VfsScanOptionElement::IndexRange(1, 5)])
         );
 
-        // TODO: add tests for identifier
+        let scan_options_group: VfsScanOptionGroup =
+            test_struct.parse_scan_options_group("p1,lvm1")?;
+        assert_eq!(
+            scan_options_group,
+            VfsScanOptionGroup::Elements(vec![
+                VfsScanOptionElement::Identifier(String::from("p1")),
+                VfsScanOptionElement::Identifier(String::from("lvm1")),
+            ])
+        );
+        assert!(!scan_options_group.contains_index(1));
 
         let result: Result<(), ErrorTrace> = test_struct.parse_partitions("none");
         assert!(result.is_err());
@@ -228,6 +244,9 @@ mod tests {
         test_struct.parse_volumes("1..5")?;
         assert_eq!(test_struct.volumes.contains_index(1), true);
         assert_eq!(test_struct.volumes.contains_index(9), false);
+
+        let result: Result<(), ErrorTrace> = test_struct.parse_volumes("none");
+        assert!(result.is_err());
 
         Ok(())
     }

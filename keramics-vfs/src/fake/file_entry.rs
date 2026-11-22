@@ -253,7 +253,25 @@ mod tests {
 
         assert_eq!(test_data, expected_data.as_bytes());
 
+        // Directory has no data stream.
+        let directory_entry: FakeFileEntry = FakeFileEntry::new_directory("dir");
+        assert!(directory_entry.get_data_stream()?.is_none());
+
+        // File entry missing its data stream returns an error.
+        let mut invalid_file_entry: FakeFileEntry = FakeFileEntry::new_file("empty.txt", &[]);
+        invalid_file_entry.data_stream = None;
+        assert!(invalid_file_entry.get_data_stream().is_err());
+
         Ok(())
+    }
+
+    #[test]
+    fn test_is_root_file_entry() {
+        let root_entry: FakeFileEntry = FakeFileEntry::new_root();
+        assert!(root_entry.is_root_file_entry());
+
+        let file_entry: FakeFileEntry = get_fake_file_entry();
+        assert!(!file_entry.is_root_file_entry());
     }
 
     #[test]

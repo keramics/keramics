@@ -194,7 +194,7 @@ mod tests {
 
     use keramics_core::{DataStreamReference, open_os_data_stream};
     use keramics_formats::vhd::VhdFile;
-    use keramics_formats::{FileResolver, RangeStream};
+    use keramics_formats::{FileResolver, OsFileResolver, RangeStream};
 
     use crate::assert_lines_eq;
 
@@ -327,6 +327,15 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_shadow_storage
-    // TODO: add tests for print_shadow_storage
+    #[test]
+    fn test_print_shadow_storage_error() {
+        let path_buf: PathBuf = PathBuf::from("../test_data/directory");
+        let file_resolver: FileResolverReference =
+            FileResolverReference::new(Box::new(OsFileResolver::new(path_buf)));
+        let file_name: PathComponent = PathComponent::from("file.txt");
+
+        let result: Result<(), ErrorTrace> =
+            VolsnapInfo::print_shadow_storage(&file_resolver, &file_name);
+        assert!(result.is_err());
+    }
 }

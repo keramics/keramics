@@ -206,6 +206,27 @@ mod tests {
         let result: Option<MbrFileEntry> = mbr_file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_none());
 
+        assert!(
+            mbr_file_system
+                .get_file_entry_by_path(&Path::from("mbr1"))?
+                .is_none()
+        );
+        assert!(
+            mbr_file_system
+                .get_file_entry_by_path(&Path::from("/mbr1/bogus"))?
+                .is_none()
+        );
+        assert!(
+            mbr_file_system
+                .get_file_entry_by_path(&Path::from("/mbr99"))?
+                .is_none()
+        );
+        assert!(
+            mbr_file_system
+                .get_file_entry_by_path(&Path::from(""))?
+                .is_none()
+        );
+
         Ok(())
     }
 
@@ -231,8 +252,61 @@ mod tests {
 
         assert_eq!(mbr_file_system.number_of_partitions, 2);
 
+        // Test error cases: missing parent, missing data stream, invalid data, and shared Arc.
+        let mut test_file_system: MbrFileSystem = MbrFileSystem::new();
+        let result: Result<(), ErrorTrace> = test_file_system.open(None, &parent_vfs_location);
+        assert!(result.is_err());
+
+        let missing_path: String = get_test_data_path("directory/bogus.txt");
+        let missing_location: VfsLocation = VfsLocation::from(&missing_path);
+        let result: Result<(), ErrorTrace> =
+            test_file_system.open(Some(&parent_file_system), &missing_location);
+        assert!(result.is_err());
+
+        let text_path: String = get_test_data_path("directory/file.txt");
+        let text_location: VfsLocation = VfsLocation::from(&text_path);
+        let result: Result<(), ErrorTrace> =
+            test_file_system.open(Some(&parent_file_system), &text_location);
+        assert!(result.is_err());
+
+        let _root_entry: MbrFileEntry = mbr_file_system.get_root_file_entry();
+        let result: Result<(), ErrorTrace> =
+            mbr_file_system.open(Some(&parent_file_system), &parent_vfs_location);
+        assert!(result.is_err());
+
+        // Test opening MBR over each image parent file system type to cover sector-size retrieval.
+        let image_cases: [(VfsType, &str, &str); 8] = [
+            (VfsType::Ewf, "ewf/ext2.E01", "/ewf1"),
+            (VfsType::Pdi, "pdi/hfsplus.hdd/DiskDescriptor.xml", "/pdi1"),
+            (VfsType::Qcow, "qcow/ext2.qcow2", "/qcow1"),
+            (
+                VfsType::SparseBundle,
+                "sparsebundle/hfsplus.sparsebundle",
+                "/sparsebundle1",
+            ),
+            (
+                VfsType::SparseImage,
+                "sparseimage/hfsplus.sparseimage",
+                "/sparseimage1",
+            ),
+            (VfsType::Udif, "udif/hfsplus_zlib.dmg", "/udif1"),
+            (VfsType::Vhdx, "vhdx/ext2.vhdx", "/vhdx1"),
+            (VfsType::Vmdk, "vmdk/ext2.vmdk", "/vmdk1"),
+        ];
+        for (vfs_type, relative_path, layer_path) in image_cases {
+            let mut image_file_system: VfsFileSystem = VfsFileSystem::new(&vfs_type);
+            let image_path: String = get_test_data_path(relative_path);
+            let os_location: VfsLocation = VfsLocation::from(&image_path);
+            image_file_system.open(Some(&parent_file_system), &os_location)?;
+            let image_file_system_reference: VfsFileSystemReference =
+                VfsFileSystemReference::new(image_file_system);
+            let layer_location: VfsLocation =
+                os_location.new_with_layer(&vfs_type, Path::from(layer_path));
+
+            let mut test_mbr_file_system: MbrFileSystem = MbrFileSystem::new();
+            _ = test_mbr_file_system.open(Some(&image_file_system_reference), &layer_location);
+        }
+
         Ok(())
     }
-
-    // TODO: add tests for open_volume_system
 }

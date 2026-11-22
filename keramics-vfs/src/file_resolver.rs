@@ -87,6 +87,20 @@ mod tests {
             file_resolver.get_data_stream(&path_components)?;
         assert!(result.is_some());
 
+        let path_components: [PathComponent; 2] = [
+            PathComponent::from("directory"),
+            PathComponent::from("bogus.txt"),
+        ];
+        let result: Option<DataStreamReference> =
+            file_resolver.get_data_stream(&path_components)?;
+        assert!(result.is_none());
+
+        // Test with a path component containing a NUL byte to trigger an OS error.
+        let invalid_component: PathComponent = PathComponent::from("invalid\0name");
+        let result: Result<Option<DataStreamReference>, ErrorTrace> =
+            file_resolver.get_data_stream(&[invalid_component]);
+        assert!(result.is_err());
+
         Ok(())
     }
 

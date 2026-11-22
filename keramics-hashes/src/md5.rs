@@ -269,6 +269,7 @@ macro_rules! md5_transform_group_step4 {
 }
 
 /// Context for calculating a MD5 hash.
+#[derive(Clone)]
 pub struct Md5Context {
     /// Hash values.
     hash_values: [u32; 4],
@@ -368,6 +369,13 @@ impl DigestHashContext for Md5Context {
 
     /// Finalizes the digest hash calculation.
     fn finalize(&mut self) -> Vec<u8> {
+        let mut hash: [u8; 16] = [0; 16];
+        self.finalize_into(&mut hash);
+        hash.to_vec()
+    }
+
+    /// Finalizes the digest hash calculation into a fixed-size output buffer.
+    fn finalize_into(&mut self, output: &mut [u8]) {
         let bit_size: u64 = (self.number_of_bytes_hashed + self.block_offset as u64) * 8;
 
         // Add padding with a size of 56 mod 64
@@ -380,23 +388,18 @@ impl DigestHashContext for Md5Context {
         self.block[self.block_offset + 1..bit_size_block_offset].fill(0);
         self.block[bit_size_block_offset..padding_size].copy_from_slice(&bit_size.to_le_bytes());
 
-        let mut hash_values: [u32; 4] = [0; 4];
-        hash_values.copy_from_slice(&self.hash_values);
+        let mut hash_values: [u32; 4] = self.hash_values;
 
         for chunk in self.block[0..padding_size].chunks_exact(MD5_BLOCK_SIZE) {
             self.transform_block(&mut hash_values, chunk);
         }
-        let hash: Vec<u8> = hash_values
-            .iter()
-            .flat_map(|hash_value| hash_value.to_le_bytes())
-            .collect::<Vec<u8>>();
-
+        for (index, hash_value) in hash_values.iter().enumerate() {
+            let offset: usize = index * 4;
+            output[offset..offset + 4].copy_from_slice(&hash_value.to_le_bytes());
+        }
         self.hash_values = MD5_HASH_VALUES;
         self.number_of_bytes_hashed = 0;
         self.block_offset = 0;
-        self.block.fill(0);
-
-        hash
     }
 
     /// Calculates the digest hash of the data.

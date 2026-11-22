@@ -571,9 +571,17 @@ impl StorageMediaImage {
             let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
-                    credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                }
+                let cdsaencr_credential: CdsaEncrCredential = match vfs_credential {
+                    VfsCredential::KeyData { identifier, data } => CdsaEncrCredential::KeyData {
+                        identifier: identifier.clone(),
+                        data: data.clone(),
+                    },
+                    VfsCredential::Passphrase(passphrase) => {
+                        CdsaEncrCredential::Passphrase(passphrase.clone())
+                    }
+                    _ => continue,
+                };
+                credentials.push(cdsaencr_credential);
             }
             match sparsebundle_image.unlock(&credentials) {
                 Ok(_) => {}
@@ -621,9 +629,17 @@ impl StorageMediaImage {
             let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
-                    credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                }
+                let cdsaencr_credential: CdsaEncrCredential = match vfs_credential {
+                    VfsCredential::KeyData { identifier, data } => CdsaEncrCredential::KeyData {
+                        identifier: identifier.clone(),
+                        data: data.clone(),
+                    },
+                    VfsCredential::Passphrase(passphrase) => {
+                        CdsaEncrCredential::Passphrase(passphrase.clone())
+                    }
+                    _ => continue,
+                };
+                credentials.push(cdsaencr_credential);
             }
             match sparseimage_file.unlock(&credentials) {
                 Ok(_) => {}
@@ -716,9 +732,17 @@ impl StorageMediaImage {
             let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
-                    credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                }
+                let cdsaencr_credential: CdsaEncrCredential = match vfs_credential {
+                    VfsCredential::KeyData { identifier, data } => CdsaEncrCredential::KeyData {
+                        identifier: identifier.clone(),
+                        data: data.clone(),
+                    },
+                    VfsCredential::Passphrase(passphrase) => {
+                        CdsaEncrCredential::Passphrase(passphrase.clone())
+                    }
+                    _ => continue,
+                };
+                credentials.push(cdsaencr_credential);
             }
             match udif_image.unlock(&credentials) {
                 Ok(_) => {}
@@ -949,5 +973,188 @@ impl StorageMediaImage {
                 Err(error)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::env;
+    use std::fs;
+    use std::process;
+
+    #[test]
+    fn test_get_base_path_and_file_name() -> Result<(), ErrorTrace> {
+        let path: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+        let (base_path, file_name): (PathBuf, &str) =
+            StorageMediaImage::get_base_path_and_file_name(&path)?;
+        assert_eq!(base_path, PathBuf::from("../test_data/ext"));
+        assert_eq!(file_name, "ext2.raw");
+
+        let root_path: PathBuf = PathBuf::from("/");
+        assert!(StorageMediaImage::get_base_path_and_file_name(&root_path).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_supported_formats() -> Result<(), ErrorTrace> {
+        // Test EWF image.
+        let path: PathBuf = PathBuf::from("../test_data/ewf/ext2.E01");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+        assert!(image.get_md5_hash().is_some());
+        assert!(image.get_sha1_hash().is_some());
+
+        // Test PDI image.
+        let path: PathBuf = PathBuf::from("../test_data/pdi/hfsplus.hdd/DiskDescriptor.xml");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+        assert!(image.get_md5_hash().is_none());
+        assert!(image.get_sha1_hash().is_none());
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 1, false)?;
+        assert!(image.get_data_stream().is_some());
+        assert!(StorageMediaImage::open(&path, 99, false).is_err());
+
+        // Test QCOW image.
+        let path: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 1, false)?;
+        assert!(image.get_data_stream().is_some());
+        assert!(StorageMediaImage::open(&path, 99, false).is_err());
+
+        // Test locked encrypted QCOW image.
+        let path: PathBuf = PathBuf::from("../test_data/qcow/ext2_aes128.qcow2");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        _ = image.get_data_stream();
+
+        // Test raw file system and volume system images.
+        let path: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+        let path: PathBuf = PathBuf::from("../test_data/mbr/mbr.raw");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+
+        // Test sparsebundle images.
+        let path: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+        let path: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus_aes128.sparsebundle");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        _ = image.get_data_stream();
+
+        // Test sparseimage files.
+        let path: PathBuf = PathBuf::from("../test_data/sparseimage/hfsplus.sparseimage");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+        let path: PathBuf = PathBuf::from("../test_data/sparseimage/hfsplus_aes128.sparseimage");
+        assert!(StorageMediaImage::open(&path, 0, false).is_err());
+
+        // Test split raw image.
+        let path: PathBuf = PathBuf::from("../test_data/splitraw/ext2.raw.000");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+
+        // Test UDIF image.
+        let path: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+
+        // Test VDI image.
+        let path: PathBuf = PathBuf::from("../test_data/vdi/ext2.vdi");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 1, false)?;
+        assert!(image.get_data_stream().is_some());
+        assert!(StorageMediaImage::open(&path, 99, false).is_err());
+
+        // Test VHD image.
+        let path: PathBuf = PathBuf::from("../test_data/vhd/ntfs-differential.vhd");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 1, false)?;
+        assert!(image.get_data_stream().is_some());
+        assert!(StorageMediaImage::open(&path, 99, false).is_err());
+
+        // Test VHDX image.
+        let path: PathBuf = PathBuf::from("../test_data/vhdx/ntfs-differential.vhdx");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 1, false)?;
+        assert!(image.get_data_stream().is_some());
+        assert!(StorageMediaImage::open(&path, 99, false).is_err());
+
+        // Test VMDK image.
+        let path: PathBuf = PathBuf::from("../test_data/vmdk/ext2.vmdk");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 1, false)?;
+        assert!(image.get_data_stream().is_some());
+        assert!(StorageMediaImage::open(&path, 99, false).is_err());
+
+        // Test LUKS locked volume and raw fallback.
+        let path: PathBuf = PathBuf::from("../test_data/luksde/luks1.raw");
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, true)?;
+        _ = image.get_data_stream();
+        let image: StorageMediaImage = StorageMediaImage::open(&path, 0, false)?;
+        assert!(image.get_data_stream().is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_errors() {
+        // Test encrypted container requiring a credential.
+        let path: PathBuf = PathBuf::from("../test_data/udif/hfsplus_aes256.dmg");
+        assert!(StorageMediaImage::open(&path, 0, false).is_err());
+
+        // Test plain text file without format signatures.
+        let path: PathBuf = PathBuf::from("../test_data/directory/file.txt");
+        assert!(StorageMediaImage::open(&path, 0, false).is_err());
+
+        // Test nonexistent file.
+        let missing_path: PathBuf = PathBuf::from("../test_data/nonexistent_image.raw");
+        assert!(StorageMediaImage::open(&missing_path, 0, false).is_err());
+
+        // Test invalid sparsebundle directory.
+        let mut fake_sparsebundle: PathBuf = env::temp_dir();
+        fake_sparsebundle.push(format!("keramics_empty_{}.sparsebundle", process::id()));
+        _ = fs::create_dir_all(&fake_sparsebundle);
+        assert!(StorageMediaImage::open(&fake_sparsebundle, 0, false).is_err());
+        _ = fs::remove_dir_all(&fake_sparsebundle);
+
+        // Test direct helper error paths.
+        let root_path: PathBuf = PathBuf::from("/");
+        let plain_path: PathBuf = PathBuf::from("../test_data/directory/file.txt");
+
+        assert!(StorageMediaImage::open_bde_volume(&missing_path).is_err());
+        assert!(StorageMediaImage::open_bde_volume(&plain_path).is_err());
+        assert!(StorageMediaImage::open_ewf_image(&root_path).is_err());
+        assert!(StorageMediaImage::open_ewf_image(&plain_path).is_err());
+        assert!(StorageMediaImage::open_luks_volume(&missing_path).is_err());
+        assert!(StorageMediaImage::open_luks_volume(&plain_path).is_err());
+        assert!(StorageMediaImage::open_pdi_image(&root_path, 0).is_err());
+        assert!(StorageMediaImage::open_pdi_image(&plain_path, 0).is_err());
+        assert!(StorageMediaImage::open_qcow_image(&root_path, 0).is_err());
+        assert!(StorageMediaImage::open_qcow_image(&plain_path, 0).is_err());
+        assert!(StorageMediaImage::open_raw_image(&missing_path).is_err());
+        assert!(StorageMediaImage::open_sparsebundle_image(&missing_path).is_err());
+        assert!(StorageMediaImage::open_sparseimage_file(&missing_path).is_err());
+        assert!(StorageMediaImage::open_sparseimage_file(&plain_path).is_err());
+        assert!(StorageMediaImage::open_splitraw_image(&root_path).is_err());
+        assert!(StorageMediaImage::open_splitraw_image(&plain_path).is_err());
+        assert!(StorageMediaImage::open_udif_image(&root_path).is_err());
+        assert!(StorageMediaImage::open_udif_image(&plain_path).is_err());
+        assert!(StorageMediaImage::open_vdi_image(&root_path, 0).is_err());
+        assert!(StorageMediaImage::open_vdi_image(&plain_path, 0).is_err());
+        assert!(StorageMediaImage::open_vhd_image(&root_path, 0).is_err());
+        assert!(StorageMediaImage::open_vhd_image(&plain_path, 0).is_err());
+        assert!(StorageMediaImage::open_vhdx_image(&root_path, 0).is_err());
+        assert!(StorageMediaImage::open_vhdx_image(&plain_path, 0).is_err());
+        assert!(StorageMediaImage::open_vmdk_image(&root_path, 0).is_err());
+        assert!(StorageMediaImage::open_vmdk_image(&plain_path, 0).is_err());
     }
 }

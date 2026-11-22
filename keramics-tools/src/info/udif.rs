@@ -168,9 +168,17 @@ impl UdifInfo {
             let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
-                if let VfsCredential::Passphrase(passphrase) = vfs_credential {
-                    credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                }
+                let cdsaencr_credential: CdsaEncrCredential = match vfs_credential {
+                    VfsCredential::KeyData { identifier, data } => CdsaEncrCredential::KeyData {
+                        identifier: identifier.clone(),
+                        data: data.clone(),
+                    },
+                    VfsCredential::Passphrase(passphrase) => {
+                        CdsaEncrCredential::Passphrase(passphrase.clone())
+                    }
+                    _ => continue,
+                };
+                credentials.push(cdsaencr_credential);
             }
             match udif_image.unlock(&credentials) {
                 Ok(_) => {}
@@ -224,6 +232,9 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_image
-    // TODO: add tests for print_image
+    #[test]
+    fn test_print_image_errors() {
+        assert!(UdifInfo::print_image(&PathBuf::from("/")).is_err());
+        assert!(UdifInfo::print_image(&PathBuf::from("../test_data/directory/file.txt")).is_err());
+    }
 }

@@ -97,11 +97,6 @@ impl ScanTreeNode {
                         &sub_offsets_to_ignore,
                         largest_pattern_offset,
                     );
-                    sub_signature_table.fill(
-                        &remaining_signatures,
-                        &sub_offsets_to_ignore,
-                        largest_pattern_offset,
-                    );
                     sub_signature_table.calculate_weights();
 
                     let mut sub_node: ScanTreeNode = ScanTreeNode::new();
@@ -169,7 +164,13 @@ impl ScanTreeNode {
         Ok(())
     }
 
+    /// Retrieves the default scan object.
+    pub(super) fn get_default_scan_object(&self) -> Option<&ScanObject> {
+        self.scan_objects.get(&Self::DEFAULT_SCAN_OBJECT)
+    }
+
     /// Recursively retrieves the signatures.
+    #[allow(dead_code)]
     pub(super) fn get_signatures(&self) -> Vec<Arc<Signature>> {
         let mut signatures: Vec<Arc<Signature>> = Vec::new();
 
@@ -271,6 +272,7 @@ mod tests {
     use super::*;
 
     use crate::enums::PatternType;
+    use crate::groups::SignatureGroup;
     use crate::signature::Signature;
 
     #[test]
@@ -404,6 +406,357 @@ mod tests {
         // Test data offset beyond data size.
         let scan_result: ScanResult = scan_tree_node.scan_buffer(64, 64, &data, 0, 8);
         assert!(matches!(scan_result, ScanResult::None));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_with_sub_nodes_and_get_signatures() -> Result<(), ErrorTrace> {
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+
+        let signatures: Vec<Arc<Signature>> = vec![
+            Arc::new(Signature::new(
+                "vhd1",
+                PatternType::BoundToStart,
+                0,
+                "conectix".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "vhd2",
+                PatternType::BoundToStart,
+                0,
+                "connectx".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "vhd3",
+                PatternType::BoundToStart,
+                0,
+                "conectiz".as_bytes(),
+            )),
+        ];
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+
+        scan_tree_node.build(&signature_table, &offsets_to_ignore, 8)?;
+
+        assert_eq!(scan_tree_node.pattern_offset, 0);
+        assert!(matches!(
+            scan_tree_node.scan_objects.get(&0x63),
+            Some(ScanObject::ScanTreeNode(_))
+        ));
+
+        let collected_signatures: Vec<Arc<Signature>> = scan_tree_node.get_signatures();
+        assert_eq!(collected_signatures.len(), 3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_with_remaining_signatures() -> Result<(), ErrorTrace> {
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+
+        let signatures: Vec<Arc<Signature>> = vec![
+            Arc::new(Signature::new(
+                "vhd1",
+                PatternType::BoundToStart,
+                0,
+                "conectix".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "vhd2",
+                PatternType::BoundToStart,
+                0,
+                "connectx".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "sig3",
+                PatternType::BoundToStart,
+                16,
+                "12345678".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "sig4",
+                PatternType::BoundToStart,
+                32,
+                "abcdefgh".as_bytes(),
+            )),
+        ];
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 40);
+        signature_table.calculate_weights();
+
+        scan_tree_node.build(&signature_table, &offsets_to_ignore, 40)?;
+
+        assert!(matches!(
+            scan_tree_node
+                .scan_objects
+                .get(&ScanTreeNode::DEFAULT_SCAN_OBJECT),
+            Some(ScanObject::ScanTreeNode(_))
+        ));
+
+        let collected_signatures: Vec<Arc<Signature>> = scan_tree_node.get_signatures();
+        assert_eq!(collected_signatures.len(), 4);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_with_empty_signature_group() {
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+
+        let signatures: Vec<Arc<Signature>> = vec![Arc::new(Signature::new(
+            "vhd1",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        ))];
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+
+        signature_table
+            .byte_value_groups
+            .get_mut(&0)
+            .unwrap()
+            .signature_groups
+            .insert(0x00, SignatureGroup::new(0x00));
+
+        let result: Result<(), ErrorTrace> =
+            scan_tree_node.build(&signature_table, &offsets_to_ignore, 8);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_with_duplicate_signatures() {
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+
+        let signatures: Vec<Arc<Signature>> = vec![
+            Arc::new(Signature::new(
+                "dup1",
+                PatternType::BoundToStart,
+                0,
+                "ab".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "dup2",
+                PatternType::BoundToStart,
+                0,
+                "ab".as_bytes(),
+            )),
+        ];
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 2);
+        signature_table.calculate_weights();
+
+        let result: Result<(), ErrorTrace> =
+            scan_tree_node.build(&signature_table, &offsets_to_ignore, 2);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_with_unbuildable_remaining_signatures() {
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+
+        let signatures: Vec<Arc<Signature>> = vec![
+            Arc::new(Signature::new(
+                "sig1",
+                PatternType::BoundToStart,
+                0,
+                "a".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "sig2",
+                PatternType::BoundToStart,
+                16,
+                "b".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "sig3",
+                PatternType::BoundToStart,
+                16,
+                "c".as_bytes(),
+            )),
+        ];
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        let offsets_to_ignore: Vec<usize> = vec![16];
+        signature_table.fill(&signatures, &offsets_to_ignore, 17);
+        signature_table.calculate_weights();
+
+        let result: Result<(), ErrorTrace> =
+            scan_tree_node.build(&signature_table, &offsets_to_ignore, 17);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_scan_buffer_with_sub_nodes_and_default_fallback() -> Result<(), ErrorTrace> {
+        // Test returning a child ScanTreeNode.
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+        let signatures: Vec<Arc<Signature>> = vec![
+            Arc::new(Signature::new(
+                "vhd1",
+                PatternType::BoundToStart,
+                0,
+                "conectix".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "vhd2",
+                PatternType::BoundToStart,
+                0,
+                "connectx".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "vhd3",
+                PatternType::BoundToStart,
+                0,
+                "conectiz".as_bytes(),
+            )),
+        ];
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        signature_table.fill(&signatures, &offsets_to_ignore, 8);
+        signature_table.calculate_weights();
+        scan_tree_node.build(&signature_table, &offsets_to_ignore, 8)?;
+
+        let data: [u8; 8] = *b"conectix";
+        let scan_result: ScanResult = scan_tree_node.scan_buffer(0, 64, &data, 0, 8);
+        assert!(matches!(scan_result, ScanResult::ScanTreeNode(_)));
+
+        // Test fallback to DEFAULT_SCAN_OBJECT signature when byte-value signature mismatches
+        // and when DEFAULT_SCAN_OBJECT signature itself matches or mismatches.
+        let mut fallback_node: ScanTreeNode = ScanTreeNode::new();
+        let signatures: Vec<Arc<Signature>> = vec![
+            Arc::new(Signature::new(
+                "vhd0",
+                PatternType::BoundToStart,
+                0,
+                "conectix".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "sig16",
+                PatternType::BoundToStart,
+                16,
+                "12345678".as_bytes(),
+            )),
+        ];
+        let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        signature_table.fill(&signatures, &offsets_to_ignore, 24);
+        signature_table.calculate_weights();
+        fallback_node.build(&signature_table, &offsets_to_ignore, 24)?;
+
+        // Byte at offset 0 does not match 'c', falls back to DEFAULT_SCAN_OBJECT (sig16),
+        // which does not match either.
+        let data_no_match: [u8; 32] = [0x7a; 32];
+        assert!(matches!(
+            fallback_node.scan_buffer(0, 32, &data_no_match, 0, 32),
+            ScanResult::None
+        ));
+
+        // Byte at offset 0 matches 'c', vhd0 fails full pattern match, falls back to
+        // DEFAULT_SCAN_OBJECT (sig16), which matches at offset 16.
+        let mut data_fallback_match: [u8; 32] = [0; 32];
+        data_fallback_match[0] = b'c';
+        data_fallback_match[16..24].copy_from_slice(b"12345678");
+        assert!(matches!(
+            fallback_node.scan_buffer(0, 32, &data_fallback_match, 0, 32),
+            ScanResult::Signature(signature) if signature.identifier.as_str() == "sig16"
+        ));
+
+        // Byte at offset 0 matches 'c', vhd0 fails full pattern match, falls back to
+        // DEFAULT_SCAN_OBJECT (sig16), which also fails.
+        let mut data_fallback_mismatch: [u8; 32] = [0; 32];
+        data_fallback_mismatch[0] = b'c';
+        assert!(matches!(
+            fallback_node.scan_buffer(0, 32, &data_fallback_mismatch, 0, 32),
+            ScanResult::None
+        ));
+
+        // Uncommon-byte signature at a non-zero offset falls back to DEFAULT_SCAN_OBJECT.
+        let mut uncommon_node: ScanTreeNode = ScanTreeNode::new();
+        let uncommon_signatures: Vec<Arc<Signature>> = vec![Arc::new(Signature::new(
+            "uncommon16",
+            PatternType::BoundToStart,
+            16,
+            &[0x02, 0x03, 0x04, 0x05],
+        ))];
+        let mut uncommon_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        uncommon_table.fill(&uncommon_signatures, &offsets_to_ignore, 20);
+        uncommon_table.calculate_weights();
+        uncommon_node.build(&uncommon_table, &offsets_to_ignore, 20)?;
+
+        let mut data_uncommon: [u8; 32] = [0; 32];
+        data_uncommon[16..20].copy_from_slice(&[0x02, 0x03, 0x04, 0x05]);
+        assert!(matches!(
+            uncommon_node.scan_buffer(0, 32, &data_uncommon, 0, 32),
+            ScanResult::Signature(signature) if signature.identifier.as_str() == "uncommon16"
+        ));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_buffer_with_debug_output() -> Result<(), ErrorTrace> {
+        let original_debug_output: bool = Mediator::current().debug_output;
+        Mediator::new(true).make_current();
+
+        // Node without DEFAULT_SCAN_OBJECT (exercises byte value match and N/A).
+        let mut node_without_default: ScanTreeNode = ScanTreeNode::new();
+        let signatures1: Vec<Arc<Signature>> = vec![Arc::new(Signature::new(
+            "vhd",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        ))];
+        let mut table1: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        let offsets_to_ignore: Vec<usize> = Vec::new();
+        table1.fill(&signatures1, &offsets_to_ignore, 8);
+        table1.calculate_weights();
+        node_without_default.build(&table1, &offsets_to_ignore, 8)?;
+
+        let matching_data: [u8; 8] = *b"conectix";
+        assert!(matches!(
+            node_without_default.scan_buffer(0, 64, &matching_data, 0, 8),
+            ScanResult::Signature(_)
+        ));
+        let non_matching_data: [u8; 8] = [0x00; 8];
+        assert!(matches!(
+            node_without_default.scan_buffer(0, 64, &non_matching_data, 0, 8),
+            ScanResult::None
+        ));
+
+        // Node with DEFAULT_SCAN_OBJECT (exercises default scan object debug output).
+        let mut node_with_default: ScanTreeNode = ScanTreeNode::new();
+        let signatures2: Vec<Arc<Signature>> = vec![
+            Arc::new(Signature::new(
+                "vhd",
+                PatternType::BoundToStart,
+                0,
+                "conectix".as_bytes(),
+            )),
+            Arc::new(Signature::new(
+                "sig16",
+                PatternType::BoundToStart,
+                16,
+                "12345678".as_bytes(),
+            )),
+        ];
+        let mut table2: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
+        table2.fill(&signatures2, &offsets_to_ignore, 24);
+        table2.calculate_weights();
+        node_with_default.build(&table2, &offsets_to_ignore, 24)?;
+
+        let mut data_default: [u8; 32] = [0; 32];
+        data_default[16..24].copy_from_slice(b"12345678");
+        assert!(matches!(
+            node_with_default.scan_buffer(0, 32, &data_default, 0, 32),
+            ScanResult::Signature(_)
+        ));
+
+        Mediator::new(original_debug_output).make_current();
 
         Ok(())
     }

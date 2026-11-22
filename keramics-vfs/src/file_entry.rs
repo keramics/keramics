@@ -11572,4 +11572,233 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_get_type_and_is_root_directory() -> Result<(), ErrorTrace> {
+        let entries: Vec<(VfsFileEntry, VfsType, bool)> = vec![
+            (get_apfs_file_entry("/")?, VfsType::Apfs, true),
+            (
+                get_apfs_file_entry("/testdir1/testfile1")?,
+                VfsType::Apfs,
+                false,
+            ),
+            (
+                get_apfs_container_file_entry("/")?,
+                VfsType::ApfsContainer,
+                true,
+            ),
+            (
+                get_apfs_container_file_entry("/apfs1")?,
+                VfsType::ApfsContainer,
+                false,
+            ),
+            (get_apm_file_entry("/")?, VfsType::Apm, true),
+            (get_apm_file_entry("/apm1")?, VfsType::Apm, false),
+            (get_bde_file_entry("/")?, VfsType::Bde, true),
+            (get_bde_file_entry("/bde1")?, VfsType::Bde, false),
+            (get_ewf_file_entry("/")?, VfsType::Ewf, true),
+            (get_ewf_file_entry("/ewf1")?, VfsType::Ewf, false),
+            (get_exfat_file_entry("/")?, VfsType::ExFat, true),
+            (
+                get_exfat_file_entry("/testdir1/testfile1")?,
+                VfsType::ExFat,
+                false,
+            ),
+            (get_ext_file_entry("/")?, VfsType::Ext, true),
+            (
+                get_ext_file_entry("/testdir1/testfile1")?,
+                VfsType::Ext,
+                false,
+            ),
+            (
+                VfsFileEntry::Fake(Arc::new(FakeFileEntry::new_root())),
+                VfsType::Fake,
+                true,
+            ),
+            (get_fake_file_entry(), VfsType::Fake, false),
+            (get_fat_file_entry("/")?, VfsType::Fat, true),
+            (
+                get_fat_file_entry("/testdir1/testfile1")?,
+                VfsType::Fat,
+                false,
+            ),
+            (get_gpt_file_entry("/")?, VfsType::Gpt, true),
+            (get_gpt_file_entry("/gpt1")?, VfsType::Gpt, false),
+            (get_hfs_file_entry("/")?, VfsType::Hfs, true),
+            (
+                get_hfs_file_entry("/testdir1/testfile1")?,
+                VfsType::Hfs,
+                false,
+            ),
+            (get_linuxlvm_file_entry("/")?, VfsType::LinuxLvm, true),
+            (get_linuxlvm_file_entry("/lvm1")?, VfsType::LinuxLvm, false),
+            (get_luksde_file_entry("/")?, VfsType::Luksde, true),
+            (get_luksde_file_entry("/luks1")?, VfsType::Luksde, false),
+            (get_mbr_file_entry("/")?, VfsType::Mbr, true),
+            (get_mbr_file_entry("/mbr1")?, VfsType::Mbr, false),
+            (get_ntfs_file_entry("/")?, VfsType::Ntfs, true),
+            (
+                get_ntfs_file_entry("/testdir1/testfile1")?,
+                VfsType::Ntfs,
+                false,
+            ),
+            (get_os_file_entry("directory/file.txt")?, VfsType::Os, false),
+            (get_pdi_file_entry("/")?, VfsType::Pdi, true),
+            (get_pdi_file_entry("/pdi1")?, VfsType::Pdi, false),
+            (get_qcow_file_entry("/")?, VfsType::Qcow, true),
+            (get_qcow_file_entry("/qcow1")?, VfsType::Qcow, false),
+            (get_sgilabel_file_entry("/")?, VfsType::SgiDiskLabel, true),
+            (
+                get_sgilabel_file_entry("/sgilabel1")?,
+                VfsType::SgiDiskLabel,
+                false,
+            ),
+            (
+                get_sparsebundle_file_entry("/")?,
+                VfsType::SparseBundle,
+                true,
+            ),
+            (
+                get_sparsebundle_file_entry("/sparsebundle1")?,
+                VfsType::SparseBundle,
+                false,
+            ),
+            (get_sparseimage_file_entry("/")?, VfsType::SparseImage, true),
+            (
+                get_sparseimage_file_entry("/sparseimage1")?,
+                VfsType::SparseImage,
+                false,
+            ),
+            (get_splitraw_file_entry("/")?, VfsType::SplitRaw, true),
+            (get_splitraw_file_entry("/raw1")?, VfsType::SplitRaw, false),
+            (get_udif_file_entry("/")?, VfsType::Udif, true),
+            (get_udif_file_entry("/udif1")?, VfsType::Udif, false),
+            (get_vdi_file_entry("/")?, VfsType::Vdi, true),
+            (get_vdi_file_entry("/vdi1")?, VfsType::Vdi, false),
+            (get_vhd_file_entry("/")?, VfsType::Vhd, true),
+            (get_vhd_file_entry("/vhd1")?, VfsType::Vhd, false),
+            (get_vhdx_file_entry("/")?, VfsType::Vhdx, true),
+            (get_vhdx_file_entry("/vhdx1")?, VfsType::Vhdx, false),
+            (get_vmdk_file_entry("/")?, VfsType::Vmdk, true),
+            (get_vmdk_file_entry("/vmdk1")?, VfsType::Vmdk, false),
+            (get_volsnap_file_entry("/")?, VfsType::Volsnap, true),
+            (
+                get_volsnap_file_entry("/volsnap1")?,
+                VfsType::Volsnap,
+                false,
+            ),
+            (get_xfs_file_entry("/")?, VfsType::Xfs, true),
+            (
+                get_xfs_file_entry("/testdir1/testfile1")?,
+                VfsType::Xfs,
+                false,
+            ),
+        ];
+
+        for (file_entry, expected_type, expected_is_root) in entries {
+            assert_eq!(file_entry.get_type(), expected_type);
+            assert_eq!(file_entry.is_root_directory(), expected_is_root);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_fork_by_index_and_fake_data_forks() -> Result<(), ErrorTrace> {
+        // ApfsContainer always returns an error.
+        let mut apfs_container_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+        assert!(apfs_container_entry.get_data_fork_by_index(0).is_err());
+
+        // Test ext file and directory.
+        let mut ext_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+        assert!(ext_file_entry.get_data_fork_by_index(0).is_ok());
+        assert!(ext_file_entry.get_data_fork_by_index(1).is_err());
+
+        let mut ext_directory_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
+        assert!(ext_directory_entry.get_data_fork_by_index(0).is_err());
+
+        // Test fake file and directory.
+        let mut fake_file_entry: VfsFileEntry = get_fake_file_entry();
+        assert_eq!(fake_file_entry.get_number_of_data_forks()?, 1);
+        assert!(fake_file_entry.get_data_fork_by_index(0).is_ok());
+
+        let mut fake_directory_entry: VfsFileEntry =
+            VfsFileEntry::Fake(Arc::new(FakeFileEntry::new_directory("dir")));
+        assert_eq!(fake_directory_entry.get_number_of_data_forks()?, 0);
+        assert!(fake_directory_entry.get_data_fork_by_index(0).is_err());
+
+        // Test HFS file with data fork.
+        let mut hfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+        assert_eq!(hfs_file_entry.get_number_of_data_forks()?, 1);
+        let data_fork: VfsDataFork = hfs_file_entry.get_data_fork_by_index(0)?;
+        assert_eq!(data_fork.get_name(), None);
+        assert!(hfs_file_entry.get_data_fork_by_index(1).is_err());
+
+        // Test NTFS out-of-bounds data fork index.
+        let mut ntfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/$UpCase")?;
+        assert!(ntfs_file_entry.get_data_fork_by_index(99).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_special_files() -> Result<(), ErrorTrace> {
+        // APFS special file types.
+        assert_eq!(
+            get_apfs_file_entry("/file_symboliclink1")?.get_file_type(),
+            VfsFileType::SymbolicLink
+        );
+        assert_eq!(
+            get_apfs_file_entry("/testdir1/pipe1")?.get_file_type(),
+            VfsFileType::NamedPipe
+        );
+
+        // ext special file types.
+        assert_eq!(
+            get_ext_file_entry("/file_symboliclink1")?.get_file_type(),
+            VfsFileType::SymbolicLink
+        );
+        assert_eq!(
+            get_ext_file_entry("/testdir1/blockdev1")?.get_file_type(),
+            VfsFileType::BlockDevice
+        );
+        assert_eq!(
+            get_ext_file_entry("/testdir1/chardev1")?.get_file_type(),
+            VfsFileType::CharacterDevice
+        );
+        assert_eq!(
+            get_ext_file_entry("/testdir1/pipe1")?.get_file_type(),
+            VfsFileType::NamedPipe
+        );
+
+        // HFS+ special file types.
+        assert_eq!(
+            get_hfs_file_entry("/file_symboliclink1")?.get_file_type(),
+            VfsFileType::SymbolicLink
+        );
+        assert_eq!(
+            get_hfs_file_entry("/testdir1/pipe1")?.get_file_type(),
+            VfsFileType::NamedPipe
+        );
+
+        // XFS special file types.
+        assert_eq!(
+            get_xfs_file_entry("/file_symboliclink1")?.get_file_type(),
+            VfsFileType::SymbolicLink
+        );
+        assert_eq!(
+            get_xfs_file_entry("/testdir1/blockdev1")?.get_file_type(),
+            VfsFileType::BlockDevice
+        );
+        assert_eq!(
+            get_xfs_file_entry("/testdir1/chardev1")?.get_file_type(),
+            VfsFileType::CharacterDevice
+        );
+        assert_eq!(
+            get_xfs_file_entry("/testdir1/pipe1")?.get_file_type(),
+            VfsFileType::NamedPipe
+        );
+
+        Ok(())
+    }
 }

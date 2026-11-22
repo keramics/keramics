@@ -549,4 +549,39 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_decompress_with_deflate_and_zlib() -> Result<(), ErrorTrace> {
+        let deflate_stored: [u8; 44] = [
+            0x01, 0x27, 0x00, 0xd8, 0xff, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x2c, 0x20, 0x4b, 0x65,
+            0x72, 0x61, 0x4d, 0x69, 0x63, 0x73, 0x20, 0x73, 0x74, 0x6f, 0x72, 0x65, 0x64, 0x20,
+            0x62, 0x6c, 0x6f, 0x63, 0x6b, 0x20, 0x74, 0x65, 0x73, 0x74, 0x20, 0x64, 0x61, 0x74,
+            0x61, 0x21,
+        ];
+        UtilTool::decompress(&CompressionType::Deflate, &deflate_stored)?;
+
+        let zlib_stored: [u8; 15] = [
+            0x78, 0x01, 0x01, 0x04, 0x00, 0xfb, 0xff, b't', b'e', b's', b't', 0x04, 0x5d, 0x01,
+            0xc1,
+        ];
+        UtilTool::decompress(&CompressionType::Zlib, &zlib_stored)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_errors() {
+        let invalid_data: [u8; 8] = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
+
+        assert!(UtilTool::decompress(&CompressionType::Adc, &invalid_data).is_err());
+        assert!(UtilTool::decompress(&CompressionType::Bzip2, &invalid_data).is_err());
+        assert!(UtilTool::decompress(&CompressionType::Deflate, &invalid_data).is_err());
+        assert!(UtilTool::decompress(&CompressionType::Lzfse, &invalid_data).is_err());
+        assert!(UtilTool::decompress(&CompressionType::Lznt1, &invalid_data).is_err());
+        assert!(UtilTool::decompress(&CompressionType::Lzvn, &invalid_data).is_err());
+        assert!(UtilTool::decompress(&CompressionType::Lzx, &invalid_data).is_err());
+        assert!(UtilTool::decompress(&CompressionType::Lzxpress, &invalid_data).is_err());
+        assert!(UtilTool::decompress(&CompressionType::LzxpressHuffman, &invalid_data).is_err());
+        assert!(UtilTool::decompress(&CompressionType::Zlib, &invalid_data).is_err());
+    }
 }

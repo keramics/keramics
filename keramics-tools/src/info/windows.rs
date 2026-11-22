@@ -110,15 +110,23 @@ impl<'a> fmt::Display for FiletimeDateTimeInfo<'a> {
 mod tests {
     use super::*;
 
-    use keramics_datetime::Filetime;
+    use keramics_datetime::{Filetime, PosixTime32};
 
     use crate::assert_lines_eq;
 
     #[test]
     fn test_file_attribute_flags_information_fmt() {
-        let test_struct: WindowsFileAttributeFlagsInfo = WindowsFileAttributeFlagsInfo::new(0x0020);
+        let test_struct: WindowsFileAttributeFlagsInfo = WindowsFileAttributeFlagsInfo::new(0x00ff);
 
-        let expected_string: &str = "        0x0020: Should be archived (FILE_ATTRIBUTE_ARCHIVE)\n";
+        let expected_string: &str = concat!(
+            "        0x0001: Is read-only (FILE_ATTRIBUTE_READ_ONLY)\n",
+            "        0x0002: Is hidden (FILE_ATTRIBUTE_HIDDEN)\n",
+            "        0x0004: Is system (FILE_ATTRIBUTE_SYSTEM)\n",
+            "        0x0010: Is directory (FILE_ATTRIBUTE_DIRECTORY)\n",
+            "        0x0020: Should be archived (FILE_ATTRIBUTE_ARCHIVE)\n",
+            "        0x0040: Is device (FILE_ATTRIBUTE_DEVICE)\n",
+            "        0x0080: Is normal (FILE_ATTRIBUTE_NORMAL)\n",
+        );
 
         let string: String = test_struct.to_string();
         assert_lines_eq!(string.as_str(), expected_string);
@@ -135,5 +143,10 @@ mod tests {
         let test_struct: FiletimeDateTimeInfo = FiletimeDateTimeInfo::new(&date_time);
         let string: String = test_struct.to_string();
         assert_eq!(string, NOT_SET_VALUE);
+
+        let date_time: DateTime = DateTime::PosixTime32(PosixTime32::new(0));
+        let test_struct: FiletimeDateTimeInfo = FiletimeDateTimeInfo::new(&date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "Unsupported date time");
     }
 }

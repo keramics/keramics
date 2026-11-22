@@ -289,4 +289,52 @@ mod tests {
         let result: Result<(), ErrorTrace> = scan_tree_node.build(&component_table, &[]);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_build_with_remaining_signatures() -> Result<(), ErrorTrace> {
+        // Component index 2 ("d") has the largest similarity weight, leaving "/a" (length 2) as
+        // the single remaining signature.
+        let component_table: ComponentTable =
+            build_component_table(&["/a", "/c/d/x", "/c/d/y", "/f/d/z", "/g/d/w"], &[0]);
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+        scan_tree_node.build(&component_table, &[0])?;
+        assert!(matches!(
+            *scan_tree_node.default_scan_object,
+            ScanObject::Signature(_)
+        ));
+
+        // Multiple short signatures ("/a", "/b") become a sub ScanTreeNode in default_scan_object.
+        let component_table: ComponentTable =
+            build_component_table(&["/a", "/b", "/c/d/x", "/c/d/y", "/f/d/z", "/g/d/w"], &[0]);
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+        scan_tree_node.build(&component_table, &[0])?;
+        assert!(matches!(
+            *scan_tree_node.default_scan_object,
+            ScanObject::ScanTreeNode(_)
+        ));
+
+        // Duplicate short remaining signatures cause sub-node build error for remaining signatures.
+        let component_table: ComponentTable = build_component_table(
+            &["/a", "/a", "/c/d/x", "/c/d/y", "/f/d/z", "/g/d/w", "/h/d/u"],
+            &[0],
+        );
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+        assert!(scan_tree_node.build(&component_table, &[0]).is_err());
+
+        // Path group with zero signatures returns an error.
+        let mut component_table: ComponentTable =
+            build_component_table(&["/testdir1/testfile1"], &[]);
+        let component_index: usize = component_table
+            .get_most_significant_component_index()
+            .unwrap();
+        if let Some(component_group) = component_table.component_groups.get_mut(&component_index) {
+            for path_group in component_group.path_groups.values_mut() {
+                path_group.signatures.clear();
+            }
+        }
+        let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
+        assert!(scan_tree_node.build(&component_table, &[]).is_err());
+
+        Ok(())
+    }
 }

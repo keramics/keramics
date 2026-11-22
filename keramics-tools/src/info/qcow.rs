@@ -260,7 +260,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_core::open_os_data_stream;
+    use keramics_core::{open_fake_data_stream, open_os_data_stream};
 
     use crate::assert_lines_eq;
 
@@ -296,6 +296,26 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_file
-    // TODO: add tests for print_file
+    #[test]
+    fn test_flags_and_print_file() -> Result<(), ErrorTrace> {
+        let compatible_flags: String = QcowCompatibilityFeatureFlagsInfo::new(0x1).to_string();
+        assert!(compatible_flags.contains("QCOW2_COMPAT_LAZY_REFCOUNTS"));
+
+        let incompatible_flags: String = QcowIncompatibilityFeatureFlagsInfo::new(0x1f).to_string();
+        assert!(incompatible_flags.contains("QCOW2_INCOMPAT_DIRTY"));
+        assert!(incompatible_flags.contains("QCOW2_INCOMPAT_CORRUPT"));
+        assert!(incompatible_flags.contains("QCOW2_INCOMPAT_DATA_FILE"));
+        assert!(incompatible_flags.contains("QCOW2_INCOMPAT_COMPRESSION"));
+        assert!(incompatible_flags.contains("QCOW2_INCOMPAT_EXTL2"));
+
+        let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2_aes128.qcow2");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        QcowInfo::print_file(&data_stream)?;
+
+        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
+        let result: Result<(), ErrorTrace> = QcowInfo::print_file(&invalid_stream);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 }

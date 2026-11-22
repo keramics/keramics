@@ -464,6 +464,17 @@ mod tests {
 
         assert_eq!(test_data, expected_data.as_bytes());
 
+        // Test with a directory that has no data stream.
+        let directory_entry: OsFileEntry = get_os_file_entry("directory")?;
+        let result: Option<DataStreamReference> = directory_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        // Test with an unopened file entry.
+        let unopened_entry: OsFileEntry = OsFileEntry::new();
+        let result: Result<Option<DataStreamReference>, ErrorTrace> =
+            unopened_entry.get_data_stream();
+        assert!(result.is_err());
+
         Ok(())
     }
 
@@ -577,7 +588,24 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_posix_datetime_value
+    #[cfg(unix)]
+    #[test]
+    fn test_get_posix_datetime_value() {
+        let datetime: DateTime = OsFileEntry::get_posix_datetime_value(1700000000, 123456789);
+        assert_eq!(
+            datetime,
+            DateTime::PosixTime64Ns(PosixTime64Ns::new(1700000000, 123456789))
+        );
+
+        let datetime: DateTime = OsFileEntry::get_posix_datetime_value(1700000000, 0);
+        assert_eq!(
+            datetime,
+            DateTime::PosixTime32(PosixTime32::new(1700000000))
+        );
+
+        let datetime: DateTime = OsFileEntry::get_posix_datetime_value(0, 0);
+        assert_eq!(datetime, DateTime::NotSet);
+    }
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
@@ -629,6 +657,9 @@ mod tests {
         let name: Option<&OsStr> = sub_file_entry.get_name();
         assert!(name.is_some());
 
+        // Out-of-bounds index returns an error.
+        assert!(file_entry.get_sub_file_entry_by_index(99).is_err());
+
         Ok(())
     }
 
@@ -655,6 +686,22 @@ mod tests {
 
         assert_eq!(result, true);
         assert_eq!(file_entry.file_type, VfsFileType::File);
+
+        // Non-existent path returns Ok(false).
+        let mut missing_entry: OsFileEntry = OsFileEntry::new();
+        let path_string: String = get_test_data_path("directory/bogus.txt");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        assert_eq!(missing_entry.open(&path_buf)?, false);
+
+        #[cfg(unix)]
+        {
+            let mut device_entry: OsFileEntry = OsFileEntry::new();
+            let device_path: PathBuf = PathBuf::from("/dev/null");
+            if device_entry.open(&device_path)? {
+                assert_eq!(device_entry.get_file_type(), VfsFileType::CharacterDevice);
+                assert!(device_entry.get_device_identifier().is_some());
+            }
+        }
 
         Ok(())
     }

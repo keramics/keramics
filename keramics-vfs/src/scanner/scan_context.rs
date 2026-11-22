@@ -37,3 +37,23 @@ impl<'a> VfsScanContext<'a> {
         self.mediator = Some(mediator);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct TestMediator {}
+
+    impl VfsScannerMediator for TestMediator {}
+
+    #[test]
+    fn test_set_mediator() {
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        assert!(scan_context.mediator.is_none());
+        assert!(scan_context.root_node.is_none());
+
+        let mediator: TestMediator = TestMediator {};
+        scan_context.set_mediator(&mediator);
+        assert!(scan_context.mediator.is_some());
+    }
+}

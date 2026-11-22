@@ -111,97 +111,139 @@ macro_rules! bytes_to_u64_le {
 mod tests {
     #[test]
     fn test_bytes_to_i16_be() {
-        let test_data: [u8; 2] = [0x12, 0x34];
+        let test_data: [u8; 4] = [0x12, 0x34, 0xff, 0xfe];
 
         let value_16bit: i16 = bytes_to_i16_be!(test_data, 0);
         assert_eq!(value_16bit, 0x1234);
+
+        let value_16bit: i16 = bytes_to_i16_be!(test_data, 2,);
+        assert_eq!(value_16bit, -2);
     }
 
     #[test]
     fn test_bytes_to_i16_le() {
-        let test_data: [u8; 2] = [0x34, 0x12];
+        let test_data: [u8; 4] = [0x34, 0x12, 0xfe, 0xff];
 
         let value_16bit: i16 = bytes_to_i16_le!(test_data, 0);
         assert_eq!(value_16bit, 0x1234);
+
+        let value_16bit: i16 = bytes_to_i16_le!(test_data, 2,);
+        assert_eq!(value_16bit, -2);
     }
 
     #[test]
     fn test_bytes_to_i32_be() {
-        let test_data: [u8; 4] = [0x12, 0x34, 0x56, 0x78];
+        let test_data: [u8; 8] = [0x12, 0x34, 0x56, 0x78, 0xff, 0xff, 0xff, 0xfe];
 
         let value_32bit: i32 = bytes_to_i32_be!(test_data, 0);
         assert_eq!(value_32bit, 0x12345678);
+
+        let value_32bit: i32 = bytes_to_i32_be!(test_data, 4,);
+        assert_eq!(value_32bit, -2);
     }
 
     #[test]
     fn test_bytes_to_i32_le() {
-        let test_data: [u8; 4] = [0x78, 0x56, 0x34, 0x12];
+        let test_data: [u8; 8] = [0x78, 0x56, 0x34, 0x12, 0xfe, 0xff, 0xff, 0xff];
 
         let value_32bit: i32 = bytes_to_i32_le!(test_data, 0);
         assert_eq!(value_32bit, 0x12345678);
+
+        let value_32bit: i32 = bytes_to_i32_le!(test_data, 4,);
+        assert_eq!(value_32bit, -2);
     }
 
     #[test]
     fn test_bytes_to_i64_be() {
-        let test_data: [u8; 8] = [0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0];
+        let test_data: [u8; 16] = [
+            0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xfe,
+        ];
 
         let value_64bit: i64 = bytes_to_i64_be!(test_data, 0);
         assert_eq!(value_64bit, 0x123456789abcdef0);
+
+        let value_64bit: i64 = bytes_to_i64_be!(test_data, 8,);
+        assert_eq!(value_64bit, -2);
     }
 
     #[test]
     fn test_bytes_to_i64_le() {
-        let test_data: [u8; 8] = [0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12];
+        let test_data: [u8; 16] = [
+            0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff,
+        ];
 
         let value_64bit: i64 = bytes_to_i64_le!(test_data, 0);
         assert_eq!(value_64bit, 0x123456789abcdef0);
+
+        let value_64bit: i64 = bytes_to_i64_le!(test_data, 8,);
+        assert_eq!(value_64bit, -2);
     }
 
     #[test]
     fn test_bytes_to_u16_be() {
-        let test_data: [u8; 2] = [0x12, 0x34];
+        let test_data: [u8; 4] = [0x00, 0x00, 0x12, 0x34];
 
-        let value_16bit: u16 = bytes_to_u16_be!(test_data, 0);
+        let value_16bit: u16 = bytes_to_u16_be!(test_data, 2);
+        assert_eq!(value_16bit, 0x1234);
+
+        let value_16bit: u16 = bytes_to_u16_be!(test_data, 2,);
         assert_eq!(value_16bit, 0x1234);
     }
 
     #[test]
     fn test_bytes_to_u16_le() {
-        let test_data: [u8; 2] = [0x34, 0x12];
+        let test_data: [u8; 4] = [0x00, 0x00, 0x34, 0x12];
 
-        let value_16bit: u16 = bytes_to_u16_le!(test_data, 0);
+        let value_16bit: u16 = bytes_to_u16_le!(test_data, 2);
+        assert_eq!(value_16bit, 0x1234);
+
+        let value_16bit: u16 = bytes_to_u16_le!(test_data, 2,);
         assert_eq!(value_16bit, 0x1234);
     }
 
     #[test]
     fn test_bytes_to_u32_be() {
-        let test_data: [u8; 4] = [0x12, 0x34, 0x56, 0x78];
+        let test_data: [u8; 6] = [0x00, 0x00, 0x12, 0x34, 0x56, 0x78];
 
-        let value_32bit: u32 = bytes_to_u32_be!(test_data, 0);
+        let value_32bit: u32 = bytes_to_u32_be!(test_data, 2);
+        assert_eq!(value_32bit, 0x12345678);
+
+        let value_32bit: u32 = bytes_to_u32_be!(test_data, 2,);
         assert_eq!(value_32bit, 0x12345678);
     }
 
     #[test]
     fn test_bytes_to_u32_le() {
-        let test_data: [u8; 4] = [0x78, 0x56, 0x34, 0x12];
+        let test_data: [u8; 6] = [0x00, 0x00, 0x78, 0x56, 0x34, 0x12];
 
-        let value_32bit: u32 = bytes_to_u32_le!(test_data, 0);
+        let value_32bit: u32 = bytes_to_u32_le!(test_data, 2);
+        assert_eq!(value_32bit, 0x12345678);
+
+        let value_32bit: u32 = bytes_to_u32_le!(test_data, 2,);
         assert_eq!(value_32bit, 0x12345678);
     }
 
     #[test]
     fn test_bytes_to_u64_be() {
-        let test_data: [u8; 8] = [0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0];
+        let test_data: [u8; 10] = [0x00, 0x00, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0];
 
-        let value_64bit: u64 = bytes_to_u64_be!(test_data, 0);
+        let value_64bit: u64 = bytes_to_u64_be!(test_data, 2);
+        assert_eq!(value_64bit, 0x123456789abcdef0);
+
+        let value_64bit: u64 = bytes_to_u64_be!(test_data, 2,);
         assert_eq!(value_64bit, 0x123456789abcdef0);
     }
 
     #[test]
     fn test_bytes_to_u64_le() {
-        let test_data: [u8; 8] = [0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12];
+        let test_data: [u8; 10] = [0x00, 0x00, 0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12];
 
-        let value_64bit: u64 = bytes_to_u64_le!(test_data, 0);
+        let value_64bit: u64 = bytes_to_u64_le!(test_data, 2);
+        assert_eq!(value_64bit, 0x123456789abcdef0);
+
+        let value_64bit: u64 = bytes_to_u64_le!(test_data, 2,);
         assert_eq!(value_64bit, 0x123456789abcdef0);
     }
 }

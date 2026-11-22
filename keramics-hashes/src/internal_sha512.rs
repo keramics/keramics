@@ -44,6 +44,7 @@ const SHA512_PRIME_CUBE_ROOTS: [u64; 80] = [
 ];
 
 /// Context for calculating a SHA-384 and SHA-512 hash.
+#[derive(Clone)]
 pub struct InternalSha512Context {
     /// Hash values.
     hash_values: [u64; 8],
@@ -71,6 +72,13 @@ impl InternalSha512Context {
 
     /// Finalizes the digest hash calculation.
     pub fn finalize(&mut self, prime_square_roots: &[u64]) -> Vec<u8> {
+        let mut hash: [u8; 64] = [0; 64];
+        self.finalize_into(prime_square_roots, &mut hash);
+        hash.to_vec()
+    }
+
+    /// Finalizes the digest hash calculation into a fixed-size output buffer.
+    pub fn finalize_into(&mut self, prime_square_roots: &[u64], output: &mut [u8]) {
         let bit_size: u64 = (self.number_of_bytes_hashed + self.block_offset as u64) * 8;
 
         // Add padding with a size of 112 mod 128
@@ -89,18 +97,14 @@ impl InternalSha512Context {
 
             self.hash_values.copy_from_slice(&hash_values);
         }
-        let hash: Vec<u8> = self
-            .hash_values
-            .iter()
-            .flat_map(|hash_value| hash_value.to_be_bytes())
-            .collect::<Vec<u8>>();
-
+        let number_of_words: usize = output.len() / 8;
+        for (index, hash_value) in self.hash_values[0..number_of_words].iter().enumerate() {
+            let offset: usize = index * 8;
+            output[offset..offset + 8].copy_from_slice(&hash_value.to_be_bytes());
+        }
         self.hash_values.copy_from_slice(prime_square_roots);
         self.number_of_bytes_hashed = 0;
         self.block_offset = 0;
-        self.block.fill(0);
-
-        hash
     }
 
     /// Calculates the hash of a block of data.

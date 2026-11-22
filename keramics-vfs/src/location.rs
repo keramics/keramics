@@ -150,7 +150,24 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    // TODO: add tests for new_base
+    #[test]
+    fn test_new_base() {
+        let path: Path = Path::from("/test");
+        let test_location: VfsLocation = VfsLocation::new_base(&VfsType::Ext, path.clone());
+
+        assert_eq!(test_location.get_type(), &VfsType::Ext);
+        assert_eq!(test_location.get_path(), &path);
+        assert!(test_location.get_parent().is_none());
+    }
+
+    #[test]
+    fn test_from_path_buf() {
+        let path_buf: PathBuf = PathBuf::from("../test_data/directory/file.txt");
+        let test_location: VfsLocation = VfsLocation::from(&path_buf);
+
+        assert_eq!(test_location.get_type(), &VfsType::Os);
+        assert_eq!(test_location.get_path(), &Path::from(&path_buf));
+    }
 
     #[test]
     fn test_new_with_layer() {

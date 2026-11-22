@@ -60,6 +60,18 @@ impl Uuid {
         }
     }
 
+    /// Converts the UUID to a big-endian byte sequence.
+    pub fn to_be_bytes(&self) -> [u8; 16] {
+        let mut data: [u8; 16] = [0; 16];
+        data[0..4].copy_from_slice(&self.part1.to_be_bytes());
+        data[4..6].copy_from_slice(&self.part2.to_be_bytes());
+        data[6..8].copy_from_slice(&self.part3.to_be_bytes());
+        data[8..10].copy_from_slice(&self.part4.to_be_bytes());
+        data[10..12].copy_from_slice(&((self.part5 >> 32) as u16).to_be_bytes());
+        data[12..16].copy_from_slice(&(self.part5 as u32).to_be_bytes());
+        data
+    }
+
     /// Creates a new UUID from a string.
     pub fn from_string(mut string: &str) -> Result<Self, ErrorTrace> {
         let mut string_length: usize = string.len();
@@ -110,7 +122,7 @@ impl Uuid {
             Err(_) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unable to parse part4: {}",
-                    &string[19..24]
+                    &string[19..23]
                 )));
             }
         };
@@ -204,17 +216,42 @@ mod tests {
 
     #[test]
     fn test_from_string() -> Result<(), ErrorTrace> {
+        let expected_uuid: Uuid = Uuid {
+            part1: 0xb61f53ca,
+            part2: 0xa786,
+            part3: 0x4528,
+            part4: 0x90e2,
+            part5: 0x55ba791a1c4c,
+        };
+
         let uuid: Uuid = Uuid::from_string("{b61f53ca-a786-4528-90e2-55ba791a1c4c}")?;
-        assert_eq!(
-            uuid,
-            Uuid {
-                part1: 0xb61f53ca,
-                part2: 0xa786,
-                part3: 0x4528,
-                part4: 0x90e2,
-                part5: 0x55ba791a1c4c,
-            }
-        );
+        assert_eq!(uuid, expected_uuid);
+
+        let uuid: Uuid = Uuid::from_string("b61f53ca-a786-4528-90e2-55ba791a1c4c")?;
+        assert_eq!(uuid, expected_uuid);
+
+        let uuid: Uuid = Uuid::from_string("B61F53CA-A786-4528-90E2-55BA791A1C4C")?;
+        assert_eq!(uuid, expected_uuid);
+
+        // Test with unsupported string lengths.
+        assert!(Uuid::from_string("").is_err());
+        assert!(Uuid::from_string("b61f53ca").is_err());
+        assert!(Uuid::from_string("{b61f53ca-a786-4528-90e2-55ba791a1c4c").is_err());
+        assert!(Uuid::from_string("b61f53ca-a786-4528-90e2-55ba791a1c4c}").is_err());
+
+        // Test with missing or invalid hyphen separators.
+        assert!(Uuid::from_string("b61f53caXa786-4528-90e2-5500791a1c4c").is_err());
+        assert!(Uuid::from_string("b61f53ca-a786X4528-90e2-5500791a1c4c").is_err());
+        assert!(Uuid::from_string("b61f53ca-a786-4528X90e2-5500791a1c4c").is_err());
+        assert!(Uuid::from_string("b61f53ca-a786-4528-90e2X5500791a1c4c").is_err());
+
+        // Test with invalid hexadecimal characters in each part.
+        assert!(Uuid::from_string("zzzzzzzz-a786-4528-90e2-5500791a1c4c").is_err());
+        assert!(Uuid::from_string("b61f53ca-zzzz-4528-90e2-5500791a1c4c").is_err());
+        assert!(Uuid::from_string("b61f53ca-a786-zzzz-90e2-5500791a1c4c").is_err());
+        assert!(Uuid::from_string("b61f53ca-a786-4528-zzzz-5500791a1c4c").is_err());
+        assert!(Uuid::from_string("b61f53ca-a786-4528-90e2-zzzzzzzzzzzz").is_err());
+
         Ok(())
     }
 
@@ -227,7 +264,7 @@ mod tests {
             part4: 0xffff,
             part5: 0xffffffffffff,
         };
-        assert_eq!(uuid.is_max(), true);
+        assert!(uuid.is_max());
     }
 
     #[test]
@@ -239,13 +276,49 @@ mod tests {
             part4: 0x90e2,
             part5: 0x55ba791a1c4c,
         };
-        assert_eq!(uuid.is_max(), false);
+        assert!(!uuid.is_max());
+
+        let uuid: Uuid = Uuid {
+            part1: 0xffffffff,
+            part2: 0x0000,
+            part3: 0xffff,
+            part4: 0xffff,
+            part5: 0xffffffffffff,
+        };
+        assert!(!uuid.is_max());
+
+        let uuid: Uuid = Uuid {
+            part1: 0xffffffff,
+            part2: 0xffff,
+            part3: 0x0000,
+            part4: 0xffff,
+            part5: 0xffffffffffff,
+        };
+        assert!(!uuid.is_max());
+
+        let uuid: Uuid = Uuid {
+            part1: 0xffffffff,
+            part2: 0xffff,
+            part3: 0xffff,
+            part4: 0x0000,
+            part5: 0xffffffffffff,
+        };
+        assert!(!uuid.is_max());
+
+        let uuid: Uuid = Uuid {
+            part1: 0xffffffff,
+            part2: 0xffff,
+            part3: 0xffff,
+            part4: 0xffff,
+            part5: 0x000000000000,
+        };
+        assert!(!uuid.is_max());
     }
 
     #[test]
     fn test_is_nil() {
         let uuid: Uuid = Uuid::new();
-        assert_eq!(uuid.is_nil(), true);
+        assert!(uuid.is_nil());
     }
 
     #[test]
@@ -257,7 +330,43 @@ mod tests {
             part4: 0x90e2,
             part5: 0x55ba791a1c4c,
         };
-        assert_eq!(uuid.is_nil(), false);
+        assert!(!uuid.is_nil());
+
+        let uuid: Uuid = Uuid {
+            part1: 0,
+            part2: 1,
+            part3: 0,
+            part4: 0,
+            part5: 0,
+        };
+        assert!(!uuid.is_nil());
+
+        let uuid: Uuid = Uuid {
+            part1: 0,
+            part2: 0,
+            part3: 1,
+            part4: 0,
+            part5: 0,
+        };
+        assert!(!uuid.is_nil());
+
+        let uuid: Uuid = Uuid {
+            part1: 0,
+            part2: 0,
+            part3: 0,
+            part4: 1,
+            part5: 0,
+        };
+        assert!(!uuid.is_nil());
+
+        let uuid: Uuid = Uuid {
+            part1: 0,
+            part2: 0,
+            part3: 0,
+            part4: 0,
+            part5: 1,
+        };
+        assert!(!uuid.is_nil());
     }
 
     #[test]
@@ -272,5 +381,15 @@ mod tests {
 
         let uuid_string: String = uuid.to_string();
         assert_eq!(uuid_string, "b61f53ca-a786-4528-90e2-55ba791a1c4c");
+    }
+
+    #[test]
+    fn test_to_be_bytes() {
+        let expected_data: [u8; 16] = [
+            0xb6, 0x1f, 0x53, 0xca, 0xa7, 0x86, 0x45, 0x28, 0x90, 0xe2, 0x55, 0xba, 0x79, 0x1a,
+            0x1c, 0x4c,
+        ];
+        let uuid: Uuid = Uuid::from_be_bytes(&expected_data);
+        assert_eq!(uuid.to_be_bytes(), expected_data);
     }
 }
