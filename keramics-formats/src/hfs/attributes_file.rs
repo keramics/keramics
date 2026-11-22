@@ -416,7 +416,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_core::open_os_data_stream;
+    use keramics_core::{open_fake_data_stream, open_os_data_stream};
 
     use crate::tests::get_test_data_path;
 
@@ -455,7 +455,211 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_attributes_by_identifier_from_node
+    fn build_hfs_btree_node(node_type: u8, records: &[&[u8]]) -> Vec<u8> {
+        let mut node: Vec<u8> = vec![0; 512];
+        node[8] = node_type;
+        node[10..12].copy_from_slice(&(records.len() as u16).to_be_bytes());
+
+        let mut data_offset: usize = 14;
+        for (index, record) in records.iter().enumerate() {
+            node[data_offset..data_offset + record.len()].copy_from_slice(record);
+            let slot_offset: usize = 512 - ((index + 1) * 2);
+            node[slot_offset..slot_offset + 2].copy_from_slice(&(data_offset as u16).to_be_bytes());
+            data_offset += record.len();
+        }
+        let free_slot_offset: usize = 512 - ((records.len() + 1) * 2);
+        node[free_slot_offset..free_slot_offset + 2]
+            .copy_from_slice(&(data_offset as u16).to_be_bytes());
+        node
+    }
+
+    fn build_attribute_key(identifier: u32, logical_block_number: u32, name: &str) -> Vec<u8> {
+        let utf16_units: Vec<u16> = name.encode_utf16().collect();
+        let key_data_size: u16 = (12 + (utf16_units.len() * 2)) as u16;
+        let mut key: Vec<u8> = vec![0; 2 + (key_data_size as usize)];
+        key[0..2].copy_from_slice(&key_data_size.to_be_bytes());
+        key[4..8].copy_from_slice(&identifier.to_be_bytes());
+        key[8..12].copy_from_slice(&logical_block_number.to_be_bytes());
+        key[12..14].copy_from_slice(&(utf16_units.len() as u16).to_be_bytes());
+        for (index, unit) in utf16_units.iter().enumerate() {
+            let offset: usize = 14 + (index * 2);
+            key[offset..offset + 2].copy_from_slice(&unit.to_be_bytes());
+        }
+        key
+    }
+
+    #[test]
+    fn test_read_attribute_record() -> Result<(), ErrorTrace> {
+        let attributes_file: HfsAttributesFile = HfsAttributesFile::new();
+        let key_bytes: Vec<u8> = build_attribute_key(10, 0, "attr");
+        let mut key: HfsAttributeKey = HfsAttributeKey::new();
+        key.read_data(&key_bytes)?;
+
+        // Test inline data record (0x00000010).
+        let mut inline_record: Vec<u8> = key_bytes.clone();
+        inline_record.extend_from_slice(&0x00000010u32.to_be_bytes());
+        inline_record.extend_from_slice(&[0; 8]);
+        inline_record.extend_from_slice(&4u32.to_be_bytes());
+        inline_record.extend_from_slice(b"test");
+        let record: HfsAttributeRecord =
+            attributes_file.read_attribute_record(&key, &inline_record)?;
+        assert!(matches!(record, HfsAttributeRecord::InlineData(_)));
+
+        // Test fork data record (0x00000020).
+        let mut fork_record: Vec<u8> = key_bytes.clone();
+        fork_record.extend_from_slice(&0x00000020u32.to_be_bytes());
+        fork_record.extend_from_slice(&[0; 84]);
+        let record: HfsAttributeRecord =
+            attributes_file.read_attribute_record(&key, &fork_record)?;
+        assert!(matches!(record, HfsAttributeRecord::ForkData(_)));
+
+        // Test extents record (0x00000030).
+        let mut extents_record: Vec<u8> = key_bytes.clone();
+        extents_record.extend_from_slice(&0x00000030u32.to_be_bytes());
+        extents_record.extend_from_slice(&[0; 68]);
+        let record: HfsAttributeRecord =
+            attributes_file.read_attribute_record(&key, &extents_record)?;
+        assert!(matches!(record, HfsAttributeRecord::Extents(_)));
+
+        // Test unsupported record type (0x00000040).
+        let mut unknown_record: Vec<u8> = key_bytes.clone();
+        unknown_record.extend_from_slice(&0x00000040u32.to_be_bytes());
+        let result: Result<HfsAttributeRecord, ErrorTrace> =
+            attributes_file.read_attribute_record(&key, &unknown_record);
+        assert!(result.is_err());
+
+        // Test truncated record data size (< key.size + 4).
+        let result: Result<HfsAttributeRecord, ErrorTrace> =
+            attributes_file.read_attribute_record(&key, &key_bytes);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_attributes_by_identifier_branch_fork_and_errors() -> Result<(), ErrorTrace> {
+        let mut image: Vec<u8> = vec![0; 6 * 512];
+        // Node 0: Header node pointing to root node 1.
+        image[8] = 0x01;
+        image[16..20].copy_from_slice(&1u32.to_be_bytes());
+        image[32..34].copy_from_slice(&512u16.to_be_bytes());
+
+        // Node 1: Index node pointing to empty leaf 5 (id 10), leaf 2 (id 20), and map node 3 (id 50).
+        let mut index_record_1: Vec<u8> = build_attribute_key(10, 0, "a");
+        index_record_1.extend_from_slice(&5u32.to_be_bytes());
+        let mut index_record_2: Vec<u8> = build_attribute_key(20, 0, "a");
+        index_record_2.extend_from_slice(&2u32.to_be_bytes());
+        let mut index_record_3: Vec<u8> = build_attribute_key(50, 0, "a");
+        index_record_3.extend_from_slice(&3u32.to_be_bytes());
+        image[512..1024].copy_from_slice(&build_hfs_btree_node(
+            0x00,
+            &[&index_record_1, &index_record_2, &index_record_3],
+        ));
+
+        // Node 2: Leaf node with ForkData + Extents for id 20 ("big"), and InlineData for id 30 ("end").
+        let mut fork_record: Vec<u8> = build_attribute_key(20, 0, "big");
+        fork_record.extend_from_slice(&0x00000020u32.to_be_bytes());
+        fork_record.extend_from_slice(&[0; 84]);
+
+        let mut extents_record: Vec<u8> = build_attribute_key(20, 8, "big");
+        extents_record.extend_from_slice(&0x00000030u32.to_be_bytes());
+        extents_record.extend_from_slice(&[0; 68]);
+
+        let mut next_record: Vec<u8> = build_attribute_key(30, 0, "end");
+        next_record.extend_from_slice(&0x00000010u32.to_be_bytes());
+        next_record.extend_from_slice(&[0; 12]);
+
+        image[1024..1536].copy_from_slice(&build_hfs_btree_node(
+            0xff,
+            &[&fork_record, &extents_record, &next_record],
+        ));
+
+        // Node 3: MapNode (unsupported node type).
+        image[1536..2048].copy_from_slice(&build_hfs_btree_node(0x02, &[]));
+
+        // Node 4: Leaf node with orphan Extents record (missing ForkData) for id 40,
+        // and duplicate inline record for id 41.
+        let mut orphan_extents: Vec<u8> = build_attribute_key(40, 8, "orphan");
+        orphan_extents.extend_from_slice(&0x00000030u32.to_be_bytes());
+        orphan_extents.extend_from_slice(&[0; 68]);
+
+        let mut duplicate_inline: Vec<u8> = build_attribute_key(41, 0, "dup");
+        duplicate_inline.extend_from_slice(&0x00000010u32.to_be_bytes());
+        duplicate_inline.extend_from_slice(&[0; 12]);
+
+        let mut nonzero_inline: Vec<u8> = build_attribute_key(42, 4, "bad");
+        nonzero_inline.extend_from_slice(&0x00000010u32.to_be_bytes());
+        nonzero_inline.extend_from_slice(&[0; 12]);
+
+        image[2048..2560].copy_from_slice(&build_hfs_btree_node(
+            0xff,
+            &[
+                &orphan_extents,
+                &duplicate_inline,
+                &duplicate_inline,
+                &nonzero_inline,
+            ],
+        ));
+
+        // Node 5: Empty LeafNode.
+        image[2560..3072].copy_from_slice(&build_hfs_btree_node(0xff, &[]));
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let mut attributes_file: HfsAttributesFile = HfsAttributesFile::new();
+        attributes_file.initialize(
+            &HfsFormat::HfsPlus,
+            512,
+            image.len() as u64,
+            vec![HfsBlockRange::new(0, 0, 6)],
+            &data_stream,
+        )?;
+
+        let mut attributes: IndexedHashMap<HfsString, HfsAttributeRecord> = IndexedHashMap::new();
+        attributes_file.get_attributes_by_identifier(&data_stream, 20, &mut attributes)?;
+        assert_eq!(attributes.len(), 1);
+
+        // Unsupported node type error via index lookup for id 50.
+        let mut error_attributes: IndexedHashMap<HfsString, HfsAttributeRecord> =
+            IndexedHashMap::new();
+        let result: Result<(), ErrorTrace> =
+            attributes_file.get_attributes_by_identifier(&data_stream, 50, &mut error_attributes);
+        assert!(result.is_err());
+
+        // Orphan extents, duplicate attribute name, and non-zero logical block number on inline data.
+        for identifier in [40u32, 41, 42] {
+            let mut read_node_numbers: HashSet<u32> = HashSet::new();
+            let mut test_attributes: IndexedHashMap<HfsString, HfsAttributeRecord> =
+                IndexedHashMap::new();
+            let result: Result<(), ErrorTrace> = attributes_file
+                .get_attributes_by_identifier_from_node(
+                    &data_stream,
+                    4,
+                    identifier,
+                    &mut test_attributes,
+                    &mut read_node_numbers,
+                );
+            assert!(result.is_err());
+        }
+
+        // Cycle detection error.
+        let mut read_node_numbers: HashSet<u32> = HashSet::new();
+        read_node_numbers.insert(2);
+        let result: Result<(), ErrorTrace> = attributes_file
+            .get_attributes_by_identifier_from_node(
+                &data_stream,
+                2,
+                20,
+                &mut error_attributes,
+                &mut read_node_numbers,
+            );
+        assert!(result.is_err());
+
+        // Root node 0 returns Ok(()).
+        let empty_file: HfsAttributesFile = HfsAttributesFile::new();
+        empty_file.get_attributes_by_identifier(&data_stream, 20, &mut error_attributes)?;
+
+        Ok(())
+    }
 
     #[test]
     fn test_initialize() -> Result<(), ErrorTrace> {
@@ -470,6 +674,4 @@ mod tests {
             &data_stream,
         )
     }
-
-    // TODO: add tests for read_attribute_record
 }

@@ -152,7 +152,14 @@ mod tests {
         ]
     }
 
-    // TODO: add tests for get_lookup_name
+    #[test]
+    fn test_get_lookup_name() {
+        let mut test_struct: FatShortNameDirectoryEntry = FatShortNameDirectoryEntry::new();
+        test_struct.name = ByteString::from("TestDir1.txt");
+
+        let lookup_name: Ucs2String = test_struct.get_lookup_name();
+        assert_eq!(lookup_name, Ucs2String::from("TESTDIR1.TXT"));
+    }
 
     #[test]
     fn test_read_at_position_fat12() -> Result<(), ErrorTrace> {
@@ -172,6 +179,21 @@ mod tests {
         assert_eq!(test_struct.file_attribute_flags, 0x10);
         assert_eq!(test_struct.data_start_cluster, 3);
         assert_eq!(test_struct.data_size, 0);
+
+        // Test FAT-32 format with high cluster word set.
+        let mut fat32_data: Vec<u8> = get_test_data_fat12();
+        fat32_data[20..22].copy_from_slice(&0x0001u16.to_le_bytes());
+        let fat32_stream: DataStreamReference = open_fake_data_stream(&fat32_data);
+
+        let mut fat32_entry: FatShortNameDirectoryEntry = FatShortNameDirectoryEntry::new();
+        fat32_entry.read_at_position(&fat32_stream, SeekFrom::Start(0), &FatFormat::Fat32)?;
+        assert_eq!(fat32_entry.data_start_cluster, 0x00010003);
+
+        // Test truncated data stream error.
+        let short_stream: DataStreamReference = open_fake_data_stream(&[0u8; 8]);
+        let result: Result<(), ErrorTrace> =
+            fat32_entry.read_at_position(&short_stream, SeekFrom::Start(0), &FatFormat::Fat32);
+        assert!(result.is_err());
 
         Ok(())
     }

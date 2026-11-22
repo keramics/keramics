@@ -136,3 +136,105 @@ impl HfsBlockRanges {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::open_fake_data_stream;
+
+    #[test]
+    fn test_read_extents() -> Result<(), ErrorTrace> {
+        let mut block_ranges: HfsBlockRanges = HfsBlockRanges::new();
+        let mut logical_block_number: u32 = 0;
+        let extents: Vec<HfsExtentDescriptor> = vec![
+            HfsExtentDescriptor {
+                block_number: 10,
+                number_of_blocks: 4,
+            },
+            HfsExtentDescriptor {
+                block_number: 20,
+                number_of_blocks: 6,
+            },
+        ];
+        block_ranges.read_extents(5, &mut logical_block_number, &extents)?;
+
+        assert_eq!(logical_block_number, 10);
+        assert_eq!(block_ranges.number_of_blocks, 10);
+        assert_eq!(block_ranges.ranges.len(), 2);
+        assert_eq!(block_ranges.ranges[0].physical_block_number, 15);
+        assert_eq!(block_ranges.ranges[1].logical_block_number, 4);
+        assert_eq!(block_ranges.ranges[1].physical_block_number, 25);
+
+        // Test block number overflow.
+        let overflow_block_extents: Vec<HfsExtentDescriptor> = vec![HfsExtentDescriptor {
+            block_number: u32::MAX,
+            number_of_blocks: 1,
+        }];
+        let mut block_ranges: HfsBlockRanges = HfsBlockRanges::new();
+        let mut logical_block_number: u32 = 0;
+        let result: Result<(), ErrorTrace> =
+            block_ranges.read_extents(1, &mut logical_block_number, &overflow_block_extents);
+        assert!(result.is_err());
+
+        // Test number of blocks overflow.
+        let overflow_count_extents: Vec<HfsExtentDescriptor> = vec![
+            HfsExtentDescriptor {
+                block_number: 0,
+                number_of_blocks: 10,
+            },
+            HfsExtentDescriptor {
+                block_number: 10,
+                number_of_blocks: u32::MAX,
+            },
+        ];
+        let mut block_ranges: HfsBlockRanges = HfsBlockRanges::new();
+        let mut logical_block_number: u32 = 0;
+        let result: Result<(), ErrorTrace> =
+            block_ranges.read_extents(0, &mut logical_block_number, &overflow_count_extents);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_fork_descriptor() -> Result<(), ErrorTrace> {
+        let data_stream: DataStreamReference = open_fake_data_stream(&[]);
+        let extents_overflow_file: HfsExtentsOverflowFile = HfsExtentsOverflowFile::new();
+
+        // Test fork descriptor with overflow lookup when root_node_number is 0.
+        let mut fork_descriptor: HfsForkDescriptor = HfsForkDescriptor::new();
+        fork_descriptor.number_of_blocks = 10;
+        fork_descriptor.extents.push(HfsExtentDescriptor {
+            block_number: 2,
+            number_of_blocks: 4,
+        });
+        let mut block_ranges: HfsBlockRanges = HfsBlockRanges::new();
+        block_ranges.read_fork_descriptor(
+            0,
+            16,
+            &fork_descriptor,
+            &data_stream,
+            &extents_overflow_file,
+        )?;
+        assert_eq!(block_ranges.number_of_blocks, 4);
+
+        // Test fork descriptor error propagation on block number overflow.
+        let mut invalid_fork_descriptor: HfsForkDescriptor = HfsForkDescriptor::new();
+        invalid_fork_descriptor.extents.push(HfsExtentDescriptor {
+            block_number: u32::MAX,
+            number_of_blocks: 1,
+        });
+        let mut block_ranges: HfsBlockRanges = HfsBlockRanges::new();
+        let result: Result<(), ErrorTrace> = block_ranges.read_fork_descriptor(
+            1,
+            16,
+            &invalid_fork_descriptor,
+            &data_stream,
+            &extents_overflow_file,
+        );
+        assert!(result.is_err());
+
+        Ok(())
+    }
+}

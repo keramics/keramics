@@ -235,11 +235,88 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let mut test_struct = XfsDirectoryTable::new(&CharacterEncoding::Utf8);
+        let mut test_struct: XfsDirectoryTable = XfsDirectoryTable::new(&CharacterEncoding::Utf8);
 
         let test_data: Vec<u8> = get_test_data();
         let mut entries: IndexedHashMap<ByteString, XfsDirectoryEntry> = IndexedHashMap::new();
-        let result = test_struct.read_data(true, true, &test_data[0..15], &mut entries);
+        let result: Result<(), ErrorTrace> =
+            test_struct.read_data(true, true, &test_data[0..15], &mut entries);
         assert!(result.is_err());
+
+        // Test data size < 2.
+        let result: Result<(), ErrorTrace> = test_struct.read_data(true, true, &[0], &mut entries);
+        assert!(result.is_err());
+
+        // Test both 32-bit and 64-bit entry counts non-zero.
+        let result: Result<(), ErrorTrace> =
+            test_struct.read_data(true, true, &[1, 1, 0, 0, 0, 0], &mut entries);
+        assert!(result.is_err());
+
+        // Test truncated version 1 header (< 9 bytes).
+        let result: Result<(), ErrorTrace> =
+            test_struct.read_data(false, false, &[0; 4], &mut entries);
+        assert!(result.is_err());
+
+        // Test truncated 64-bit version 2 header (< 10 bytes).
+        let result: Result<(), ErrorTrace> =
+            test_struct.read_data(true, false, &[0, 1, 0, 0, 0, 0], &mut entries);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_v1_and_v2_64bit() -> Result<(), ErrorTrace> {
+        let mut test_struct: XfsDirectoryTable = XfsDirectoryTable::new(&CharacterEncoding::Utf8);
+
+        // Build version 1 directory table (9-byte header: 8-byte parent + 1-byte count,
+        // followed by 8-byte inode + 1-byte name length + name bytes).
+        let mut v1_data: Vec<u8> = vec![0; 9 + 9 + 4];
+        v1_data[0..8].copy_from_slice(&128u64.to_be_bytes());
+        v1_data[8] = 1;
+        v1_data[9..17].copy_from_slice(&256u64.to_be_bytes());
+        v1_data[17] = 4;
+        v1_data[18..22].copy_from_slice(b"test");
+
+        let mut entries: IndexedHashMap<ByteString, XfsDirectoryEntry> = IndexedHashMap::new();
+        test_struct.read_data(false, false, &v1_data, &mut entries)?;
+        assert_eq!(entries.len(), 1);
+        assert_eq!(
+            entries
+                .get_value_by_key(&ByteString::from("test"))
+                .unwrap()
+                .inode_number,
+            256
+        );
+
+        // Build 64-bit version 2 directory table with file type byte.
+        // Header: 1-byte 32-bit count (0), 1-byte 64-bit count (1), 8-byte parent inode.
+        // Entry: 1-byte name length, 2-byte offset, name bytes, 1-byte file type, 8-byte inode.
+        let mut v2_64bit_data: Vec<u8> = vec![0; 10 + 3 + 5 + 1 + 8];
+        v2_64bit_data[1] = 1;
+        v2_64bit_data[2..10].copy_from_slice(&128u64.to_be_bytes());
+        v2_64bit_data[10] = 5;
+        v2_64bit_data[13..18].copy_from_slice(b"file1");
+        v2_64bit_data[18] = 1;
+        v2_64bit_data[19..27].copy_from_slice(&512u64.to_be_bytes());
+
+        let mut entries: IndexedHashMap<ByteString, XfsDirectoryEntry> = IndexedHashMap::new();
+        test_struct.read_data(true, true, &v2_64bit_data, &mut entries)?;
+        assert_eq!(entries.len(), 1);
+        assert_eq!(
+            entries
+                .get_value_by_key(&ByteString::from("file1"))
+                .unwrap()
+                .inode_number,
+            512
+        );
+
+        // Test entry name offset out of bounds on version 1 table.
+        let mut truncated_v1_data: Vec<u8> = vec![0; 10];
+        truncated_v1_data[8] = 1;
+        let mut entries: IndexedHashMap<ByteString, XfsDirectoryEntry> = IndexedHashMap::new();
+        let result: Result<(), ErrorTrace> =
+            test_struct.read_data(false, false, &truncated_v1_data, &mut entries);
+        assert!(result.is_err());
+
+        Ok(())
     }
 }

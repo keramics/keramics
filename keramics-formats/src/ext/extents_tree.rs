@@ -348,6 +348,107 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for read_node_data with depth > 0
-    // TODO: add tests for read_node_at_position
+    #[test]
+    fn test_read_data_reference_with_index_node_and_sparse_extents() -> Result<(), ErrorTrace> {
+        let block_size: usize = 1024;
+        let mut image: Vec<u8> = vec![0; 2 * block_size];
+
+        // Leaf node at block 1 (depth=0, 3 extent descriptors + 4-byte footer):
+        // Descriptor 0: logical=2 (creates sparse gap 0..2), number_of_blocks=4, physical=10.
+        // Descriptor 1: logical=6, number_of_blocks=32768 + 2 (uninitialized -> sparse), physical=20.
+        // Descriptor 2: logical=8, number_of_blocks=2, physical=0 (sparse).
+        let leaf: &mut [u8] = &mut image[block_size..2 * block_size];
+        leaf[0..2].copy_from_slice(&0xf30au16.to_le_bytes());
+        leaf[2..4].copy_from_slice(&3u16.to_le_bytes());
+        leaf[4..6].copy_from_slice(&4u16.to_le_bytes());
+        leaf[6..8].copy_from_slice(&0u16.to_le_bytes());
+
+        // Descriptor 0 at offset 12.
+        leaf[12..16].copy_from_slice(&2u32.to_le_bytes());
+        leaf[16..18].copy_from_slice(&4u16.to_le_bytes());
+        leaf[20..24].copy_from_slice(&10u32.to_le_bytes());
+
+        // Descriptor 1 at offset 24 (uninitialized extent > 32768).
+        leaf[24..28].copy_from_slice(&6u32.to_le_bytes());
+        leaf[28..30].copy_from_slice(&(32768u16 + 2).to_le_bytes());
+        leaf[32..36].copy_from_slice(&20u32.to_le_bytes());
+
+        // Descriptor 2 at offset 36 (physical_block_number == 0).
+        leaf[36..40].copy_from_slice(&8u32.to_le_bytes());
+        leaf[40..42].copy_from_slice(&2u16.to_le_bytes());
+
+        // Root index node (depth=1, 1 extent index pointing to block 1).
+        let mut root_data: Vec<u8> = vec![0; 28];
+        root_data[0..2].copy_from_slice(&0xf30au16.to_le_bytes());
+        root_data[2..4].copy_from_slice(&1u16.to_le_bytes());
+        root_data[4..6].copy_from_slice(&4u16.to_le_bytes());
+        root_data[6..8].copy_from_slice(&1u16.to_le_bytes());
+        // Extent index at offset 12: logical=0, leaf_low=1.
+        root_data[16..20].copy_from_slice(&1u32.to_le_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let mut tree: ExtExtentsTree = ExtExtentsTree::new(block_size as u32, 12);
+        let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
+        tree.read_data_reference(&root_data, &data_stream, &mut block_ranges)?;
+
+        assert_eq!(block_ranges.len(), 5);
+        assert!(block_ranges[0].range_type == ExtBlockRangeType::Sparse);
+        assert_eq!(block_ranges[0].number_of_blocks, 2);
+        assert!(block_ranges[1].range_type == ExtBlockRangeType::InFile);
+        assert_eq!(block_ranges[1].physical_block_number, 10);
+        assert!(block_ranges[2].range_type == ExtBlockRangeType::Sparse);
+        assert_eq!(block_ranges[2].number_of_blocks, 2);
+        assert!(block_ranges[3].range_type == ExtBlockRangeType::Sparse);
+        assert!(block_ranges[4].range_type == ExtBlockRangeType::Sparse);
+        assert_eq!(block_ranges[4].logical_block_number, 10);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_reference_with_errors() {
+        let empty_stream: DataStreamReference = open_fake_data_stream(&[]);
+        let mut tree: ExtExtentsTree = ExtExtentsTree::new(1024, 16);
+        let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
+
+        // Test invalid header signature.
+        let result: Result<(), ErrorTrace> =
+            tree.read_data_reference(&[0; 12], &empty_stream, &mut block_ranges);
+        assert!(result.is_err());
+
+        // Test depth >= parent_depth (6).
+        let mut invalid_depth: Vec<u8> = vec![0; 12];
+        invalid_depth[0..2].copy_from_slice(&0xf30au16.to_le_bytes());
+        invalid_depth[6..8].copy_from_slice(&6u16.to_le_bytes());
+        let result: Result<(), ErrorTrace> =
+            tree.read_data_reference(&invalid_depth, &empty_stream, &mut block_ranges);
+        assert!(result.is_err());
+
+        // Test truncated extent index entry (depth=1, number_of_entries=1, only 12 bytes).
+        let mut truncated_index: Vec<u8> = vec![0; 12];
+        truncated_index[0..2].copy_from_slice(&0xf30au16.to_le_bytes());
+        truncated_index[2..4].copy_from_slice(&1u16.to_le_bytes());
+        truncated_index[6..8].copy_from_slice(&1u16.to_le_bytes());
+        let result: Result<(), ErrorTrace> =
+            tree.read_data_reference(&truncated_index, &empty_stream, &mut block_ranges);
+        assert!(result.is_err());
+
+        // Test truncated extent descriptor entry (depth=0, number_of_entries=1, only 12 bytes).
+        let mut truncated_descriptor: Vec<u8> = vec![0; 12];
+        truncated_descriptor[0..2].copy_from_slice(&0xf30au16.to_le_bytes());
+        truncated_descriptor[2..4].copy_from_slice(&1u16.to_le_bytes());
+        let result: Result<(), ErrorTrace> =
+            tree.read_data_reference(&truncated_descriptor, &empty_stream, &mut block_ranges);
+        assert!(result.is_err());
+
+        // Test out-of-bounds sub-node read from empty stream.
+        let mut missing_sub_node: Vec<u8> = vec![0; 24];
+        missing_sub_node[0..2].copy_from_slice(&0xf30au16.to_le_bytes());
+        missing_sub_node[2..4].copy_from_slice(&1u16.to_le_bytes());
+        missing_sub_node[6..8].copy_from_slice(&1u16.to_le_bytes());
+        missing_sub_node[16..20].copy_from_slice(&5u32.to_le_bytes());
+        let result: Result<(), ErrorTrace> =
+            tree.read_data_reference(&missing_sub_node, &empty_stream, &mut block_ranges);
+        assert!(result.is_err());
+    }
 }

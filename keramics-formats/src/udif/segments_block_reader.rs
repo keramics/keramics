@@ -284,3 +284,120 @@ impl BlockReader for UdifSegmentsBlockReader {
         Ok(data_offset)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    use keramics_core::open_fake_data_stream;
+
+    use crate::file_resolver::FileResolver;
+
+    /// In-memory file resolver for testing.
+    struct TestFileResolver {
+        /// Data streams indexed by file name.
+        files: HashMap<String, DataStreamReference>,
+
+        /// File name configured to return an error.
+        fail_name: Option<String>,
+    }
+
+    impl FileResolver for TestFileResolver {
+        /// Retrieves a data stream for the given path components.
+        fn get_data_stream(
+            &self,
+            path_components: &[PathComponent],
+        ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+            if let Some(first_component) = path_components.first() {
+                let name: String = first_component.to_string();
+                if self.fail_name.as_ref() == Some(&name) {
+                    return Err(keramics_core::error_trace_new!("Injected resolver error"));
+                }
+                return Ok(self.files.get(&name).cloned());
+            }
+            Ok(None)
+        }
+    }
+
+    #[test]
+    fn test_read_data_from_blocks_with_errors() {
+        let mut files: HashMap<String, DataStreamReference> = HashMap::new();
+        files.insert(String::from("bad.dmg"), open_fake_data_stream(&[0u8; 32]));
+        let mut invalid_encrypted: Vec<u8> = vec![0; 64];
+        invalid_encrypted[0..8].copy_from_slice(CDSAENCR_CONTAINER_HEADER_SIGNATURE);
+        files.insert(
+            String::from("enc.dmg"),
+            open_fake_data_stream(&invalid_encrypted),
+        );
+        let file_resolver: FileResolverReference = Arc::new(Box::new(TestFileResolver {
+            files,
+            fail_name: Some(String::from("fail.dmg")),
+        }));
+
+        let segment_ranges: [UdifSegmentRange; 1] = [UdifSegmentRange::new(1, 512, 512)];
+        let mut reader: UdifSegmentsBlockReader = UdifSegmentsBlockReader::new(
+            &file_resolver,
+            "missing",
+            None,
+            &segment_ranges,
+            &[],
+            1024,
+        );
+        assert_eq!(reader.get_size(), 1024);
+
+        let mut buffer: [u8; 512] = [0; 512];
+        // Test out-of-range offsets before and after segment range.
+        let result: Result<usize, ErrorTrace> = reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        let result: Result<usize, ErrorTrace> = reader.read_data_from_blocks(&mut buffer, 1024);
+        assert!(result.is_err());
+
+        // Test open_segment_file error paths: missing file, resolver error, invalid UDIF file,
+        // invalid encrypted container, and alternate file name.
+        let ranges: [UdifSegmentRange; 1] = [UdifSegmentRange::new(1, 0, 512)];
+        for (segment_name, alternate) in [
+            ("missing", None),
+            ("fail", None),
+            ("bad", None),
+            ("enc", None),
+            ("ignored", Some(PathComponent::from("bad.dmg"))),
+        ] {
+            let mut test_reader: UdifSegmentsBlockReader = UdifSegmentsBlockReader::new(
+                &file_resolver,
+                segment_name,
+                alternate.as_ref(),
+                &ranges,
+                &[],
+                512,
+            );
+            let result: Result<usize, ErrorTrace> =
+                test_reader.read_data_from_blocks(&mut buffer, 0);
+            assert!(result.is_err());
+        }
+
+        // Test segment 2 naming path (segment_number > 1).
+        let second_segment_ranges: [UdifSegmentRange; 1] = [UdifSegmentRange::new(2, 0, 512)];
+        let mut second_segment_reader: UdifSegmentsBlockReader = UdifSegmentsBlockReader::new(
+            &file_resolver,
+            "missing",
+            None,
+            &second_segment_ranges,
+            &[],
+            512,
+        );
+        let result: Result<usize, ErrorTrace> =
+            second_segment_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        // Test read error from pre-cached empty UdifFile.
+        let mut cached_reader: UdifSegmentsBlockReader =
+            UdifSegmentsBlockReader::new(&file_resolver, "missing", None, &ranges, &[], 512);
+        cached_reader.segment_file_cache.insert(1, UdifFile::new());
+        let result: Result<usize, ErrorTrace> = cached_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+    }
+}

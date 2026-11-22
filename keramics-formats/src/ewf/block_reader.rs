@@ -286,3 +286,151 @@ impl BlockReader for EwfBlockReader {
         Ok(data_offset)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    use keramics_core::open_fake_data_stream;
+
+    use crate::file_resolver::FileResolver;
+
+    /// In-memory file resolver for testing.
+    struct TestFileResolver {
+        /// Data streams indexed by file name.
+        files: HashMap<String, DataStreamReference>,
+
+        /// File name configured to return an error.
+        fail_name: Option<String>,
+    }
+
+    impl FileResolver for TestFileResolver {
+        /// Retrieves a data stream for the given path components.
+        fn get_data_stream(
+            &self,
+            path_components: &[PathComponent],
+        ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+            if let Some(first_component) = path_components.first() {
+                let name: String = first_component.to_string();
+                if self.fail_name.as_ref() == Some(&name) {
+                    return Err(keramics_core::error_trace_new!("Injected resolver error"));
+                }
+                return Ok(self.files.get(&name).cloned());
+            }
+            Ok(None)
+        }
+    }
+
+    #[test]
+    fn test_read_data_from_blocks_corrupt_and_errors() -> Result<(), ErrorTrace> {
+        let mut files: HashMap<String, DataStreamReference> = HashMap::new();
+        files.insert(String::from("bad.E01"), open_fake_data_stream(&[0u8; 16]));
+        let file_resolver: FileResolverReference = Arc::new(Box::new(TestFileResolver {
+            files,
+            fail_name: Some(String::from("fail.E01")),
+        }));
+
+        // Test missing block range (binary search miss before and after).
+        let ranges: [EwfBlockRange; 1] = [EwfBlockRange::new(
+            512,
+            1,
+            0,
+            512,
+            EwfBlockRangeType::Corrupt,
+        )];
+        let mut reader: EwfBlockReader = EwfBlockReader::new(
+            &file_resolver,
+            "missing",
+            Some(&EwfNamingSchema::E01UpperCase),
+            512,
+            &ranges,
+            1024,
+        );
+        assert_eq!(reader.get_size(), 1024);
+
+        let mut buffer: [u8; 512] = [0xff; 512];
+        let result: Result<usize, ErrorTrace> = reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        let result: Result<usize, ErrorTrace> = reader.read_data_from_blocks(&mut buffer, 1024);
+        assert!(result.is_err());
+
+        // Test corrupt chunk when segment file is pre-populated in cache.
+        reader.segment_file_cache.insert(1, EwfFile::new());
+        let read_count: usize = reader.read_data_from_blocks(&mut buffer, 512)?;
+        assert_eq!(read_count, 512);
+        assert_eq!(buffer, [0x00; 512]);
+
+        // Test reading beyond available block ranges returns error.
+        let mut reader_with_gap: EwfBlockReader = EwfBlockReader::new(
+            &file_resolver,
+            "missing",
+            Some(&EwfNamingSchema::E01UpperCase),
+            512,
+            &[EwfBlockRange::new(0, 1, 0, 512, EwfBlockRangeType::Corrupt)],
+            1024,
+        );
+        reader_with_gap.segment_file_cache.insert(1, EwfFile::new());
+        let mut large_buffer: [u8; 1024] = [0; 1024];
+        let result: Result<usize, ErrorTrace> =
+            reader_with_gap.read_data_from_blocks(&mut large_buffer, 0);
+        assert!(result.is_err());
+
+        // Test open_segment_file error paths: missing file, resolver error, invalid EWF file,
+        // and missing naming schema.
+        let ranges: [EwfBlockRange; 1] =
+            [EwfBlockRange::new(0, 1, 0, 512, EwfBlockRangeType::InFile)];
+        for (name, schema) in [
+            ("missing", Some(EwfNamingSchema::E01UpperCase)),
+            ("fail", Some(EwfNamingSchema::E01UpperCase)),
+            ("bad", Some(EwfNamingSchema::E01UpperCase)),
+            ("missing", None),
+        ] {
+            let mut test_reader: EwfBlockReader =
+                EwfBlockReader::new(&file_resolver, name, schema.as_ref(), 512, &ranges, 512);
+            let result: Result<usize, ErrorTrace> =
+                test_reader.read_data_from_blocks(&mut buffer, 0);
+            assert!(result.is_err());
+        }
+
+        // Test InFile and Compressed read errors on empty EwfFile (no data stream).
+        let mut reader_in_file: EwfBlockReader = EwfBlockReader::new(
+            &file_resolver,
+            "missing",
+            Some(&EwfNamingSchema::E01UpperCase),
+            512,
+            &[EwfBlockRange::new(0, 1, 0, 512, EwfBlockRangeType::InFile)],
+            512,
+        );
+        reader_in_file.segment_file_cache.insert(1, EwfFile::new());
+        let result: Result<usize, ErrorTrace> =
+            reader_in_file.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        let mut reader_compressed: EwfBlockReader = EwfBlockReader::new(
+            &file_resolver,
+            "missing",
+            Some(&EwfNamingSchema::E01UpperCase),
+            512,
+            &[EwfBlockRange::new(
+                0,
+                1,
+                0,
+                512,
+                EwfBlockRangeType::Compressed,
+            )],
+            512,
+        );
+        reader_compressed
+            .segment_file_cache
+            .insert(1, EwfFile::new());
+        let result: Result<usize, ErrorTrace> =
+            reader_compressed.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+}

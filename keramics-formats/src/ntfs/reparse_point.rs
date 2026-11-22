@@ -140,9 +140,16 @@ mod tests {
     #[test]
     fn test_get_reparse_tag() {
         let test_struct: NtfsReparsePoint = NtfsReparsePoint::new(0x80000017);
+        assert_eq!(test_struct.get_reparse_tag(), 0x80000017);
 
-        let reparse_tag: u32 = test_struct.get_reparse_tag();
-        assert_eq!(reparse_tag, 0x80000017);
+        let junction: NtfsReparsePoint = NtfsReparsePoint::new(0xa0000003);
+        assert_eq!(junction.get_reparse_tag(), 0xa0000003);
+
+        let symbolic_link: NtfsReparsePoint = NtfsReparsePoint::new(0xa000000c);
+        assert_eq!(symbolic_link.get_reparse_tag(), 0xa000000c);
+
+        let undefined: NtfsReparsePoint = NtfsReparsePoint::new(0x12345678);
+        assert_eq!(undefined.get_reparse_tag(), 0x12345678);
     }
 
     #[test]
@@ -181,6 +188,73 @@ mod tests {
         let test_struct: NtfsReparsePoint = NtfsReparsePoint::from_attribute(&mft_attribute)?;
 
         assert!(matches!(test_struct, NtfsReparsePoint::Junction { .. }));
+
+        // Test WindowsOverlayFilter reparse point from attribute.
+        let mut overlay_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        overlay_attribute.attribute_type = NTFS_ATTRIBUTE_TYPE_REPARSE_POINT;
+        overlay_attribute.resident_data = vec![
+            0x17, 0x00, 0x00, 0x80, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00,
+            0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+        ];
+        let overlay_point: NtfsReparsePoint = NtfsReparsePoint::from_attribute(&overlay_attribute)?;
+        assert!(matches!(
+            overlay_point,
+            NtfsReparsePoint::WindowsOverlayFilter { .. }
+        ));
+
+        // Test SymbolicLink reparse point from attribute.
+        let mut symbolic_link_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        symbolic_link_attribute.attribute_type = NTFS_ATTRIBUTE_TYPE_REPARSE_POINT;
+        symbolic_link_attribute.resident_data = vec![
+            0x0c, 0x00, 0x00, 0xa0, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x02, 0x00,
+            0x02, 0x00, 0x00, 0x00, 0x00, 0x00, b'a', 0x00, b'b', 0x00,
+        ];
+        let symbolic_link_point: NtfsReparsePoint =
+            NtfsReparsePoint::from_attribute(&symbolic_link_attribute)?;
+        assert!(matches!(
+            symbolic_link_point,
+            NtfsReparsePoint::SymbolicLink { .. }
+        ));
+
+        // Test Undefined reparse point from attribute.
+        let mut undefined_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        undefined_attribute.attribute_type = NTFS_ATTRIBUTE_TYPE_REPARSE_POINT;
+        undefined_attribute.resident_data = vec![0x78, 0x56, 0x34, 0x12, 0x00, 0x00, 0x00, 0x00];
+        let undefined_point: NtfsReparsePoint =
+            NtfsReparsePoint::from_attribute(&undefined_attribute)?;
+        assert_eq!(undefined_point.get_reparse_tag(), 0x12345678);
+
+        // Test unsupported attribute type error.
+        let mut wrong_type_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        wrong_type_attribute.attribute_type = NTFS_ATTRIBUTE_TYPE_DATA;
+        let result: Result<NtfsReparsePoint, ErrorTrace> =
+            NtfsReparsePoint::from_attribute(&wrong_type_attribute);
+        assert!(result.is_err());
+
+        // Test non-resident attribute error.
+        let mut non_resident_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        non_resident_attribute.attribute_type = NTFS_ATTRIBUTE_TYPE_REPARSE_POINT;
+        non_resident_attribute.non_resident_flag = 1;
+        let result: Result<NtfsReparsePoint, ErrorTrace> =
+            NtfsReparsePoint::from_attribute(&non_resident_attribute);
+        assert!(result.is_err());
+
+        // Test truncated header error.
+        let mut truncated_header_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        truncated_header_attribute.attribute_type = NTFS_ATTRIBUTE_TYPE_REPARSE_POINT;
+        truncated_header_attribute.resident_data = vec![0; 4];
+        let result: Result<NtfsReparsePoint, ErrorTrace> =
+            NtfsReparsePoint::from_attribute(&truncated_header_attribute);
+        assert!(result.is_err());
+
+        // Test invalid reparse point data error.
+        let mut invalid_data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        invalid_data_attribute.attribute_type = NTFS_ATTRIBUTE_TYPE_REPARSE_POINT;
+        invalid_data_attribute.resident_data =
+            vec![0x17, 0x00, 0x00, 0x80, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let result: Result<NtfsReparsePoint, ErrorTrace> =
+            NtfsReparsePoint::from_attribute(&invalid_data_attribute);
+        assert!(result.is_err());
 
         Ok(())
     }

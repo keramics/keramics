@@ -67,3 +67,36 @@ impl LuksEncryptionContext {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_encryption::{AesContext, CryptContext};
+
+    #[test]
+    fn test_decrypt_sector() -> Result<(), ErrorTrace> {
+        let mut aes_context: AesContext = AesContext::new();
+        aes_context.set_key(&[0x11; 16])?;
+        let encryption_context: LuksEncryptionContext = LuksEncryptionContext {
+            cipher_context: LuksCipherContext::AesCbc(aes_context),
+            initialization_vector_context: LuksInitializationVectorContext::Plain64,
+        };
+        let encrypted_data: [u8; 32] = [0xaa; 32];
+        let mut decrypted_data: [u8; 32] = [0; 32];
+        encryption_context.decrypt_sector(0, &encrypted_data, &mut decrypted_data)?;
+        assert_ne!(decrypted_data, [0; 32]);
+
+        // Test cipher decryption error with invalid non-block-aligned buffer.
+        let invalid_encrypted_data: [u8; 7] = [0xaa; 7];
+        let mut invalid_decrypted_data: [u8; 7] = [0; 7];
+        let result: Result<(), ErrorTrace> = encryption_context.decrypt_sector(
+            0,
+            &invalid_encrypted_data,
+            &mut invalid_decrypted_data,
+        );
+        assert!(result.is_err());
+
+        Ok(())
+    }
+}
