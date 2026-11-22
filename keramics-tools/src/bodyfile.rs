@@ -33,7 +33,7 @@ impl Bodyfile {
 
         match data_stream.write() {
             Ok(mut data_stream) => loop {
-                let read_count = match data_stream.read(&mut data) {
+                let read_count: usize = match data_stream.read(&mut data) {
                     Ok(read_count) => read_count,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to read data stream");

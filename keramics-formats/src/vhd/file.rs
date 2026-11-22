@@ -133,7 +133,7 @@ impl VhdFile {
         self.media_size
     }
 
-    /// Retrieves the parent file name
+    /// Retrieves the parent file name.
     pub fn get_parent_file_name(&self) -> Option<Ucs2String> {
         match &self.parent_name {
             Some(parent_name) => {

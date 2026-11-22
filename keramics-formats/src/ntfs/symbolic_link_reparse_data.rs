@@ -47,7 +47,7 @@ impl NtfsSymbolicLinkReparseData {
 
     /// Reads the header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        let data_size = data.len();
+        let data_size: usize = data.len();
 
         if data_size < 12 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));

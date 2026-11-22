@@ -217,7 +217,7 @@ impl ByteString {
 }
 
 impl From<&[u8]> for ByteString {
-    /// Converts a [`&[u8]`] into a [`ByteString`]
+    /// Converts a [`&[u8]`] into a [`ByteString`].
     fn from(slice: &[u8]) -> Self {
         let elements: &[u8] = match slice.iter().position(|value| *value == 0) {
             Some(slice_index) => &slice[0..slice_index],
@@ -231,7 +231,7 @@ impl From<&[u8]> for ByteString {
 }
 
 impl From<&str> for ByteString {
-    /// Converts a [`&str`] into a [`ByteString`]
+    /// Converts a [`&str`] into a [`ByteString`].
     #[inline(always)]
     fn from(string: &str) -> Self {
         Self::from(string.as_bytes())
@@ -239,7 +239,7 @@ impl From<&str> for ByteString {
 }
 
 impl From<&String> for ByteString {
-    /// Converts a [`&String`] into a [`ByteString`]
+    /// Converts a [`&String`] into a [`ByteString`].
     #[inline(always)]
     fn from(string: &String) -> Self {
         Self::from(string.as_str().as_bytes())
@@ -247,7 +247,7 @@ impl From<&String> for ByteString {
 }
 
 impl PartialEq<&[u8]> for ByteString {
-    /// Determines if a [`ByteString`] is equal to a [`&[u8]`]
+    /// Determines if a [`ByteString`] is equal to a [`&[u8]`].
     #[inline(always)]
     fn eq(&self, slice: &&[u8]) -> bool {
         self.elements == *slice
@@ -255,7 +255,7 @@ impl PartialEq<&[u8]> for ByteString {
 }
 
 impl PartialEq<str> for ByteString {
-    /// Determines if a [`ByteString`] is equal to a [`str`]
+    /// Determines if a [`ByteString`] is equal to a [`str`].
     #[inline(always)]
     fn eq(&self, string: &str) -> bool {
         // TODO: handle encoding
@@ -264,7 +264,7 @@ impl PartialEq<str> for ByteString {
 }
 
 impl PartialEq<&str> for ByteString {
-    /// Determines if a [`ByteString`] is equal to a [`&str`]
+    /// Determines if a [`ByteString`] is equal to a [`&str`].
     #[inline(always)]
     fn eq(&self, string: &&str) -> bool {
         Self::eq(self, *string)

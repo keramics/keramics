@@ -18,7 +18,7 @@ use keramics_datetime::{DateTime, PosixTime32};
 
 use super::file_record::CpioFileRecord;
 
-/// Copy in and out (CPIO) portable ASCII file record
+/// Copy in and out (CPIO) portable ASCII file record.
 pub struct CpioPortableAsciiFileRecord {}
 
 impl CpioPortableAsciiFileRecord {

@@ -24,7 +24,7 @@ use super::inode_tree_branch_value::XfsInodeTreeBranchValue;
 use super::inode_tree_leaf_record::XfsInodeTreeLeafRecord;
 use super::superblock::XfsSuperblock;
 
-/// X File System (XFS) inode tree
+/// X File System (XFS) inode tree.
 pub struct XfsInodeTree {
     /// Format version.
     pub format_version: u16,

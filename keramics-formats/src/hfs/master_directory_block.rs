@@ -147,7 +147,7 @@ impl HfsMasterDirectoryBlock {
         self.extents_overflow_file_size = bytes_to_u32_be!(data, 130);
 
         for data_offset in (134..146).step_by(4) {
-            let data_end_offset = data_offset + 4;
+            let data_end_offset: usize = data_offset + 4;
 
             if data[data_offset..data_end_offset] == [0; 4] {
                 break;
@@ -175,7 +175,7 @@ impl HfsMasterDirectoryBlock {
         self.catalog_file_size = bytes_to_u32_be!(data, 146);
 
         for data_offset in (150..162).step_by(4) {
-            let data_end_offset = data_offset + 4;
+            let data_end_offset: usize = data_offset + 4;
 
             if data[data_offset..data_end_offset] == [0; 4] {
                 break;

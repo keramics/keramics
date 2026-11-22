@@ -61,7 +61,7 @@ use super::constants::*;
     ),
     methods("debug_read_data")
 )]
-/// BitLocker Drive Encryption (BDE) Used Disk Space Only encryption boot record
+/// BitLocker Drive Encryption (BDE) Used Disk Space Only encryption boot record.
 pub struct BdeBootRecordUsedDiskSpace {
     /// Bytes per sector.
     pub bytes_per_sector: u16,

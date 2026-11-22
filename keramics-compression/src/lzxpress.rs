@@ -175,7 +175,7 @@ impl LzxpressContext {
 
             compressed_data_offset += 4;
 
-            let mut compression_flags_mask = 0x80000000;
+            let mut compression_flags_mask: u32 = 0x80000000;
 
             for _ in 0..32 {
                 if compressed_data_offset >= compressed_data_size {

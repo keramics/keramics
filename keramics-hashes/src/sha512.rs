@@ -18,7 +18,7 @@
 use super::internal_sha512::InternalSha512Context;
 use super::traits::DigestHashContext;
 
-/// The first 64-bits of the fractional parts of the square roots of the primes in [2, 19]
+/// The first 64-bits of the fractional parts of the square roots of the primes in [2, 19].
 #[rustfmt::skip]
 const SHA512_PRIME_SQUARE_ROOTS: [u64; 8] = [
     0x6a09e667f3bcc908, 0xbb67ae8584caa73b, 0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,

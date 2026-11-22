@@ -636,7 +636,7 @@ impl HashTool {
 }
 
 fn main() -> ExitCode {
-    let arguments = CommandLineArguments::parse();
+    let arguments: CommandLineArguments = CommandLineArguments::parse();
 
     #[cfg(feature = "debug-trace")]
     {

@@ -94,7 +94,7 @@ use super::constants::*;
     ),
     methods("debug_read_data", "read_at_position")
 )]
-/// X File System (XFS) superblock
+/// X File System (XFS) superblock.
 pub struct XfsSuperblock {
     /// Block size.
     pub block_size: u32,

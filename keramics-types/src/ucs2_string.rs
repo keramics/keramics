@@ -57,7 +57,7 @@ impl Ucs2CharacterMappings {
 }
 
 impl From<&[(u16, u16)]> for Ucs2CharacterMappings {
-    /// Converts a [`&[(u16, u16)]`] into a [`Ucs2CharacterMappings`]
+    /// Converts a [`&[(u16, u16)]`] into a [`Ucs2CharacterMappings`].
     #[inline(always)]
     fn from(mappings: &[(u16, u16)]) -> Self {
         Self {
@@ -299,7 +299,7 @@ impl Ucs2String {
 }
 
 impl From<&[u16]> for Ucs2String {
-    /// Converts a [`&[u16]`] into a [`Ucs2String`]
+    /// Converts a [`&[u16]`] into a [`Ucs2String`].
     fn from(slice: &[u16]) -> Self {
         let elements: &[u16] = match slice.iter().position(|ucs2_value| *ucs2_value == 0) {
             Some(slice_index) => &slice[0..slice_index],
@@ -312,7 +312,7 @@ impl From<&[u16]> for Ucs2String {
 }
 
 impl From<&str> for Ucs2String {
-    /// Converts a [`&str`] into a [`Ucs2String`]
+    /// Converts a [`&str`] into a [`Ucs2String`].
     fn from(string: &str) -> Self {
         Self {
             elements: string.encode_utf16().collect::<Vec<u16>>(),
@@ -321,7 +321,7 @@ impl From<&str> for Ucs2String {
 }
 
 impl From<&String> for Ucs2String {
-    /// Converts a [`&String`] into a [`Ucs2String`]
+    /// Converts a [`&String`] into a [`Ucs2String`].
     #[inline(always)]
     fn from(string: &String) -> Self {
         Self::from(string.as_str())
@@ -329,7 +329,7 @@ impl From<&String> for Ucs2String {
 }
 
 impl PartialEq<&[u16]> for Ucs2String {
-    /// Determines if a [`Ucs2String`] is equal to a [`&[u16]`]
+    /// Determines if a [`Ucs2String`] is equal to a [`&[u16]`].
     #[inline(always)]
     fn eq(&self, slice: &&[u16]) -> bool {
         self.elements == *slice
@@ -337,7 +337,7 @@ impl PartialEq<&[u16]> for Ucs2String {
 }
 
 impl PartialEq<str> for Ucs2String {
-    /// Determines if a [`Ucs2String`] is equal to a [`str`]
+    /// Determines if a [`Ucs2String`] is equal to a [`str`].
     #[inline(always)]
     fn eq(&self, string: &str) -> bool {
         self.elements == string.encode_utf16().collect::<Vec<u16>>()
@@ -345,7 +345,7 @@ impl PartialEq<str> for Ucs2String {
 }
 
 impl PartialEq<&str> for Ucs2String {
-    /// Determines if a [`Ucs2String`] is equal to a [`&str`]
+    /// Determines if a [`Ucs2String`] is equal to a [`&str`].
     #[inline(always)]
     fn eq(&self, string: &&str) -> bool {
         Self::eq(self, *string)

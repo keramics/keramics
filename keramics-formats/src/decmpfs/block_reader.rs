@@ -107,7 +107,7 @@ impl DecmpfsBlockReader {
         block_size: usize,
         data: &mut [u8],
     ) -> Result<(), ErrorTrace> {
-        let mut compressed_data = vec![0; block_size];
+        let mut compressed_data: Vec<u8> = vec![0; block_size];
 
         keramics_core::data_stream_read_exact_at_position!(
             &self.data_stream,
@@ -133,7 +133,7 @@ impl DecmpfsBlockReader {
         }
         match self.compression_method {
             DecmpfsCompressionMethod::Lzfse => {
-                let mut context = LzfseContext::new();
+                let mut context: LzfseContext = LzfseContext::new();
 
                 match context.decompress(&compressed_data, data) {
                     Ok(_) => {}
@@ -147,7 +147,7 @@ impl DecmpfsBlockReader {
                 }
             }
             DecmpfsCompressionMethod::Lzvn => {
-                let mut context = LzvnContext::new();
+                let mut context: LzvnContext = LzvnContext::new();
 
                 match context.decompress(&compressed_data, data) {
                     Ok(_) => {}

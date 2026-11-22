@@ -109,7 +109,7 @@ mod tests {
         let file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let path: Path = Path::from("../test_data");
-        let _ = new_vfs_file_resolver(&file_system, path)?;
+        _ = new_vfs_file_resolver(&file_system, path)?;
 
         Ok(())
     }

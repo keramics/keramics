@@ -28,7 +28,7 @@ pub struct FatDirectoryEntry {
     /// Short name.
     pub short_name: FatShortNameDirectoryEntry,
 
-    /// Long name
+    /// Long name.
     pub long_name: Option<Ucs2String>,
 }
 

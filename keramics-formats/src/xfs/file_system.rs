@@ -26,7 +26,7 @@ use super::inode_information::XfsInodeInformation;
 use super::inode_tree::XfsInodeTree;
 use super::superblock::XfsSuperblock;
 
-/// X File System (XFS) file system
+/// X File System (XFS) file system.
 pub struct XfsFileSystem {
     /// Data stream.
     data_stream: Option<DataStreamReference>,

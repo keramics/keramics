@@ -63,7 +63,7 @@ impl HfsForkDescriptor {
         self.number_of_blocks = bytes_to_u32_be!(data, 12);
 
         for data_offset in (16..80).step_by(8) {
-            let data_end_offset = data_offset + 8;
+            let data_end_offset: usize = data_offset + 8;
 
             if data[data_offset..data_end_offset] == [0; 8] {
                 break;

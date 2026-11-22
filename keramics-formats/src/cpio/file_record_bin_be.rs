@@ -38,7 +38,7 @@ use super::file_record::CpioFileRecord;
     ),
     methods("debug_read_data")
 )]
-/// Copy in and out (CPIO) bit-endian binary file record
+/// Copy in and out (CPIO) big-endian binary file record.
 pub struct CpioBinaryFileRecordBigEndian {}
 
 impl CpioBinaryFileRecordBigEndian {

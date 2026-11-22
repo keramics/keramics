@@ -247,7 +247,7 @@ impl UdifFile {
             );
             let block_table_data_size: u32 = bytes_to_u32_be!(data, 0);
 
-            let mut block_table = UdifBlockTable::new();
+            let mut block_table: UdifBlockTable = UdifBlockTable::new();
 
             match block_table.read_at_position(
                 data_stream,

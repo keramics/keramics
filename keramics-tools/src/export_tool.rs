@@ -247,7 +247,7 @@ impl ExportTool {
 }
 
 fn main() -> ExitCode {
-    let arguments = CommandLineArguments::parse();
+    let arguments: CommandLineArguments = CommandLineArguments::parse();
 
     let source_string: &str = match arguments.source.to_str() {
         Some(value) => value,

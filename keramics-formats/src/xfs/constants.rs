@@ -11,31 +11,31 @@
  * under the License.
  */
 
-/// XFS superblock signature
+/// XFS superblock signature.
 pub(crate) const XFS_SUPERBLOCK_SIGNATURE: &[u8] = b"XFSB";
 
-/// XFS inode information signature
+/// XFS inode information signature.
 pub(super) const XFS_INODE_INFORMATION_SIGNATURE: &[u8] = b"XAGI";
 
 // XFS free block information signature
 // pub(super) const XFS_FREE_BLOCK_INFORMATION_SIGNATURE: &[u8] = b"XAGF";
 
-/// XFS extent B-tree node signature
+/// XFS extent B-tree node signature.
 pub(super) const XFS_EXTENT_TREE_SIGNATURE: &[u8] = b"BMAP";
 
-/// XFS extent B-tree node version 5 signature
+/// XFS extent B-tree node version 5 signature.
 pub(super) const XFS_EXTENT_TREE_V5_SIGNATURE: &[u8] = b"BMA3";
 
-/// XFS inode B-tree node signature
+/// XFS inode B-tree node signature.
 pub(super) const XFS_INODE_TREE_SIGNATURE: &[u8] = b"IABT";
 
-/// XFS inode B-tree node version 5 signature
+/// XFS inode B-tree node version 5 signature.
 pub(super) const XFS_INODE_TREE_V5_SIGNATURE: &[u8] = b"IAB3";
 
-/// XFS inode signature
+/// XFS inode signature.
 pub(super) const XFS_INODE_SIGNATURE: &[u8] = b"IN";
 
-/// XFS file mode types
+/// XFS file mode types.
 pub const XFS_FILE_MODE_TYPE_FIFO: u16 = 0x1000;
 pub const XFS_FILE_MODE_TYPE_CHARACTER_DEVICE: u16 = 0x2000;
 pub const XFS_FILE_MODE_TYPE_DIRECTORY: u16 = 0x4000;
@@ -44,7 +44,7 @@ pub const XFS_FILE_MODE_TYPE_REGULAR_FILE: u16 = 0x8000;
 pub const XFS_FILE_MODE_TYPE_SYMBOLIC_LINK: u16 = 0xa000;
 pub const XFS_FILE_MODE_TYPE_SOCKET: u16 = 0xc000;
 
-/// XFS fork types
+/// XFS fork types.
 pub const XFS_FORK_TYPE_DEVICE: u8 = 0;
 pub const XFS_FORK_TYPE_INLINE_DATA: u8 = 1;
 pub const XFS_FORK_TYPE_EXTENTS: u8 = 2;

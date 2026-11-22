@@ -44,7 +44,7 @@ use super::constants::*;
     ),
     methods("debug_read_data", "read_at_position")
 )]
-/// X File System (XFS) inode information
+/// X File System (XFS) inode information.
 pub struct XfsInodeInformation {
     /// Inode B-tree root block number.
     pub inode_btree_root_block_number: u32,

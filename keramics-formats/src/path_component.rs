@@ -464,7 +464,7 @@ impl PathComponent {
 }
 
 impl From<ByteString> for PathComponent {
-    /// Converts a [`ByteString`] into a [`PathComponent`]
+    /// Converts a [`ByteString`] into a [`PathComponent`].
     fn from(byte_string: ByteString) -> Self {
         match byte_string.elements.as_slice() {
             [0x2e] => Self::Current,
@@ -475,7 +475,7 @@ impl From<ByteString> for PathComponent {
 }
 
 impl From<&ByteString> for PathComponent {
-    /// Converts a [`&ByteString`] into a [`PathComponent`]
+    /// Converts a [`&ByteString`] into a [`PathComponent`].
     fn from(byte_string: &ByteString) -> Self {
         match byte_string.elements.as_slice() {
             [0x2e] => Self::Current,
@@ -486,7 +486,7 @@ impl From<&ByteString> for PathComponent {
 }
 
 impl From<OsString> for PathComponent {
-    /// Converts a [`OsString`] into a [`PathComponent`]
+    /// Converts a [`OsString`] into a [`PathComponent`].
     fn from(os_string: OsString) -> Self {
         if os_string.eq(".") {
             Self::Current
@@ -499,7 +499,7 @@ impl From<OsString> for PathComponent {
 }
 
 impl From<&OsStr> for PathComponent {
-    /// Converts a [`&OsStr`] into a [`PathComponent`]
+    /// Converts a [`&OsStr`] into a [`PathComponent`].
     fn from(os_str: &OsStr) -> Self {
         if os_str.eq(".") {
             Self::Current
@@ -512,7 +512,7 @@ impl From<&OsStr> for PathComponent {
 }
 
 impl From<&str> for PathComponent {
-    /// Converts a [`&str`] into a [`PathComponent`]
+    /// Converts a [`&str`] into a [`PathComponent`].
     fn from(string: &str) -> Self {
         match string {
             "." => Self::Current,
@@ -523,7 +523,7 @@ impl From<&str> for PathComponent {
 }
 
 impl From<String> for PathComponent {
-    /// Converts a [`String`] into a [`PathComponent`]
+    /// Converts a [`String`] into a [`PathComponent`].
     fn from(string: String) -> Self {
         match string.as_str() {
             "." => Self::Current,
@@ -534,7 +534,7 @@ impl From<String> for PathComponent {
 }
 
 impl From<&String> for PathComponent {
-    /// Converts a [`&String`] into a [`PathComponent`]
+    /// Converts a [`&String`] into a [`PathComponent`].
     fn from(string: &String) -> Self {
         match string.as_str() {
             "." => Self::Current,
@@ -545,7 +545,7 @@ impl From<&String> for PathComponent {
 }
 
 impl From<Ucs2String> for PathComponent {
-    /// Converts a [`Ucs2String`] into a [`PathComponent`]
+    /// Converts a [`Ucs2String`] into a [`PathComponent`].
     fn from(ucs2_string: Ucs2String) -> Self {
         match ucs2_string.elements.as_slice() {
             [0x002e] => Self::Current,
@@ -556,7 +556,7 @@ impl From<Ucs2String> for PathComponent {
 }
 
 impl From<&Ucs2String> for PathComponent {
-    /// Converts a [`&Ucs2String`] into a [`PathComponent`]
+    /// Converts a [`&Ucs2String`] into a [`PathComponent`].
     fn from(ucs2_string: &Ucs2String) -> Self {
         match ucs2_string.elements.as_slice() {
             [0x002e] => Self::Current,
@@ -567,7 +567,7 @@ impl From<&Ucs2String> for PathComponent {
 }
 
 impl From<Utf16String> for PathComponent {
-    /// Converts a [`Utf16String`] into a [`PathComponent`]
+    /// Converts a [`Utf16String`] into a [`PathComponent`].
     fn from(utf16_string: Utf16String) -> Self {
         match utf16_string.elements.as_slice() {
             [0x002e] => Self::Current,
@@ -578,7 +578,7 @@ impl From<Utf16String> for PathComponent {
 }
 
 impl From<&Utf16String> for PathComponent {
-    /// Converts a [`&Utf16String`] into a [`PathComponent`]
+    /// Converts a [`&Utf16String`] into a [`PathComponent`].
     fn from(utf16_string: &Utf16String) -> Self {
         match utf16_string.elements.as_slice() {
             [0x002e] => Self::Current,
@@ -589,7 +589,7 @@ impl From<&Utf16String> for PathComponent {
 }
 
 impl PartialEq<str> for PathComponent {
-    /// Determines if a [`PathComponent`] is equal to a [`str`]
+    /// Determines if a [`PathComponent`] is equal to a [`str`].
     #[inline(always)]
     fn eq(&self, other: &str) -> bool {
         Self::eq(self, &other)
@@ -597,7 +597,7 @@ impl PartialEq<str> for PathComponent {
 }
 
 impl PartialEq<&str> for PathComponent {
-    /// Determines if a [`PathComponent`] is equal to a [`&str`]
+    /// Determines if a [`PathComponent`] is equal to a [`&str`].
     #[inline(always)]
     fn eq(&self, other: &&str) -> bool {
         match self {
@@ -996,7 +996,6 @@ mod tests {
                 elements: b"test".to_vec(),
             }
         );
-
         Ok(())
     }
 

@@ -187,7 +187,7 @@ mod tests {
         let code_points: [u32; 8] = [0x4b, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x73];
 
         for encoding in encodings {
-            let _ = new_character_encoder(&encoding, &code_points);
+            _ = new_character_encoder(&encoding, &code_points);
         }
     }
 }

@@ -38,7 +38,7 @@ pub struct VhdxBlockReader {
     /// Block size.
     block_size: u32,
 
-    /// Number of entries per chunk;
+    /// Number of entries per chunk.
     entries_per_chunk: u64,
 
     /// Sector bitmap size.

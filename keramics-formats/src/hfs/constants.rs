@@ -29,7 +29,7 @@ pub(super) const HFS_CATALOG_FILE_IDENTIFIER: u32 = 4;
 /// HFS attributes file identifier (CNID).
 pub(super) const HFS_ATTRIBUTES_FILE_IDENTIFIER: u32 = 8;
 
-/// HFS file mode types
+/// HFS file mode types.
 pub const HFS_FILE_MODE_TYPE_FIFO: u16 = 0x1000;
 pub const HFS_FILE_MODE_TYPE_CHARACTER_DEVICE: u16 = 0x2000;
 pub const HFS_FILE_MODE_TYPE_DIRECTORY: u16 = 0x4000;

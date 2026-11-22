@@ -53,7 +53,7 @@ impl<'a> Iterator for DecoderUtf8<'a> {
         let code_point: u32 = match byte_value1 {
             0x00..=0x7f => byte_value1 as u32,
             0xc2..=0xdf => {
-                let byte_value2 = match self.bytes.get(byte_index) {
+                let byte_value2: u8 = match self.bytes.get(byte_index) {
                     Some(&byte_value) if (0x80..=0xbf).contains(&byte_value) => {
                         byte_index += 1;
                         byte_value
@@ -68,9 +68,9 @@ impl<'a> Iterator for DecoderUtf8<'a> {
                 (((byte_value1 & 0x1f) as u32) << 6) | ((byte_value2 & 0x3f) as u32)
             }
             0xe0..=0xef => {
-                let byte_value2 = match self.bytes.get(byte_index) {
+                let byte_value2: u8 = match self.bytes.get(byte_index) {
                     Some(&byte_value) => {
-                        let is_valid = match byte_value1 {
+                        let is_valid: bool = match byte_value1 {
                             0xe0 => (0xa0..=0xbf).contains(&byte_value),
                             0xed => (0x80..=0x9f).contains(&byte_value),
                             _ => (0x80..=0xbf).contains(&byte_value),
@@ -93,7 +93,7 @@ impl<'a> Iterator for DecoderUtf8<'a> {
                     }
                 };
 
-                let byte_value3 = match self.bytes.get(byte_index) {
+                let byte_value3: u8 = match self.bytes.get(byte_index) {
                     Some(&byte_value) if (0x80..=0xbf).contains(&byte_value) => {
                         byte_index += 1;
                         byte_value
@@ -110,9 +110,9 @@ impl<'a> Iterator for DecoderUtf8<'a> {
                     | ((byte_value3 & 0x3f) as u32)
             }
             0xf0..=0xf4 => {
-                let byte_value2 = match self.bytes.get(byte_index) {
+                let byte_value2: u8 = match self.bytes.get(byte_index) {
                     Some(&byte_value) => {
-                        let is_valid = match byte_value1 {
+                        let is_valid: bool = match byte_value1 {
                             0xf0 => (0x90..=0xbf).contains(&byte_value),
                             0xf4 => (0x80..=0x8f).contains(&byte_value),
                             _ => (0x80..=0xbf).contains(&byte_value),
@@ -134,7 +134,7 @@ impl<'a> Iterator for DecoderUtf8<'a> {
                         ))));
                     }
                 };
-                let byte_value3 = match self.bytes.get(byte_index) {
+                let byte_value3: u8 = match self.bytes.get(byte_index) {
                     Some(&byte_value) if (0x80..=0xbf).contains(&byte_value) => {
                         byte_index += 1;
                         byte_value
@@ -146,7 +146,7 @@ impl<'a> Iterator for DecoderUtf8<'a> {
                         ))));
                     }
                 };
-                let byte_value4 = match self.bytes.get(byte_index) {
+                let byte_value4: u8 = match self.bytes.get(byte_index) {
                     Some(&byte_value) if (0x80..=0xbf).contains(&byte_value) => {
                         byte_index += 1;
                         byte_value

@@ -187,7 +187,7 @@ mod tests {
         let byte_string: [u8; 8] = [b'K', b'e', b'r', b'a', b'm', b'i', b'c', b's'];
 
         for encoding in encodings {
-            let _ = new_character_decoder(&encoding, &byte_string);
+            _ = new_character_decoder(&encoding, &byte_string);
         }
     }
 }

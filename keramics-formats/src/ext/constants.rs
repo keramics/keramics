@@ -11,35 +11,35 @@
  * under the License.
  */
 
-/// ext superblock signature: "\x53\xef"
+/// ext superblock signature: "\x53\xef".
 pub(crate) const EXT_SUPERBLOCK_SIGNATURE: &[u8] = &[0x53, 0xef];
 
-/// ext extents header signature: "\x0a\xf3"
+/// ext extents header signature: "\x0a\xf3".
 pub(super) const EXT_EXTENTS_HEADER_SIGNATURE: &[u8] = &[0x0a, 0xf3];
 
-/// ext attribute inode or block header signature: "\x00\x00\x02\xea"
+/// ext attribute inode or block header signature: "\x00\x00\x02\xea".
 pub(super) const EXT_ATTRIBUTES_HEADER_SIGNATURE: &[u8] = &[0x00, 0x00, 0x02, 0xea];
 
-/// ext compatible feature flags
+/// ext compatible feature flags.
 pub const EXT_COMPATIBLE_FEATURE_FLAG_SPARSE_SUPERBLOCK2: u32 = 0x00000200;
 
-/// ext incompatible feature flags
+/// ext incompatible feature flags.
 pub const EXT_INCOMPATIBLE_FEATURE_FLAG_JOURNAL_DEVICE: u32 = 0x00000008;
 pub const EXT_INCOMPATIBLE_FEATURE_FLAG_HAS_META_BLOCK_GROUPS: u32 = 0x00000010;
 pub const EXT_INCOMPATIBLE_FEATURE_FLAG_64BIT_SUPPORT: u32 = 0x00000080;
 pub const EXT_INCOMPATIBLE_FEATURE_FLAG_HAS_FLEX_BLOCK_GROUPS: u32 = 0x00000200;
 pub const EXT_INCOMPATIBLE_FEATURE_FLAG_HAS_METADATA_CHECKSUM_SEED: u32 = 0x00002000;
 
-/// ext read-only compatible feature flags
+/// ext read-only compatible feature flags.
 pub const EXT_READ_ONLY_COMPATIBLE_FEATURE_FLAG_SPARSE_SUPERBLOCK: u32 = 0x00000001;
 pub const EXT_READ_ONLY_COMPATIBLE_FEATURE_FLAG_METADATA_CHECKSUM: u32 = 0x00000400;
 
-/// ext inode flags
+/// ext inode flags.
 pub(super) const EXT_INODE_FLAG_HAS_EXTENTS: u32 = 0x00080000;
 pub(super) const EXT_INODE_FLAG_IS_EXTENDED_ATTRIBUTE_INODE: u32 = 0x00200000;
 pub(super) const EXT_INODE_FLAG_INLINE_DATA: u32 = 0x10000000;
 
-/// ext file mode types
+/// ext file mode types.
 pub const EXT_FILE_MODE_TYPE_FIFO: u16 = 0x1000;
 pub const EXT_FILE_MODE_TYPE_CHARACTER_DEVICE: u16 = 0x2000;
 pub const EXT_FILE_MODE_TYPE_DIRECTORY: u16 = 0x4000;

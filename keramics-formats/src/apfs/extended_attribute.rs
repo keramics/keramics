@@ -65,7 +65,7 @@ mod tests {
         let test_struct: ApfsExtendedAttribute =
             ApfsExtendedAttribute::new(&test_name, data_stream);
 
-        let _ = test_struct.get_data_stream();
+        _ = test_struct.get_data_stream();
     }
 
     #[test]

@@ -31,10 +31,10 @@ use super::mft_attribute::NtfsMftAttribute;
 )]
 /// New Technologies File System (NTFS) volume information ($VOLUME_INFORMATION).
 pub struct NtfsVolumeInformation {
-    /// Major format version
+    /// Major format version.
     pub(super) major_format_version: u8,
 
-    /// Minor format version
+    /// Minor format version.
     pub(super) minor_format_version: u8,
 
     /// Volume flags.

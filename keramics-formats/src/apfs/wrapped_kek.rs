@@ -20,13 +20,13 @@ use super::key_bag_packed_value::ApfsKeyBagPackedValue;
 
 /// Apple File System (APFS) wrapped key encryption key (KEK).
 pub struct ApfsWrappedKek {
-    /// Flags
+    /// Flags.
     pub flags: u32,
 
     /// Salt.
     pub salt: Vec<u8>,
 
-    /// Number of iterations
+    /// Number of iterations.
     pub number_of_iterations: u64,
 
     /// Wrapped key data.

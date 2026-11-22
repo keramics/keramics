@@ -24,7 +24,7 @@ use super::extents_tree_branch_key::XfsExtentsTreeBranchKey;
 use super::extents_tree_branch_value::XfsExtentsTreeBranchValue;
 use super::packed_extent::XfsPackedExtent;
 
-/// X File System (XFS) extents tree
+/// X File System (XFS) extents tree.
 pub struct XfsExtentsTree {
     /// Format version.
     format_version: u16,

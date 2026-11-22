@@ -253,7 +253,7 @@ impl VmdkImageLayer {
         Ok(())
     }
 
-    /// Reads the descriptor
+    /// Reads the descriptor.
     fn read_descriptor(
         &mut self,
         data_stream: &DataStreamReference,

@@ -51,10 +51,10 @@ use super::constants::*;
 )]
 /// Virtual Disk Image (VDI) file header.
 pub struct VdiFileHeader {
-    /// Minor format version
+    /// Minor format version.
     pub minor_format_version: u16,
 
-    /// Major format version
+    /// Major format version.
     pub major_format_version: u16,
 
     /// Image type.

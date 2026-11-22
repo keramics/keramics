@@ -1056,7 +1056,7 @@ impl LzfseContext {
         literal_states.copy_from_slice(&decoder.literal_states);
 
         let number_of_bits: i32 = -decoder.literal_bits;
-        let _ = bitstream.get_value(number_of_bits as usize);
+        _ = bitstream.get_value(number_of_bits as usize);
 
         for literal_index in (0..decoder.number_of_literals).step_by(4) {
             for (literal_states_index, literal_state_entry) in literal_states.iter_mut().enumerate()
@@ -1130,7 +1130,7 @@ impl LzfseContext {
         let mut d_value_state: i32 = decoder.d_value_state as i32;
 
         let number_of_bits: i32 = -decoder.lmd_values_bits;
-        let _ = bitstream.get_value(number_of_bits as usize);
+        _ = bitstream.get_value(number_of_bits as usize);
 
         for _ in 0..decoder.number_of_lmd_values {
             // TODO: refactor to decoder.get_l_value?

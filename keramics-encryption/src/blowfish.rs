@@ -545,7 +545,7 @@ impl CryptCbc for BlowfishContext {
     }
 }
 
-/// Context for Blowfish-CBC
+/// Context for Blowfish-CBC.
 pub type BlowfishCbcContext = CbcContext<BlowfishContext, 8>;
 
 #[cfg(test)]

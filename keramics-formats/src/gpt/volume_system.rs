@@ -95,7 +95,7 @@ impl GptVolumeSystem {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        let mut partition_table_header = GptPartitionTableHeader::new();
+        let mut partition_table_header: GptPartitionTableHeader = GptPartitionTableHeader::new();
 
         if self.bytes_per_sector != 0 {
             match partition_table_header
@@ -131,7 +131,8 @@ impl GptVolumeSystem {
         let backup_partition_table_offset: u64 =
             partition_table_header.backup_header_block_number * self.bytes_per_sector as u64;
 
-        let mut backup_partition_table_header = GptPartitionTableHeader::new();
+        let mut backup_partition_table_header: GptPartitionTableHeader =
+            GptPartitionTableHeader::new();
 
         if backup_partition_table_offset > 0 {
             match backup_partition_table_header
@@ -194,7 +195,8 @@ impl GptVolumeSystem {
 
             crc32_context.update(&entry_data);
 
-            let mut partition_entry = GptPartitionEntry::new(entry_index as usize);
+            let mut partition_entry: GptPartitionEntry =
+                GptPartitionEntry::new(entry_index as usize);
 
             match partition_entry.read_data(&entry_data) {
                 Ok(_) => {}

@@ -11,7 +11,7 @@
  * under the License.
  */
 
-/// Header value type
+/// Header value type.
 #[derive(Eq, Hash, PartialEq)]
 pub enum EwfHeaderValueType {
     AcquisitionDate,
