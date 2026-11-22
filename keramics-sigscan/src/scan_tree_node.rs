@@ -170,7 +170,8 @@ impl ScanTreeNode {
     }
 
     /// Recursively retrieves the signatures.
-    #[allow(dead_code)]
+    // Used for testing.
+    #[cfg(test)]
     pub(super) fn get_signatures(&self) -> Vec<Arc<Signature>> {
         let mut signatures: Vec<Arc<Signature>> = Vec::new();
 
