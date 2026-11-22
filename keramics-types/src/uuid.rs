@@ -234,23 +234,47 @@ mod tests {
         assert_eq!(uuid, expected_uuid);
 
         // Test with unsupported string lengths.
-        assert!(Uuid::from_string("").is_err());
-        assert!(Uuid::from_string("b61f53ca").is_err());
-        assert!(Uuid::from_string("{b61f53ca-a786-4528-90e2-55ba791a1c4c").is_err());
-        assert!(Uuid::from_string("b61f53ca-a786-4528-90e2-55ba791a1c4c}").is_err());
+        let result: Result<Uuid, ErrorTrace> = Uuid::from_string("");
+        assert!(result.is_err());
+        let result: Result<Uuid, ErrorTrace> = Uuid::from_string("b61f53ca");
+        assert!(result.is_err());
+        let result: Result<Uuid, ErrorTrace> =
+            Uuid::from_string("{b61f53ca-a786-4528-90e2-55ba791a1c4c");
+        assert!(result.is_err());
+        let result: Result<Uuid, ErrorTrace> =
+            Uuid::from_string("b61f53ca-a786-4528-90e2-55ba791a1c4c}");
+        assert!(result.is_err());
 
         // Test with missing or invalid hyphen separators.
-        assert!(Uuid::from_string("b61f53caXa786-4528-90e2-5500791a1c4c").is_err());
-        assert!(Uuid::from_string("b61f53ca-a786X4528-90e2-5500791a1c4c").is_err());
-        assert!(Uuid::from_string("b61f53ca-a786-4528X90e2-5500791a1c4c").is_err());
-        assert!(Uuid::from_string("b61f53ca-a786-4528-90e2X5500791a1c4c").is_err());
+        let result: Result<Uuid, ErrorTrace> =
+            Uuid::from_string("b61f53caXa786-4528-90e2-5500791a1c4c");
+        assert!(result.is_err());
+        let result: Result<Uuid, ErrorTrace> =
+            Uuid::from_string("b61f53ca-a786X4528-90e2-5500791a1c4c");
+        assert!(result.is_err());
+        let result: Result<Uuid, ErrorTrace> =
+            Uuid::from_string("b61f53ca-a786-4528X90e2-5500791a1c4c");
+        assert!(result.is_err());
+        let result: Result<Uuid, ErrorTrace> =
+            Uuid::from_string("b61f53ca-a786-4528-90e2X5500791a1c4c");
+        assert!(result.is_err());
 
         // Test with invalid hexadecimal characters in each part.
-        assert!(Uuid::from_string("zzzzzzzz-a786-4528-90e2-5500791a1c4c").is_err());
-        assert!(Uuid::from_string("b61f53ca-zzzz-4528-90e2-5500791a1c4c").is_err());
-        assert!(Uuid::from_string("b61f53ca-a786-zzzz-90e2-5500791a1c4c").is_err());
-        assert!(Uuid::from_string("b61f53ca-a786-4528-zzzz-5500791a1c4c").is_err());
-        assert!(Uuid::from_string("b61f53ca-a786-4528-90e2-zzzzzzzzzzzz").is_err());
+        let result: Result<Uuid, ErrorTrace> =
+            Uuid::from_string("zzzzzzzz-a786-4528-90e2-5500791a1c4c");
+        assert!(result.is_err());
+        let result: Result<Uuid, ErrorTrace> =
+            Uuid::from_string("b61f53ca-zzzz-4528-90e2-5500791a1c4c");
+        assert!(result.is_err());
+        let result: Result<Uuid, ErrorTrace> =
+            Uuid::from_string("b61f53ca-a786-zzzz-90e2-5500791a1c4c");
+        assert!(result.is_err());
+        let result: Result<Uuid, ErrorTrace> =
+            Uuid::from_string("b61f53ca-a786-4528-zzzz-5500791a1c4c");
+        assert!(result.is_err());
+        let result: Result<Uuid, ErrorTrace> =
+            Uuid::from_string("b61f53ca-a786-4528-90e2-zzzzzzzzzzzz");
+        assert!(result.is_err());
 
         Ok(())
     }

@@ -112,22 +112,18 @@ mod tests {
         // Test with a path outside the UCS-2 range.
         let invalid_path_signature: PathFilterSignature =
             PathFilterSignature::new(Path::from("/\u{1f600}"), None);
-        assert!(
-            invalid_path_signature
-                .new_with_case_folding(&mappings)
-                .is_err()
-        );
+        let result: Result<PathFilterSignature, ErrorTrace> =
+            invalid_path_signature.new_with_case_folding(&mappings);
+        assert!(result.is_err());
 
         // Test with a data fork name outside the UCS-2 range.
         let invalid_fork_signature: PathFilterSignature = PathFilterSignature::new(
             Path::from("/Library/Caches"),
             Some(PathComponent::from("\u{1f600}")),
         );
-        assert!(
-            invalid_fork_signature
-                .new_with_case_folding(&mappings)
-                .is_err()
-        );
+        let result: Result<PathFilterSignature, ErrorTrace> =
+            invalid_fork_signature.new_with_case_folding(&mappings);
+        assert!(result.is_err());
 
         Ok(())
     }

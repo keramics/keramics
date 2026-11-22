@@ -319,7 +319,8 @@ mod tests {
             &[0],
         );
         let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
-        assert!(scan_tree_node.build(&component_table, &[0]).is_err());
+        let result: Result<(), ErrorTrace> = scan_tree_node.build(&component_table, &[0]);
+        assert!(result.is_err());
 
         // Path group with zero signatures returns an error.
         let mut component_table: ComponentTable =
@@ -333,7 +334,8 @@ mod tests {
             }
         }
         let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
-        assert!(scan_tree_node.build(&component_table, &[]).is_err());
+        let result: Result<(), ErrorTrace> = scan_tree_node.build(&component_table, &[]);
+        assert!(result.is_err());
 
         Ok(())
     }

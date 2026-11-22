@@ -133,7 +133,8 @@ mod tests {
         let mut missing_entries: OsDirectoryEntries = OsDirectoryEntries::new();
         let path_string: String = get_test_data_path("directory/bogus");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        assert!(missing_entries.read(&path_buf).is_err());
+        let result: Result<(), ErrorTrace> = missing_entries.read(&path_buf);
+        assert!(result.is_err());
 
         Ok(())
     }

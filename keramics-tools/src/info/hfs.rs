@@ -623,10 +623,12 @@ mod tests {
 
         HfsInfo::print_file_system(&data_stream)?;
         HfsInfo::print_file_entry_by_identifier(&data_stream, 20)?;
-        assert!(
-            HfsInfo::print_file_entry_by_identifier(&data_stream, u32::MAX as u64 + 1).is_err()
-        );
-        assert!(HfsInfo::print_file_entry_by_identifier(&data_stream, 999999).is_err());
+        let result: Result<(), ErrorTrace> =
+            HfsInfo::print_file_entry_by_identifier(&data_stream, u32::MAX as u64 + 1);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            HfsInfo::print_file_entry_by_identifier(&data_stream, 999999);
+        assert!(result.is_err());
 
         HfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/testfile1"))?;
         HfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/xattr1"))?;
@@ -638,21 +640,27 @@ mod tests {
         let wrapped_stream: DataStreamReference =
             open_os_data_stream(&PathBuf::from("../test_data/hfs/hfs_wrapped_hfsplus.raw"))?;
         HfsInfo::print_file_system(&wrapped_stream)?;
-        assert!(
-            HfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/nonexistent")).is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            HfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/nonexistent"));
+        assert!(result.is_err());
 
         HfsInfo::print_hierarchy(&data_stream, None)?;
         HfsInfo::print_hierarchy(&data_stream, Some(&String::from("/testdir1")))?;
-        assert!(
-            HfsInfo::print_hierarchy(&data_stream, Some(&String::from("/nonexistent"))).is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            HfsInfo::print_hierarchy(&data_stream, Some(&String::from("/nonexistent")));
+        assert!(result.is_err());
 
         let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
-        assert!(HfsInfo::print_file_system(&invalid_stream).is_err());
-        assert!(HfsInfo::print_file_entry_by_identifier(&invalid_stream, 2).is_err());
-        assert!(HfsInfo::print_file_entry_by_path(&invalid_stream, &Path::from("/")).is_err());
-        assert!(HfsInfo::print_hierarchy(&invalid_stream, None).is_err());
+        let result: Result<(), ErrorTrace> = HfsInfo::print_file_system(&invalid_stream);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            HfsInfo::print_file_entry_by_identifier(&invalid_stream, 2);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            HfsInfo::print_file_entry_by_path(&invalid_stream, &Path::from("/"));
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> = HfsInfo::print_hierarchy(&invalid_stream, None);
+        assert!(result.is_err());
 
         Ok(())
     }

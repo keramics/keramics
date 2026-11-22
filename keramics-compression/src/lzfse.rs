@@ -1329,7 +1329,8 @@ mod tests {
         let mut test_decoder: LzfseDecoder = LzfseDecoder::new();
 
         let bad_data: [u8; 41] = [0; 41];
-        assert!(test_header.read_data(&bad_data, &mut test_decoder).is_err());
+        let result: Result<(), ErrorTrace> = test_header.read_data(&bad_data, &mut test_decoder);
+        assert!(result.is_err());
 
         let test_data: [u8; 42] = [
             0xf2, 0x02, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x10, 0x00,
@@ -1356,16 +1357,14 @@ mod tests {
         let mut test_decoder: LzfseDecoder = LzfseDecoder::new();
 
         let bad_data: [u8; 23] = [0; 23];
-        assert!(test_header.read_data(&bad_data, &mut test_decoder).is_err());
+        let result: Result<(), ErrorTrace> = test_header.read_data(&bad_data, &mut test_decoder);
+        assert!(result.is_err());
 
         let mut test_data: [u8; 24] = [0; 24];
         let header_size: u32 = 16;
         test_data[16..20].copy_from_slice(&header_size.to_le_bytes());
-        assert!(
-            test_header
-                .read_data(&test_data, &mut test_decoder)
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> = test_header.read_data(&test_data, &mut test_decoder);
+        assert!(result.is_err());
     }
 
     #[test]

@@ -1302,26 +1302,32 @@ mod tests {
         NtfsInfo::print_file_entry_by_identifier(&data_stream, 3)?;
         NtfsInfo::print_file_entry_by_identifier(&data_stream, 5)?;
         NtfsInfo::print_file_entry_by_identifier(&data_stream, 66)?;
-        assert!(
-            NtfsInfo::print_file_entry_by_identifier(&data_stream, u32::MAX as u64 + 1).is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            NtfsInfo::print_file_entry_by_identifier(&data_stream, u32::MAX as u64 + 1);
+        assert!(result.is_err());
 
         NtfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/testdir1/testfile1"))?;
-        assert!(
-            NtfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/nonexistent")).is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            NtfsInfo::print_file_entry_by_path(&data_stream, &Path::from("/nonexistent"));
+        assert!(result.is_err());
 
         NtfsInfo::print_hierarchy(&data_stream, None)?;
         NtfsInfo::print_hierarchy(&data_stream, Some(&String::from("/testdir1")))?;
-        assert!(
-            NtfsInfo::print_hierarchy(&data_stream, Some(&String::from("/nonexistent"))).is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            NtfsInfo::print_hierarchy(&data_stream, Some(&String::from("/nonexistent")));
+        assert!(result.is_err());
 
         let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
-        assert!(NtfsInfo::print_file_system(&invalid_stream).is_err());
-        assert!(NtfsInfo::print_file_entry_by_identifier(&invalid_stream, 0).is_err());
-        assert!(NtfsInfo::print_file_entry_by_path(&invalid_stream, &Path::from("/")).is_err());
-        assert!(NtfsInfo::print_hierarchy(&invalid_stream, None).is_err());
+        let result: Result<(), ErrorTrace> = NtfsInfo::print_file_system(&invalid_stream);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            NtfsInfo::print_file_entry_by_identifier(&invalid_stream, 0);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            NtfsInfo::print_file_entry_by_path(&invalid_stream, &Path::from("/"));
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> = NtfsInfo::print_hierarchy(&invalid_stream, None);
+        assert!(result.is_err());
 
         Ok(())
     }

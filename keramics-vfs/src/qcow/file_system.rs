@@ -225,7 +225,8 @@ mod tests {
         let layer_entry: QcowFileEntry = qcow_file_system
             .get_file_entry_by_path(&Path::from("/qcow1"))?
             .unwrap();
-        assert!(layer_entry.get_sub_file_entry_by_index(0).is_err());
+        let result: Result<QcowFileEntry, ErrorTrace> = layer_entry.get_sub_file_entry_by_index(0);
+        assert!(result.is_err());
 
         Ok(())
     }

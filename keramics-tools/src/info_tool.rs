@@ -910,7 +910,9 @@ mod tests {
         );
         let bde_ntfs: HashSet<FormatIdentifier> =
             HashSet::from([FormatIdentifier::Bde, FormatIdentifier::Ntfs]);
-        assert!(info_tool.check_scan_results(&bde_ntfs).is_err());
+        let result: Result<Option<FormatIdentifier>, ErrorTrace> =
+            info_tool.check_scan_results(&bde_ntfs);
+        assert!(result.is_err());
 
         // Test UDIF signature disambiguation.
         let udif_hfs: HashSet<FormatIdentifier> =
@@ -921,10 +923,14 @@ mod tests {
         );
         let udif_unknown: HashSet<FormatIdentifier> =
             HashSet::from([FormatIdentifier::Udif, FormatIdentifier::Unknown]);
-        assert!(info_tool.check_scan_results(&udif_unknown).is_err());
+        let result: Result<Option<FormatIdentifier>, ErrorTrace> =
+            info_tool.check_scan_results(&udif_unknown);
+        assert!(result.is_err());
         let udif_vhd: HashSet<FormatIdentifier> =
             HashSet::from([FormatIdentifier::Udif, FormatIdentifier::Vhd]);
-        assert!(info_tool.check_scan_results(&udif_vhd).is_err());
+        let result: Result<Option<FormatIdentifier>, ErrorTrace> =
+            info_tool.check_scan_results(&udif_vhd);
+        assert!(result.is_err());
 
         // Test VHD signature disambiguation.
         let vhd_ntfs: HashSet<FormatIdentifier> =
@@ -935,10 +941,14 @@ mod tests {
         );
         let vhd_unknown: HashSet<FormatIdentifier> =
             HashSet::from([FormatIdentifier::Vhd, FormatIdentifier::Unknown]);
-        assert!(info_tool.check_scan_results(&vhd_unknown).is_err());
+        let result: Result<Option<FormatIdentifier>, ErrorTrace> =
+            info_tool.check_scan_results(&vhd_unknown);
+        assert!(result.is_err());
         let vhd_vhdx: HashSet<FormatIdentifier> =
             HashSet::from([FormatIdentifier::Vhd, FormatIdentifier::Vhdx]);
-        assert!(info_tool.check_scan_results(&vhd_vhdx).is_err());
+        let result: Result<Option<FormatIdentifier>, ErrorTrace> =
+            info_tool.check_scan_results(&vhd_vhdx);
+        assert!(result.is_err());
 
         // Test volsnap signature disambiguation.
         let volsnap_ntfs: HashSet<FormatIdentifier> =
@@ -949,12 +959,16 @@ mod tests {
         );
         let volsnap_fat: HashSet<FormatIdentifier> =
             HashSet::from([FormatIdentifier::Volsnap, FormatIdentifier::Fat]);
-        assert!(info_tool.check_scan_results(&volsnap_fat).is_err());
+        let result: Result<Option<FormatIdentifier>, ErrorTrace> =
+            info_tool.check_scan_results(&volsnap_fat);
+        assert!(result.is_err());
 
         // Test unresolvable multiple signatures.
         let ext_fat: HashSet<FormatIdentifier> =
             HashSet::from([FormatIdentifier::Ext, FormatIdentifier::Fat]);
-        assert!(info_tool.check_scan_results(&ext_fat).is_err());
+        let result: Result<Option<FormatIdentifier>, ErrorTrace> =
+            info_tool.check_scan_results(&ext_fat);
+        assert!(result.is_err());
 
         Ok(())
     }
@@ -966,7 +980,9 @@ mod tests {
 
         let file_name: PathComponent = info_tool.get_file_name(&ext_path)?;
         assert_eq!(file_name, PathComponent::from("ext2.raw"));
-        assert!(info_tool.get_file_name(&PathBuf::from("/")).is_err());
+        let result: Result<PathComponent, ErrorTrace> =
+            info_tool.get_file_name(&PathBuf::from("/"));
+        assert!(result.is_err());
 
         let data_stream: DataStreamReference = info_tool.get_data_stream(&ext_path, 0)?;
         let _file_resolver: FileResolverReference =
@@ -1017,8 +1033,12 @@ mod tests {
 
         // Test error cases with a nonexistent file.
         let missing_path: PathBuf = PathBuf::from("../test_data/nonexistent_file.raw");
-        assert!(info_tool.get_data_stream(&missing_path, 0).is_err());
-        assert!(contents_tool.get_data_stream(&missing_path, 0).is_err());
+        let result: Result<DataStreamReference, ErrorTrace> =
+            info_tool.get_data_stream(&missing_path, 0);
+        assert!(result.is_err());
+        let result: Result<DataStreamReference, ErrorTrace> =
+            contents_tool.get_data_stream(&missing_path, 0);
+        assert!(result.is_err());
 
         Ok(())
     }

@@ -1091,28 +1091,38 @@ mod tests {
         ApfsInfo::print_container(&data_stream)?;
         ApfsInfo::print_file_entry_by_identifier(&data_stream, 0, 18)?;
         ApfsInfo::print_file_entry_by_identifier(&data_stream, 1, 18)?;
-        assert!(ApfsInfo::print_file_entry_by_identifier(&data_stream, 99, 18).is_err());
-        assert!(ApfsInfo::print_file_entry_by_identifier(&data_stream, 1, 999999).is_err());
+        let result: Result<(), ErrorTrace> =
+            ApfsInfo::print_file_entry_by_identifier(&data_stream, 99, 18);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            ApfsInfo::print_file_entry_by_identifier(&data_stream, 1, 999999);
+        assert!(result.is_err());
 
         ApfsInfo::print_file_entry_by_path(&data_stream, 0, &Path::from("/testdir1/testfile1"))?;
         ApfsInfo::print_file_entry_by_path(&data_stream, 1, &Path::from("/testdir1/xattr1"))?;
-        assert!(ApfsInfo::print_file_entry_by_path(&data_stream, 99, &Path::from("/")).is_err());
-        assert!(
-            ApfsInfo::print_file_entry_by_path(&data_stream, 1, &Path::from("/nonexistent"))
-                .is_err()
-        );
+        let result: Result<(), ErrorTrace> =
+            ApfsInfo::print_file_entry_by_path(&data_stream, 99, &Path::from("/"));
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            ApfsInfo::print_file_entry_by_path(&data_stream, 1, &Path::from("/nonexistent"));
+        assert!(result.is_err());
 
         ApfsInfo::print_hierarchy(&data_stream, 0, &DisplayPathType::Index, None)?;
         ApfsInfo::print_hierarchy(&data_stream, 1, &DisplayPathType::Identifier, None)?;
         ApfsInfo::print_hierarchy(&data_stream, 2, &DisplayPathType::Index, None)?;
 
         let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
-        assert!(ApfsInfo::print_container(&invalid_stream).is_err());
-        assert!(ApfsInfo::print_file_entry_by_identifier(&invalid_stream, 0, 1).is_err());
-        assert!(ApfsInfo::print_file_entry_by_path(&invalid_stream, 0, &Path::from("/")).is_err());
-        assert!(
-            ApfsInfo::print_hierarchy(&invalid_stream, 0, &DisplayPathType::Index, None).is_err()
-        );
+        let result: Result<(), ErrorTrace> = ApfsInfo::print_container(&invalid_stream);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            ApfsInfo::print_file_entry_by_identifier(&invalid_stream, 0, 1);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            ApfsInfo::print_file_entry_by_path(&invalid_stream, 0, &Path::from("/"));
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            ApfsInfo::print_hierarchy(&invalid_stream, 0, &DisplayPathType::Index, None);
+        assert!(result.is_err());
 
         Ok(())
     }

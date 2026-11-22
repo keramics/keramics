@@ -241,11 +241,13 @@ mod tests {
     #[test]
     fn test_format_as_timestamp_unsupported() {
         let date_time: DateTime = DateTime::XfsBigtime(XfsBigtime::new(1281643591000000000));
-        assert!(Bodyfile::format_as_timestamp(Some(&date_time)).is_err());
+        let result: Result<String, ErrorTrace> = Bodyfile::format_as_timestamp(Some(&date_time));
+        assert!(result.is_err());
 
         let fake_time: SystemTime = SystemTime::now();
         let date_time: DateTime = DateTime::FakeTime(fake_time);
-        assert!(Bodyfile::format_as_timestamp(Some(&date_time)).is_err());
+        let result: Result<String, ErrorTrace> = Bodyfile::format_as_timestamp(Some(&date_time));
+        assert!(result.is_err());
     }
 
     #[test]

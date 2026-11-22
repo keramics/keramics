@@ -573,15 +573,35 @@ mod tests {
     fn test_decompress_errors() {
         let invalid_data: [u8; 8] = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff];
 
-        assert!(UtilTool::decompress(&CompressionType::Adc, &invalid_data).is_err());
-        assert!(UtilTool::decompress(&CompressionType::Bzip2, &invalid_data).is_err());
-        assert!(UtilTool::decompress(&CompressionType::Deflate, &invalid_data).is_err());
-        assert!(UtilTool::decompress(&CompressionType::Lzfse, &invalid_data).is_err());
-        assert!(UtilTool::decompress(&CompressionType::Lznt1, &invalid_data).is_err());
-        assert!(UtilTool::decompress(&CompressionType::Lzvn, &invalid_data).is_err());
-        assert!(UtilTool::decompress(&CompressionType::Lzx, &invalid_data).is_err());
-        assert!(UtilTool::decompress(&CompressionType::Lzxpress, &invalid_data).is_err());
-        assert!(UtilTool::decompress(&CompressionType::LzxpressHuffman, &invalid_data).is_err());
-        assert!(UtilTool::decompress(&CompressionType::Zlib, &invalid_data).is_err());
+        let result: Result<(), ErrorTrace> =
+            UtilTool::decompress(&CompressionType::Adc, &invalid_data);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            UtilTool::decompress(&CompressionType::Bzip2, &invalid_data);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            UtilTool::decompress(&CompressionType::Deflate, &invalid_data);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            UtilTool::decompress(&CompressionType::Lzfse, &invalid_data);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            UtilTool::decompress(&CompressionType::Lznt1, &invalid_data);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            UtilTool::decompress(&CompressionType::Lzvn, &invalid_data);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            UtilTool::decompress(&CompressionType::Lzx, &invalid_data);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            UtilTool::decompress(&CompressionType::Lzxpress, &invalid_data);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            UtilTool::decompress(&CompressionType::LzxpressHuffman, &invalid_data);
+        assert!(result.is_err());
+        let result: Result<(), ErrorTrace> =
+            UtilTool::decompress(&CompressionType::Zlib, &invalid_data);
+        assert!(result.is_err());
     }
 }

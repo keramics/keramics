@@ -671,7 +671,8 @@ mod tests {
         assert!(name.is_some());
 
         // Out-of-bounds index returns an error.
-        assert!(file_entry.get_sub_file_entry_by_index(99).is_err());
+        let result: Result<OsFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
 
         Ok(())
     }
