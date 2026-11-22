@@ -138,7 +138,7 @@ impl UdifBlockTableReader {
                     0,
                     UdifBlockRangeType::InFile,
                 ),
-                0x80000004..0x80000008 => {
+                0x80000004..=0x80000008 => {
                     if block_table_entry.number_of_sectors > 2048 {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Unsupported compressed block table entry: {} - number of sectors value out of bounds",
@@ -173,5 +173,123 @@ impl UdifBlockTableReader {
             self.media_sector += block_table_entry.number_of_sectors;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::udif::block_table_entry::UdifBlockTableEntry;
+
+    fn get_test_block_table_entry(
+        entry_type: u32,
+        start_sector: u64,
+        number_of_sectors: u64,
+        data_offset: u64,
+        data_size: u64,
+    ) -> UdifBlockTableEntry {
+        UdifBlockTableEntry {
+            entry_type,
+            start_sector,
+            number_of_sectors,
+            data_offset,
+            data_size,
+        }
+    }
+
+    #[test]
+    fn test_process_block_table_with_lzma() -> Result<(), ErrorTrace> {
+        let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
+        assert_eq!(reader.get_compression_method(), UdifCompressionMethod::None);
+
+        let block_table: UdifBlockTable = UdifBlockTable {
+            start_sector: 0,
+            entries: vec![
+                get_test_block_table_entry(0x7ffffffe, 0, 0, 0, 0),
+                get_test_block_table_entry(0x80000008, 0, 2, 0, 128),
+                get_test_block_table_entry(0x00000001, 2, 1, 128, 512),
+                get_test_block_table_entry(0x00000000, 3, 1, 0, 0),
+                get_test_block_table_entry(0x00000002, 4, 1, 0, 0),
+                get_test_block_table_entry(0xffffffff, 5, 0, 0, 0),
+            ],
+        };
+        reader.process_block_table(&block_table)?;
+
+        assert_eq!(reader.get_compression_method(), UdifCompressionMethod::Lzma);
+        assert_eq!(reader.get_media_size(), 5 * 512);
+        assert_eq!(reader.block_ranges.len(), 4);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_process_block_table_with_errors() {
+        // Start sector out of bounds.
+        let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
+        let block_table: UdifBlockTable = UdifBlockTable {
+            start_sector: 1,
+            entries: Vec::new(),
+        };
+        assert!(reader.process_block_table(&block_table).is_err());
+
+        // Entry start sector out of bounds.
+        let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
+        let block_table: UdifBlockTable = UdifBlockTable {
+            start_sector: 0,
+            entries: vec![get_test_block_table_entry(0x00000000, 1, 1, 0, 0)],
+        };
+        assert!(reader.process_block_table(&block_table).is_err());
+
+        // Number of sectors is zero.
+        let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
+        let block_table: UdifBlockTable = UdifBlockTable {
+            start_sector: 0,
+            entries: vec![get_test_block_table_entry(0x00000000, 0, 0, 0, 0)],
+        };
+        assert!(reader.process_block_table(&block_table).is_err());
+
+        // Data offset out of bounds.
+        let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
+        let block_table: UdifBlockTable = UdifBlockTable {
+            start_sector: 0,
+            entries: vec![get_test_block_table_entry(0x80000008, 0, 1, 4096, 16)],
+        };
+        assert!(reader.process_block_table(&block_table).is_err());
+
+        // Data size out of bounds.
+        let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
+        let block_table: UdifBlockTable = UdifBlockTable {
+            start_sector: 0,
+            entries: vec![get_test_block_table_entry(0x80000008, 0, 1, 4000, 100)],
+        };
+        assert!(reader.process_block_table(&block_table).is_err());
+
+        // Compressed entry number of sectors > 2048.
+        let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
+        let block_table: UdifBlockTable = UdifBlockTable {
+            start_sector: 0,
+            entries: vec![get_test_block_table_entry(0x80000008, 0, 2049, 0, 100)],
+        };
+        assert!(reader.process_block_table(&block_table).is_err());
+
+        // Mixed compression methods (LZMA followed by zlib).
+        let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
+        let block_table: UdifBlockTable = UdifBlockTable {
+            start_sector: 0,
+            entries: vec![
+                get_test_block_table_entry(0x80000008, 0, 1, 0, 100),
+                get_test_block_table_entry(0x80000005, 1, 1, 100, 100),
+            ],
+        };
+        assert!(reader.process_block_table(&block_table).is_err());
+
+        // Unsupported entry type.
+        let mut reader: UdifBlockTableReader = UdifBlockTableReader::new(512, 4096);
+        let block_table: UdifBlockTable = UdifBlockTable {
+            start_sector: 0,
+            entries: vec![get_test_block_table_entry(0x80000009, 0, 1, 0, 100)],
+        };
+        assert!(reader.process_block_table(&block_table).is_err());
     }
 }

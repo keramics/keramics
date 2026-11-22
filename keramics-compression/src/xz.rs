@@ -1,0 +1,2357 @@
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may
+ * obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+
+//! xz decompression.
+//!
+//! Provides decompression support for xz (LZMA2) compressed data.
+
+use keramics_checksums::ReversedCrc32Context;
+use keramics_core::{DebugTrace, DebugTraceScope, ErrorTrace};
+use keramics_layout_map::LayoutMap;
+use keramics_types::{bytes_to_u16_be, bytes_to_u32_le};
+
+use super::lzma::LzmaDecoder;
+
+/// xz stream header signature.
+const XZ_STREAM_HEADER_SIGNATURE: &[u8] = b"\xfd7zXZ\x00";
+
+/// Size of the xz stream header in bytes.
+const XZ_STREAM_HEADER_SIZE: usize = 12;
+
+/// xz stream footer signature.
+const XZ_STREAM_FOOTER_SIGNATURE: &[u8] = b"YZ";
+
+/// Size of the xz stream footer in bytes.
+const XZ_STREAM_FOOTER_SIZE: usize = 12;
+
+/// LZMA2 filter identifier.
+const XZ_LZMA2_FILTER_IDENTIFIER: u64 = 0x21;
+
+/// Minimum block header size in bytes.
+const XZ_MINIMUM_BLOCK_HEADER_SIZE: usize = 8;
+
+/// Maximum block header size in bytes.
+const XZ_MAXIMUM_BLOCK_HEADER_SIZE: usize = 1024;
+
+/// Maximum number of bytes used to encode a variable-length integer.
+const XZ_MAXIMUM_VARIABLE_LENGTH_INTEGER_SIZE: usize = 9;
+
+/// xz checksum type: none.
+const XZ_CHECKSUM_TYPE_NONE: u8 = 0;
+
+/// xz checksum type: CRC32.
+const XZ_CHECKSUM_TYPE_CRC32: u8 = 1;
+
+/// Reads a variable-length integer (up to 9 bytes) at offset.
+fn read_variable_length_integer(data: &[u8], offset: usize) -> Result<(u64, usize), ErrorTrace> {
+    let mut value: u64 = 0;
+    let mut shift: usize = 0;
+    let mut byte_offset: usize = offset;
+    let mut number_of_bytes: usize = 0;
+
+    loop {
+        if byte_offset >= data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        if number_of_bytes >= XZ_MAXIMUM_VARIABLE_LENGTH_INTEGER_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid variable-length integer: too many bytes"
+            ));
+        }
+        let byte_value: u8 = data[byte_offset];
+        byte_offset += 1;
+        number_of_bytes += 1;
+
+        if shift < 63 {
+            value |= ((byte_value & 0x7f) as u64) << shift;
+        }
+        if byte_value & 0x80 == 0x00 {
+            // A continuation of a multi-byte variable-length integer must not end with a 0-byte
+            // (non-canonical encoding).
+            if number_of_bytes > 1 && byte_value == 0x00 {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid variable-length integer: non-canonical encoding"
+                ));
+            }
+            break;
+        }
+        shift += 7;
+    }
+    Ok((value, byte_offset))
+}
+
+#[derive(LayoutMap)]
+#[layout_map(
+    structure(
+        byte_order = "little",
+        field(name = "signature", data_type = "[u8; 6]", format = "hex"),
+        field(name = "stream_flags", data_type = "[u8; 2]", format = "hex"),
+        field(name = "checksum", data_type = "u32", format = "hex"),
+    ),
+    methods("debug_read_data")
+)]
+/// Stream header used by xz compressed data.
+struct XzStreamHeader {
+    /// Stream checksum type.
+    pub checksum_type: u8,
+
+    /// Size of the block checksum in bytes.
+    pub checksum_size: usize,
+}
+
+impl XzStreamHeader {
+    /// Creates a new stream header.
+    pub fn new() -> Self {
+        Self {
+            checksum_type: 0,
+            checksum_size: 0,
+        }
+    }
+
+    /// Reads the stream header.
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        if data.len() < XZ_STREAM_HEADER_SIZE {
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
+        }
+        if &data[0..6] != XZ_STREAM_HEADER_SIGNATURE {
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
+        }
+        let flags_byte1: u8 = data[6];
+        let flags_byte2: u8 = data[7];
+
+        // The first byte of stream flags is always a 0-byte.
+        if flags_byte1 != 0x00 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid stream flags: first byte must be zero"
+            ));
+        }
+        // The upper 4 bits of the second byte are reserved.
+        if flags_byte2 & 0xf0 != 0x00 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid stream flags: reserved bits are set"
+            ));
+        }
+        let checksum_type: u8 = flags_byte2 & 0x0f;
+
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(&data[6..8]);
+
+        let calculated_checksum: u32 = crc32_context.finalize();
+        let stored_checksum: u32 = bytes_to_u32_le!(data, 8);
+
+        if stored_checksum != calculated_checksum {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} stream header checksums",
+                stored_checksum, calculated_checksum
+            )));
+        }
+        let checksum_size: usize = match checksum_type {
+            XZ_CHECKSUM_TYPE_NONE => 0,
+            XZ_CHECKSUM_TYPE_CRC32 => 4,
+            _ => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported checksum type: 0x{:02x}",
+                    checksum_type
+                )));
+            }
+        };
+        self.checksum_type = checksum_type;
+        self.checksum_size = checksum_size;
+
+        Ok(())
+    }
+}
+
+/// Block header used by xz compressed data.
+struct XzBlockHeader {
+    /// Size of the block header in bytes.
+    pub header_size: usize,
+
+    /// Stored compressed size, if present.
+    pub compressed_size: Option<u64>,
+
+    /// Stored uncompressed size, if present.
+    pub uncompressed_size: Option<u64>,
+}
+
+impl XzBlockHeader {
+    /// Creates a new block header.
+    pub fn new() -> Self {
+        Self {
+            header_size: 0,
+            compressed_size: None,
+            uncompressed_size: None,
+        }
+    }
+
+    /// Reads the block header.
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        if data.is_empty() {
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
+        }
+        let size_byte: u8 = data[0];
+        let header_size: usize = ((size_byte as usize) + 1) * 4;
+
+        if !(XZ_MINIMUM_BLOCK_HEADER_SIZE..=XZ_MAXIMUM_BLOCK_HEADER_SIZE).contains(&header_size) {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid block header size: 0x{:02x} value out of bounds",
+                size_byte
+            )));
+        }
+        if data.len() < header_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        let mut data_offset: usize = 1;
+        let flags: u8 = data[data_offset];
+        data_offset += 1;
+
+        let number_of_filters: usize = ((flags & 0x03) as usize) + 1;
+
+        if flags & 0x3c != 0x00 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid block flags: 0x{:02x} reserved bits are set",
+                flags
+            )));
+        }
+        let compressed_size: Option<u64> = if flags & 0x40 != 0 {
+            let (value, next_offset): (u64, usize) =
+                match read_variable_length_integer(data, data_offset) {
+                    Ok((value, next_offset)) => (value, next_offset),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read variable-length integer"
+                        );
+                        return Err(error);
+                    }
+                };
+            data_offset = next_offset;
+
+            Some(value)
+        } else {
+            None
+        };
+        let uncompressed_size: Option<u64> = if flags & 0x80 != 0 {
+            let (value, next_offset): (u64, usize) =
+                match read_variable_length_integer(data, data_offset) {
+                    Ok((value, next_offset)) => (value, next_offset),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read variable-length integer"
+                        );
+                        return Err(error);
+                    }
+                };
+            data_offset = next_offset;
+
+            Some(value)
+        } else {
+            None
+        };
+        // Currently only a single filter chain consisting of the LZMA2 filter is supported.
+        if number_of_filters != 1 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported number of filters: {}",
+                number_of_filters
+            )));
+        }
+        if data_offset >= header_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        let (filter_identifier, next_offset): (u64, usize) =
+            match read_variable_length_integer(data, data_offset) {
+                Ok((filter_identifier, next_offset)) => (filter_identifier, next_offset),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read variable-length integer"
+                    );
+                    return Err(error);
+                }
+            };
+        data_offset = next_offset;
+
+        let (properties_size, next_offset): (u64, usize) =
+            match read_variable_length_integer(data, data_offset) {
+                Ok((properties_size, next_offset)) => (properties_size, next_offset),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read variable-length integer"
+                    );
+                    return Err(error);
+                }
+            };
+        data_offset = next_offset;
+
+        if data_offset + (properties_size as usize) > header_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        let filter_properties: &[u8] = &data[data_offset..data_offset + (properties_size as usize)];
+        data_offset += properties_size as usize;
+
+        if filter_identifier != XZ_LZMA2_FILTER_IDENTIFIER || properties_size != 1 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported filter identifier: 0x{:02x}",
+                filter_identifier
+            )));
+        }
+        let lzma2_properties: u8 = filter_properties[0];
+
+        // The upper 2 bits of the LZMA2 filter properties byte are reserved and the raw dictionary
+        // size value must be 0 to 40.
+        if lzma2_properties & 0xc0 != 0x00 || lzma2_properties & 0x3f > 40 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid LZMA2 filter properties: 0x{:02x}",
+                lzma2_properties
+            )));
+        }
+        // Header padding (up to header_size - 4) must be 0-bytes.
+        if data_offset > header_size - 4 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        for padding_byte in &data[data_offset..header_size - 4] {
+            if *padding_byte != 0x00 {
+                return Err(keramics_core::error_trace_new!(
+                    "Non 0-byte in block header padding"
+                ));
+            }
+        }
+        // The block header CRC32 is calculated over the entire block header
+        // field except the CRC32 field itself.
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(&data[0..header_size - 4]);
+
+        let calculated_checksum: u32 = crc32_context.finalize();
+        let stored_checksum: u32 = bytes_to_u32_le!(data, header_size - 4);
+
+        if stored_checksum != calculated_checksum {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} block header checksums",
+                stored_checksum, calculated_checksum
+            )));
+        }
+        self.header_size = header_size;
+        self.compressed_size = compressed_size;
+        self.uncompressed_size = uncompressed_size;
+
+        Ok(())
+    }
+
+    /// Verifies that the stored block sizes (if defined) match the decoded sizes.
+    pub fn verify_stored_sizes(
+        &self,
+        compressed_data_size: usize,
+        uncompressed_data_size: usize,
+    ) -> Result<(), ErrorTrace> {
+        if let Some(stored_compressed_size) = self.compressed_size {
+            if stored_compressed_size != compressed_data_size as u64 {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between stored: {} and calculated: {} compressed sizes",
+                    stored_compressed_size, compressed_data_size
+                )));
+            }
+        }
+        if let Some(stored_uncompressed_size) = self.uncompressed_size {
+            if stored_uncompressed_size != uncompressed_data_size as u64 {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between stored: {} and calculated: {} uncompressed sizes",
+                    stored_uncompressed_size, uncompressed_data_size
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(LayoutMap)]
+#[layout_map(
+    structure(
+        byte_order = "little",
+        field(name = "checksum", data_type = "u32", format = "hex"),
+        field(name = "backward_size", data_type = "u32"),
+        field(name = "stream_flags", data_type = "[u8; 2]", format = "hex"),
+        field(name = "signature", data_type = "[u8; 2]", format = "char"),
+    ),
+    methods("debug_read_data")
+)]
+/// Stream footer used by xz compressed data.
+struct XzStreamFooter {
+    /// Size of the index in bytes calculated from the backward size.
+    pub index_size: usize,
+
+    /// Stream checksum type.
+    pub checksum_type: u8,
+}
+
+impl XzStreamFooter {
+    /// Creates a new stream footer.
+    pub fn new() -> Self {
+        Self {
+            index_size: 0,
+            checksum_type: 0,
+        }
+    }
+
+    /// Reads the stream footer.
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        if data.len() < XZ_STREAM_FOOTER_SIZE {
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
+        }
+        // CRC32 is calculated over the backward size and stream flags.
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(&data[4..10]);
+
+        let calculated_checksum: u32 = crc32_context.finalize();
+        let stored_checksum: u32 = bytes_to_u32_le!(data, 0);
+
+        if stored_checksum != calculated_checksum {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} stream footer checksums",
+                stored_checksum, calculated_checksum
+            )));
+        }
+        let backward_size: u32 = bytes_to_u32_le!(data, 4);
+        let flags_byte1: u8 = data[8];
+        let flags_byte2: u8 = data[9];
+
+        // The first byte of stream flags is always a 0-byte.
+        if flags_byte1 != 0x00 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid stream footer flags: reserved bits are set"
+            ));
+        }
+        if flags_byte2 & 0xf0 != 0x00 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid stream footer flags: reserved bits are set"
+            ));
+        }
+        if &data[10..12] != XZ_STREAM_FOOTER_SIGNATURE {
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
+        }
+        // Index size is (backward size + 1) * 4.
+        self.index_size = ((backward_size as usize) + 1) * 4;
+        self.checksum_type = flags_byte2 & 0x0f;
+
+        Ok(())
+    }
+
+    /// Verifies that the stream footer matches the index and the stream header.
+    pub fn verify_stream(&self, index_size: usize, checksum_type: u8) -> Result<(), ErrorTrace> {
+        if self.index_size != index_size {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between calculated index size: {} and stream footer backward size: {}",
+                index_size, self.index_size
+            )));
+        }
+        if self.checksum_type != checksum_type {
+            return Err(keramics_core::error_trace_new!(
+                "Mismatch between stream footer and stream header flags"
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Context for decompressing xz (LZMA2) compressed data.
+pub struct XzContext {
+    /// Uncompressed data size.
+    pub uncompressed_data_size: usize,
+}
+
+impl XzContext {
+    /// Creates a new context.
+    pub fn new() -> Self {
+        Self {
+            uncompressed_data_size: 0,
+        }
+    }
+
+    /// Decompress data.
+    pub fn decompress(
+        &mut self,
+        compressed_data: &[u8],
+        uncompressed_data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        let compressed_data_size: usize = compressed_data.len();
+
+        if compressed_data_size < XZ_STREAM_HEADER_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        keramics_core::debug_trace_data_and_structure!(
+            "XzStreamHeader",
+            0,
+            &compressed_data[0..XZ_STREAM_HEADER_SIZE],
+            XZ_STREAM_HEADER_SIZE,
+            XzStreamHeader::debug_read_data(compressed_data)
+        );
+        let mut stream_header: XzStreamHeader = XzStreamHeader::new();
+
+        match stream_header.read_data(compressed_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read stream header");
+                return Err(error);
+            }
+        }
+        let mut compressed_data_offset: usize = XZ_STREAM_HEADER_SIZE;
+        let mut uncompressed_data_offset: usize = 0;
+        let uncompressed_data_size: usize = uncompressed_data.len();
+        let mut records: Vec<(u64, u64)> = Vec::new();
+
+        // The blocks are terminated by the index indicator (0x00).
+        loop {
+            if compressed_data_offset >= compressed_data_size {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid compressed data value too small"
+                ));
+            }
+            if compressed_data[compressed_data_offset] == 0x00 {
+                break;
+            }
+            let block_header_offset: usize = compressed_data_offset;
+            let mut block_header: XzBlockHeader = XzBlockHeader::new();
+
+            match block_header.read_data(&compressed_data[compressed_data_offset..]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read block header");
+                    return Err(error);
+                }
+            }
+            keramics_core::debug_trace_data!(
+                "XzBlockHeader",
+                block_header_offset as u64,
+                &compressed_data
+                    [block_header_offset..block_header_offset + block_header.header_size],
+                block_header.header_size
+            );
+            compressed_data_offset += block_header.header_size;
+
+            let block_uncompressed_data_offset: usize = uncompressed_data_offset;
+            let (block_compressed_data_size, block_uncompressed_data_size): (usize, usize) =
+                match self.decompress_block_data(
+                    compressed_data,
+                    compressed_data_offset,
+                    uncompressed_data,
+                    uncompressed_data_size,
+                    block_uncompressed_data_offset,
+                ) {
+                    Ok(sizes) => sizes,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress block data"
+                        );
+                        return Err(error);
+                    }
+                };
+            compressed_data_offset += block_compressed_data_size;
+
+            match block_header
+                .verify_stored_sizes(block_compressed_data_size, block_uncompressed_data_size)
+            {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to verify stored sizes");
+                    return Err(error);
+                }
+            }
+            let unpadded_size: u64 = (block_header.header_size as u64)
+                + (block_compressed_data_size as u64)
+                + (stream_header.checksum_size as u64);
+            let block_padding_size: usize = match Self::read_block_padding(
+                compressed_data,
+                compressed_data_offset,
+                block_header_offset,
+                unpadded_size,
+            ) {
+                Ok(block_padding_size) => block_padding_size,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read block padding");
+                    return Err(error);
+                }
+            };
+            compressed_data_offset += block_padding_size;
+
+            let checksum_size: usize = match Self::verify_block_checksum(
+                stream_header.checksum_type,
+                compressed_data,
+                compressed_data_offset,
+                &uncompressed_data[block_uncompressed_data_offset
+                    ..block_uncompressed_data_offset + block_uncompressed_data_size],
+            ) {
+                Ok(checksum_size) => checksum_size,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to verify block checksum");
+                    return Err(error);
+                }
+            };
+            compressed_data_offset += checksum_size;
+
+            records.push((unpadded_size, block_uncompressed_data_size as u64));
+            uncompressed_data_offset += block_uncompressed_data_size;
+        }
+        let index_size: usize =
+            match Self::read_index(compressed_data, compressed_data_offset, &records) {
+                Ok(index_size) => index_size,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read index");
+                    return Err(error);
+                }
+            };
+        compressed_data_offset += index_size;
+
+        if compressed_data_offset + XZ_STREAM_FOOTER_SIZE > compressed_data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        keramics_core::debug_trace_data_and_structure!(
+            "XzStreamFooter",
+            compressed_data_offset as u64,
+            &compressed_data
+                [compressed_data_offset..compressed_data_offset + XZ_STREAM_FOOTER_SIZE],
+            XZ_STREAM_FOOTER_SIZE,
+            XzStreamFooter::debug_read_data(&compressed_data[compressed_data_offset..])
+        );
+        let mut stream_footer: XzStreamFooter = XzStreamFooter::new();
+
+        match stream_footer.read_data(&compressed_data[compressed_data_offset..]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read stream footer");
+                return Err(error);
+            }
+        }
+        match stream_footer.verify_stream(index_size, stream_header.checksum_type) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to verify stream footer");
+                return Err(error);
+            }
+        }
+        // Note that the decompressor is strict. The stream must end exactly at the end of the
+        // footer. Trailing data, including trailing (padding) bytes, is rejected.
+        if compressed_data_offset + XZ_STREAM_FOOTER_SIZE != compressed_data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Trailing data after end of xz stream"
+            ));
+        }
+        if uncompressed_data_offset != uncompressed_data_size {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between calculated: {} and expected: {} uncompressed data sizes",
+                uncompressed_data_offset, uncompressed_data_size
+            )));
+        }
+        self.uncompressed_data_size = uncompressed_data_offset;
+
+        Ok(())
+    }
+
+    /// Decompresses the LZMA2 chunks of a block.
+    fn decompress_block_data(
+        &mut self,
+        data: &[u8],
+        offset: usize,
+        uncompressed_data: &mut [u8],
+        uncompressed_data_size: usize,
+        block_uncompressed_data_offset: usize,
+    ) -> Result<(usize, usize), ErrorTrace> {
+        let compressed_data_start_offset: usize = offset;
+        let mut data_offset: usize = offset;
+        let mut uncompressed_data_offset: usize = block_uncompressed_data_offset;
+
+        // LZMA2 chunk state.
+        let mut need_properties: bool = true;
+        let mut need_dictionary_reset: bool = true;
+        let mut dictionary_start_offset: usize = block_uncompressed_data_offset;
+        let mut lzma_decoder: Option<LzmaDecoder> = None;
+
+        DebugTrace::scope(|debug_trace| {
+            loop {
+                if data_offset >= data.len() {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid compressed data value too small"
+                    ));
+                }
+                let control: u8 = data[data_offset];
+                data_offset += 1;
+
+                // End marker.
+                if control == 0x00 {
+                    break;
+                }
+                if control >= 0xe0 || control == 0x01 {
+                    need_properties = true;
+                    need_dictionary_reset = true;
+                } else if need_dictionary_reset {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid LZMA2 chunk: dictionary reset required"
+                    ));
+                }
+                if control >= 0x80 {
+                    // LZMA chunk.
+                    match Self::decompress_lzma_chunk(
+                        debug_trace,
+                        data,
+                        &mut data_offset,
+                        uncompressed_data,
+                        uncompressed_data_size,
+                        &mut uncompressed_data_offset,
+                        &mut dictionary_start_offset,
+                        control,
+                        &mut need_properties,
+                        &mut need_dictionary_reset,
+                        &mut lzma_decoder,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to decompress LZMA chunk"
+                            );
+                            return Err(error);
+                        }
+                    }
+                } else {
+                    // Uncompressed chunk.
+                    match Self::decompress_uncompressed_chunk(
+                        data,
+                        &mut data_offset,
+                        uncompressed_data,
+                        uncompressed_data_size,
+                        &mut uncompressed_data_offset,
+                        &mut dictionary_start_offset,
+                        control,
+                        &mut need_dictionary_reset,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to decompress uncompressed chunk"
+                            );
+                            return Err(error);
+                        }
+                    }
+                }
+            }
+            let block_compressed_data_size: usize = data_offset - compressed_data_start_offset;
+            let block_uncompressed_data_size: usize =
+                uncompressed_data_offset - block_uncompressed_data_offset;
+
+            Ok((block_compressed_data_size, block_uncompressed_data_size))
+        })
+    }
+
+    /// Decompresses an LZMA chunk.
+    fn decompress_lzma_chunk(
+        debug_trace: &mut DebugTraceScope,
+        data: &[u8],
+        data_offset: &mut usize,
+        uncompressed_data: &mut [u8],
+        uncompressed_data_size: usize,
+        uncompressed_data_offset: &mut usize,
+        dictionary_start_offset: &mut usize,
+        control: u8,
+        need_properties: &mut bool,
+        need_dictionary_reset: &mut bool,
+        lzma_decoder: &mut Option<LzmaDecoder>,
+    ) -> Result<(), ErrorTrace> {
+        if *data_offset + 4 > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        // Uncompressed and compressed size fields hold the size minus 1 in 16 bits
+        // (plus 5 upper bits of the control byte for the uncompressed size).
+        let uncompressed_chunk_size: usize = ((((control & 0x1f) as usize) << 16)
+            | (bytes_to_u16_be!(data, *data_offset) as usize))
+            + 1;
+        *data_offset += 2;
+
+        let compressed_chunk_size: usize = (bytes_to_u16_be!(data, *data_offset) as usize) + 1;
+        *data_offset += 2;
+
+        if control >= 0xc0 {
+            if *data_offset >= data.len() {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid compressed data value too small"
+                ));
+            }
+            let properties_byte: u8 = data[*data_offset];
+            *data_offset += 1;
+
+            let (literal_context_bits, literal_position_bits, position_bits): (u8, u8, u8) =
+                match LzmaDecoder::decode_properties(properties_byte) {
+                    Ok(properties) => properties,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decode LZMA properties"
+                        );
+                        return Err(error);
+                    }
+                };
+            match lzma_decoder.as_mut() {
+                Some(decoder) => {
+                    match decoder.reset_state_and_properties(
+                        literal_context_bits,
+                        literal_position_bits,
+                        position_bits,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to reset LZMA decoder state"
+                            );
+                            return Err(error);
+                        }
+                    }
+                }
+                None => {
+                    let decoder: LzmaDecoder = match LzmaDecoder::new(
+                        literal_context_bits,
+                        literal_position_bits,
+                        position_bits,
+                    ) {
+                        Ok(decoder) => decoder,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to create LZMA decoder"
+                            );
+                            return Err(error);
+                        }
+                    };
+                    *lzma_decoder = Some(decoder);
+                }
+            }
+            *need_properties = false;
+        } else if *need_properties {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid LZMA2 chunk: properties required"
+            ));
+        } else if control >= 0xa0 {
+            match lzma_decoder.as_mut() {
+                Some(decoder) => {
+                    decoder.reset_state();
+                }
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid LZMA2 chunk: no properties defined"
+                    ));
+                }
+            }
+        }
+        if *need_dictionary_reset {
+            *dictionary_start_offset = *uncompressed_data_offset;
+            *need_dictionary_reset = false;
+        }
+        if *uncompressed_data_offset + uncompressed_chunk_size > uncompressed_data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid uncompressed data value too small"
+            ));
+        }
+        if *data_offset + compressed_chunk_size > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        let decoder: &mut LzmaDecoder = match lzma_decoder.as_mut() {
+            Some(decoder) => decoder,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid LZMA2 chunk: no properties defined"
+                ));
+            }
+        };
+        let number_of_bytes: usize = match decoder.decompress_chunk(
+            debug_trace,
+            &data[*data_offset..*data_offset + compressed_chunk_size],
+            uncompressed_data,
+            uncompressed_data_size,
+            *uncompressed_data_offset,
+            *dictionary_start_offset,
+            uncompressed_chunk_size,
+            false,
+        ) {
+            Ok(number_of_bytes) => number_of_bytes,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decompress chunk");
+                return Err(error);
+            }
+        };
+        if number_of_bytes != uncompressed_chunk_size {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between calculated: {} and expected: {} LZMA2 chunk sizes",
+                number_of_bytes, uncompressed_chunk_size
+            )));
+        }
+        *data_offset += compressed_chunk_size;
+        *uncompressed_data_offset += uncompressed_chunk_size;
+
+        Ok(())
+    }
+
+    /// Decompresses an uncompressed chunk.
+    fn decompress_uncompressed_chunk(
+        data: &[u8],
+        data_offset: &mut usize,
+        uncompressed_data: &mut [u8],
+        uncompressed_data_size: usize,
+        uncompressed_data_offset: &mut usize,
+        dictionary_start_offset: &mut usize,
+        control: u8,
+        need_dictionary_reset: &mut bool,
+    ) -> Result<(), ErrorTrace> {
+        if control > 0x02 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid LZMA2 control byte: 0x{:02x}",
+                control
+            )));
+        }
+        if *data_offset + 2 > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        let chunk_size: usize = (bytes_to_u16_be!(data, *data_offset) as usize) + 1;
+        *data_offset += 2;
+
+        if *need_dictionary_reset {
+            *dictionary_start_offset = *uncompressed_data_offset;
+            *need_dictionary_reset = false;
+        }
+        if *uncompressed_data_offset + chunk_size > uncompressed_data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid uncompressed data value too small"
+            ));
+        }
+        if *data_offset + chunk_size > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        uncompressed_data[*uncompressed_data_offset..*uncompressed_data_offset + chunk_size]
+            .copy_from_slice(&data[*data_offset..*data_offset + chunk_size]);
+        *data_offset += chunk_size;
+        *uncompressed_data_offset += chunk_size;
+
+        Ok(())
+    }
+
+    /// Validates the block padding and returns its size in bytes.
+    fn read_block_padding(
+        data: &[u8],
+        data_offset: usize,
+        block_header_offset: usize,
+        unpadded_size: u64,
+    ) -> Result<usize, ErrorTrace> {
+        let block_padding_size: usize =
+            (4 - (((block_header_offset as u64) + unpadded_size) & 3)) as usize & 3;
+
+        if data_offset + block_padding_size > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        for padding_byte in &data[data_offset..data_offset + block_padding_size] {
+            if *padding_byte != 0x00 {
+                return Err(keramics_core::error_trace_new!(
+                    "Non 0-byte in block padding"
+                ));
+            }
+        }
+        Ok(block_padding_size)
+    }
+
+    /// Reads and validates the index, verifying it against the decoded blocks.
+    fn read_index(
+        data: &[u8],
+        index_offset: usize,
+        records: &[(u64, u64)],
+    ) -> Result<usize, ErrorTrace> {
+        if index_offset >= data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        if data[index_offset] != 0x00 {
+            return Err(keramics_core::error_trace_new!("Invalid index indicator"));
+        }
+        let mut data_offset: usize = index_offset + 1;
+        let (number_of_records, next_offset): (u64, usize) =
+            match read_variable_length_integer(data, data_offset) {
+                Ok((number_of_records, next_offset)) => (number_of_records, next_offset),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read variable-length integer"
+                    );
+                    return Err(error);
+                }
+            };
+        data_offset = next_offset;
+
+        if number_of_records != records.len() as u64 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between number of records: {} and number of blocks: {}",
+                number_of_records,
+                records.len()
+            )));
+        }
+        for (record_index, (unpadded_size, uncompressed_size)) in records.iter().enumerate() {
+            let (stored_unpadded_size, next_offset): (u64, usize) =
+                match read_variable_length_integer(data, data_offset) {
+                    Ok((stored_unpadded_size, next_offset)) => (stored_unpadded_size, next_offset),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read variable-length integer"
+                        );
+                        return Err(error);
+                    }
+                };
+            data_offset = next_offset;
+
+            let (stored_uncompressed_size, next_offset): (u64, usize) =
+                match read_variable_length_integer(data, data_offset) {
+                    Ok((stored_uncompressed_size, next_offset)) => {
+                        (stored_uncompressed_size, next_offset)
+                    }
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read variable-length integer"
+                        );
+                        return Err(error);
+                    }
+                };
+            data_offset = next_offset;
+
+            if stored_unpadded_size != *unpadded_size
+                || stored_uncompressed_size != *uncompressed_size
+            {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between index record: {} and decoded block",
+                    record_index
+                )));
+            }
+        }
+        let index_body_size: usize = data_offset - index_offset;
+        let index_padding_size: usize = (4 - (index_body_size & 3)) & 3;
+
+        if index_offset + index_body_size + index_padding_size + 4 > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        for padding_byte in &data
+            [index_offset + index_body_size..index_offset + index_body_size + index_padding_size]
+        {
+            if *padding_byte != 0x00 {
+                return Err(keramics_core::error_trace_new!(
+                    "Non 0-byte in index padding"
+                ));
+            }
+        }
+        let index_size: usize = index_body_size + index_padding_size + 4;
+
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context
+            .update(&data[index_offset..index_offset + index_body_size + index_padding_size]);
+
+        let calculated_checksum: u32 = crc32_context.finalize();
+        let stored_checksum: u32 = bytes_to_u32_le!(data, index_offset + index_size - 4);
+
+        if stored_checksum != calculated_checksum {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} index checksums",
+                stored_checksum, calculated_checksum
+            )));
+        }
+        Ok(index_size)
+    }
+
+    /// Validates the block checksum (if defined) and returns the number of bytes consumed.
+    fn verify_block_checksum(
+        checksum_type: u8,
+        data: &[u8],
+        data_offset: usize,
+        uncompressed_block: &[u8],
+    ) -> Result<usize, ErrorTrace> {
+        if checksum_type != XZ_CHECKSUM_TYPE_CRC32 {
+            return Ok(0);
+        }
+        if data_offset + 4 > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
+            ));
+        }
+        let stored_checksum: u32 = bytes_to_u32_le!(data, data_offset);
+
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(uncompressed_block);
+
+        let calculated_checksum: u32 = crc32_context.finalize();
+
+        if stored_checksum != calculated_checksum {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} block checksums",
+                stored_checksum, calculated_checksum
+            )));
+        }
+        Ok(4)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::mediator::Mediator;
+
+    /// xz stream of TEST_INPUT_V1, single Block, CRC32 check, no size fields.
+    const TEST_DATA_V1: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a,
+    ];
+
+    /// xz stream of TEST_INPUT_V2 (four Blocks of 4 KiB), no check.
+    const TEST_DATA_V2: [u8; 376] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x00, 0xff, 0x12, 0xd9, 0x41, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x0f, 0xff, 0x00, 0x40, 0x5d,
+        0x00, 0x18, 0x0c, 0x42, 0x92, 0x6a, 0x67, 0xbc, 0x0e, 0xd1, 0x33, 0x2a, 0x1a, 0x9b, 0x12,
+        0x86, 0x95, 0x8e, 0x58, 0xc9, 0x62, 0x7a, 0x88, 0x8a, 0x54, 0xe4, 0xad, 0x4c, 0x93, 0x62,
+        0x81, 0x65, 0x17, 0xad, 0x78, 0xf6, 0xe2, 0x85, 0x23, 0xc3, 0x69, 0x1a, 0xba, 0x32, 0x74,
+        0x47, 0x98, 0xab, 0xf8, 0xa2, 0xb1, 0xb1, 0x7c, 0x59, 0x82, 0x15, 0x8e, 0x7d, 0x50, 0xde,
+        0xd8, 0x30, 0xb0, 0x30, 0x00, 0x00, 0x02, 0x00, 0x21, 0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f,
+        0x98, 0x41, 0x9c, 0xe0, 0x0f, 0xff, 0x00, 0x40, 0x5d, 0x00, 0x3a, 0x1d, 0x4b, 0x26, 0x11,
+        0x1b, 0x2b, 0x49, 0x6a, 0xbf, 0xa5, 0x74, 0xf0, 0x7d, 0xf4, 0x67, 0x4d, 0x2b, 0xd1, 0x73,
+        0x28, 0xfc, 0x84, 0xc7, 0xdd, 0xf1, 0x77, 0x3b, 0x50, 0xc0, 0x94, 0xd5, 0x0d, 0xb8, 0x37,
+        0x7d, 0x46, 0x3e, 0x1e, 0x97, 0x7b, 0x38, 0x90, 0xe5, 0x01, 0xfd, 0x81, 0x6d, 0x2c, 0x8a,
+        0xec, 0xfc, 0x03, 0xf0, 0x15, 0x47, 0xc8, 0xc7, 0xdb, 0x84, 0x60, 0x87, 0x3b, 0x00, 0x00,
+        0x02, 0x00, 0x21, 0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x0f, 0xff,
+        0x00, 0x40, 0x5d, 0x00, 0x36, 0x1b, 0x4a, 0x1d, 0xf7, 0x75, 0x3e, 0x6e, 0xfa, 0x49, 0x2d,
+        0x43, 0x65, 0x15, 0x1d, 0x51, 0xc1, 0x19, 0x94, 0xfb, 0x9d, 0x6e, 0xe4, 0xaf, 0x0d, 0xa1,
+        0x52, 0xfd, 0xfc, 0x89, 0x2e, 0xc4, 0xb8, 0x6f, 0x8d, 0x3d, 0xa2, 0xef, 0xdf, 0x06, 0x82,
+        0xa4, 0x79, 0x1b, 0xa3, 0x26, 0x5b, 0xbc, 0xe6, 0xff, 0x46, 0x05, 0x86, 0xe3, 0x63, 0x39,
+        0x14, 0xf1, 0x87, 0x84, 0x6e, 0x29, 0xd3, 0x00, 0x00, 0x02, 0x00, 0x21, 0x01, 0x0c, 0x00,
+        0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x0b, 0x5f, 0x00, 0x3c, 0x5d, 0x00, 0x32, 0x19,
+        0x49, 0x04, 0xc9, 0x5e, 0x9e, 0xcb, 0x07, 0xb4, 0xf7, 0x33, 0xff, 0xdb, 0x70, 0x91, 0x0d,
+        0x6e, 0x82, 0x3c, 0x34, 0x49, 0x0b, 0x8d, 0xa7, 0x31, 0xba, 0x7a, 0xc6, 0x96, 0x21, 0x02,
+        0xab, 0x2c, 0x2a, 0x45, 0x37, 0xec, 0xe3, 0x21, 0x14, 0x22, 0xfb, 0x22, 0x6b, 0x4b, 0x49,
+        0x99, 0xbd, 0x98, 0x2c, 0x0f, 0x45, 0xba, 0x9b, 0xb0, 0x40, 0xcc, 0xcc, 0x00, 0x00, 0x00,
+        0x04, 0x54, 0x80, 0x20, 0x54, 0x80, 0x20, 0x54, 0x80, 0x20, 0x50, 0xe0, 0x16, 0x00, 0x00,
+        0x92, 0xf2, 0xb9, 0xe4, 0xb5, 0xe3, 0x53, 0x2a, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x59,
+        0x5a,
+    ];
+
+    /// xz stream of TEST_INPUT_V3, two Blocks, CRC32 check.
+    const TEST_DATA_V3: [u8; 168] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x10, 0x00, 0x00, 0x00, 0xa8, 0x70, 0x8e, 0x86, 0xe0, 0x03, 0xff, 0x00, 0x2c, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x84, 0xfe, 0x2f, 0xc5,
+        0x66, 0x22, 0xeb, 0x93, 0xd0, 0xcf, 0xd0, 0xfa, 0xba, 0x2f, 0xf9, 0x3b, 0x75, 0x26, 0x9f,
+        0xb5, 0x09, 0x6a, 0x4c, 0x9e, 0x54, 0xeb, 0xfa, 0x74, 0xe9, 0xbf, 0xe2, 0x3e, 0x89, 0x00,
+        0x00, 0x16, 0x7d, 0x2c, 0x52, 0x02, 0x00, 0x21, 0x01, 0x10, 0x00, 0x00, 0x00, 0xa8, 0x70,
+        0x8e, 0x86, 0xe0, 0x00, 0xff, 0x00, 0x27, 0x5d, 0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e,
+        0x83, 0x57, 0x5e, 0xcb, 0x84, 0xfe, 0x2f, 0xc5, 0x66, 0x22, 0xeb, 0x93, 0xd0, 0xcf, 0xd0,
+        0xfa, 0xba, 0x2f, 0xf9, 0x3b, 0x75, 0x26, 0x9f, 0xb5, 0x09, 0x6a, 0x4c, 0x95, 0xd8, 0x00,
+        0x94, 0x00, 0x00, 0x00, 0x00, 0x1f, 0x6f, 0xc3, 0x9c, 0x00, 0x02, 0x44, 0x80, 0x08, 0x3f,
+        0x80, 0x02, 0x8d, 0x45, 0x9c, 0xe8, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00,
+        0x01, 0x59, 0x5a,
+    ];
+
+    /// xz stream of 8 MiB of TEST_PHRASE, one Block with five LZMA2 chunks.
+    const TEST_DATA_V4: [u8; 1404] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x00, 0xff, 0x12, 0xd9, 0x41, 0x02, 0x00, 0x21,
+        0x01, 0x10, 0x00, 0x00, 0x00, 0xa8, 0x70, 0x8e, 0x86, 0xff, 0xff, 0x4e, 0x01, 0xa5, 0x5d,
+        0x00, 0x2a, 0x1a, 0x08, 0xa2, 0x03, 0x25, 0x66, 0xf1, 0x4b, 0x78, 0xc5, 0xa2, 0x05, 0xff,
+        0x2e, 0xe6, 0xd9, 0xd2, 0x20, 0x1a, 0xad, 0x34, 0xf8, 0xe2, 0x1d, 0xe8, 0x41, 0x36, 0xfa,
+        0xdc, 0x06, 0x69, 0xbb, 0x3c, 0xe4, 0x10, 0x34, 0x27, 0x09, 0xeb, 0xb3, 0x66, 0xe3, 0xd4,
+        0x6d, 0x7a, 0xb9, 0x4e, 0xe0, 0x67, 0xdf, 0x9d, 0x75, 0xba, 0x0f, 0x8b, 0xfb, 0xa2, 0x16,
+        0x8b, 0xaf, 0xc6, 0x8b, 0x01, 0xb6, 0x7b, 0xe0, 0x2a, 0x41, 0xcd, 0xbc, 0xc7, 0x6b, 0x55,
+        0xf3, 0x56, 0x07, 0xcf, 0xb5, 0xde, 0x8f, 0x8b, 0x2c, 0x8a, 0x7d, 0xfa, 0x36, 0x6d, 0xa0,
+        0xfe, 0xfb, 0x9f, 0x8f, 0xc8, 0xff, 0x92, 0xe6, 0xc7, 0x89, 0xc6, 0xe7, 0xe2, 0xf4, 0x7f,
+        0x45, 0x71, 0x70, 0xb9, 0x0b, 0x1d, 0x74, 0xc5, 0x43, 0x1b, 0xec, 0xdd, 0x03, 0x51, 0xa0,
+        0xee, 0x1e, 0xb8, 0x2c, 0xe7, 0x0f, 0xbc, 0xcd, 0x7d, 0xb5, 0xd9, 0xe6, 0x6a, 0x27, 0xc7,
+        0xc8, 0x81, 0xe0, 0x01, 0x4e, 0x79, 0x0b, 0x6f, 0x14, 0x6d, 0xed, 0x22, 0x26, 0x51, 0x42,
+        0x98, 0xf7, 0x6c, 0xf8, 0xf2, 0x1f, 0xdf, 0xb5, 0x3b, 0xf0, 0xc4, 0xbd, 0x2e, 0x5f, 0xaa,
+        0x0f, 0x3e, 0x4b, 0x66, 0x42, 0x90, 0x13, 0x0e, 0xff, 0x10, 0x93, 0xf8, 0x71, 0x78, 0x59,
+        0xf8, 0x0b, 0xcd, 0xff, 0x95, 0x28, 0x46, 0x0f, 0xa9, 0xfc, 0x7c, 0xde, 0xfb, 0x9a, 0x30,
+        0x2e, 0x56, 0xc0, 0x8f, 0x85, 0xf3, 0x83, 0x81, 0xc0, 0x65, 0xc4, 0x25, 0x53, 0xf8, 0xf5,
+        0x91, 0x36, 0x31, 0x05, 0xa5, 0xb0, 0xee, 0x6f, 0xc1, 0x70, 0x4d, 0x47, 0x0c, 0xd1, 0x91,
+        0x11, 0xaa, 0xad, 0x60, 0x1d, 0xba, 0xce, 0xb1, 0x27, 0x18, 0x5c, 0x59, 0x86, 0xe9, 0x66,
+        0x52, 0x58, 0xbe, 0xe9, 0x76, 0xac, 0x59, 0xe4, 0xe5, 0x5b, 0x05, 0x08, 0xf9, 0xc7, 0xda,
+        0xad, 0xfc, 0xfb, 0x52, 0x2b, 0x74, 0xcd, 0x1e, 0x5b, 0x20, 0x42, 0xf9, 0xdd, 0x53, 0x3d,
+        0xf8, 0x29, 0x64, 0x09, 0x3b, 0x80, 0xcb, 0x2a, 0x6c, 0xdf, 0xb5, 0x3b, 0xf0, 0xc4, 0xbd,
+        0x2e, 0x5f, 0xaa, 0x0f, 0x3e, 0x4b, 0x66, 0x42, 0x90, 0x13, 0x0e, 0xff, 0x10, 0x93, 0xf8,
+        0x71, 0x78, 0x59, 0xf8, 0x0b, 0xcd, 0xff, 0x95, 0x28, 0x46, 0x0f, 0xa9, 0xfc, 0x7c, 0xde,
+        0xfb, 0x9a, 0x30, 0x2e, 0x56, 0xc0, 0x8f, 0x85, 0xf3, 0x83, 0x81, 0xc0, 0x65, 0xc4, 0x25,
+        0x53, 0xf8, 0xf5, 0x91, 0x36, 0x31, 0x05, 0xa5, 0xb0, 0xee, 0x6f, 0xc1, 0x70, 0x4d, 0x47,
+        0x0c, 0xd1, 0x91, 0x11, 0xaa, 0xad, 0x60, 0x1d, 0xba, 0xce, 0xb1, 0x27, 0x18, 0x5c, 0x59,
+        0x86, 0xe9, 0x66, 0x52, 0x58, 0xbe, 0xe9, 0x76, 0xac, 0x59, 0xe4, 0xe5, 0x5b, 0x05, 0x08,
+        0xf9, 0xc7, 0xda, 0xad, 0xfc, 0xfb, 0x52, 0x2b, 0x74, 0xcd, 0x1e, 0x5b, 0x20, 0x42, 0xf9,
+        0xdd, 0x53, 0x3d, 0xf8, 0x29, 0x64, 0x09, 0x3b, 0x80, 0xcb, 0x2a, 0x6c, 0xdf, 0xb5, 0x3b,
+        0xf0, 0xc4, 0xbd, 0x2e, 0x5f, 0xaa, 0x0f, 0x3e, 0x4b, 0x66, 0x42, 0x90, 0x13, 0x0b, 0xff,
+        0x19, 0x6d, 0x9f, 0xff, 0x10, 0x01, 0x2b, 0x00, 0xec, 0x73, 0x53, 0xa7, 0xfd, 0xbe, 0xae,
+        0x7c, 0x31, 0x1a, 0x9f, 0xb7, 0x8d, 0x31, 0x6e, 0x70, 0x9e, 0xa7, 0x23, 0x5f, 0xec, 0x28,
+        0xcb, 0x85, 0xd1, 0x95, 0x98, 0x8a, 0x7e, 0x2a, 0x91, 0xf2, 0x27, 0x75, 0xf7, 0x19, 0xc0,
+        0x06, 0x98, 0x4d, 0x98, 0xfd, 0xd8, 0xaf, 0xd5, 0x90, 0x0f, 0xc4, 0x25, 0x53, 0xf8, 0xf5,
+        0x91, 0x36, 0x31, 0x05, 0xa5, 0xb0, 0xee, 0x6f, 0xc1, 0x70, 0x4d, 0x47, 0x0c, 0xd1, 0x91,
+        0x11, 0xaa, 0xad, 0x60, 0x1d, 0xba, 0xce, 0xb1, 0x27, 0x18, 0x5c, 0x59, 0x86, 0xe9, 0x66,
+        0x52, 0x58, 0xbe, 0xe9, 0x76, 0xac, 0x59, 0xe4, 0xe5, 0x5b, 0x05, 0x08, 0xf9, 0xc7, 0xda,
+        0xad, 0xfc, 0xfb, 0x52, 0x2b, 0x74, 0xcd, 0x1e, 0x5b, 0x20, 0x42, 0xf9, 0xdd, 0x53, 0x3d,
+        0xf8, 0x29, 0x64, 0x09, 0x3b, 0x80, 0xcb, 0x2a, 0x6c, 0xdf, 0xb5, 0x3b, 0xf0, 0xc4, 0xbd,
+        0x2e, 0x5f, 0xaa, 0x0f, 0x3e, 0x4b, 0x66, 0x42, 0x90, 0x13, 0x0e, 0xff, 0x10, 0x93, 0xf8,
+        0x71, 0x78, 0x59, 0xf8, 0x0b, 0xcd, 0xff, 0x95, 0x28, 0x46, 0x0f, 0xa9, 0xfc, 0x7c, 0xde,
+        0xfb, 0x9a, 0x30, 0x2e, 0x56, 0xc0, 0x8f, 0x85, 0xf3, 0x83, 0x81, 0xc0, 0x65, 0xc4, 0x25,
+        0x53, 0xf8, 0xf5, 0x91, 0x36, 0x31, 0x05, 0xa5, 0xb0, 0xee, 0x6f, 0xc1, 0x70, 0x4d, 0x47,
+        0x0c, 0xd1, 0x91, 0x11, 0xaa, 0xad, 0x60, 0x1d, 0xba, 0xce, 0xb1, 0x27, 0x18, 0x5c, 0x59,
+        0x86, 0xe9, 0x66, 0x52, 0x58, 0xbe, 0xe9, 0x76, 0xac, 0x59, 0xe4, 0xe5, 0x5b, 0x05, 0x08,
+        0xf9, 0xc7, 0xda, 0xad, 0xfc, 0xfb, 0x52, 0x2b, 0x74, 0xcd, 0x1e, 0x5b, 0x20, 0x42, 0xf9,
+        0xdd, 0x53, 0x3d, 0xf8, 0x29, 0x64, 0x09, 0x3b, 0x80, 0xcb, 0x2a, 0x6c, 0xdf, 0xb5, 0x3b,
+        0xf0, 0xc4, 0xbd, 0x2e, 0x5f, 0xaa, 0x0f, 0x3e, 0x4b, 0x66, 0x42, 0x90, 0x13, 0x0e, 0xff,
+        0x10, 0x93, 0xf8, 0x71, 0x78, 0x59, 0xf8, 0x0b, 0xcd, 0xff, 0x95, 0x28, 0x46, 0x0f, 0xa9,
+        0xfc, 0x7c, 0xde, 0xfb, 0x9a, 0x30, 0x2e, 0x56, 0xc0, 0x8f, 0x85, 0xf3, 0x83, 0x81, 0xc0,
+        0x65, 0xc4, 0x25, 0x51, 0x0f, 0x3f, 0xb2, 0x9f, 0xff, 0x10, 0x01, 0x2b, 0x00, 0xec, 0x73,
+        0x53, 0xa7, 0xfd, 0xbe, 0xae, 0x7c, 0x31, 0x1a, 0x9f, 0xb7, 0x8d, 0x31, 0x6e, 0x70, 0x9e,
+        0xa7, 0x23, 0x5f, 0xec, 0x28, 0xcb, 0x85, 0xd1, 0x95, 0x98, 0x8a, 0x7e, 0x2a, 0x91, 0xf2,
+        0x27, 0x75, 0xf7, 0x19, 0xc0, 0x06, 0x98, 0x4d, 0x98, 0xfd, 0xd8, 0xaf, 0xd5, 0x90, 0x0f,
+        0xc4, 0x25, 0x53, 0xf8, 0xf5, 0x91, 0x36, 0x31, 0x05, 0xa5, 0xb0, 0xee, 0x6f, 0xc1, 0x70,
+        0x4d, 0x47, 0x0c, 0xd1, 0x91, 0x11, 0xaa, 0xad, 0x60, 0x1d, 0xba, 0xce, 0xb1, 0x27, 0x18,
+        0x5c, 0x59, 0x86, 0xe9, 0x66, 0x52, 0x58, 0xbe, 0xe9, 0x76, 0xac, 0x59, 0xe4, 0xe5, 0x5b,
+        0x05, 0x08, 0xf9, 0xc7, 0xda, 0xad, 0xfc, 0xfb, 0x52, 0x2b, 0x74, 0xcd, 0x1e, 0x5b, 0x20,
+        0x42, 0xf9, 0xdd, 0x53, 0x3d, 0xf8, 0x29, 0x64, 0x09, 0x3b, 0x80, 0xcb, 0x2a, 0x6c, 0xdf,
+        0xb5, 0x3b, 0xf0, 0xc4, 0xbd, 0x2e, 0x5f, 0xaa, 0x0f, 0x3e, 0x4b, 0x66, 0x42, 0x90, 0x13,
+        0x0e, 0xff, 0x10, 0x93, 0xf8, 0x71, 0x78, 0x59, 0xf8, 0x0b, 0xcd, 0xff, 0x95, 0x28, 0x46,
+        0x0f, 0xa9, 0xfc, 0x7c, 0xde, 0xfb, 0x9a, 0x30, 0x2e, 0x56, 0xc0, 0x8f, 0x85, 0xf3, 0x83,
+        0x81, 0xc0, 0x65, 0xc4, 0x25, 0x53, 0xf8, 0xf5, 0x91, 0x36, 0x31, 0x05, 0xa5, 0xb0, 0xee,
+        0x6f, 0xc1, 0x70, 0x4d, 0x47, 0x0c, 0xd1, 0x91, 0x11, 0xaa, 0xad, 0x60, 0x1d, 0xba, 0xce,
+        0xb1, 0x27, 0x18, 0x5c, 0x59, 0x86, 0xe9, 0x66, 0x52, 0x58, 0xbe, 0xe9, 0x76, 0xac, 0x59,
+        0xe4, 0xe5, 0x5b, 0x05, 0x08, 0xf9, 0xc7, 0xda, 0xad, 0xfc, 0xfb, 0x52, 0x2b, 0x74, 0xcd,
+        0x1e, 0x5b, 0x20, 0x42, 0xf9, 0xdd, 0x53, 0x3d, 0xf8, 0x29, 0x64, 0x09, 0x3b, 0x80, 0xcb,
+        0x2a, 0x6c, 0xdf, 0xb5, 0x3b, 0xf0, 0xc4, 0xbd, 0x2e, 0x5f, 0xaa, 0x0f, 0x3e, 0x4b, 0x66,
+        0x42, 0x90, 0x13, 0x0e, 0xff, 0x10, 0x93, 0xf8, 0x71, 0x78, 0x59, 0xf8, 0x0b, 0xcd, 0xff,
+        0x95, 0x28, 0x46, 0x0f, 0xa9, 0xfc, 0x7c, 0xde, 0xfb, 0x9a, 0x30, 0x2e, 0x56, 0xc0, 0x8f,
+        0x85, 0xf3, 0x83, 0x81, 0xc0, 0x65, 0xc4, 0x25, 0x51, 0x0f, 0x3f, 0xb2, 0x9f, 0xff, 0x10,
+        0x01, 0x2b, 0x00, 0xec, 0x73, 0x53, 0xa7, 0xfd, 0xbe, 0xae, 0x7c, 0x31, 0x1a, 0x9f, 0xb7,
+        0x8d, 0x31, 0x6e, 0x70, 0x9e, 0xa7, 0x23, 0x5f, 0xec, 0x28, 0xcb, 0x85, 0xd1, 0x95, 0x98,
+        0x8a, 0x7e, 0x2a, 0x91, 0xf2, 0x27, 0x75, 0xf7, 0x19, 0xc0, 0x06, 0x98, 0x4d, 0x98, 0xfd,
+        0xd8, 0xaf, 0xd5, 0x90, 0x0f, 0xc4, 0x25, 0x53, 0xf8, 0xf5, 0x91, 0x36, 0x31, 0x05, 0xa5,
+        0xb0, 0xee, 0x6f, 0xc1, 0x70, 0x4d, 0x47, 0x0c, 0xd1, 0x91, 0x11, 0xaa, 0xad, 0x60, 0x1d,
+        0xba, 0xce, 0xb1, 0x27, 0x18, 0x5c, 0x59, 0x86, 0xe9, 0x66, 0x52, 0x58, 0xbe, 0xe9, 0x76,
+        0xac, 0x59, 0xe4, 0xe5, 0x5b, 0x05, 0x08, 0xf9, 0xc7, 0xda, 0xad, 0xfc, 0xfb, 0x52, 0x2b,
+        0x74, 0xcd, 0x1e, 0x5b, 0x20, 0x42, 0xf9, 0xdd, 0x53, 0x3d, 0xf8, 0x29, 0x64, 0x09, 0x3b,
+        0x80, 0xcb, 0x2a, 0x6c, 0xdf, 0xb5, 0x3b, 0xf0, 0xc4, 0xbd, 0x2e, 0x5f, 0xaa, 0x0f, 0x3e,
+        0x4b, 0x66, 0x42, 0x90, 0x13, 0x0e, 0xff, 0x10, 0x93, 0xf8, 0x71, 0x78, 0x59, 0xf8, 0x0b,
+        0xcd, 0xff, 0x95, 0x28, 0x46, 0x0f, 0xa9, 0xfc, 0x7c, 0xde, 0xfb, 0x9a, 0x30, 0x2e, 0x56,
+        0xc0, 0x8f, 0x85, 0xf3, 0x83, 0x81, 0xc0, 0x65, 0xc4, 0x25, 0x53, 0xf8, 0xf5, 0x91, 0x36,
+        0x31, 0x05, 0xa5, 0xb0, 0xee, 0x6f, 0xc1, 0x70, 0x4d, 0x47, 0x0c, 0xd1, 0x91, 0x11, 0xaa,
+        0xad, 0x60, 0x1d, 0xba, 0xce, 0xb1, 0x27, 0x18, 0x5c, 0x59, 0x86, 0xe9, 0x66, 0x52, 0x58,
+        0xbe, 0xe9, 0x76, 0xac, 0x59, 0xe4, 0xe5, 0x5b, 0x05, 0x08, 0xf9, 0xc7, 0xda, 0xad, 0xfc,
+        0xfb, 0x52, 0x2b, 0x74, 0xcd, 0x1e, 0x5b, 0x20, 0x42, 0xf9, 0xdd, 0x53, 0x3d, 0xf8, 0x29,
+        0x64, 0x09, 0x3b, 0x80, 0xcb, 0x2a, 0x6c, 0xdf, 0xb5, 0x3b, 0xf0, 0xc4, 0xbd, 0x2e, 0x5f,
+        0xaa, 0x0f, 0x3e, 0x4b, 0x66, 0x42, 0x90, 0x13, 0x0e, 0xff, 0x10, 0x93, 0xf8, 0x71, 0x78,
+        0x59, 0xf8, 0x0b, 0xcd, 0xff, 0x95, 0x28, 0x46, 0x0f, 0xa9, 0xfc, 0x7c, 0xde, 0xfb, 0x9a,
+        0x30, 0x2e, 0x56, 0xc0, 0x8f, 0x85, 0xf3, 0x83, 0x81, 0xc0, 0x65, 0xc4, 0x25, 0x51, 0x0f,
+        0x3f, 0xb2, 0x80, 0x03, 0x7d, 0x00, 0x05, 0x00, 0x7a, 0x7e, 0x9f, 0xe3, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0xd7, 0x0a, 0x80, 0x80, 0x80, 0x04, 0x02, 0x11, 0x5c, 0xb6, 0xa8, 0x00, 0x0a,
+        0xfc, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x59, 0x5a,
+    ];
+
+    /// xz stream with an uncompressed chunk (0x01 and 0x02) followed by an
+    /// LZMA chunk, CRC32 check.
+    const TEST_DATA_V5A: [u8; 164] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x16, 0x00, 0x00, 0x00, 0x74, 0x2f, 0xe5, 0xa3, 0x01, 0x00, 0x01, 0xaa, 0x55, 0x02,
+        0x00, 0x02, 0x11, 0x22, 0x33, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d, 0x00, 0x35, 0x99, 0x4a,
+        0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7, 0x64, 0xd0, 0xb5, 0x83,
+        0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd, 0x7c, 0x27, 0x03, 0x5d,
+        0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89, 0x82, 0x99, 0x18, 0x16,
+        0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d, 0x04, 0xa9, 0xae, 0xfa,
+        0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19, 0x34, 0xd7, 0xa7, 0x85,
+        0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b, 0x40, 0x00, 0x00, 0x00,
+        0x00, 0xba, 0x0e, 0xa9, 0xc0, 0x00, 0x01, 0x7d, 0xec, 0x04, 0x00, 0x00, 0x00, 0x4b, 0x77,
+        0xaf, 0x16, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01, 0x59, 0x5a,
+    ];
+
+    /// xz stream with an uncompressed chunk (0x02) followed by an LZMA chunk,
+    /// CRC32 check.
+    const TEST_DATA_V5B: [u8; 184] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x16, 0x00, 0x00, 0x00, 0x74, 0x2f, 0xe5, 0xa3, 0x01, 0x00, 0x01, 0xde, 0xad, 0x00,
+        0x00, 0x00, 0x3b, 0x25, 0x05, 0xf6, 0x02, 0x00, 0x21, 0x01, 0x16, 0x00, 0x00, 0x00, 0x74,
+        0x2f, 0xe5, 0xa3, 0x01, 0x00, 0x00, 0xbe, 0x02, 0x00, 0x00, 0xef, 0xe0, 0x02, 0x66, 0x00,
+        0x5a, 0x5d, 0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03,
+        0x18, 0xc7, 0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a,
+        0x97, 0xfd, 0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb,
+        0x39, 0x89, 0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32,
+        0x13, 0x2d, 0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d,
+        0xba, 0x19, 0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58,
+        0x48, 0x9b, 0x40, 0x00, 0x00, 0x00, 0xda, 0x1e, 0xa9, 0xbf, 0x00, 0x02, 0x16, 0x02, 0x7a,
+        0xe9, 0x04, 0x00, 0x75, 0x12, 0x2f, 0x9b, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00,
+        0x00, 0x01, 0x59, 0x5a,
+    ];
+
+    /// xz stream with an uncompressed chunk (0x01) followed by an LZMA chunk,
+    /// header Compressed and Uncompressed Size fields, CRC32 check.
+    const TEST_DATA_V5C: [u8; 168] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x03, 0xc0, 0x6d,
+        0xec, 0x04, 0x21, 0x01, 0x16, 0x00, 0x00, 0x00, 0x00, 0x85, 0x48, 0x85, 0x9c, 0x01, 0x00,
+        0x01, 0xaa, 0x55, 0x02, 0x00, 0x02, 0x11, 0x22, 0x33, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x00, 0xba, 0x0e, 0xa9, 0xc0, 0x00, 0x01, 0x81, 0x01, 0xec, 0x04,
+        0x00, 0x00, 0x4c, 0x6c, 0x79, 0xb0, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00,
+        0x01, 0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: unsupported signature.
+    const TEST_DATA_NEG_BAD_SIGNATURE: [u8; 152] = [
+        0xfb, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: header_crc_mismatch.
+    const TEST_DATA_NEG_HEADER_CRC_MISMATCH: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x37, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: unsupported_check.
+    const TEST_DATA_NEG_UNSUPPORTED_CHECK: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x02, 0xd3, 0x73, 0xd7, 0xaf, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: reserved_flags.
+    const TEST_DATA_NEG_RESERVED_FLAGS: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x10, 0x9b, 0x02, 0x6e, 0x5c, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: block_header_crc_mismatch.
+    const TEST_DATA_NEG_BLOCK_HEADER_CRC_MISMATCH: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x02, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: unsupported_filter.
+    const TEST_DATA_NEG_UNSUPPORTED_FILTER: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x03,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0xb2, 0x3c, 0x25, 0xd6, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: properties_reserved_bits.
+    const TEST_DATA_NEG_PROPERTIES_RESERVED_BITS: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x96, 0x00, 0x00, 0x00, 0x4f, 0x99, 0xbc, 0x4e, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: invalid_control_byte.
+    const TEST_DATA_NEG_INVALID_CONTROL_BYTE: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0x05, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: missing_properties.
+    const TEST_DATA_NEG_MISSING_PROPERTIES: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0x80, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: sequence_missing_properties_after_reset.
+    const TEST_DATA_NEG_SEQUENCE_MISSING_PROPERTIES_AFTER_RESET: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x00, 0xff, 0x12, 0xd9, 0x41, 0x02, 0x00, 0x21,
+        0x01, 0x16, 0x00, 0x00, 0x00, 0x74, 0x2f, 0xe5, 0xa3, 0x01, 0x00, 0x00, 0x2a, 0x90, 0x02,
+        0x66, 0x00, 0x5a, 0x5d, 0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb,
+        0x97, 0x03, 0x18, 0xc7, 0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9,
+        0x1a, 0x0a, 0x97, 0xfd, 0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8,
+        0xf0, 0xeb, 0x39, 0x89, 0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1,
+        0xfd, 0x32, 0x13, 0x2d, 0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2,
+        0x9b, 0x6d, 0xba, 0x19, 0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69,
+        0x6d, 0x58, 0x48, 0x9b, 0x40, 0x00, 0x00, 0x00, 0x00, 0x01, 0x72, 0xe8, 0x04, 0x00, 0x00,
+        0x00, 0x5e, 0x63, 0x79, 0x12, 0xa8, 0x00, 0x0a, 0xfc, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: trailing_data.
+    const TEST_DATA_NEG_TRAILING_DATA: [u8; 156] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a, 0xde, 0xad, 0xbe, 0xef,
+    ];
+
+    /// Invalid xz stream: padding_misaligned.
+    const TEST_DATA_NEG_PADDING_MISALIGNED: [u8; 153] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a, 0x00,
+    ];
+
+    /// Invalid xz stream: footer_flags_mismatch.
+    const TEST_DATA_NEG_FOOTER_FLAGS_MISMATCH: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x12, 0x51, 0x03, 0x65, 0x02, 0x00, 0x00, 0x00, 0x00, 0x03,
+        0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: index_mismatch.
+    const TEST_DATA_NEG_INDEX_MISMATCH: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe8, 0x04, 0x00, 0x00,
+        0x00, 0x5e, 0x63, 0x79, 0x12, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: truncated.
+    const TEST_DATA_NEG_TRUNCATED: [u8; 100] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c,
+    ];
+
+    /// Invalid xz stream: range decoder initialization byte non-zero.
+    const TEST_DATA_NEG_RANGE_DECODER_INITIALIZATION_NONZERO: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x01, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x72, 0xe7, 0x04, 0x00, 0x00,
+        0x00, 0x8f, 0xf4, 0x29, 0x90, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a,
+    ];
+
+    /// Invalid xz stream: variable-length integer non-canonical encoding.
+    const TEST_DATA_NEG_VARIABLE_LENGTH_INTEGER_NONCANONICAL: [u8; 152] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x0c, 0x00, 0x00, 0x00, 0x8f, 0x98, 0x41, 0x9c, 0xe0, 0x02, 0x66, 0x00, 0x5a, 0x5d,
+        0x00, 0x35, 0x99, 0x4a, 0xaa, 0x9a, 0x1e, 0x83, 0x57, 0x5e, 0xcb, 0x97, 0x03, 0x18, 0xc7,
+        0x64, 0xd0, 0xb5, 0x83, 0x16, 0x14, 0x3e, 0xec, 0x2e, 0x31, 0xa9, 0x1a, 0x0a, 0x97, 0xfd,
+        0x7c, 0x27, 0x03, 0x5d, 0x51, 0x01, 0x9a, 0xa1, 0x6c, 0x52, 0xe8, 0xf0, 0xeb, 0x39, 0x89,
+        0x82, 0x99, 0x18, 0x16, 0x82, 0x2f, 0x03, 0x13, 0xaa, 0x04, 0xc1, 0xfd, 0x32, 0x13, 0x2d,
+        0x04, 0xa9, 0xae, 0xfa, 0x63, 0xa8, 0xb4, 0x7c, 0x28, 0x4c, 0xc2, 0x9b, 0x6d, 0xba, 0x19,
+        0x34, 0xd7, 0xa7, 0x85, 0x32, 0x87, 0xcc, 0x6b, 0xe9, 0xed, 0x69, 0x6d, 0x58, 0x48, 0x9b,
+        0x40, 0x00, 0x00, 0x00, 0x5b, 0x9c, 0xcf, 0x9b, 0x00, 0x01, 0x80, 0x00, 0x80, 0x00, 0x00,
+        0x00, 0x3e, 0x76, 0xbc, 0x30, 0x3e, 0x30, 0x0d, 0x8b, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x59, 0x5a,
+    ];
+
+    fn get_test_input_v1() -> Vec<u8> {
+        let mut data: Vec<u8> = b"keramics xz decompression test vector. ".repeat(10);
+        data.extend_from_slice(&b"The quick brown fox jumps over the lazy dog. ".repeat(5));
+        data
+    }
+
+    fn calculate_crc32(data: &[u8]) -> u32 {
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(data);
+        crc32_context.finalize()
+    }
+
+    fn encode_variable_length_integer(mut value: u64, output: &mut Vec<u8>) {
+        loop {
+            let mut byte_value: u8 = (value & 0x7f) as u8;
+            value >>= 7;
+            if value != 0 {
+                byte_value |= 0x80;
+            }
+            output.push(byte_value);
+            if value == 0 {
+                break;
+            }
+        }
+    }
+
+    fn decompress_test_data(test_data: &[u8], expected_data: &[u8]) -> Result<(), ErrorTrace> {
+        let mut test_context: XzContext = XzContext::new();
+        let mut uncompressed_data: Vec<u8> = vec![0; expected_data.len()];
+        test_context.decompress(test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, expected_data.len());
+        assert_eq!(&uncompressed_data, expected_data);
+        Ok(())
+    }
+
+    fn assert_decompress_fails(test_data: &[u8]) {
+        let mut test_context: XzContext = XzContext::new();
+        let mut uncompressed_data: Vec<u8> = vec![0; 2048];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_stream_header() -> Result<(), ErrorTrace> {
+        let mut stream_header: XzStreamHeader = XzStreamHeader::new();
+
+        stream_header.read_data(&TEST_DATA_V1)?;
+        assert_eq!(stream_header.checksum_type, XZ_CHECKSUM_TYPE_CRC32);
+        assert_eq!(stream_header.checksum_size, 4);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_stream_header_with_invalid_size() {
+        let mut stream_header: XzStreamHeader = XzStreamHeader::new();
+
+        let result: Result<(), ErrorTrace> = stream_header.read_data(&TEST_DATA_V1[0..11]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_block_header() -> Result<(), ErrorTrace> {
+        let mut block_header: XzBlockHeader = XzBlockHeader::new();
+
+        block_header.read_data(&TEST_DATA_V5C[12..])?;
+        assert_eq!(block_header.header_size, 16);
+        assert_eq!(block_header.compressed_size, Some(109));
+        assert_eq!(block_header.uncompressed_size, Some(620));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_stream_footer() -> Result<(), ErrorTrace> {
+        let mut stream_footer: XzStreamFooter = XzStreamFooter::new();
+
+        stream_footer.read_data(&TEST_DATA_V1[TEST_DATA_V1.len() - XZ_STREAM_FOOTER_SIZE..])?;
+        assert_eq!(stream_footer.index_size, 12);
+        assert_eq!(stream_footer.checksum_type, XZ_CHECKSUM_TYPE_CRC32);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_v1() -> Result<(), ErrorTrace> {
+        let expected_data: Vec<u8> = get_test_input_v1();
+        decompress_test_data(&TEST_DATA_V1, &expected_data)
+    }
+
+    #[test]
+    fn test_decompress_v2() -> Result<(), ErrorTrace> {
+        let expected_data: Vec<u8> = b"0123456789 abcdefghijklmnopqrstuvwxyz "
+            .to_vec()
+            .repeat(400);
+        decompress_test_data(&TEST_DATA_V2, &expected_data)
+    }
+
+    #[test]
+    fn test_decompress_v3() -> Result<(), ErrorTrace> {
+        let expected_data: Vec<u8> = b"keramics multiblock crc32 test. ".to_vec().repeat(40);
+        decompress_test_data(&TEST_DATA_V3, &expected_data)
+    }
+
+    #[test]
+    fn test_decompress_v4() -> Result<(), ErrorTrace> {
+        let phrase: &[u8] = b"The quick brown fox jumps over the lazy dog, again and again. ";
+        let mut expected_data: Vec<u8> = phrase.repeat(135301);
+        expected_data.truncate(8 << 20);
+        decompress_test_data(&TEST_DATA_V4, &expected_data)
+    }
+
+    #[test]
+    fn test_decompress_v5a() -> Result<(), ErrorTrace> {
+        let mut expected_data: Vec<u8> = vec![0xaa, 0x55, 0x11, 0x22, 0x33];
+        expected_data.extend_from_slice(&get_test_input_v1());
+        decompress_test_data(&TEST_DATA_V5A, &expected_data)
+    }
+
+    #[test]
+    fn test_decompress_v5b() -> Result<(), ErrorTrace> {
+        let mut expected_data: Vec<u8> = vec![0xde, 0xad, 0xbe, 0xef];
+        expected_data.extend_from_slice(&get_test_input_v1());
+        decompress_test_data(&TEST_DATA_V5B, &expected_data)
+    }
+
+    #[test]
+    fn test_decompress_v5c() -> Result<(), ErrorTrace> {
+        let mut expected_data: Vec<u8> = vec![0xaa, 0x55, 0x11, 0x22, 0x33];
+        expected_data.extend_from_slice(&get_test_input_v1());
+        decompress_test_data(&TEST_DATA_V5C, &expected_data)
+    }
+
+    #[test]
+    fn test_decompress_with_unsupported_signature() {
+        assert_decompress_fails(&TEST_DATA_NEG_BAD_SIGNATURE);
+    }
+
+    #[test]
+    fn test_decompress_with_header_crc_mismatch() {
+        assert_decompress_fails(&TEST_DATA_NEG_HEADER_CRC_MISMATCH);
+    }
+
+    #[test]
+    fn test_decompress_with_unsupported_check() {
+        assert_decompress_fails(&TEST_DATA_NEG_UNSUPPORTED_CHECK);
+    }
+
+    #[test]
+    fn test_decompress_with_reserved_flags() {
+        assert_decompress_fails(&TEST_DATA_NEG_RESERVED_FLAGS);
+    }
+
+    #[test]
+    fn test_decompress_with_block_header_crc_mismatch() {
+        assert_decompress_fails(&TEST_DATA_NEG_BLOCK_HEADER_CRC_MISMATCH);
+    }
+
+    #[test]
+    fn test_decompress_with_unsupported_filter() {
+        assert_decompress_fails(&TEST_DATA_NEG_UNSUPPORTED_FILTER);
+    }
+
+    #[test]
+    fn test_decompress_with_properties_reserved_bits() {
+        assert_decompress_fails(&TEST_DATA_NEG_PROPERTIES_RESERVED_BITS);
+    }
+
+    #[test]
+    fn test_decompress_with_invalid_control_byte() {
+        assert_decompress_fails(&TEST_DATA_NEG_INVALID_CONTROL_BYTE);
+    }
+
+    #[test]
+    fn test_decompress_with_missing_properties() {
+        assert_decompress_fails(&TEST_DATA_NEG_MISSING_PROPERTIES);
+    }
+
+    #[test]
+    fn test_decompress_with_sequence_missing_properties_after_reset() {
+        assert_decompress_fails(&TEST_DATA_NEG_SEQUENCE_MISSING_PROPERTIES_AFTER_RESET);
+    }
+
+    #[test]
+    fn test_decompress_with_trailing_data() {
+        assert_decompress_fails(&TEST_DATA_NEG_TRAILING_DATA);
+    }
+
+    #[test]
+    fn test_decompress_with_padding_misaligned() {
+        assert_decompress_fails(&TEST_DATA_NEG_PADDING_MISALIGNED);
+    }
+
+    #[test]
+    fn test_decompress_with_footer_flags_mismatch() {
+        assert_decompress_fails(&TEST_DATA_NEG_FOOTER_FLAGS_MISMATCH);
+    }
+
+    #[test]
+    fn test_decompress_with_index_mismatch() {
+        assert_decompress_fails(&TEST_DATA_NEG_INDEX_MISMATCH);
+    }
+
+    #[test]
+    fn test_decompress_with_truncated_data() {
+        assert_decompress_fails(&TEST_DATA_NEG_TRUNCATED);
+    }
+
+    #[test]
+    fn test_decompress_with_invalid_range_decoder_initialization_byte() {
+        assert_decompress_fails(&TEST_DATA_NEG_RANGE_DECODER_INITIALIZATION_NONZERO);
+    }
+
+    #[test]
+    fn test_decompress_with_variable_length_integer_noncanonical() {
+        assert_decompress_fails(&TEST_DATA_NEG_VARIABLE_LENGTH_INTEGER_NONCANONICAL);
+    }
+
+    #[test]
+    fn test_read_variable_length_integer() -> Result<(), ErrorTrace> {
+        let data: [u8; 4] = [0x05, 0x00, 0x85, 0x01];
+        let (value, offset): (u64, usize) = read_variable_length_integer(&data, 0)?;
+        assert_eq!(value, 5);
+        assert_eq!(offset, 1);
+
+        let (value, offset): (u64, usize) = read_variable_length_integer(&data, 2)?;
+        assert_eq!(value, 133);
+        assert_eq!(offset, 4);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_variable_length_integer_with_too_many_bytes() {
+        let data: [u8; 10] = [0x80; 10];
+        let result: Result<(u64, usize), ErrorTrace> = read_variable_length_integer(&data, 0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_variable_length_integer_with_truncated_data() {
+        let data: [u8; 1] = [0x80];
+        let result: Result<(u64, usize), ErrorTrace> = read_variable_length_integer(&data, 0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_variable_length_integer_with_noncanonical_encoding() {
+        let data: [u8; 2] = [0x80, 0x00];
+        let result: Result<(u64, usize), ErrorTrace> = read_variable_length_integer(&data, 0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_variable_length_integer_at_end_of_data() {
+        let result: Result<(u64, usize), ErrorTrace> = read_variable_length_integer(&[], 0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_stream_header_with_nonzero_first_flags_byte() {
+        let mut stream_header: XzStreamHeader = XzStreamHeader::new();
+        let mut test_data: [u8; 12] = [
+            0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let checksum: u32 = calculate_crc32(&test_data[6..8]);
+        test_data[8..12].copy_from_slice(&checksum.to_le_bytes());
+
+        let result: Result<(), ErrorTrace> = stream_header.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_block_header_with_errors() {
+        let mut block_header: XzBlockHeader = XzBlockHeader::new();
+
+        // Empty data.
+        assert!(block_header.read_data(&[]).is_err());
+
+        // Header size byte 0x00 (4 bytes < minimum 8).
+        assert!(block_header.read_data(&[0x00, 0x00, 0x00, 0x00]).is_err());
+
+        // Data shorter than declared header size.
+        assert!(block_header.read_data(&[0x01, 0x00, 0x00, 0x00]).is_err());
+
+        // Reserved block flags bits set.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Invalid compressed size variable-length integer.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x40, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Invalid uncompressed size variable-length integer.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x80, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Unsupported number of filters (2).
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x01, 0x21, 0x01, 0x0c, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Data offset reaches header size before filter list.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0xc0, 0x81, 0x81, 0x01, 0x81, 0x81, 0x01])
+                .is_err()
+        );
+
+        // Invalid filter identifier variable-length integer.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Invalid properties size variable-length integer.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x00, 0x21, 0x80, 0x00, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Filter properties extend beyond header size.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x00, 0x21, 0x05, 0x00, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Filter data overlaps the 4-byte header CRC32 field (header_size = 8, data_offset = 5).
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x00, 0x21, 0x01, 0x0c, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Non-zero byte in block header padding.
+        let mut bad_padding: [u8; 12] = [
+            0x02, 0x00, 0x21, 0x01, 0x0c, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let checksum: u32 = calculate_crc32(&bad_padding[0..8]);
+        bad_padding[8..12].copy_from_slice(&checksum.to_le_bytes());
+        assert!(block_header.read_data(&bad_padding).is_err());
+
+        // Block header CRC32 mismatch.
+        let mut bad_checksum: Vec<u8> = TEST_DATA_V1[12..24].to_vec();
+        bad_checksum[11] ^= 0x01;
+        assert!(block_header.read_data(&bad_checksum).is_err());
+    }
+
+    #[test]
+    fn test_block_header_verify_stored_sizes() -> Result<(), ErrorTrace> {
+        let mut block_header: XzBlockHeader = XzBlockHeader::new();
+        block_header.read_data(&TEST_DATA_V5C[12..])?;
+
+        block_header.verify_stored_sizes(109, 620)?;
+        assert!(block_header.verify_stored_sizes(108, 620).is_err());
+        assert!(block_header.verify_stored_sizes(109, 619).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_stream_footer_with_errors() -> Result<(), ErrorTrace> {
+        let mut stream_footer: XzStreamFooter = XzStreamFooter::new();
+
+        // Data too short.
+        assert!(stream_footer.read_data(&[0; 11]).is_err());
+
+        // Checksum mismatch.
+        let mut bad_checksum: Vec<u8> =
+            TEST_DATA_V1[TEST_DATA_V1.len() - XZ_STREAM_FOOTER_SIZE..].to_vec();
+        bad_checksum[0] ^= 0x01;
+        assert!(stream_footer.read_data(&bad_checksum).is_err());
+
+        // First stream flags byte non-zero with valid checksum.
+        let mut bad_flags1: [u8; 12] = [
+            0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01, 0x01, b'Y', b'Z',
+        ];
+        let checksum: u32 = calculate_crc32(&bad_flags1[4..10]);
+        bad_flags1[0..4].copy_from_slice(&checksum.to_le_bytes());
+        assert!(stream_footer.read_data(&bad_flags1).is_err());
+
+        // Reserved upper bits of second stream flags byte set with valid checksum.
+        let mut bad_flags2: [u8; 12] = [
+            0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x10, b'Y', b'Z',
+        ];
+        let checksum: u32 = calculate_crc32(&bad_flags2[4..10]);
+        bad_flags2[0..4].copy_from_slice(&checksum.to_le_bytes());
+        assert!(stream_footer.read_data(&bad_flags2).is_err());
+
+        // Unsupported footer signature with valid checksum.
+        let mut bad_signature: [u8; 12] = [
+            0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01, b'X', b'X',
+        ];
+        let checksum: u32 = calculate_crc32(&bad_signature[4..10]);
+        bad_signature[0..4].copy_from_slice(&checksum.to_le_bytes());
+        assert!(stream_footer.read_data(&bad_signature).is_err());
+
+        // Index size mismatch in verify_stream.
+        stream_footer.read_data(&TEST_DATA_V1[TEST_DATA_V1.len() - XZ_STREAM_FOOTER_SIZE..])?;
+        assert!(
+            stream_footer
+                .verify_stream(16, XZ_CHECKSUM_TYPE_CRC32)
+                .is_err()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_multi_chunk_state_and_property_resets() -> Result<(), ErrorTrace> {
+        // Build a valid xz stream with 3 LZMA2 chunks in a single block:
+        // 1. 0xe0 (dictionary + state + properties reset)
+        // 2. 0xa0 (state reset, keeping existing properties)
+        // 3. 0xc0 (state + properties reset on existing decoder)
+        let mut stream: Vec<u8> = Vec::new();
+        stream.extend_from_slice(&TEST_DATA_V1[0..24]);
+
+        let block_data_start: usize = stream.len();
+        // Chunk 1: control 0xe0 with properties 0x5d.
+        stream.extend_from_slice(&TEST_DATA_V1[24..121]);
+        // Chunk 2: control 0xa0 without properties byte.
+        stream.push(0xa0);
+        stream.extend_from_slice(&TEST_DATA_V1[25..29]);
+        stream.extend_from_slice(&TEST_DATA_V1[30..121]);
+        // Chunk 3: control 0xc0 with properties 0x5d.
+        stream.push(0xc0);
+        stream.extend_from_slice(&TEST_DATA_V1[25..121]);
+        // End of LZMA2 block marker.
+        stream.push(0x00);
+
+        let block_compressed_size: usize = stream.len() - block_data_start;
+        let unpadded_size: u64 = 12 + (block_compressed_size as u64) + 4;
+        let block_padding_size: usize = (4 - ((12 + unpadded_size) & 3)) as usize & 3;
+        stream.resize(stream.len() + block_padding_size, 0x00);
+
+        let test_input_v1: Vec<u8> = get_test_input_v1();
+        let mut expected_data: Vec<u8> = Vec::with_capacity(test_input_v1.len() * 3);
+        expected_data.extend_from_slice(&test_input_v1);
+        expected_data.extend_from_slice(&test_input_v1);
+        expected_data.extend_from_slice(&test_input_v1);
+
+        let block_checksum: u32 = calculate_crc32(&expected_data);
+        stream.extend_from_slice(&block_checksum.to_le_bytes());
+
+        // Build index.
+        let index_start: usize = stream.len();
+        stream.push(0x00);
+        encode_variable_length_integer(1, &mut stream);
+        encode_variable_length_integer(unpadded_size, &mut stream);
+        encode_variable_length_integer(expected_data.len() as u64, &mut stream);
+
+        let index_body_size: usize = stream.len() - index_start;
+        let index_padding_size: usize = (4 - (index_body_size & 3)) & 3;
+        stream.resize(stream.len() + index_padding_size, 0x00);
+
+        let index_checksum: u32 = calculate_crc32(&stream[index_start..]);
+        stream.extend_from_slice(&index_checksum.to_le_bytes());
+
+        let index_size: usize = stream.len() - index_start;
+        let backward_size: u32 = ((index_size / 4) - 1) as u32;
+
+        // Build stream footer.
+        let mut footer_body: [u8; 6] = [0; 6];
+        footer_body[0..4].copy_from_slice(&backward_size.to_le_bytes());
+        footer_body[4] = 0x00;
+        footer_body[5] = XZ_CHECKSUM_TYPE_CRC32;
+        let footer_checksum: u32 = calculate_crc32(&footer_body);
+
+        stream.extend_from_slice(&footer_checksum.to_le_bytes());
+        stream.extend_from_slice(&footer_body);
+        stream.extend_from_slice(XZ_STREAM_FOOTER_SIGNATURE);
+
+        decompress_test_data(&stream, &expected_data)
+    }
+
+    #[test]
+    fn test_decompress_with_structural_and_size_errors() {
+        // Compressed data shorter than stream header.
+        assert_decompress_fails(&TEST_DATA_V1[0..11]);
+
+        // Stream truncated immediately after stream header.
+        assert_decompress_fails(&TEST_DATA_V1[0..12]);
+
+        // Stream truncated immediately after block header.
+        assert_decompress_fails(&TEST_DATA_V1[0..24]);
+
+        // Stream truncated before complete stream footer.
+        assert_decompress_fails(&TEST_DATA_V1[0..TEST_DATA_V1.len() - 4]);
+
+        // Stream footer CRC mismatch via decompress.
+        let mut bad_footer: Vec<u8> = TEST_DATA_V1.to_vec();
+        let footer_offset: usize = bad_footer.len() - XZ_STREAM_FOOTER_SIZE;
+        bad_footer[footer_offset] ^= 0x01;
+        assert_decompress_fails(&bad_footer);
+
+        // Block padding non-zero byte via decompress.
+        let mut bad_block_padding: Vec<u8> = TEST_DATA_V1.to_vec();
+        bad_block_padding[122] = 0x01;
+        assert_decompress_fails(&bad_block_padding);
+
+        // Block CRC32 mismatch via decompress.
+        let mut bad_block_checksum: Vec<u8> = TEST_DATA_V1.to_vec();
+        bad_block_checksum[124] ^= 0x01;
+        assert_decompress_fails(&bad_block_checksum);
+
+        // Stored compressed size mismatch via decompress.
+        let mut bad_stored_size: Vec<u8> = TEST_DATA_V5C.to_vec();
+        bad_stored_size[14] = 0x6c;
+        let block_header_checksum: u32 = calculate_crc32(&bad_stored_size[12..24]);
+        bad_stored_size[24..28].copy_from_slice(&block_header_checksum.to_le_bytes());
+        assert_decompress_fails(&bad_stored_size);
+
+        // Output buffer larger than uncompressed data.
+        let mut test_context: XzContext = XzContext::new();
+        let mut large_buffer: Vec<u8> = vec![0; get_test_input_v1().len() + 10];
+        assert!(
+            test_context
+                .decompress(&TEST_DATA_V1, &mut large_buffer)
+                .is_err()
+        );
+
+        // Output buffer too small for LZMA chunk.
+        let mut small_buffer: Vec<u8> = vec![0; 10];
+        assert!(
+            test_context
+                .decompress(&TEST_DATA_V1, &mut small_buffer)
+                .is_err()
+        );
+
+        // Output buffer too small for uncompressed chunk.
+        let mut tiny_buffer: Vec<u8> = vec![0; 1];
+        assert!(
+            test_context
+                .decompress(&TEST_DATA_V5A, &mut tiny_buffer)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_decompress_chunk_with_errors() -> Result<(), ErrorTrace> {
+        DebugTrace::scope(|debug_trace: &mut DebugTraceScope| {
+            let mut uncompressed_data: [u8; 16] = [0; 16];
+
+            // LZMA chunk: truncated 4-byte chunk header.
+            let mut data_offset: usize = 0;
+            let mut uncompressed_data_offset: usize = 0;
+            let mut dictionary_start_offset: usize = 0;
+            let mut need_properties: bool = true;
+            let mut need_dictionary_reset: bool = true;
+            let mut lzma_decoder: Option<LzmaDecoder> = None;
+
+            assert!(
+                XzContext::decompress_lzma_chunk(
+                    debug_trace,
+                    &[0x00, 0x00, 0x00],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0xe0,
+                    &mut need_properties,
+                    &mut need_dictionary_reset,
+                    &mut lzma_decoder,
+                )
+                .is_err()
+            );
+
+            // LZMA chunk: truncated properties byte.
+            data_offset = 0;
+            assert!(
+                XzContext::decompress_lzma_chunk(
+                    debug_trace,
+                    &[0x00, 0x00, 0x00, 0x00],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0xe0,
+                    &mut need_properties,
+                    &mut need_dictionary_reset,
+                    &mut lzma_decoder,
+                )
+                .is_err()
+            );
+
+            // LZMA chunk: invalid properties byte.
+            data_offset = 0;
+            assert!(
+                XzContext::decompress_lzma_chunk(
+                    debug_trace,
+                    &[0x00, 0x00, 0x00, 0x00, 0xe1],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0xe0,
+                    &mut need_properties,
+                    &mut need_dictionary_reset,
+                    &mut lzma_decoder,
+                )
+                .is_err()
+            );
+
+            // LZMA chunk: state reset (0xa0) with no decoder defined.
+            data_offset = 0;
+            need_properties = false;
+            need_dictionary_reset = false;
+            assert!(
+                XzContext::decompress_lzma_chunk(
+                    debug_trace,
+                    &[0x00, 0x00, 0x00, 0x00, 0x00],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0xa0,
+                    &mut need_properties,
+                    &mut need_dictionary_reset,
+                    &mut lzma_decoder,
+                )
+                .is_err()
+            );
+
+            // LZMA chunk: continuation (0x80) with no decoder defined.
+            data_offset = 0;
+            assert!(
+                XzContext::decompress_lzma_chunk(
+                    debug_trace,
+                    &[0x00, 0x00, 0x00, 0x00, 0x00],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0x80,
+                    &mut need_properties,
+                    &mut need_dictionary_reset,
+                    &mut lzma_decoder,
+                )
+                .is_err()
+            );
+
+            // Uncompressed chunk: invalid control byte after dictionary reset.
+            let mut stream: Vec<u8> = TEST_DATA_V1[0..24].to_vec();
+            stream.extend_from_slice(&[0x01, 0x00, 0x00, 0xaa, 0x03]);
+            assert_decompress_fails(&stream);
+
+            // Uncompressed chunk: truncated size field.
+            data_offset = 0;
+            assert!(
+                XzContext::decompress_uncompressed_chunk(
+                    &[0x00],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0x01,
+                    &mut need_dictionary_reset,
+                )
+                .is_err()
+            );
+
+            // Uncompressed chunk: truncated payload data.
+            data_offset = 0;
+            assert!(
+                XzContext::decompress_uncompressed_chunk(
+                    &[0x00, 0x05, 0xaa],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0x01,
+                    &mut need_dictionary_reset,
+                )
+                .is_err()
+            );
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_read_block_padding_and_index_with_errors() {
+        // Block padding truncated.
+        assert!(XzContext::read_block_padding(&[0x00, 0x00], 0, 0, 1).is_err());
+
+        // Block checksum truncated.
+        assert!(
+            XzContext::verify_block_checksum(XZ_CHECKSUM_TYPE_CRC32, &[0x00, 0x00], 0, &[])
+                .is_err()
+        );
+
+        // Index offset at end of data.
+        assert!(XzContext::read_index(&[], 0, &[]).is_err());
+
+        // Invalid index indicator byte.
+        assert!(XzContext::read_index(&[0x01, 0x00], 0, &[]).is_err());
+
+        // Invalid number of records variable-length integer.
+        assert!(XzContext::read_index(&[0x00, 0x80, 0x00], 0, &[]).is_err());
+
+        // Number of records mismatch.
+        assert!(XzContext::read_index(&[0x00, 0x02], 0, &[(16, 10)]).is_err());
+
+        // Invalid stored uncompressed size variable-length integer.
+        assert!(XzContext::read_index(&[0x00, 0x01, 0x10, 0x80, 0x00], 0, &[(16, 10)]).is_err());
+
+        // Truncated index padding / checksum.
+        assert!(XzContext::read_index(&[0x00, 0x01, 0x10, 0x0a, 0x00], 0, &[(16, 10)]).is_err());
+
+        // Non-zero byte in index padding.
+        let mut bad_index_padding: [u8; 8] = [0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let checksum: u32 = calculate_crc32(&bad_index_padding[0..4]);
+        bad_index_padding[4..8].copy_from_slice(&checksum.to_le_bytes());
+        assert!(XzContext::read_index(&bad_index_padding, 0, &[]).is_err());
+
+        // Index CRC32 mismatch.
+        let mut bad_index_checksum: [u8; 8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let checksum: u32 = calculate_crc32(&bad_index_checksum[0..4]) ^ 0x01;
+        bad_index_checksum[4..8].copy_from_slice(&checksum.to_le_bytes());
+        assert!(XzContext::read_index(&bad_index_checksum, 0, &[]).is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_debug_output() -> Result<(), ErrorTrace> {
+        let original_debug_output: bool = Mediator::current().debug_output;
+        Mediator::new(true).make_current();
+
+        let expected_data: Vec<u8> = get_test_input_v1();
+        let result: Result<(), ErrorTrace> = decompress_test_data(&TEST_DATA_V1, &expected_data);
+
+        Mediator::new(original_debug_output).make_current();
+
+        result
+    }
+}

@@ -11,9 +11,9 @@
  * under the License.
  */
 
-//! ZLIB decompression.
+//! zlib decompression.
 //!
-//! Provides decompression support for ZLIB compressed data (RFC 1950).
+//! Provides decompression support for zlib compressed data (RFC 1950).
 
 use keramics_checksums::Adler32Context;
 use keramics_core::ErrorTrace;
@@ -24,7 +24,7 @@ use keramics_core::DebugTrace;
 
 use super::deflate::{DeflateBitstream, DeflateContext};
 
-/// Data header used by ZLIB compressed data.
+/// Data header used by zlib compressed data.
 struct ZlibDataHeader {
     /// Header size.
     header_size: usize,
@@ -111,7 +111,7 @@ impl ZlibDataHeader {
     }
 }
 
-/// Context for decompressing ZLIB compressed data.
+/// Context for decompressing zlib compressed data.
 pub struct ZlibContext {
     /// Uncompressed data size.
     pub uncompressed_data_size: usize,

@@ -136,6 +136,13 @@ doc = false
 required-features = ["fuzzing"]
 
 [[bin]]
+name = "lzma"
+path = "fuzz_targets/lzma.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
 name = "lznt1"
 path = "fuzz_targets/lznt1.rs"
 test = false
@@ -292,6 +299,13 @@ required-features = ["fuzzing"]
 [[bin]]
 name = "xfs"
 path = "fuzz_targets/xfs.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
+name = "xz"
+path = "fuzz_targets/xz.rs"
 test = false
 doc = false
 required-features = ["fuzzing"]
