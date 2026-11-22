@@ -256,3 +256,122 @@ impl BlockReader for UdifBlockReader {
         Ok(data_offset)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::open_fake_data_stream;
+
+    /// Valid xz stream that decompresses to b"test".
+    const TEST_XZ_DATA: [u8; 56] = [
+        0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x00, 0x01, 0x69, 0x22, 0xde, 0x36, 0x02, 0x00, 0x21,
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x37, 0x27, 0x97, 0xd6, 0x01, 0x00, 0x03, 0x74, 0x65, 0x73,
+        0x74, 0x00, 0x0c, 0x7e, 0x7f, 0xd8, 0x00, 0x01, 0x18, 0x04, 0x6b, 0xe9, 0xf0, 0xa5, 0x90,
+        0x42, 0x99, 0x0d, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01, 0x59, 0x5a,
+    ];
+
+    #[test]
+    fn test_decompress_block_with_lzma() -> Result<(), ErrorTrace> {
+        let data_stream: DataStreamReference = open_fake_data_stream(&[]);
+        let block_reader: UdifBlockReader =
+            UdifBlockReader::new(&data_stream, &[], &UdifCompressionMethod::Lzma, 4);
+
+        let mut uncompressed_data: [u8; 4] = [0; 4];
+        block_reader.decompress_block(&TEST_XZ_DATA, &mut uncompressed_data)?;
+        assert_eq!(&uncompressed_data, b"test");
+
+        let mut invalid_data: Vec<u8> = TEST_XZ_DATA.to_vec();
+        invalid_data[0] = 0x00;
+        let result: Result<(), ErrorTrace> =
+            block_reader.decompress_block(&invalid_data, &mut uncompressed_data);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_block_with_errors() {
+        let data_stream: DataStreamReference = open_fake_data_stream(&[]);
+        let mut uncompressed_data: [u8; 4] = [0; 4];
+
+        let methods: [UdifCompressionMethod; 5] = [
+            UdifCompressionMethod::Adc,
+            UdifCompressionMethod::Bzip2,
+            UdifCompressionMethod::Lzfse,
+            UdifCompressionMethod::Zlib,
+            UdifCompressionMethod::None,
+        ];
+        for compression_method in methods {
+            let block_reader: UdifBlockReader =
+                UdifBlockReader::new(&data_stream, &[], &compression_method, 4);
+            let result: Result<(), ErrorTrace> =
+                block_reader.decompress_block(&[0xff, 0xff], &mut uncompressed_data);
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn test_read_data_from_blocks_with_lzma() -> Result<(), ErrorTrace> {
+        let mut segment_data: Vec<u8> = TEST_XZ_DATA.to_vec();
+        segment_data.extend_from_slice(b"raw!");
+        let data_stream: DataStreamReference = open_fake_data_stream(&segment_data);
+
+        let block_ranges: [UdifBlockRange; 3] = [
+            UdifBlockRange::new(
+                0,
+                0,
+                4,
+                TEST_XZ_DATA.len() as u32,
+                UdifBlockRangeType::Compressed,
+            ),
+            UdifBlockRange::new(
+                4,
+                TEST_XZ_DATA.len() as u64,
+                4,
+                0,
+                UdifBlockRangeType::InFile,
+            ),
+            UdifBlockRange::new(8, 0, 4, 0, UdifBlockRangeType::Sparse),
+        ];
+        let mut block_reader: UdifBlockReader = UdifBlockReader::new(
+            &data_stream,
+            &block_ranges,
+            &UdifCompressionMethod::Lzma,
+            12,
+        );
+        assert_eq!(block_reader.get_size(), 12);
+
+        let mut data: [u8; 12] = [0xff; 12];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut data, 0)?;
+        assert_eq!(read_count, 12);
+        assert_eq!(&data, b"testraw!\x00\x00\x00\x00");
+
+        // Second read exercises cached compressed block.
+        let mut cached_data: [u8; 4] = [0; 4];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut cached_data, 0)?;
+        assert_eq!(read_count, 4);
+        assert_eq!(&cached_data, b"test");
+
+        // Missing block range returns error.
+        let result: Result<usize, ErrorTrace> =
+            block_reader.read_data_from_blocks(&mut cached_data, 100);
+        assert!(result.is_err());
+
+        // Corrupted LZMA block returns error.
+        let mut bad_segment_data: Vec<u8> = TEST_XZ_DATA.to_vec();
+        bad_segment_data[0] = 0x00;
+        let bad_stream: DataStreamReference = open_fake_data_stream(&bad_segment_data);
+        let mut bad_reader: UdifBlockReader = UdifBlockReader::new(
+            &bad_stream,
+            &block_ranges[0..1],
+            &UdifCompressionMethod::Lzma,
+            4,
+        );
+        let result: Result<usize, ErrorTrace> =
+            bad_reader.read_data_from_blocks(&mut cached_data, 0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+}

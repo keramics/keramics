@@ -1129,6 +1129,8 @@ impl XzContext {
 mod tests {
     use super::*;
 
+    use keramics_core::mediator::Mediator;
+
     /// Input of TEST_DATA_V1: "keramics xz decompression vector. " repeated.
     const TEST_INPUT_V1: [u8; 615] = [
         0x6b, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x73, 0x20, 0x78, 0x7a, 0x20, 0x64, 0x65, 0x63,
@@ -1866,5 +1868,520 @@ mod tests {
     fn test_read_variable_length_integer_at_end_of_data() {
         let result: Result<(u64, usize), ErrorTrace> = read_variable_length_integer(&[], 0);
         assert!(result.is_err());
+    }
+
+    fn calculate_crc32(data: &[u8]) -> u32 {
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(data);
+        crc32_context.finalize()
+    }
+
+    fn encode_variable_length_integer(mut value: u64, output: &mut Vec<u8>) {
+        loop {
+            let mut byte_value: u8 = (value & 0x7f) as u8;
+            value >>= 7;
+            if value != 0 {
+                byte_value |= 0x80;
+            }
+            output.push(byte_value);
+            if value == 0 {
+                break;
+            }
+        }
+    }
+
+    #[test]
+    fn test_read_stream_header_with_nonzero_first_flags_byte() {
+        let mut stream_header: XzStreamHeader = XzStreamHeader::new();
+        let mut test_data: [u8; 12] = [
+            0xfd, 0x37, 0x7a, 0x58, 0x5a, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let checksum: u32 = calculate_crc32(&test_data[6..8]);
+        test_data[8..12].copy_from_slice(&checksum.to_le_bytes());
+
+        let result: Result<(), ErrorTrace> = stream_header.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_block_header_errors() {
+        let mut block_header: XzBlockHeader = XzBlockHeader::new();
+
+        // Empty data.
+        assert!(block_header.read_data(&[]).is_err());
+
+        // Header size byte 0x00 (4 bytes < minimum 8).
+        assert!(block_header.read_data(&[0x00, 0x00, 0x00, 0x00]).is_err());
+
+        // Data shorter than declared header size.
+        assert!(block_header.read_data(&[0x01, 0x00, 0x00, 0x00]).is_err());
+
+        // Reserved block flags bits set.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Invalid compressed size variable-length integer.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x40, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Invalid uncompressed size variable-length integer.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x80, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Unsupported number of filters (2).
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x01, 0x21, 0x01, 0x0c, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Data offset reaches header size before filter list.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0xc0, 0x81, 0x81, 0x01, 0x81, 0x81, 0x01])
+                .is_err()
+        );
+
+        // Invalid filter identifier variable-length integer.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Invalid properties size variable-length integer.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x00, 0x21, 0x80, 0x00, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Filter properties extend beyond header size.
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x00, 0x21, 0x05, 0x00, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Filter data overlaps the 4-byte header CRC32 field (header_size = 8, data_offset = 5).
+        assert!(
+            block_header
+                .read_data(&[0x01, 0x00, 0x21, 0x01, 0x0c, 0x00, 0x00, 0x00])
+                .is_err()
+        );
+
+        // Non-zero byte in block header padding.
+        let mut bad_padding: [u8; 12] = [
+            0x02, 0x00, 0x21, 0x01, 0x0c, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let checksum: u32 = calculate_crc32(&bad_padding[0..8]);
+        bad_padding[8..12].copy_from_slice(&checksum.to_le_bytes());
+        assert!(block_header.read_data(&bad_padding).is_err());
+
+        // Block header CRC32 mismatch.
+        let mut bad_crc: Vec<u8> = TEST_DATA_V1[12..24].to_vec();
+        bad_crc[11] ^= 0x01;
+        assert!(block_header.read_data(&bad_crc).is_err());
+    }
+
+    #[test]
+    fn test_block_header_verify_stored_sizes() -> Result<(), ErrorTrace> {
+        let mut block_header: XzBlockHeader = XzBlockHeader::new();
+        block_header.read_data(&TEST_DATA_V5C[12..])?;
+
+        block_header.verify_stored_sizes(109, 620)?;
+        assert!(block_header.verify_stored_sizes(108, 620).is_err());
+        assert!(block_header.verify_stored_sizes(109, 619).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_stream_footer_and_verify_errors() -> Result<(), ErrorTrace> {
+        let mut stream_footer: XzStreamFooter = XzStreamFooter::new();
+
+        // Data too short.
+        assert!(stream_footer.read_data(&[0; 11]).is_err());
+
+        // Checksum mismatch.
+        let mut bad_crc: Vec<u8> =
+            TEST_DATA_V1[TEST_DATA_V1.len() - XZ_STREAM_FOOTER_SIZE..].to_vec();
+        bad_crc[0] ^= 0x01;
+        assert!(stream_footer.read_data(&bad_crc).is_err());
+
+        // First stream flags byte non-zero with valid checksum.
+        let mut bad_flags1: [u8; 12] = [
+            0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01, 0x01, b'Y', b'Z',
+        ];
+        let checksum: u32 = calculate_crc32(&bad_flags1[4..10]);
+        bad_flags1[0..4].copy_from_slice(&checksum.to_le_bytes());
+        assert!(stream_footer.read_data(&bad_flags1).is_err());
+
+        // Reserved upper bits of second stream flags byte set with valid checksum.
+        let mut bad_flags2: [u8; 12] = [
+            0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x10, b'Y', b'Z',
+        ];
+        let checksum: u32 = calculate_crc32(&bad_flags2[4..10]);
+        bad_flags2[0..4].copy_from_slice(&checksum.to_le_bytes());
+        assert!(stream_footer.read_data(&bad_flags2).is_err());
+
+        // Unsupported footer signature with valid checksum.
+        let mut bad_signature: [u8; 12] = [
+            0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01, b'X', b'X',
+        ];
+        let checksum: u32 = calculate_crc32(&bad_signature[4..10]);
+        bad_signature[0..4].copy_from_slice(&checksum.to_le_bytes());
+        assert!(stream_footer.read_data(&bad_signature).is_err());
+
+        // Index size mismatch in verify_stream.
+        stream_footer.read_data(&TEST_DATA_V1[TEST_DATA_V1.len() - XZ_STREAM_FOOTER_SIZE..])?;
+        assert!(
+            stream_footer
+                .verify_stream(16, XZ_CHECKSUM_TYPE_CRC32)
+                .is_err()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decompress_with_multi_chunk_state_and_property_resets() -> Result<(), ErrorTrace> {
+        // Build a valid xz stream with 3 LZMA2 chunks in a single block:
+        // 1. 0xe0 (dictionary + state + properties reset)
+        // 2. 0xa0 (state reset, keeping existing properties)
+        // 3. 0xc0 (state + properties reset on existing decoder)
+        let mut stream: Vec<u8> = Vec::new();
+        stream.extend_from_slice(&TEST_DATA_V1[0..24]);
+
+        let block_data_start: usize = stream.len();
+        // Chunk 1: control 0xe0 with properties 0x5d.
+        stream.extend_from_slice(&TEST_DATA_V1[24..121]);
+        // Chunk 2: control 0xa0 without properties byte.
+        stream.push(0xa0);
+        stream.extend_from_slice(&TEST_DATA_V1[25..29]);
+        stream.extend_from_slice(&TEST_DATA_V1[30..121]);
+        // Chunk 3: control 0xc0 with properties 0x5d.
+        stream.push(0xc0);
+        stream.extend_from_slice(&TEST_DATA_V1[25..121]);
+        // End of LZMA2 block marker.
+        stream.push(0x00);
+
+        let block_compressed_size: usize = stream.len() - block_data_start;
+        let unpadded_size: u64 = 12 + (block_compressed_size as u64) + 4;
+        let block_padding_size: usize = (4 - ((12 + unpadded_size) & 3)) as usize & 3;
+        stream.resize(stream.len() + block_padding_size, 0x00);
+
+        let mut expected_data: Vec<u8> = Vec::with_capacity(TEST_INPUT_V1.len() * 3);
+        expected_data.extend_from_slice(&TEST_INPUT_V1);
+        expected_data.extend_from_slice(&TEST_INPUT_V1);
+        expected_data.extend_from_slice(&TEST_INPUT_V1);
+
+        let block_checksum: u32 = calculate_crc32(&expected_data);
+        stream.extend_from_slice(&block_checksum.to_le_bytes());
+
+        // Build index.
+        let index_start: usize = stream.len();
+        stream.push(0x00);
+        encode_variable_length_integer(1, &mut stream);
+        encode_variable_length_integer(unpadded_size, &mut stream);
+        encode_variable_length_integer(expected_data.len() as u64, &mut stream);
+
+        let index_body_size: usize = stream.len() - index_start;
+        let index_padding_size: usize = (4 - (index_body_size & 3)) & 3;
+        stream.resize(stream.len() + index_padding_size, 0x00);
+
+        let index_checksum: u32 = calculate_crc32(&stream[index_start..]);
+        stream.extend_from_slice(&index_checksum.to_le_bytes());
+
+        let index_size: usize = stream.len() - index_start;
+        let backward_size: u32 = ((index_size / 4) - 1) as u32;
+
+        // Build stream footer.
+        let mut footer_body: [u8; 6] = [0; 6];
+        footer_body[0..4].copy_from_slice(&backward_size.to_le_bytes());
+        footer_body[4] = 0x00;
+        footer_body[5] = XZ_CHECKSUM_TYPE_CRC32;
+        let footer_checksum: u32 = calculate_crc32(&footer_body);
+
+        stream.extend_from_slice(&footer_checksum.to_le_bytes());
+        stream.extend_from_slice(&footer_body);
+        stream.extend_from_slice(XZ_STREAM_FOOTER_SIGNATURE);
+
+        decompress_test_data(&stream, &expected_data)
+    }
+
+    #[test]
+    fn test_decompress_with_structural_and_size_errors() {
+        // Compressed data shorter than stream header.
+        assert_decompress_fails(&TEST_DATA_V1[0..11]);
+
+        // Stream truncated immediately after stream header.
+        assert_decompress_fails(&TEST_DATA_V1[0..12]);
+
+        // Stream truncated immediately after block header.
+        assert_decompress_fails(&TEST_DATA_V1[0..24]);
+
+        // Stream truncated before complete stream footer.
+        assert_decompress_fails(&TEST_DATA_V1[0..TEST_DATA_V1.len() - 4]);
+
+        // Stream footer CRC mismatch via decompress.
+        let mut bad_footer: Vec<u8> = TEST_DATA_V1.to_vec();
+        let footer_offset: usize = bad_footer.len() - XZ_STREAM_FOOTER_SIZE;
+        bad_footer[footer_offset] ^= 0x01;
+        assert_decompress_fails(&bad_footer);
+
+        // Block padding non-zero byte via decompress.
+        let mut bad_block_padding: Vec<u8> = TEST_DATA_V1.to_vec();
+        bad_block_padding[122] = 0x01;
+        assert_decompress_fails(&bad_block_padding);
+
+        // Block CRC32 mismatch via decompress.
+        let mut bad_block_crc: Vec<u8> = TEST_DATA_V1.to_vec();
+        bad_block_crc[124] ^= 0x01;
+        assert_decompress_fails(&bad_block_crc);
+
+        // Stored compressed size mismatch via decompress.
+        let mut bad_stored_size: Vec<u8> = TEST_DATA_V5C.to_vec();
+        bad_stored_size[14] = 0x6c;
+        let block_header_crc: u32 = calculate_crc32(&bad_stored_size[12..24]);
+        bad_stored_size[24..28].copy_from_slice(&block_header_crc.to_le_bytes());
+        assert_decompress_fails(&bad_stored_size);
+
+        // Output buffer larger than uncompressed data.
+        let mut test_context: XzContext = XzContext::new();
+        let mut large_buffer: Vec<u8> = vec![0; TEST_INPUT_V1.len() + 10];
+        assert!(
+            test_context
+                .decompress(&TEST_DATA_V1, &mut large_buffer)
+                .is_err()
+        );
+
+        // Output buffer too small for LZMA chunk.
+        let mut small_buffer: Vec<u8> = vec![0; 10];
+        assert!(
+            test_context
+                .decompress(&TEST_DATA_V1, &mut small_buffer)
+                .is_err()
+        );
+
+        // Output buffer too small for uncompressed chunk.
+        let mut tiny_buffer: Vec<u8> = vec![0; 1];
+        assert!(
+            test_context
+                .decompress(&TEST_DATA_V5A, &mut tiny_buffer)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_decompress_chunk_error_paths() -> Result<(), ErrorTrace> {
+        DebugTrace::scope(|debug_trace: &mut DebugTraceScope| {
+            let mut uncompressed_data: [u8; 16] = [0; 16];
+
+            // LZMA chunk: truncated 4-byte chunk header.
+            let mut data_offset: usize = 0;
+            let mut uncompressed_data_offset: usize = 0;
+            let mut dictionary_start_offset: usize = 0;
+            let mut need_properties: bool = true;
+            let mut need_dictionary_reset: bool = true;
+            let mut lzma_decoder: Option<LzmaDecoder> = None;
+
+            assert!(
+                XzContext::decompress_lzma_chunk(
+                    debug_trace,
+                    &[0x00, 0x00, 0x00],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0xe0,
+                    &mut need_properties,
+                    &mut need_dictionary_reset,
+                    &mut lzma_decoder,
+                )
+                .is_err()
+            );
+
+            // LZMA chunk: truncated properties byte.
+            data_offset = 0;
+            assert!(
+                XzContext::decompress_lzma_chunk(
+                    debug_trace,
+                    &[0x00, 0x00, 0x00, 0x00],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0xe0,
+                    &mut need_properties,
+                    &mut need_dictionary_reset,
+                    &mut lzma_decoder,
+                )
+                .is_err()
+            );
+
+            // LZMA chunk: invalid properties byte.
+            data_offset = 0;
+            assert!(
+                XzContext::decompress_lzma_chunk(
+                    debug_trace,
+                    &[0x00, 0x00, 0x00, 0x00, 0xe1],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0xe0,
+                    &mut need_properties,
+                    &mut need_dictionary_reset,
+                    &mut lzma_decoder,
+                )
+                .is_err()
+            );
+
+            // LZMA chunk: state reset (0xa0) with no decoder defined.
+            data_offset = 0;
+            need_properties = false;
+            need_dictionary_reset = false;
+            assert!(
+                XzContext::decompress_lzma_chunk(
+                    debug_trace,
+                    &[0x00, 0x00, 0x00, 0x00, 0x00],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0xa0,
+                    &mut need_properties,
+                    &mut need_dictionary_reset,
+                    &mut lzma_decoder,
+                )
+                .is_err()
+            );
+
+            // LZMA chunk: continuation (0x80) with no decoder defined.
+            data_offset = 0;
+            assert!(
+                XzContext::decompress_lzma_chunk(
+                    debug_trace,
+                    &[0x00, 0x00, 0x00, 0x00, 0x00],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0x80,
+                    &mut need_properties,
+                    &mut need_dictionary_reset,
+                    &mut lzma_decoder,
+                )
+                .is_err()
+            );
+
+            // Uncompressed chunk: invalid control byte after dictionary reset.
+            let mut stream: Vec<u8> = TEST_DATA_V1[0..24].to_vec();
+            stream.extend_from_slice(&[0x01, 0x00, 0x00, 0xaa, 0x03]);
+            assert_decompress_fails(&stream);
+
+            // Uncompressed chunk: truncated size field.
+            data_offset = 0;
+            assert!(
+                XzContext::decompress_uncompressed_chunk(
+                    &[0x00],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0x01,
+                    &mut need_dictionary_reset,
+                )
+                .is_err()
+            );
+
+            // Uncompressed chunk: truncated payload data.
+            data_offset = 0;
+            assert!(
+                XzContext::decompress_uncompressed_chunk(
+                    &[0x00, 0x05, 0xaa],
+                    &mut data_offset,
+                    &mut uncompressed_data,
+                    16,
+                    &mut uncompressed_data_offset,
+                    &mut dictionary_start_offset,
+                    0x01,
+                    &mut need_dictionary_reset,
+                )
+                .is_err()
+            );
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_read_block_padding_index_and_checksum_errors() {
+        // Block padding truncated.
+        assert!(XzContext::read_block_padding(&[0x00, 0x00], 0, 0, 1).is_err());
+
+        // Block checksum truncated.
+        assert!(
+            XzContext::verify_block_checksum(XZ_CHECKSUM_TYPE_CRC32, &[0x00, 0x00], 0, &[])
+                .is_err()
+        );
+
+        // Index offset at end of data.
+        assert!(XzContext::read_index(&[], 0, &[]).is_err());
+
+        // Invalid index indicator byte.
+        assert!(XzContext::read_index(&[0x01, 0x00], 0, &[]).is_err());
+
+        // Invalid number of records variable-length integer.
+        assert!(XzContext::read_index(&[0x00, 0x80, 0x00], 0, &[]).is_err());
+
+        // Number of records mismatch.
+        assert!(XzContext::read_index(&[0x00, 0x02], 0, &[(16, 10)]).is_err());
+
+        // Invalid stored uncompressed size variable-length integer.
+        assert!(XzContext::read_index(&[0x00, 0x01, 0x10, 0x80, 0x00], 0, &[(16, 10)]).is_err());
+
+        // Truncated index padding / checksum.
+        assert!(XzContext::read_index(&[0x00, 0x01, 0x10, 0x0a, 0x00], 0, &[(16, 10)]).is_err());
+
+        // Non-zero byte in index padding.
+        let mut bad_index_padding: [u8; 8] = [0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let checksum: u32 = calculate_crc32(&bad_index_padding[0..4]);
+        bad_index_padding[4..8].copy_from_slice(&checksum.to_le_bytes());
+        assert!(XzContext::read_index(&bad_index_padding, 0, &[]).is_err());
+
+        // Index CRC32 mismatch.
+        let mut bad_index_crc: [u8; 8] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+        let checksum: u32 = calculate_crc32(&bad_index_crc[0..4]) ^ 0x01;
+        bad_index_crc[4..8].copy_from_slice(&checksum.to_le_bytes());
+        assert!(XzContext::read_index(&bad_index_crc, 0, &[]).is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_debug_output() -> Result<(), ErrorTrace> {
+        let original_debug_output: bool = Mediator::current().debug_output;
+        Mediator::new(true).make_current();
+
+        let result: Result<(), ErrorTrace> = decompress_test_data(&TEST_DATA_V1, &TEST_INPUT_V1);
+
+        Mediator::new(original_debug_output).make_current();
+
+        result
     }
 }

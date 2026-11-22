@@ -1410,6 +1410,8 @@ impl LzmaContext {
 mod tests {
     use super::*;
 
+    use keramics_core::mediator::Mediator;
+
     /// LZMA stream of "hello world" repeated 200 times (2200 bytes).
     /// Uses an unknown uncompressed data size and an end of payload marker (EOPM).
     const TEST_DATA_P1_ALONE: [u8; 49] = [
@@ -1795,5 +1797,740 @@ mod tests {
             &mut uncompressed_data,
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_range_decoder_read_initialization_bytes_with_insufficient_data() {
+        let test_data: [u8; 4] = [0x00, 0x01, 0x02, 0x03];
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&test_data, 0);
+
+        let result: Result<(), ErrorTrace> = range_decoder.read_initialization_bytes();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_range_decoder_decode_bit_and_direct() -> Result<(), ErrorTrace> {
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0x0000_0001;
+
+        let mut probability: u16 = LZMA_PROBABILITY_INITIAL_VALUE;
+        let result: Result<u32, ErrorTrace> = range_decoder.decode_bit(&mut probability);
+        assert!(result.is_err());
+
+        let result: Result<u32, ErrorTrace> = range_decoder.decode_bit_direct();
+        assert!(result.is_err());
+
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0x1000_0000;
+        range_decoder.code = 0x0000_0000;
+
+        let bit_value: u32 = range_decoder.decode_bit_direct()?;
+        assert_eq!(bit_value, 0);
+
+        range_decoder.code = range_decoder.range - 1;
+        let bit_value: u32 = range_decoder.decode_bit_direct()?;
+        assert_eq!(bit_value, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_range_decoder_decode_length_with_errors() {
+        let mut table: Vec<u16> =
+            vec![LZMA_PROBABILITY_INITIAL_VALUE; LZMA_MATCH_LENGTH_NUMBER_OF_CELLS];
+
+        // Error on first choice bit.
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0x0000_0001;
+        let result: Result<usize, ErrorTrace> = range_decoder.decode_length(0, &mut table);
+        assert!(result.is_err());
+
+        // Error on second choice bit (first bit decodes 1, halving range below threshold).
+        let mut table: Vec<u16> =
+            vec![LZMA_PROBABILITY_INITIAL_VALUE; LZMA_MATCH_LENGTH_NUMBER_OF_CELLS];
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0x0100_0000;
+        range_decoder.code = 0x00ff_ffff;
+        let result: Result<usize, ErrorTrace> = range_decoder.decode_length(0, &mut table);
+        assert!(result.is_err());
+
+        // Error inside symbol bit loop (first bit decodes 0, halving range below threshold).
+        let mut table: Vec<u16> =
+            vec![LZMA_PROBABILITY_INITIAL_VALUE; LZMA_MATCH_LENGTH_NUMBER_OF_CELLS];
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0x0100_0000;
+        range_decoder.code = 0x0000_0000;
+        let result: Result<usize, ErrorTrace> = range_decoder.decode_length(0, &mut table);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_range_decoder_is_finished_and_check_for_end_of_chunk() -> Result<(), ErrorTrace> {
+        // Normalization failure in is_finished and check_for_end_of_chunk.
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0x0000_0001;
+
+        let result: Result<bool, ErrorTrace> = range_decoder.is_finished();
+        assert!(result.is_err());
+
+        let result: Result<bool, ErrorTrace> = range_decoder.check_for_end_of_chunk(false);
+        assert!(result.is_err());
+
+        // Incomplete stream (code != 0) when EOPM is disallowed.
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0x1000_0000;
+        range_decoder.code = 0x0000_0001;
+
+        let result: Result<bool, ErrorTrace> = range_decoder.check_for_end_of_chunk(false);
+        assert!(result.is_err());
+
+        // Trailing compressed data when EOPM is disallowed.
+        let test_data: [u8; 2] = [0x00, 0x00];
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&test_data, 0);
+        range_decoder.range = 0x1000_0000;
+        range_decoder.code = 0x0000_0000;
+
+        let result: Result<bool, ErrorTrace> = range_decoder.check_for_end_of_chunk(false);
+        assert!(result.is_err());
+
+        // Exact end of chunk when EOPM is disallowed.
+        range_decoder.data_offset = 2;
+        let finished: bool = range_decoder.check_for_end_of_chunk(false)?;
+        assert!(finished);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_stream_header_with_small_dictionary_size() -> Result<(), ErrorTrace> {
+        let mut stream_header: LzmaStreamHeader = LzmaStreamHeader::new();
+
+        let test_data: [u8; 13] = [
+            0x5d, 0x00, 0x04, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        ];
+        stream_header.read_data(&test_data)?;
+        assert_eq!(stream_header.dictionary_size, LZMA_MINIMUM_DICTIONARY_SIZE);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decoder_new_with_invalid_properties() {
+        let result: Result<LzmaDecoder, ErrorTrace> = LzmaDecoder::new(4, 1, 0);
+        assert!(result.is_err());
+
+        let result: Result<LzmaDecoder, ErrorTrace> = LzmaDecoder::new(3, 0, 5);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decoder_reset_state_and_properties() -> Result<(), ErrorTrace> {
+        let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+        decoder.state = 9;
+        decoder.repeated_distances = [1, 2, 3, 4];
+        decoder.previous_byte = 0xaa;
+        decoder.match_probabilities[0] = 100;
+
+        decoder.reset_state();
+        assert_eq!(decoder.state, 0);
+        assert_eq!(decoder.repeated_distances, [0; 4]);
+        assert_eq!(decoder.previous_byte, 0);
+        assert_eq!(
+            decoder.match_probabilities[0],
+            LZMA_PROBABILITY_INITIAL_VALUE
+        );
+
+        decoder.reset_state_and_properties(2, 1, 1)?;
+        assert_eq!(decoder.literal_context_bits, 2);
+        assert_eq!(decoder.literal_position_bits, 1);
+        assert_eq!(decoder.position_bits, 1);
+
+        let result: Result<(), ErrorTrace> = decoder.reset_state_and_properties(4, 1, 0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decoder_select_repeated_match_distance() -> Result<(), ErrorTrace> {
+        let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+        decoder.repeated_distances = [10, 20, 30, 40];
+
+        // Select rep1 (bit 0).
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0xffff_ffff;
+        range_decoder.code = 0x0000_0000;
+        let distance: usize = decoder.select_repeated_match_distance(&mut range_decoder)?;
+        assert_eq!(distance, 20);
+        assert_eq!(decoder.repeated_distances, [20, 10, 30, 40]);
+
+        // Select rep2 (bits 1, 0).
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0xffff_ffff;
+        range_decoder.code = 0x9000_0000;
+        let distance: usize = decoder.select_repeated_match_distance(&mut range_decoder)?;
+        assert_eq!(distance, 30);
+        assert_eq!(decoder.repeated_distances, [30, 20, 10, 40]);
+
+        // Select rep3 (bits 1, 1).
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0xffff_ffff;
+        range_decoder.code = 0xffff_fffe;
+        let distance: usize = decoder.select_repeated_match_distance(&mut range_decoder)?;
+        assert_eq!(distance, 40);
+        assert_eq!(decoder.repeated_distances, [40, 30, 20, 10]);
+
+        // Error on first bit.
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0x0000_0001;
+        let result: Result<usize, ErrorTrace> =
+            decoder.select_repeated_match_distance(&mut range_decoder);
+        assert!(result.is_err());
+
+        // Error on second bit.
+        let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0x0100_0000;
+        range_decoder.code = 0x00ff_ffff;
+        let result: Result<usize, ErrorTrace> =
+            decoder.select_repeated_match_distance(&mut range_decoder);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decoder_decode_distance_methods() -> Result<(), ErrorTrace> {
+        // Distance slot < 4.
+        let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0xffff_ffff;
+        range_decoder.code = 0x0000_0000;
+        let distance: usize = decoder.decode_match_distance(&mut range_decoder, 0)?;
+        assert_eq!(distance, 0);
+
+        // Error in decode_match_distance slot loop.
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0x0000_0001;
+        let result: Result<usize, ErrorTrace> =
+            decoder.decode_match_distance(&mut range_decoder, 0);
+        assert!(result.is_err());
+
+        // Error in decode_distance_low_bits.
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0x0000_0001;
+        let result: Result<usize, ErrorTrace> =
+            decoder.decode_distance_low_bits(&mut range_decoder, 4);
+        assert!(result.is_err());
+
+        // Error in decode_distance_high_bits alignment loop (after 2 plain 0-bits).
+        let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+        range_decoder.range = 0x0400_0000;
+        range_decoder.code = 0x0000_0000;
+        let result: Result<usize, ErrorTrace> =
+            decoder.decode_distance_high_bits(&mut range_decoder, 14);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decoder_decode_literal_errors() -> Result<(), ErrorTrace> {
+        DebugTrace::scope(|debug_trace: &mut DebugTraceScope| {
+            // Normal literal bit decode error.
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+            range_decoder.range = 0x0000_0001;
+            let mut uncompressed_data: [u8; 4] = [0; 4];
+            let mut uncompressed_data_offset: usize = 0;
+
+            let result: Result<(), ErrorTrace> = decoder.decode_literal(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                4,
+                0,
+                0,
+            );
+            assert!(result.is_err());
+
+            // Matched literal bit decode error (state >= 7).
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            decoder.state = 7;
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+            range_decoder.range = 0x0000_0001;
+            uncompressed_data[0] = 0x55;
+            uncompressed_data_offset = 1;
+
+            let result: Result<(), ErrorTrace> = decoder.decode_literal(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                4,
+                0,
+                0,
+            );
+            assert!(result.is_err());
+
+            // Output buffer too small.
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[0x00; 4], 0);
+            range_decoder.range = 0xffff_ffff;
+            range_decoder.code = 0x0000_0000;
+            uncompressed_data_offset = 4;
+
+            let result: Result<(), ErrorTrace> = decoder.decode_literal(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                4,
+                0,
+                0,
+            );
+            assert!(result.is_err());
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_decoder_decode_match_errors() -> Result<(), ErrorTrace> {
+        DebugTrace::scope(|debug_trace: &mut DebugTraceScope| {
+            // Length decode error.
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+            range_decoder.range = 0x0000_0001;
+            let mut uncompressed_data: [u8; 4] = [0x41; 4];
+            let mut uncompressed_data_offset: usize = 1;
+
+            let result: Result<bool, ErrorTrace> = decoder.decode_match(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                4,
+                0,
+                0,
+                false,
+            );
+            assert!(result.is_err());
+
+            // Unexpected EOPM (all-1s range decoder decodes distance 0xffffffff).
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let all_ones_data: [u8; 16] = [0xff; 16];
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&all_ones_data, 0);
+            range_decoder.range = 0xffff_ffff;
+            range_decoder.code = 0xffff_fffe;
+            uncompressed_data_offset = 1;
+
+            let result: Result<bool, ErrorTrace> = decoder.decode_match(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                4,
+                0,
+                0,
+                false,
+            );
+            assert!(result.is_err());
+
+            // Invalid EOPM (expected, but range decoder code != 0).
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&all_ones_data, 0);
+            range_decoder.range = 0xffff_ffff;
+            range_decoder.code = 0xffff_fffe;
+            uncompressed_data_offset = 1;
+
+            let result: Result<bool, ErrorTrace> = decoder.decode_match(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                4,
+                0,
+                0,
+                true,
+            );
+            assert!(result.is_err());
+
+            // EOPM where is_finished() fails normalization.
+            for shift in 0..8u32 {
+                let initial_range: u32 = 0xffff_ffff >> shift;
+                let mut probe_decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+                let mut probe_range_decoder: LzmaRangeDecoder =
+                    LzmaRangeDecoder::new(&all_ones_data, 0);
+                probe_range_decoder.range = initial_range;
+                probe_range_decoder.code = initial_range - 1;
+                _ = probe_range_decoder
+                    .decode_length(0, &mut probe_decoder.match_length_probabilities);
+                _ = probe_decoder.decode_match_distance(&mut probe_range_decoder, 3);
+                if probe_range_decoder.range < 16777216 {
+                    let bytes_consumed: usize = probe_range_decoder.data_offset;
+                    let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+                    let mut range_decoder: LzmaRangeDecoder =
+                        LzmaRangeDecoder::new(&all_ones_data[0..bytes_consumed], 0);
+                    range_decoder.range = initial_range;
+                    range_decoder.code = initial_range - 1;
+                    uncompressed_data_offset = 1;
+
+                    let result: Result<bool, ErrorTrace> = decoder.decode_match(
+                        debug_trace,
+                        &mut range_decoder,
+                        &mut uncompressed_data,
+                        &mut uncompressed_data_offset,
+                        4,
+                        0,
+                        0,
+                        true,
+                    );
+                    assert!(result.is_err());
+                    break;
+                }
+            }
+
+            // Distance out of bounds (offset 0 with distance 0).
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let all_zeros_data: [u8; 16] = [0x00; 16];
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&all_zeros_data, 0);
+            range_decoder.range = 0xffff_ffff;
+            range_decoder.code = 0x0000_0000;
+            uncompressed_data_offset = 0;
+
+            let result: Result<bool, ErrorTrace> = decoder.decode_match(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                4,
+                0,
+                0,
+                false,
+            );
+            assert!(result.is_err());
+
+            // Output buffer too small during match copy.
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&all_zeros_data, 0);
+            range_decoder.range = 0xffff_ffff;
+            range_decoder.code = 0x0000_0000;
+            uncompressed_data_offset = 1;
+
+            let result: Result<bool, ErrorTrace> = decoder.decode_match(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                2,
+                0,
+                0,
+                false,
+            );
+            assert!(result.is_err());
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_decoder_decode_repeated_match_and_errors() -> Result<(), ErrorTrace> {
+        DebugTrace::scope(|debug_trace: &mut DebugTraceScope| {
+            let mut uncompressed_data: [u8; 8] = [0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0];
+
+            // Repeated match at offset 0.
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+            let mut uncompressed_data_offset: usize = 0;
+            let result: Result<(), ErrorTrace> = decoder.decode_repeated_match(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                8,
+                0,
+                0,
+            );
+            assert!(result.is_err());
+
+            // Error decoding repeated_match_distance0 bit.
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+            range_decoder.range = 0x0000_0001;
+            uncompressed_data_offset = 4;
+            let result: Result<(), ErrorTrace> = decoder.decode_repeated_match(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                8,
+                0,
+                0,
+            );
+            assert!(result.is_err());
+
+            // Error decoding repeated_match_distance0_long bit.
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+            range_decoder.range = 0x0100_0000;
+            range_decoder.code = 0x0000_0000;
+            let result: Result<(), ErrorTrace> = decoder.decode_repeated_match(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                8,
+                0,
+                0,
+            );
+            assert!(result.is_err());
+
+            // Error in select_repeated_match_distance from decode_repeated_match.
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+            range_decoder.range = 0x0100_0000;
+            range_decoder.code = 0x00ff_ffff;
+            let result: Result<(), ErrorTrace> = decoder.decode_repeated_match(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                8,
+                0,
+                0,
+            );
+            assert!(result.is_err());
+
+            // Valid repeated match selecting rep1 (bit 1 then bit 0, then length 2 via 0-bits).
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            decoder.repeated_distances = [0, 1, 2, 3];
+            let zeros_data: [u8; 8] = [0x00; 8];
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&zeros_data, 0);
+            range_decoder.range = 0xffff_ffff;
+            range_decoder.code = 0x8000_0000;
+            uncompressed_data_offset = 4;
+
+            decoder.decode_repeated_match(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                8,
+                0,
+                0,
+            )?;
+            assert_eq!(uncompressed_data_offset, 6);
+            assert_eq!(uncompressed_data[4], 0x43);
+            assert_eq!(uncompressed_data[5], 0x44);
+
+            // decode_short_repeated_match: output buffer too small and out-of-bounds distance.
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            uncompressed_data_offset = 8;
+            let result: Result<(), ErrorTrace> = decoder.decode_short_repeated_match(
+                debug_trace,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                8,
+                0,
+            );
+            assert!(result.is_err());
+
+            decoder.repeated_distances[0] = 10;
+            uncompressed_data_offset = 2;
+            let result: Result<(), ErrorTrace> = decoder.decode_short_repeated_match(
+                debug_trace,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                8,
+                0,
+            );
+            assert!(result.is_err());
+
+            // decode_long_repeated_match: length error, output too small, out-of-bounds distance.
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&[], 0);
+            range_decoder.range = 0x0000_0001;
+            uncompressed_data_offset = 2;
+            let result: Result<(), ErrorTrace> = decoder.decode_long_repeated_match(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                8,
+                0,
+                0,
+                0,
+            );
+            assert!(result.is_err());
+
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&zeros_data, 0);
+            range_decoder.range = 0xffff_ffff;
+            range_decoder.code = 0x0000_0000;
+            uncompressed_data_offset = 1;
+            let result: Result<(), ErrorTrace> = decoder.decode_long_repeated_match(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                2,
+                0,
+                0,
+                0,
+            );
+            assert!(result.is_err());
+
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let mut range_decoder: LzmaRangeDecoder = LzmaRangeDecoder::new(&zeros_data, 0);
+            range_decoder.range = 0xffff_ffff;
+            range_decoder.code = 0x0000_0000;
+            uncompressed_data_offset = 2;
+            let result: Result<(), ErrorTrace> = decoder.decode_long_repeated_match(
+                debug_trace,
+                &mut range_decoder,
+                &mut uncompressed_data,
+                &mut uncompressed_data_offset,
+                8,
+                0,
+                0,
+                10,
+            );
+            assert!(result.is_err());
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_decoder_decompress_chunk_errors() -> Result<(), ErrorTrace> {
+        DebugTrace::scope(|debug_trace: &mut DebugTraceScope| {
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let mut uncompressed_data: [u8; 8] = [0; 8];
+            let init_bytes: [u8; 5] = [0x00, 0x00, 0x00, 0x00, 0x01];
+
+            // Overflow on uncompressed_data_offset + expected_uncompressed_size.
+            let result: Result<usize, ErrorTrace> = decoder.decompress_chunk(
+                debug_trace,
+                &init_bytes,
+                &mut uncompressed_data,
+                8,
+                usize::MAX - 1,
+                0,
+                2,
+                false,
+            );
+            assert!(result.is_err());
+
+            // Expected uncompressed size exceeds output buffer size.
+            let result: Result<usize, ErrorTrace> = decoder.decompress_chunk(
+                debug_trace,
+                &init_bytes,
+                &mut uncompressed_data,
+                8,
+                4,
+                0,
+                6,
+                false,
+            );
+            assert!(result.is_err());
+
+            // End of chunk check fails (code != 0 and EOPM disallowed).
+            let result: Result<usize, ErrorTrace> = decoder.decompress_chunk(
+                debug_trace,
+                &init_bytes,
+                &mut uncompressed_data,
+                8,
+                0,
+                0,
+                0,
+                false,
+            );
+            assert!(result.is_err());
+
+            // Repeated match error at offset 0 via decompress_chunk (all-1s -> match + repeated).
+            let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+            let repeated_at_zero: [u8; 5] = [0x00, 0xff, 0xff, 0xff, 0xff];
+            let result: Result<usize, ErrorTrace> = decoder.decompress_chunk(
+                debug_trace,
+                &repeated_at_zero,
+                &mut uncompressed_data,
+                8,
+                0,
+                0,
+                8,
+                false,
+            );
+            assert!(result.is_err());
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_decompress_with_invalid_stream_header() {
+        let mut test_context: LzmaContext = LzmaContext::new();
+        let mut test_data: Vec<u8> = TEST_DATA_P1_ALONE.to_vec();
+        test_data[0] = 0xe1;
+
+        let mut uncompressed_data: Vec<u8> = vec![0; 2200];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&test_data, &mut uncompressed_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decompress_with_truncated_prefixes() {
+        let mut uncompressed_data: Vec<u8> = vec![0; 5000];
+
+        for length in 13..TEST_DATA_P1_ALONE.len() {
+            let mut test_context: LzmaContext = LzmaContext::new();
+            let result: Result<(), ErrorTrace> = test_context.decompress(
+                &TEST_DATA_P1_ALONE[0..length],
+                &mut uncompressed_data[0..2200],
+            );
+            assert!(result.is_err());
+        }
+        for length in 13..TEST_DATA_ZEROS.len() {
+            let mut test_context: LzmaContext = LzmaContext::new();
+            let result: Result<(), ErrorTrace> =
+                test_context.decompress(&TEST_DATA_ZEROS[0..length], &mut uncompressed_data);
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn test_decompress_with_debug_output() -> Result<(), ErrorTrace> {
+        let original_debug_output: bool = Mediator::current().debug_output;
+        Mediator::new(true).make_current();
+
+        let mut test_context: LzmaContext = LzmaContext::new();
+        let expected_data: Vec<u8> = b"hello world".to_vec().repeat(200);
+        let mut uncompressed_data: Vec<u8> = vec![0; expected_data.len()];
+        let result: Result<(), ErrorTrace> =
+            test_context.decompress(&TEST_DATA_P1_ALONE, &mut uncompressed_data);
+
+        let mut zeros_context: LzmaContext = LzmaContext::new();
+        let mut zeros_data: Vec<u8> = vec![0; 5000];
+        let zeros_result: Result<(), ErrorTrace> =
+            zeros_context.decompress(&TEST_DATA_ZEROS, &mut zeros_data);
+
+        let short_repeated_result: Result<(), ErrorTrace> =
+            DebugTrace::scope(|debug_trace: &mut DebugTraceScope| {
+                let mut decoder: LzmaDecoder = LzmaDecoder::new(3, 0, 2)?;
+                let mut buffer: [u8; 4] = [0x41, 0, 0, 0];
+                let mut offset: usize = 1;
+                decoder.decode_short_repeated_match(debug_trace, &mut buffer, &mut offset, 4, 0)
+            });
+
+        Mediator::new(original_debug_output).make_current();
+
+        result?;
+        assert_eq!(&uncompressed_data, &expected_data);
+        zeros_result?;
+        assert_eq!(zeros_data, vec![0; 5000]);
+        short_repeated_result?;
+
+        Ok(())
     }
 }
