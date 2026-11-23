@@ -485,9 +485,9 @@ mod tests {
         let epoch_days: i64 = get_days_from_civil(1980, 1, 1);
         let days_in_month: [u8; 13] = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-        for year in 1980..2108i16 {
+        for year in 1980..2108 {
             let leap_year: bool = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
-            for month in 1..13u8 {
+            for month in 1..13 {
                 let last_day: u8 = if month == 2 && leap_year {
                     29
                 } else {
@@ -513,9 +513,9 @@ mod tests {
 
     #[test]
     fn test_fat_get_number_of_seconds_with_time_full_range() {
-        for hours in 0..24u8 {
-            for minutes in 0..60u8 {
-                for seconds_ticks in 0..30u8 {
+        for hours in 0..24 {
+            for minutes in 0..60 {
+                for seconds_ticks in 0..30 {
                     let time: u16 =
                         ((hours as u16) << 11) | ((minutes as u16) << 5) | (seconds_ticks as u16);
                     let oracle_seconds: u32 = ((hours as u32 * 60) + (minutes as u32)) * 60

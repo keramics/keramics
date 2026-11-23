@@ -270,9 +270,9 @@ mod tests {
         // Build version 1 directory table (9-byte header: 8-byte parent + 1-byte count,
         // followed by 8-byte inode + 1-byte name length + name bytes).
         let mut v1_data: Vec<u8> = vec![0; 9 + 9 + 4];
-        v1_data[0..8].copy_from_slice(&128u64.to_be_bytes());
+        v1_data[0..8].copy_from_slice(&128_u64.to_be_bytes());
         v1_data[8] = 1;
-        v1_data[9..17].copy_from_slice(&256u64.to_be_bytes());
+        v1_data[9..17].copy_from_slice(&256_u64.to_be_bytes());
         v1_data[17] = 4;
         v1_data[18..22].copy_from_slice(b"test");
 
@@ -292,11 +292,11 @@ mod tests {
         // Entry: 1-byte name length, 2-byte offset, name bytes, 1-byte file type, 8-byte inode.
         let mut v2_64bit_data: Vec<u8> = vec![0; 10 + 3 + 5 + 1 + 8];
         v2_64bit_data[1] = 1;
-        v2_64bit_data[2..10].copy_from_slice(&128u64.to_be_bytes());
+        v2_64bit_data[2..10].copy_from_slice(&128_u64.to_be_bytes());
         v2_64bit_data[10] = 5;
         v2_64bit_data[13..18].copy_from_slice(b"file1");
         v2_64bit_data[18] = 1;
-        v2_64bit_data[19..27].copy_from_slice(&512u64.to_be_bytes());
+        v2_64bit_data[19..27].copy_from_slice(&512_u64.to_be_bytes());
 
         let mut entries: IndexedHashMap<ByteString, XfsDirectoryEntry> = IndexedHashMap::new();
         test_struct.read_data(true, true, &v2_64bit_data, &mut entries)?;

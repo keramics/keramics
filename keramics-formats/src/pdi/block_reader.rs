@@ -378,7 +378,7 @@ mod tests {
         let mut files: HashMap<PathComponent, DataStreamReference> = HashMap::new();
         files.insert(
             PathComponent::from("bad_sparse.hds"),
-            open_fake_data_stream(&[0u8; 16]),
+            open_fake_data_stream(&[0; 16]),
         );
         files.insert(
             PathComponent::from("extent1.raw"),

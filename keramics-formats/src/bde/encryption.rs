@@ -86,7 +86,7 @@ mod tests {
         let key_data: [u8; 64] = [0x11; 64];
 
         // Test all supported BDE encryption methods.
-        for method in [0x8000u16, 0x8001, 0x8002, 0x8003, 0x8004, 0x8005] {
+        for method in [0x8000, 0x8001, 0x8002, 0x8003, 0x8004, 0x8005] {
             let encryption_type: BdeEncryptionType = BdeEncryptionType::new(method);
             let context: Option<BdeEncryptionContext> =
                 BdeEncryption::get_encryption_context(512, &encryption_type, &key_data)?;

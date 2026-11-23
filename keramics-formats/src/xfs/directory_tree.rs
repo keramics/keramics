@@ -420,26 +420,26 @@ mod tests {
     fn build_directory_leaf_block(block_size: usize) -> Vec<u8> {
         let mut block: Vec<u8> = vec![0; block_size];
         // File system block signature 0xfeeb at offset 8.
-        block[8..10].copy_from_slice(&0xfeebu16.to_be_bytes());
+        block[8..10].copy_from_slice(&0xfeeb_u16.to_be_bytes());
         // Leaf header at offset 12..32: number_of_entries = 3 (".", "..", "entry1").
-        block[12..14].copy_from_slice(&3u16.to_be_bytes());
+        block[12..14].copy_from_slice(&3_u16.to_be_bytes());
 
         // Entry 0 at offset 32: "." at value_offset 128.
-        block[36..38].copy_from_slice(&128u16.to_be_bytes());
+        block[36..38].copy_from_slice(&128_u16.to_be_bytes());
         block[38] = 1;
-        block[128..136].copy_from_slice(&10u64.to_be_bytes());
+        block[128..136].copy_from_slice(&10_u64.to_be_bytes());
         block[136] = b'.';
 
         // Entry 1 at offset 40: ".." at value_offset 144.
-        block[44..46].copy_from_slice(&144u16.to_be_bytes());
+        block[44..46].copy_from_slice(&144_u16.to_be_bytes());
         block[46] = 2;
-        block[144..152].copy_from_slice(&11u64.to_be_bytes());
+        block[144..152].copy_from_slice(&11_u64.to_be_bytes());
         block[152..154].copy_from_slice(b"..");
 
         // Entry 2 at offset 48: "entry1" at value_offset 160.
-        block[52..54].copy_from_slice(&160u16.to_be_bytes());
+        block[52..54].copy_from_slice(&160_u16.to_be_bytes());
         block[54] = 6;
-        block[160..168].copy_from_slice(&200u64.to_be_bytes());
+        block[160..168].copy_from_slice(&200_u64.to_be_bytes());
         block[168..174].copy_from_slice(b"entry1");
 
         block
@@ -452,9 +452,9 @@ mod tests {
 
         // Block 0: branch node (0xfebe) pointing to logical block 1.
         let branch: &mut [u8] = &mut image[0..block_size];
-        branch[8..10].copy_from_slice(&0xfebeu16.to_be_bytes());
-        branch[12..14].copy_from_slice(&1u16.to_be_bytes());
-        branch[20..24].copy_from_slice(&1u32.to_be_bytes());
+        branch[8..10].copy_from_slice(&0xfebe_u16.to_be_bytes());
+        branch[12..14].copy_from_slice(&1_u16.to_be_bytes());
+        branch[20..24].copy_from_slice(&1_u32.to_be_bytes());
 
         // Block 1: leaf node (0xfeeb).
         let leaf: Vec<u8> = build_directory_leaf_block(block_size);
@@ -486,11 +486,11 @@ mod tests {
         let block_size: usize = 512;
         let mut image: Vec<u8> = vec![0; 3 * block_size];
         // Block 0: unsupported signature 0x1234.
-        image[8..10].copy_from_slice(&0x1234u16.to_be_bytes());
+        image[8..10].copy_from_slice(&0x1234_u16.to_be_bytes());
         // Block 1: branch pointing back to block 1 (cycle).
-        image[block_size + 8..block_size + 10].copy_from_slice(&0xfebeu16.to_be_bytes());
-        image[block_size + 12..block_size + 14].copy_from_slice(&1u16.to_be_bytes());
-        image[block_size + 20..block_size + 24].copy_from_slice(&1u32.to_be_bytes());
+        image[block_size + 8..block_size + 10].copy_from_slice(&0xfebe_u16.to_be_bytes());
+        image[block_size + 12..block_size + 14].copy_from_slice(&1_u16.to_be_bytes());
+        image[block_size + 20..block_size + 24].copy_from_slice(&1_u32.to_be_bytes());
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);
         let directory_tree: XfsDirectoryTree =
@@ -549,7 +549,7 @@ mod tests {
         assert!(result.is_err());
 
         block.data = vec![0; 20];
-        block.data[12..14].copy_from_slice(&10u16.to_be_bytes());
+        block.data[12..14].copy_from_slice(&10_u16.to_be_bytes());
         let result: Result<(), ErrorTrace> = directory_tree.read_entries_from_branch_node(
             &block,
             &data_stream,
@@ -574,27 +574,27 @@ mod tests {
         assert!(result.is_err());
 
         leaf_block.data = vec![0; 40];
-        leaf_block.data[12..14].copy_from_slice(&10u16.to_be_bytes());
+        leaf_block.data[12..14].copy_from_slice(&10_u16.to_be_bytes());
         let result: Result<(), ErrorTrace> =
             directory_tree.read_entries_from_leaf_node(&leaf_block, &mut entries);
         assert!(result.is_err());
 
         // Value offset out of bounds.
         leaf_block.data = vec![0; 64];
-        leaf_block.data[12..14].copy_from_slice(&1u16.to_be_bytes());
-        leaf_block.data[36..38].copy_from_slice(&100u16.to_be_bytes());
+        leaf_block.data[12..14].copy_from_slice(&1_u16.to_be_bytes());
+        leaf_block.data[36..38].copy_from_slice(&100_u16.to_be_bytes());
         let result: Result<(), ErrorTrace> =
             directory_tree.read_entries_from_leaf_node(&leaf_block, &mut entries);
         assert!(result.is_err());
 
         // Value end offset out of bounds.
-        leaf_block.data[36..38].copy_from_slice(&60u16.to_be_bytes());
+        leaf_block.data[36..38].copy_from_slice(&60_u16.to_be_bytes());
         let result: Result<(), ErrorTrace> =
             directory_tree.read_entries_from_leaf_node(&leaf_block, &mut entries);
         assert!(result.is_err());
 
         // Zero name size.
-        leaf_block.data[36..38].copy_from_slice(&48u16.to_be_bytes());
+        leaf_block.data[36..38].copy_from_slice(&48_u16.to_be_bytes());
         leaf_block.data[38] = 0;
         let result: Result<(), ErrorTrace> =
             directory_tree.read_entries_from_leaf_node(&leaf_block, &mut entries);

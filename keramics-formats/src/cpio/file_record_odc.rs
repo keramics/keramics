@@ -209,7 +209,7 @@ mod tests {
         assert!(result.is_err());
 
         // Test with invalid octal characters in each numeric field.
-        for offset in [12usize, 18, 24, 30, 36, 42, 48, 59, 65] {
+        for offset in [12, 18, 24, 30, 36, 42, 48, 59, 65] {
             let mut invalid_octal: Vec<u8> = get_test_data();
             invalid_octal[offset] = b'9';
             let mut test_struct: CpioFileRecord = CpioFileRecord::new();

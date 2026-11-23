@@ -537,13 +537,13 @@ mod tests {
         // to the backing file or sparse zeros, and entry 2 to a compressed cluster at offset 1536.
         let mut image: Vec<u8> = vec![0; 2560];
         // L1 entry 0 = 512.
-        image[0..8].copy_from_slice(&512u64.to_be_bytes());
+        image[0..8].copy_from_slice(&512_u64.to_be_bytes());
         // L1 entry 1 = 0.
         // L2 entry 0 = 1024.
-        image[512..520].copy_from_slice(&1024u64.to_be_bytes());
+        image[512..520].copy_from_slice(&1024_u64.to_be_bytes());
         // L2 entry 1 = 0.
         // L2 entry 2 = compressed flag (bit 62) | 1536.
-        let compressed_reference: u64 = (1u64 << 62) | 1536u64;
+        let compressed_reference: u64 = (1 << 62) | 1536;
         image[528..536].copy_from_slice(&compressed_reference.to_be_bytes());
 
         // Plain cluster at offset 1024.
@@ -563,7 +563,7 @@ mod tests {
             &data_stream,
             image.len() as u64,
             512,
-            0x00ff_ffff_ffff_ffff,
+            0x00ffffffffffffff,
             11,
             0,
             2,
@@ -571,8 +571,8 @@ mod tests {
             4,
             9,
             512,
-            0x0000_00ff_ffff_ffff,
-            1u64 << 62,
+            0x000000ffffffffff,
+            1 << 62,
             &QcowCompressionMethod::Deflate,
             None,
             Some(backing_stream),
@@ -606,7 +606,7 @@ mod tests {
             &data_stream,
             image.len() as u64,
             512,
-            0x00ff_ffff_ffff_ffff,
+            0x00ffffffffffffff,
             11,
             0,
             2,
@@ -614,8 +614,8 @@ mod tests {
             4,
             9,
             512,
-            0x0000_00ff_ffff_ffff,
-            1u64 << 62,
+            0x000000ffffffffff,
+            1 << 62,
             &QcowCompressionMethod::Deflate,
             None,
             None,
@@ -633,9 +633,9 @@ mod tests {
     fn test_read_data_from_blocks_encrypted() -> Result<(), ErrorTrace> {
         let mut image: Vec<u8> = vec![0; 1536];
         // L1 entry 0 -> L2 table at offset 512.
-        image[0..8].copy_from_slice(&512u64.to_be_bytes());
+        image[0..8].copy_from_slice(&512_u64.to_be_bytes());
         // L2 entry 0 -> encrypted cluster at offset 1024.
-        image[512..520].copy_from_slice(&1024u64.to_be_bytes());
+        image[512..520].copy_from_slice(&1024_u64.to_be_bytes());
         image[1024..1536].fill(0x22);
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);
@@ -647,7 +647,7 @@ mod tests {
             &data_stream,
             image.len() as u64,
             512,
-            0x00ff_ffff_ffff_ffff,
+            0x00ffffffffffffff,
             11,
             0,
             1,
@@ -655,8 +655,8 @@ mod tests {
             4,
             9,
             512,
-            0x0000_00ff_ffff_ffff,
-            1u64 << 62,
+            0x000000ffffffffff,
+            1 << 62,
             &QcowCompressionMethod::Deflate,
             Some(&encryption_context),
             None,
@@ -680,21 +680,21 @@ mod tests {
     fn test_read_data_from_blocks_with_errors() -> Result<(), ErrorTrace> {
         // Test unsupported compression method.
         let mut image: Vec<u8> = vec![0; 2048];
-        image[0..8].copy_from_slice(&512u64.to_be_bytes());
-        let compressed_reference: u64 = (1u64 << 62) | 1024u64;
+        image[0..8].copy_from_slice(&512_u64.to_be_bytes());
+        let compressed_reference: u64 = (1 << 62) | 1024;
         image[512..520].copy_from_slice(&compressed_reference.to_be_bytes());
         // Invalid compressed block offset out of bounds at L2 entry 1.
-        let out_of_bounds_compressed_reference: u64 = (1u64 << 62) | 4096u64;
+        let out_of_bounds_compressed_reference: u64 = (1 << 62) | 4096;
         image[520..528].copy_from_slice(&out_of_bounds_compressed_reference.to_be_bytes());
         // Out of bounds encrypted block offset at L2 entry 2.
-        image[528..536].copy_from_slice(&4096u64.to_be_bytes());
+        image[528..536].copy_from_slice(&4096_u64.to_be_bytes());
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);
         let mut reader: QcowBlockReader = QcowBlockReader::new(
             &data_stream,
             image.len() as u64,
             512,
-            0x00ff_ffff_ffff_ffff,
+            0x00ffffffffffffff,
             11,
             0,
             1,
@@ -702,8 +702,8 @@ mod tests {
             4,
             9,
             512,
-            0x0000_00ff_ffff_ffff,
-            1u64 << 62,
+            0x000000ffffffffff,
+            1 << 62,
             &QcowCompressionMethod::Unknown,
             None,
             None,
@@ -722,7 +722,7 @@ mod tests {
             &data_stream,
             image.len() as u64,
             512,
-            0x00ff_ffff_ffff_ffff,
+            0x00ffffffffffffff,
             11,
             0,
             1,
@@ -730,8 +730,8 @@ mod tests {
             4,
             9,
             512,
-            0x0000_00ff_ffff_ffff,
-            1u64 << 62,
+            0x000000ffffffffff,
+            1 << 62,
             &QcowCompressionMethod::Deflate,
             None,
             None,
@@ -749,7 +749,7 @@ mod tests {
             &data_stream,
             image.len() as u64,
             512,
-            0x00ff_ffff_ffff_ffff,
+            0x00ffffffffffffff,
             11,
             0,
             1,
@@ -757,8 +757,8 @@ mod tests {
             4,
             9,
             512,
-            0x0000_00ff_ffff_ffff,
-            1u64 << 62,
+            0x000000ffffffffff,
+            1 << 62,
             &QcowCompressionMethod::Deflate,
             Some(&encryption_context),
             None,
@@ -769,12 +769,12 @@ mod tests {
         assert!(result.is_err());
 
         // Truncated stream fails L1 cluster table entry read.
-        let short_stream: DataStreamReference = open_fake_data_stream(&[0u8; 4]);
+        let short_stream: DataStreamReference = open_fake_data_stream(&[0; 4]);
         let mut reader_short: QcowBlockReader = QcowBlockReader::new(
             &short_stream,
             4,
             512,
-            0x00ff_ffff_ffff_ffff,
+            0x00ffffffffffffff,
             11,
             0,
             1,
@@ -782,8 +782,8 @@ mod tests {
             4,
             9,
             512,
-            0x0000_00ff_ffff_ffff,
-            1u64 << 62,
+            0x000000ffffffffff,
+            1 << 62,
             &QcowCompressionMethod::Deflate,
             None,
             None,

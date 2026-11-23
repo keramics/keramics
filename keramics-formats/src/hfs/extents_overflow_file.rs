@@ -401,7 +401,7 @@ mod tests {
         let mut node: Vec<u8> = vec![0; 512];
         node[8] = 0x01;
         node[16..20].copy_from_slice(&root_node_number.to_be_bytes());
-        node[32..34].copy_from_slice(&512u16.to_be_bytes());
+        node[32..34].copy_from_slice(&512_u16.to_be_bytes());
         node
     }
 
@@ -415,17 +415,17 @@ mod tests {
         let mut index_record_1: Vec<u8> = vec![
             0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00,
         ];
-        index_record_1.extend_from_slice(&4u32.to_be_bytes());
+        index_record_1.extend_from_slice(&4_u32.to_be_bytes());
 
         let mut index_record_2: Vec<u8> = vec![
             0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00,
         ];
-        index_record_2.extend_from_slice(&2u32.to_be_bytes());
+        index_record_2.extend_from_slice(&2_u32.to_be_bytes());
 
         let mut index_record_3: Vec<u8> = vec![
             0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00,
         ];
-        index_record_3.extend_from_slice(&3u32.to_be_bytes());
+        index_record_3.extend_from_slice(&3_u32.to_be_bytes());
 
         let index_node: Vec<u8> =
             build_hfs_btree_node(0x00, &[&index_record_1, &index_record_2, &index_record_3]);
@@ -436,10 +436,10 @@ mod tests {
         leaf_record_1[0..12].copy_from_slice(&[
             0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00,
         ]);
-        leaf_record_1[12..16].copy_from_slice(&100u32.to_be_bytes());
-        leaf_record_1[16..20].copy_from_slice(&4u32.to_be_bytes());
-        leaf_record_1[20..24].copy_from_slice(&200u32.to_be_bytes());
-        leaf_record_1[24..28].copy_from_slice(&2u32.to_be_bytes());
+        leaf_record_1[12..16].copy_from_slice(&100_u32.to_be_bytes());
+        leaf_record_1[16..20].copy_from_slice(&4_u32.to_be_bytes());
+        leaf_record_1[20..24].copy_from_slice(&200_u32.to_be_bytes());
+        leaf_record_1[24..28].copy_from_slice(&2_u32.to_be_bytes());
 
         let mut leaf_record_2: Vec<u8> = vec![0; 76];
         leaf_record_2[0..12].copy_from_slice(&[
@@ -505,8 +505,8 @@ mod tests {
         let mut hfs_file: HfsExtentsOverflowFile = HfsExtentsOverflowFile::new();
         hfs_file.btree_file.format = HfsFormat::Hfs;
         let mut hfs_record: Vec<u8> = vec![0; 20];
-        hfs_record[8..10].copy_from_slice(&12u16.to_be_bytes());
-        hfs_record[10..12].copy_from_slice(&3u16.to_be_bytes());
+        hfs_record[8..10].copy_from_slice(&12_u16.to_be_bytes());
+        hfs_record[10..12].copy_from_slice(&3_u16.to_be_bytes());
         let mut extents: Vec<HfsExtentDescriptor> = Vec::new();
         hfs_file.read_extents_overflow_record(&hfs_record, &mut extents)?;
         assert_eq!(extents.len(), 1);

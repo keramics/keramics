@@ -1258,12 +1258,12 @@ mod tests {
         let mut attribute_list: NtfsAttributeList = NtfsAttributeList::new();
         let mut entry1: NtfsAttributeListEntry = NtfsAttributeListEntry::new();
         entry1.attribute_type = NTFS_ATTRIBUTE_TYPE_DATA;
-        entry1.file_reference = 0x0001_0000_0000_0042;
+        entry1.file_reference = 0x0001000000000042;
         attribute_list.entries.push(entry1);
 
         let mut entry2: NtfsAttributeListEntry = NtfsAttributeListEntry::new();
         entry2.attribute_type = 0xdeadbeef;
-        entry2.file_reference = 0x0002_0000_0000_0005;
+        entry2.file_reference = 0x0002000000000005;
         attribute_list.entries.push(entry2);
 
         let test_struct: NtfsAttributeListInfo = NtfsAttributeListInfo::new(&attribute_list);
@@ -1317,7 +1317,7 @@ mod tests {
             NtfsInfo::print_hierarchy(&data_stream, Some(&String::from("/nonexistent")));
         assert!(result.is_err());
 
-        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
+        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0; 64]);
         let result: Result<(), ErrorTrace> = NtfsInfo::print_file_system(&invalid_stream);
         assert!(result.is_err());
         let result: Result<(), ErrorTrace> =

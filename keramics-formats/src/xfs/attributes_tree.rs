@@ -536,7 +536,7 @@ mod tests {
             (0x3bee, 56, 80)
         };
         block[8..10].copy_from_slice(&signature.to_be_bytes());
-        block[header_offset..header_offset + 2].copy_from_slice(&1u16.to_be_bytes());
+        block[header_offset..header_offset + 2].copy_from_slice(&1_u16.to_be_bytes());
 
         // Leaf entry: hash(4) + value_offset(2) + attribute_flags(1, 0x01 = local) + pad(1).
         let value_offset: u16 = 256;
@@ -558,7 +558,7 @@ mod tests {
     fn test_read_attributes_v4_and_v5() -> Result<(), ErrorTrace> {
         let block_size: usize = 512;
 
-        for format_version in [4u16, 5] {
+        for format_version in [4, 5] {
             let mut image: Vec<u8> = vec![0; 2 * block_size];
             let (branch_signature, header_offset, entry_offset): (u16, usize, usize) =
                 if format_version < 5 {
@@ -568,8 +568,8 @@ mod tests {
                 };
             // Block 0: branch node pointing to logical block 1.
             image[8..10].copy_from_slice(&branch_signature.to_be_bytes());
-            image[header_offset..header_offset + 2].copy_from_slice(&1u16.to_be_bytes());
-            image[entry_offset + 4..entry_offset + 8].copy_from_slice(&1u32.to_be_bytes());
+            image[header_offset..header_offset + 2].copy_from_slice(&1_u16.to_be_bytes());
+            image[entry_offset + 4..entry_offset + 8].copy_from_slice(&1_u32.to_be_bytes());
 
             // Block 1: leaf node with a local inline attribute.
             let leaf: Vec<u8> =
@@ -607,10 +607,10 @@ mod tests {
     fn test_read_attributes_with_errors() {
         let block_size: usize = 512;
         let mut image: Vec<u8> = vec![0; 2 * block_size];
-        image[8..10].copy_from_slice(&0x1234u16.to_be_bytes());
-        image[block_size + 8..block_size + 10].copy_from_slice(&0xfebeu16.to_be_bytes());
-        image[block_size + 12..block_size + 14].copy_from_slice(&1u16.to_be_bytes());
-        image[block_size + 20..block_size + 24].copy_from_slice(&1u32.to_be_bytes());
+        image[8..10].copy_from_slice(&0x1234_u16.to_be_bytes());
+        image[block_size + 8..block_size + 10].copy_from_slice(&0xfebe_u16.to_be_bytes());
+        image[block_size + 12..block_size + 14].copy_from_slice(&1_u16.to_be_bytes());
+        image[block_size + 20..block_size + 24].copy_from_slice(&1_u32.to_be_bytes());
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);
         let attributes_tree_v4: XfsAttributesTree =
@@ -648,8 +648,8 @@ mod tests {
 
         // Test branch node errors for v4 and v5 (wrong signature, short data, entries OOB).
         for (tree, valid_signature, header_offset) in [
-            (&attributes_tree_v4, 0xfebeu16, 12usize),
-            (&attributes_tree_v5, 0x3ebeu16, 56usize),
+            (&attributes_tree_v4, 0xfebe, 12),
+            (&attributes_tree_v5, 0x3ebe, 56),
         ] {
             let mut block: XfsFileSystemBlock = XfsFileSystemBlock::new();
             let mut read_blocks: HashSet<u32> = HashSet::new();
@@ -675,7 +675,7 @@ mod tests {
             assert!(result.is_err());
 
             block.data = vec![0; header_offset + 12];
-            block.data[header_offset..header_offset + 2].copy_from_slice(&10u16.to_be_bytes());
+            block.data[header_offset..header_offset + 2].copy_from_slice(&10_u16.to_be_bytes());
             let result: Result<(), ErrorTrace> = tree.read_attributes_from_branch_node(
                 &block,
                 &data_stream,
@@ -688,8 +688,8 @@ mod tests {
 
         // Test leaf node errors for v4 and v5.
         for (tree, valid_signature, header_offset) in [
-            (&attributes_tree_v4, 0xfbeeu16, 12usize),
-            (&attributes_tree_v5, 0x3beeu16, 56usize),
+            (&attributes_tree_v4, 0xfbee, 12),
+            (&attributes_tree_v5, 0x3bee, 56),
         ] {
             let mut leaf_block: XfsFileSystemBlock = XfsFileSystemBlock::new();
             leaf_block.signature = 0x0000;
@@ -708,22 +708,22 @@ mod tests {
         let mut leaf_block: XfsFileSystemBlock = XfsFileSystemBlock::new();
         leaf_block.signature = 0xfbee;
         leaf_block.data = vec![0; 48];
-        leaf_block.data[12..14].copy_from_slice(&10u16.to_be_bytes());
+        leaf_block.data[12..14].copy_from_slice(&10_u16.to_be_bytes());
         let result: Result<(), ErrorTrace> =
             attributes_tree_v4.read_attributes_from_leaf_node(&leaf_block, &mut attributes);
         assert!(result.is_err());
 
         // Value offset out of bounds.
         leaf_block.data = vec![0; 64];
-        leaf_block.data[12..14].copy_from_slice(&1u16.to_be_bytes());
-        leaf_block.data[36..38].copy_from_slice(&100u16.to_be_bytes());
+        leaf_block.data[12..14].copy_from_slice(&1_u16.to_be_bytes());
+        leaf_block.data[36..38].copy_from_slice(&100_u16.to_be_bytes());
         leaf_block.data[38] = 0x01;
         let result: Result<(), ErrorTrace> =
             attributes_tree_v4.read_attributes_from_leaf_node(&leaf_block, &mut attributes);
         assert!(result.is_err());
 
         // Value size out of bounds (both local and remote flag).
-        leaf_block.data[36..38].copy_from_slice(&63u16.to_be_bytes());
+        leaf_block.data[36..38].copy_from_slice(&63_u16.to_be_bytes());
         let result: Result<(), ErrorTrace> =
             attributes_tree_v4.read_attributes_from_leaf_node(&leaf_block, &mut attributes);
         assert!(result.is_err());
@@ -734,7 +734,7 @@ mod tests {
         assert!(result.is_err());
 
         // Zero name size.
-        leaf_block.data[36..38].copy_from_slice(&48u16.to_be_bytes());
+        leaf_block.data[36..38].copy_from_slice(&48_u16.to_be_bytes());
         leaf_block.data[38] = 0x01;
         leaf_block.data[50] = 0;
         let result: Result<(), ErrorTrace> =
@@ -742,7 +742,7 @@ mod tests {
         assert!(result.is_err());
 
         // Value data size out of bounds.
-        leaf_block.data[48..50].copy_from_slice(&50u16.to_be_bytes());
+        leaf_block.data[48..50].copy_from_slice(&50_u16.to_be_bytes());
         leaf_block.data[50] = 2;
         let result: Result<(), ErrorTrace> =
             attributes_tree_v4.read_attributes_from_leaf_node(&leaf_block, &mut attributes);

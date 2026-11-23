@@ -504,11 +504,11 @@ mod tests {
         let mut files: HashMap<String, DataStreamReference> = HashMap::new();
         files.insert(
             String::from("bad_sparse.vmdk"),
-            open_fake_data_stream(&[0u8; 16]),
+            open_fake_data_stream(&[0; 16]),
         );
         files.insert(
             String::from("bad_cowd.vmdk"),
-            open_fake_data_stream(&[0u8; 16]),
+            open_fake_data_stream(&[0; 16]),
         );
         let file_resolver: FileResolverReference = Arc::new(Box::new(TestFileResolver {
             files,

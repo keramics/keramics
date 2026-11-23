@@ -225,8 +225,8 @@ mod tests {
         // Build a synthetic image with FAT at offset 0 (512 bytes) and clusters starting at 512.
         // Cluster size is 512 bytes; chain: cluster 2 -> cluster 4 -> end (0xffffffff).
         let mut image: Vec<u8> = vec![0; 512 + 4 * 512];
-        image[8..12].copy_from_slice(&4u32.to_le_bytes());
-        image[16..20].copy_from_slice(&0xffffffffu32.to_le_bytes());
+        image[8..12].copy_from_slice(&4_u32.to_le_bytes());
+        image[16..20].copy_from_slice(&0xffffffff_u32.to_le_bytes());
         // Cluster 2 data at offset 512..1024.
         image[512..1024].fill(0xaa);
         // Cluster 4 data at offset 1536..2048.
@@ -260,14 +260,14 @@ mod tests {
 
         // Test cycle detection in cluster chain (cluster 2 -> cluster 2).
         let mut cycle_image: Vec<u8> = vec![0; 1024];
-        cycle_image[8..12].copy_from_slice(&2u32.to_le_bytes());
+        cycle_image[8..12].copy_from_slice(&2_u32.to_le_bytes());
         let cycle_stream: DataStreamReference = open_fake_data_stream(&cycle_image);
         let mut cycle_reader: ExFatBlockReader = ExFatBlockReader::new(&cycle_stream, 512, 1024);
         let result: Result<(), ErrorTrace> = cycle_reader.open(&block_allocation_table, 2, false);
         assert!(result.is_err());
 
         // Test FAT read error on truncated stream.
-        let short_stream: DataStreamReference = open_fake_data_stream(&[0u8; 4]);
+        let short_stream: DataStreamReference = open_fake_data_stream(&[0; 4]);
         let mut short_reader: ExFatBlockReader = ExFatBlockReader::new(&short_stream, 512, 512);
         let result: Result<(), ErrorTrace> = short_reader.open(&block_allocation_table, 2, false);
         assert!(result.is_err());

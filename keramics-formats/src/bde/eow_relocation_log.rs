@@ -224,7 +224,7 @@ mod tests {
         let checksum: u32 = crc32_context.finalize();
 
         // Entry header at 512..1024 and backup entry at 1536..2048.
-        log_data[512 + 20..512 + 24].copy_from_slice(&512u32.to_le_bytes());
+        log_data[512 + 20..512 + 24].copy_from_slice(&512_u32.to_le_bytes());
         log_data[512 + 24..512 + 28].copy_from_slice(&checksum.to_le_bytes());
 
         let data_stream: DataStreamReference = open_fake_data_stream(&log_data);
@@ -273,7 +273,7 @@ mod tests {
         // Test entry sectors data size out of bounds.
         let mut out_of_bounds_sectors_data: Vec<u8> = vec![0; 2560];
         out_of_bounds_sectors_data[0..512].copy_from_slice(&build_header(1, 1536));
-        out_of_bounds_sectors_data[512 + 20..512 + 24].copy_from_slice(&4096u32.to_le_bytes());
+        out_of_bounds_sectors_data[512 + 20..512 + 24].copy_from_slice(&4096_u32.to_le_bytes());
         let stream: DataStreamReference = open_fake_data_stream(&out_of_bounds_sectors_data);
         let result: Result<(), ErrorTrace> =
             relocation_log.read_at_position(&stream, 2560, SeekFrom::Start(0));
@@ -282,8 +282,8 @@ mod tests {
         // Test CRC-32 checksum mismatch.
         let mut invalid_checksum_data: Vec<u8> = vec![0; 2560];
         invalid_checksum_data[0..512].copy_from_slice(&build_header(1, 1536));
-        invalid_checksum_data[512 + 20..512 + 24].copy_from_slice(&512u32.to_le_bytes());
-        invalid_checksum_data[512 + 24..512 + 28].copy_from_slice(&0xdeadbeefu32.to_le_bytes());
+        invalid_checksum_data[512 + 20..512 + 24].copy_from_slice(&512_u32.to_le_bytes());
+        invalid_checksum_data[512 + 24..512 + 28].copy_from_slice(&0xdeadbeef_u32.to_le_bytes());
         let stream: DataStreamReference = open_fake_data_stream(&invalid_checksum_data);
         let result: Result<(), ErrorTrace> =
             relocation_log.read_at_position(&stream, 2560, SeekFrom::Start(0));

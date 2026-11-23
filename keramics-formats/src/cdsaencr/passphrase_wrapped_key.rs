@@ -368,14 +368,14 @@ mod tests {
     fn test_read_data_with_invalid_sizes_and_unlock() -> Result<(), ErrorTrace> {
         // Test salt_size > 32.
         let mut invalid_salt_data: Vec<u8> = get_test_data();
-        invalid_salt_data[12..16].copy_from_slice(&33u32.to_be_bytes());
+        invalid_salt_data[12..16].copy_from_slice(&33_u32.to_be_bytes());
         let mut test_struct: CdsaEncrPassphraseWrappedKey = CdsaEncrPassphraseWrappedKey::new();
         let result: Result<(), ErrorTrace> = test_struct.read_data(&invalid_salt_data);
         assert!(result.is_err());
 
         // Test initialization_vector_size > 32.
         let mut invalid_initialization_vector_data: Vec<u8> = get_test_data();
-        invalid_initialization_vector_data[48..52].copy_from_slice(&33u32.to_be_bytes());
+        invalid_initialization_vector_data[48..52].copy_from_slice(&33_u32.to_be_bytes());
         let mut test_struct: CdsaEncrPassphraseWrappedKey = CdsaEncrPassphraseWrappedKey::new();
         let result: Result<(), ErrorTrace> =
             test_struct.read_data(&invalid_initialization_vector_data);
@@ -383,7 +383,7 @@ mod tests {
 
         // Test wrapped_key_data_size > 64.
         let mut invalid_wrapped_key_size_data: Vec<u8> = get_test_data();
-        invalid_wrapped_key_size_data[100..104].copy_from_slice(&65u32.to_be_bytes());
+        invalid_wrapped_key_size_data[100..104].copy_from_slice(&65_u32.to_be_bytes());
         let mut test_struct: CdsaEncrPassphraseWrappedKey = CdsaEncrPassphraseWrappedKey::new();
         let result: Result<(), ErrorTrace> = test_struct.read_data(&invalid_wrapped_key_size_data);
         assert!(result.is_err());

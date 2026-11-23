@@ -363,7 +363,7 @@ mod tests {
             .derive_initialization_vector(3, &mut initialization_vector)?;
         assert_eq!(
             &initialization_vector[0..8],
-            &((3u64 << 5) + 1).to_be_bytes()
+            &((3_u64 << 5) + 1).to_be_bytes()
         );
 
         initialization_vector.fill(0x55);
@@ -374,14 +374,14 @@ mod tests {
         initialization_vector.fill(0);
         LuksInitializationVectorContext::Plain32
             .derive_initialization_vector(0x01020304, &mut initialization_vector)?;
-        assert_eq!(&initialization_vector[0..4], &0x01020304u32.to_le_bytes());
+        assert_eq!(&initialization_vector[0..4], &0x01020304_u32.to_le_bytes());
 
         initialization_vector.fill(0);
         LuksInitializationVectorContext::Plain64
             .derive_initialization_vector(0x0102030405060708, &mut initialization_vector)?;
         assert_eq!(
             &initialization_vector[0..8],
-            &0x0102030405060708u64.to_le_bytes()
+            &0x0102030405060708_u64.to_le_bytes()
         );
 
         let mut essiv_aes: AesContext = AesContext::new();

@@ -182,7 +182,7 @@ mod tests {
 
         // Test FAT-32 format with high cluster word set.
         let mut fat32_data: Vec<u8> = get_test_data_fat12();
-        fat32_data[20..22].copy_from_slice(&0x0001u16.to_le_bytes());
+        fat32_data[20..22].copy_from_slice(&0x0001_u16.to_le_bytes());
         let fat32_stream: DataStreamReference = open_fake_data_stream(&fat32_data);
 
         let mut fat32_entry: FatShortNameDirectoryEntry = FatShortNameDirectoryEntry::new();
@@ -190,7 +190,7 @@ mod tests {
         assert_eq!(fat32_entry.data_start_cluster, 0x00010003);
 
         // Test truncated data stream error.
-        let short_stream: DataStreamReference = open_fake_data_stream(&[0u8; 8]);
+        let short_stream: DataStreamReference = open_fake_data_stream(&[0; 8]);
         let result: Result<(), ErrorTrace> =
             fat32_entry.read_at_position(&short_stream, SeekFrom::Start(0), &FatFormat::Fat32);
         assert!(result.is_err());

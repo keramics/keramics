@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_print_file_error() {
-        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
+        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0; 64]);
         let result: Result<(), ErrorTrace> = VhdxInfo::print_file(&invalid_stream);
         assert!(result.is_err());
     }

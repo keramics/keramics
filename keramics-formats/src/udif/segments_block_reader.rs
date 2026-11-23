@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn test_read_data_from_blocks_with_errors() {
         let mut files: HashMap<String, DataStreamReference> = HashMap::new();
-        files.insert(String::from("bad.dmg"), open_fake_data_stream(&[0u8; 32]));
+        files.insert(String::from("bad.dmg"), open_fake_data_stream(&[0; 32]));
         let mut invalid_encrypted: Vec<u8> = vec![0; 64];
         invalid_encrypted[0..8].copy_from_slice(CDSAENCR_CONTAINER_HEADER_SIGNATURE);
         files.insert(

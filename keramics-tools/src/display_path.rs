@@ -475,7 +475,7 @@ mod tests {
         let escaped_string: String = display_path.escape_path_component(&test_path_component);
         assert_eq!(escaped_string, "utf16\\:name");
 
-        let invalid_byte_string: ByteString = ByteString::from(&[0xffu8][..]);
+        let invalid_byte_string: ByteString = ByteString::from(&[0xff][..]);
         let test_path_component: PathComponent = PathComponent::from(invalid_byte_string);
         let escaped_string: String = display_path.escape_path_component(&test_path_component);
         assert!(!escaped_string.is_empty());

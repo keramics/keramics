@@ -66,6 +66,8 @@ or `#!/usr/bin/env bash`).
   `"...".as_bytes()` or ASCII byte vectors like `vec![0x74, 0x65, 0x73, 0x74]` when representing
   ASCII `ByteString` elements or byte patterns. Reserve `vec![0x80]` / `vec![0xff]` for empty or
   non-ASCII raw byte sequences.
+* Write hexadecimal literals in lowercase without underscore digit separators (for example,
+  `0x000000ffffffffff` instead of `0x0000_00ff_ffff_ffff`).
 
 ### Type Annotations and Bindings
 
@@ -77,6 +79,11 @@ let mut offset: u64 = 0;
 let path: Path = Path::from("/testdir1/testfile1");
 ```
 
+* Omit type suffixes on integer literals whenever the type can be inferred from context or a `let`
+  type annotation (for example, write `1024` instead of `1024u64`). When a type suffix is required
+  on a literal (for example, when calling methods directly on it), use the trailing underscore form
+  (for example, `1024_u64.to_be_bytes()` or `0xdeadbeef_u32.to_le_bytes()` instead of
+  `1024u64.to_be_bytes()` or `0xdeadbeefu32.to_le_bytes()`).
 * Discard unused return values with `_ = expression;` rather than `let _ = expression;`.
 
 ### Imports and Module Organization

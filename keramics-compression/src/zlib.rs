@@ -47,7 +47,7 @@ impl ZlibDataHeader {
         string_parts.push(format!("    compression_method: {},\n", compression_method));
 
         let compression_window_bits: u8 = (compression_data >> 4) + 8;
-        let compression_window_size: u32 = 1u32 << compression_window_bits;
+        let compression_window_size: u32 = 1 << compression_window_bits;
         string_parts.push(format!(
             "    compression_window_size: {} bytes ({}),\n",
             compression_window_size, compression_window_bits,
@@ -89,7 +89,7 @@ impl ZlibDataHeader {
             )));
         }
         let compression_window_bits: u8 = (compression_data >> 4) + 8;
-        let compression_window_size: u32 = 1u32 << compression_window_bits;
+        let compression_window_size: u32 = 1 << compression_window_bits;
 
         if compression_window_size > 32768 {
             return Err(keramics_core::error_trace_new!(format!(
@@ -559,7 +559,7 @@ mod tests {
             0x78, 0x21, 0xde, 0xad, 0xbe, 0xef, 0xcb, 0x48, 0xcd, 0xc9, 0xc9, 0x57, 0x28, 0xcf,
             0x2f, 0xca, 0x49, 0x01, 0x00, 0x1a, 0x0b, 0x04, 0x5d,
         ];
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 11];
+        let mut uncompressed_data: Vec<u8> = vec![0; 11];
         test_context.decompress(&test_data, &mut uncompressed_data)?;
         assert_eq!(test_context.uncompressed_data_size, 11);
 
@@ -577,7 +577,7 @@ mod tests {
             0x78, 0x9c, 0xcb, 0x48, 0xcd, 0xc9, 0xc9, 0x57, 0x28, 0xcf, 0x2f, 0xca, 0x49, 0x01,
             0x00, 0x1a, 0x0b, 0x04, 0x5d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 11];
+        let mut uncompressed_data: Vec<u8> = vec![0; 11];
         test_context.decompress(&test_data, &mut uncompressed_data)?;
         assert_eq!(test_context.uncompressed_data_size, 11);
 
@@ -595,7 +595,7 @@ mod tests {
             0x78, 0x9c, 0xcb, 0x48, 0xcd, 0xc9, 0xc9, 0x57, 0x28, 0xcf, 0x2f, 0xca, 0x49, 0x01,
             0x00,
         ];
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 11];
+        let mut uncompressed_data: Vec<u8> = vec![0; 11];
         test_context.decompress(&test_data, &mut uncompressed_data)?;
         assert_eq!(test_context.uncompressed_data_size, 11);
 
@@ -610,7 +610,7 @@ mod tests {
         let mut test_context: ZlibContext = ZlibContext::new();
 
         let test_data: [u8; 1] = [0x78];
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 11];
+        let mut uncompressed_data: Vec<u8> = vec![0; 11];
         let result: Result<(), ErrorTrace> =
             test_context.decompress(&test_data, &mut uncompressed_data);
 
@@ -625,7 +625,7 @@ mod tests {
             0x79, 0x9c, 0xcb, 0x48, 0xcd, 0xc9, 0xc9, 0x57, 0x28, 0xcf, 0x2f, 0xca, 0x49, 0x01,
             0x00, 0x1a, 0x0b, 0x04, 0x5d,
         ];
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 11];
+        let mut uncompressed_data: Vec<u8> = vec![0; 11];
         let result: Result<(), ErrorTrace> =
             test_context.decompress(&test_data, &mut uncompressed_data);
 
@@ -640,7 +640,7 @@ mod tests {
             0xf8, 0x9c, 0xcb, 0x48, 0xcd, 0xc9, 0xc9, 0x57, 0x28, 0xcf, 0x2f, 0xca, 0x49, 0x01,
             0x00, 0x1a, 0x0b, 0x04, 0x5d,
         ];
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 11];
+        let mut uncompressed_data: Vec<u8> = vec![0; 11];
         let result: Result<(), ErrorTrace> =
             test_context.decompress(&test_data, &mut uncompressed_data);
 
@@ -652,7 +652,7 @@ mod tests {
         let mut test_context: ZlibContext = ZlibContext::new();
 
         let test_data: [u8; 5] = [0x78, 0x21, 0xde, 0xad, 0xbe];
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 11];
+        let mut uncompressed_data: Vec<u8> = vec![0; 11];
         let result: Result<(), ErrorTrace> =
             test_context.decompress(&test_data, &mut uncompressed_data);
 
@@ -667,7 +667,7 @@ mod tests {
             0x78, 0x9c, 0xcb, 0x48, 0xcd, 0xc9, 0xc9, 0x57, 0x28, 0xcf, 0x2f, 0xca, 0x49, 0x01,
             0x00, 0xde, 0xad, 0xbe, 0xef, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 11];
+        let mut uncompressed_data: Vec<u8> = vec![0; 11];
         let result: Result<(), ErrorTrace> =
             test_context.decompress(&test_data, &mut uncompressed_data);
 
@@ -682,7 +682,7 @@ mod tests {
             0x78, 0x9c, 0xcb, 0x48, 0xcd, 0xc9, 0xc9, 0x57, 0x28, 0xcf, 0x2f, 0xca, 0x49, 0x01,
             0x00, 0x1a, 0x0b, 0x04, 0x5d,
         ];
-        let mut uncompressed_data: Vec<u8> = vec![0u8; 5];
+        let mut uncompressed_data: Vec<u8> = vec![0; 5];
         let result: Result<(), ErrorTrace> =
             test_context.decompress(&test_data, &mut uncompressed_data);
 

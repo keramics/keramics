@@ -327,7 +327,7 @@ mod tests {
     #[test]
     fn test_read_data_from_blocks_corrupt_and_errors() -> Result<(), ErrorTrace> {
         let mut files: HashMap<String, DataStreamReference> = HashMap::new();
-        files.insert(String::from("bad.E01"), open_fake_data_stream(&[0u8; 16]));
+        files.insert(String::from("bad.E01"), open_fake_data_stream(&[0; 16]));
         let file_resolver: FileResolverReference = Arc::new(Box::new(TestFileResolver {
             files,
             fail_name: Some(String::from("fail.E01")),

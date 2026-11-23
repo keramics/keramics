@@ -242,7 +242,7 @@ mod tests {
             XfsPackedExtent {
                 number_of_blocks: 1,
                 physical_block_number: 2,
-                logical_block_number: 0x0200_0001,
+                logical_block_number: 0x02000001,
                 extent_type: XfsExtentType::InFile,
             },
         ];

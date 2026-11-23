@@ -838,11 +838,11 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
 
         for (hash_type, expected_len) in [
-            (DigestHashType::Md5, 32usize),
-            (DigestHashType::Sha1, 40usize),
-            (DigestHashType::Sha224, 56usize),
-            (DigestHashType::Sha256, 64usize),
-            (DigestHashType::Sha512, 128usize),
+            (DigestHashType::Md5, 32),
+            (DigestHashType::Sha1, 40),
+            (DigestHashType::Sha224, 56),
+            (DigestHashType::Sha256, 64),
+            (DigestHashType::Sha512, 128),
         ] {
             let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
             let hash_tool: HashTool = HashTool::new(
@@ -866,11 +866,11 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
 
         for (hash_type, expected_len) in [
-            (DigestHashType::Md5, 32usize),
-            (DigestHashType::Sha1, 40usize),
-            (DigestHashType::Sha224, 56usize),
-            (DigestHashType::Sha256, 64usize),
-            (DigestHashType::Sha512, 128usize),
+            (DigestHashType::Md5, 32),
+            (DigestHashType::Sha1, 40),
+            (DigestHashType::Sha224, 56),
+            (DigestHashType::Sha256, 64),
+            (DigestHashType::Sha512, 128),
         ] {
             let mut reader: Cursor<&[u8]> = Cursor::new(&test_data);
             let hash_tool: HashTool = HashTool::new(

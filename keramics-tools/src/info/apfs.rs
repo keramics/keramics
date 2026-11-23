@@ -1111,7 +1111,7 @@ mod tests {
         ApfsInfo::print_hierarchy(&data_stream, 1, &DisplayPathType::Identifier, None)?;
         ApfsInfo::print_hierarchy(&data_stream, 2, &DisplayPathType::Index, None)?;
 
-        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
+        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0; 64]);
         let result: Result<(), ErrorTrace> = ApfsInfo::print_container(&invalid_stream);
         assert!(result.is_err());
         let result: Result<(), ErrorTrace> =

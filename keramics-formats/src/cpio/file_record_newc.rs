@@ -214,7 +214,7 @@ mod tests {
         assert!(result.is_err());
 
         // Test with invalid hexadecimal characters in each numeric field.
-        for offset in [6usize, 14, 22, 30, 38, 46, 54, 94, 102] {
+        for offset in [6, 14, 22, 30, 38, 46, 54, 94, 102] {
             let mut invalid_hex: Vec<u8> = get_test_data();
             invalid_hex[offset] = b'Z';
             let mut test_struct: CpioFileRecord = CpioFileRecord::new();
