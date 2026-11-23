@@ -312,7 +312,7 @@ mod tests {
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         QcowInfo::print_file(&data_stream)?;
 
-        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
+        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0; 64]);
         let result: Result<(), ErrorTrace> = QcowInfo::print_file(&invalid_stream);
         assert!(result.is_err());
 

@@ -720,4 +720,72 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_parse_booleans_floating_point_and_errors() -> Result<(), ErrorTrace> {
+        let test_data: &str = concat!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
+            "<plist version=\"1.0\">\n",
+            "<dict>\n",
+            "    <key>flag_true</key>\n",
+            "    <true/>\n",
+            "    <key>flag_false</key>\n",
+            "    <false/>\n",
+            "    <key>ratio</key>\n",
+            "    <real>3.25</real>\n",
+            "    <key>items</key>\n",
+            "    <array>\n",
+            "        <integer>42</integer>\n",
+            "        <string>hello</string>\n",
+            "        <true/>\n",
+            "        <false/>\n",
+            "        <real>1.5</real>\n",
+            "    </array>\n",
+            "</dict>\n",
+            "</plist>\n",
+        );
+        let mut xml_plist: XmlPlist = XmlPlist::new();
+        xml_plist.parse(test_data)?;
+
+        let hashmap: &HashMap<String, PlistObject> = xml_plist.root_object.as_hashmap().unwrap();
+        let flag_true: Option<&bool> = hashmap.get("flag_true").unwrap().as_boolean();
+        assert_eq!(flag_true, Some(&true));
+        let flag_false: Option<&bool> = hashmap.get("flag_false").unwrap().as_boolean();
+        assert_eq!(flag_false, Some(&false));
+        let ratio: Option<&f64> = hashmap.get("ratio").unwrap().as_floating_point();
+        assert_eq!(ratio, Some(&3.25));
+        let items: &[PlistObject] = hashmap.get("items").unwrap().as_slice().unwrap();
+        assert_eq!(items.len(), 5);
+
+        // Test with invalid XML syntax.
+        let mut xml_plist: XmlPlist = XmlPlist::new();
+        let result: Result<(), ErrorTrace> = xml_plist.parse("<plist><unclosed>");
+        assert!(result.is_err());
+
+        // Test with invalid floating-point value.
+        let invalid_float: &str = concat!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
+            "<plist version=\"1.0\"><real>not_a_number</real></plist>\n",
+        );
+        let result: Result<(), ErrorTrace> = xml_plist.parse(invalid_float);
+        assert!(result.is_err());
+
+        // Test with overflowing integer value.
+        let invalid_integer: &str = concat!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
+            "<plist version=\"1.0\"><integer>99999999999999999999999999</integer></plist>\n",
+        );
+        let result: Result<(), ErrorTrace> = xml_plist.parse(invalid_integer);
+        assert!(result.is_err());
+
+        // Test with invalid base64 data inside array and dict.
+        let invalid_data: &str = concat!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
+            "<plist version=\"1.0\"><dict><key>k</key><array><data>!!!</data></array></dict></plist>\n",
+        );
+        let result: Result<(), ErrorTrace> = xml_plist.parse(invalid_data);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 }

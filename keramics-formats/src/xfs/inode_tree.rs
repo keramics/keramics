@@ -432,3 +432,156 @@ impl XfsInodeTree {
         self.root_directory_inode_number = root_directory_inode_number;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::open_fake_data_stream;
+    use keramics_encodings::CharacterEncoding;
+
+    /// Builds a synthetic XFS inode tree for testing.
+    fn build_inode_tree(
+        format_version: u16,
+        block_size: u32,
+        root_block_number: u32,
+    ) -> XfsInodeTree {
+        let mut superblock: XfsSuperblock = XfsSuperblock::new(&CharacterEncoding::Utf8);
+        superblock.format_version = format_version;
+        superblock.allocation_group_size = 16;
+        superblock.block_size = block_size;
+        superblock.inode_size = 256;
+        superblock.number_of_relative_inode_number_bits = 8;
+        superblock.directory_block_size = block_size;
+        superblock.number_of_relative_block_number_bits = 4;
+
+        let mut inode_tree: XfsInodeTree = XfsInodeTree::new();
+        inode_tree.initialize(&superblock, false, false, 64);
+        inode_tree.root_block_numbers.push(root_block_number);
+        inode_tree
+    }
+
+    #[test]
+    fn test_get_inode_by_identifier_branch_and_leaf() -> Result<(), ErrorTrace> {
+        let block_size: usize = 512;
+        let mut image: Vec<u8> = vec![0; 16 * block_size];
+
+        // Block 1: v4 branch node ("IABT", 16-byte header, level=1, 2 records).
+        // Record 0: key=0 -> child block 2; Record 1: key=128 -> child block 3.
+        let branch_end_offset: usize = 2 * block_size;
+        let branch: &mut [u8] = &mut image[block_size..branch_end_offset];
+        branch[0..4].copy_from_slice(XFS_INODE_TREE_SIGNATURE);
+        branch[4..6].copy_from_slice(&1_u16.to_be_bytes());
+        branch[6..8].copy_from_slice(&2_u16.to_be_bytes());
+        let number_of_pairs: usize = (block_size - 16) / 8;
+        let values_offset: usize = 16 + (number_of_pairs * 4);
+        let values_mid_offset: usize = values_offset + 4;
+        let values_end_offset: usize = values_offset + 8;
+        branch[16..20].copy_from_slice(&0_u32.to_be_bytes());
+        branch[20..24].copy_from_slice(&128_u32.to_be_bytes());
+        branch[values_offset..values_mid_offset].copy_from_slice(&2_u32.to_be_bytes());
+        branch[values_mid_offset..values_end_offset].copy_from_slice(&3_u32.to_be_bytes());
+
+        // Block 2: v4 leaf node ("IABT", level=0, 1 record covering relative inodes 0..64).
+        let leaf_offset: usize = 2 * block_size;
+        let leaf_end_offset: usize = 3 * block_size;
+        let leaf: &mut [u8] = &mut image[leaf_offset..leaf_end_offset];
+        leaf[0..4].copy_from_slice(XFS_INODE_TREE_SIGNATURE);
+        leaf[4..6].copy_from_slice(&0_u16.to_be_bytes());
+        leaf[6..8].copy_from_slice(&1_u16.to_be_bytes());
+        // Leaf record at offset 16: inode_number=0, free_count=0, allocation_bitmap.
+        leaf[16..20].copy_from_slice(&0_u32.to_be_bytes());
+
+        // Write a minimal valid v2 XFS inode at relative inode 10 (offset = 10 * 256 = 2560).
+        let inode_offset: usize = 10 * 256;
+        let inode_end_offset: usize = inode_offset + 256;
+        let inode_data: &mut [u8] = &mut image[inode_offset..inode_end_offset];
+        inode_data[0..2].copy_from_slice(b"IN");
+        inode_data[2..4].copy_from_slice(&0x81a4_u16.to_be_bytes());
+        inode_data[4] = 2;
+        inode_data[5] = 2;
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let inode_tree: XfsInodeTree = build_inode_tree(4, block_size as u32, 1);
+
+        let inode: Option<XfsInode> = inode_tree.get_inode_by_identifier(&data_stream, 10)?;
+        assert!(inode.is_some());
+
+        // Missing relative inode within valid allocation group returns None.
+        let missing_inode: Option<XfsInode> =
+            inode_tree.get_inode_by_identifier(&data_stream, 100)?;
+        assert!(missing_inode.is_none());
+
+        // Missing allocation group index returns None.
+        let missing_group: Option<XfsInode> =
+            inode_tree.get_inode_by_identifier(&data_stream, 1024)?;
+        assert!(missing_group.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_by_identifier_with_errors() {
+        let block_size: usize = 512;
+        let mut image: Vec<u8> = vec![0; 8 * block_size];
+
+        // Block 1: unsupported signature.
+        let block1_signature_end_offset: usize = block_size + 4;
+        image[block_size..block1_signature_end_offset].copy_from_slice(b"XXXX");
+
+        // Block 2: branch node with out-of-bounds record count.
+        let block2_offset: usize = 2 * block_size;
+        let block2_end_offset: usize = 3 * block_size;
+        let invalid_branch: &mut [u8] = &mut image[block2_offset..block2_end_offset];
+        invalid_branch[0..4].copy_from_slice(XFS_INODE_TREE_SIGNATURE);
+        invalid_branch[4..6].copy_from_slice(&1_u16.to_be_bytes());
+        invalid_branch[6..8].copy_from_slice(&200_u16.to_be_bytes());
+
+        // Block 3: branch node with zero child block number.
+        let block3_offset: usize = 3 * block_size;
+        let block3_end_offset: usize = 4 * block_size;
+        let zero_child_branch: &mut [u8] = &mut image[block3_offset..block3_end_offset];
+        zero_child_branch[0..4].copy_from_slice(XFS_INODE_TREE_SIGNATURE);
+        zero_child_branch[4..6].copy_from_slice(&1_u16.to_be_bytes());
+        zero_child_branch[6..8].copy_from_slice(&1_u16.to_be_bytes());
+
+        // Block 4: leaf node with out-of-bounds record count.
+        let block4_offset: usize = 4 * block_size;
+        let block4_end_offset: usize = 5 * block_size;
+        let invalid_leaf: &mut [u8] = &mut image[block4_offset..block4_end_offset];
+        invalid_leaf[0..4].copy_from_slice(XFS_INODE_TREE_SIGNATURE);
+        invalid_leaf[4..6].copy_from_slice(&0_u16.to_be_bytes());
+        invalid_leaf[6..8].copy_from_slice(&100_u16.to_be_bytes());
+
+        // Block 5: valid leaf matching inode 0, but inode bytes at offset 0 are invalid ("XXXX").
+        let block5_offset: usize = 5 * block_size;
+        let block5_end_offset: usize = 6 * block_size;
+        let valid_leaf: &mut [u8] = &mut image[block5_offset..block5_end_offset];
+        valid_leaf[0..4].copy_from_slice(XFS_INODE_TREE_SIGNATURE);
+        valid_leaf[4..6].copy_from_slice(&0_u16.to_be_bytes());
+        valid_leaf[6..8].copy_from_slice(&1_u16.to_be_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+
+        for root_block in [1, 2, 3, 4, 5, 100] {
+            let inode_tree: XfsInodeTree = build_inode_tree(4, block_size as u32, root_block);
+            let result: Result<Option<XfsInode>, ErrorTrace> =
+                inode_tree.get_inode_by_identifier(&data_stream, 0);
+            assert!(result.is_err());
+        }
+
+        // Test cycle detection when node was already read.
+        let inode_tree: XfsInodeTree = build_inode_tree(4, block_size as u32, 5);
+        let mut read_block_numbers: HashSet<u32> = HashSet::new();
+        read_block_numbers.insert(5);
+        let result: Result<bool, ErrorTrace> = inode_tree.get_inode_by_identifier_from_node(
+            &data_stream,
+            0,
+            0,
+            5,
+            0,
+            &mut read_block_numbers,
+        );
+        assert!(result.is_err());
+    }
+}

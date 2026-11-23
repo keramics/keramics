@@ -789,7 +789,7 @@ mod tests {
             0x0067,
         ];
         assert!(ucs2_string.eq(&test_array.as_slice()));
-        assert!(!ucs2_string.eq(&[0x0041u16].as_slice()));
+        assert!(!ucs2_string.eq(&[0x0041].as_slice()));
     }
 
     #[test]

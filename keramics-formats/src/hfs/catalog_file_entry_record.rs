@@ -29,3 +29,25 @@ impl HfsCatalogFileEntryRecord {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_identifier() {
+        let mut file_record: HfsCatalogFileRecord = HfsCatalogFileRecord::new();
+        file_record.identifier = 42;
+        let file_entry_record: HfsCatalogFileEntryRecord =
+            HfsCatalogFileEntryRecord::File(file_record);
+        let identifier: u32 = file_entry_record.get_identifier();
+        assert_eq!(identifier, 42);
+
+        let mut folder_record: HfsCatalogFolderRecord = HfsCatalogFolderRecord::new();
+        folder_record.identifier = 99;
+        let folder_entry_record: HfsCatalogFileEntryRecord =
+            HfsCatalogFileEntryRecord::Folder(folder_record);
+        let identifier: u32 = folder_entry_record.get_identifier();
+        assert_eq!(identifier, 99);
+    }
+}

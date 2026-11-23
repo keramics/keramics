@@ -357,10 +357,66 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let mut test_struct = CdsaEncrPassphraseWrappedKey::new();
+        let mut test_struct: CdsaEncrPassphraseWrappedKey = CdsaEncrPassphraseWrappedKey::new();
 
         let test_data: Vec<u8> = get_test_data();
-        let result = test_struct.read_data(&test_data[0..103]);
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&test_data[0..103]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_with_invalid_sizes_and_unlock() -> Result<(), ErrorTrace> {
+        // Test salt_size > 32.
+        let mut invalid_salt_data: Vec<u8> = get_test_data();
+        invalid_salt_data[12..16].copy_from_slice(&33_u32.to_be_bytes());
+        let mut test_struct: CdsaEncrPassphraseWrappedKey = CdsaEncrPassphraseWrappedKey::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&invalid_salt_data);
+        assert!(result.is_err());
+
+        // Test initialization_vector_size > 32.
+        let mut invalid_initialization_vector_data: Vec<u8> = get_test_data();
+        invalid_initialization_vector_data[48..52].copy_from_slice(&33_u32.to_be_bytes());
+        let mut test_struct: CdsaEncrPassphraseWrappedKey = CdsaEncrPassphraseWrappedKey::new();
+        let result: Result<(), ErrorTrace> =
+            test_struct.read_data(&invalid_initialization_vector_data);
+        assert!(result.is_err());
+
+        // Test wrapped_key_data_size > 64.
+        let mut invalid_wrapped_key_size_data: Vec<u8> = get_test_data();
+        invalid_wrapped_key_size_data[100..104].copy_from_slice(&65_u32.to_be_bytes());
+        let mut test_struct: CdsaEncrPassphraseWrappedKey = CdsaEncrPassphraseWrappedKey::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&invalid_wrapped_key_size_data);
+        assert!(result.is_err());
+
+        // Test unlock_with_credential with unsupported key derivation method.
+        let test_data: Vec<u8> = get_test_data();
+        let mut wrapped_key: CdsaEncrPassphraseWrappedKey = CdsaEncrPassphraseWrappedKey::new();
+        wrapped_key.read_data(&test_data)?;
+        wrapped_key.key_derivation_method = 9999;
+        let credential: CdsaEncrCredential = CdsaEncrCredential::Passphrase(b"pass".to_vec());
+        let result: Result<bool, ErrorTrace> = wrapped_key.unlock_with_credential(&credential);
+        assert!(result.is_err());
+
+        // Test unlock_with_kek with unsupported encryption type.
+        wrapped_key.encryption_type.method = 0x9999;
+        let result: Result<bool, ErrorTrace> = wrapped_key.unlock_with_kek(&[0x11; 24]);
+        assert!(result.is_err());
+
+        // Test unlock_with_kek with invalid key length for 3DES-CBC.
+        wrapped_key.read_data(&test_data)?;
+        let result: Result<bool, ErrorTrace> = wrapped_key.unlock_with_kek(&[0x11; 5]);
+        assert!(result.is_err());
+
+        // Test unlock_with_kek with wrong key.
+        let result: Result<bool, ErrorTrace> = wrapped_key.unlock_with_kek(&[0x11; 24]);
+        assert!(result.is_err());
+
+        // Test unlock_with_credential with valid PBKDF2 and 1 iteration.
+        wrapped_key.number_of_iterations = 1;
+        let credential: CdsaEncrCredential = CdsaEncrCredential::Passphrase(b"wrong".to_vec());
+        let result: Result<bool, ErrorTrace> = wrapped_key.unlock_with_credential(&credential);
+        assert!(result.is_err());
+
+        Ok(())
     }
 }

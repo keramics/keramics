@@ -836,7 +836,7 @@ mod tests {
             0x006e, 0x0067,
         ];
         assert!(utf16_string.eq(&test_array.as_slice()));
-        assert!(!utf16_string.eq(&[0x0041u16].as_slice()));
+        assert!(!utf16_string.eq(&[0x0041].as_slice()));
     }
 
     #[test]

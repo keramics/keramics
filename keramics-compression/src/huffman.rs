@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_huffman_tree_build_with_too_many_code_sizes() {
-        let code_sizes: Vec<u8> = vec![0u8; u16::MAX as usize + 1];
+        let code_sizes: Vec<u8> = vec![0; u16::MAX as usize + 1];
 
         let mut test_huffman_tree: HuffmanTree = HuffmanTree::new(288, 15);
 

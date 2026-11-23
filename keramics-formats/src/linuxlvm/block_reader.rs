@@ -155,3 +155,184 @@ impl BlockReader for LinuxLvmBlockReader {
         Ok(data_offset)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::collections::HashMap;
+
+    use keramics_core::open_fake_data_stream;
+
+    use crate::file_resolver::FileResolver;
+
+    /// In-memory file resolver for testing.
+    struct TestFileResolver {
+        /// Data streams indexed by path component.
+        data_streams: HashMap<PathComponent, DataStreamReference>,
+    }
+
+    impl TestFileResolver {
+        /// Creates a new test file resolver.
+        fn new() -> Self {
+            Self {
+                data_streams: HashMap::new(),
+            }
+        }
+    }
+
+    impl FileResolver for TestFileResolver {
+        /// Retrieves a data stream for the given path components.
+        fn get_data_stream(
+            &self,
+            path_components: &[PathComponent],
+        ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+            match path_components.first() {
+                Some(path_component) => Ok(self.data_streams.get(path_component).cloned()),
+                None => Ok(None),
+            }
+        }
+    }
+
+    /// Builds a test file resolver with two synthetic physical volume data streams.
+    fn build_test_file_resolver() -> FileResolverReference {
+        let mut file_resolver: TestFileResolver = TestFileResolver::new();
+        let physical_volume0_name: PathComponent = PathComponent::from("pv0");
+        let physical_volume0_stream: DataStreamReference =
+            open_fake_data_stream(b"0123456789ABCDEF");
+        file_resolver
+            .data_streams
+            .insert(physical_volume0_name, physical_volume0_stream);
+
+        let physical_volume1_name: PathComponent = PathComponent::from("pv1");
+        let physical_volume1_stream: DataStreamReference =
+            open_fake_data_stream(b"ghijklmnopqrstuv");
+        file_resolver
+            .data_streams
+            .insert(physical_volume1_name, physical_volume1_stream);
+
+        let boxed_file_resolver: Box<dyn FileResolver> = Box::new(file_resolver);
+        FileResolverReference::new(boxed_file_resolver)
+    }
+
+    #[test]
+    fn test_get_size() {
+        let file_resolver: FileResolverReference = build_test_file_resolver();
+        let block_reader: LinuxLvmBlockReader =
+            LinuxLvmBlockReader::new(&file_resolver, &[], &[], 32);
+
+        let size: u64 = block_reader.get_size();
+        assert_eq!(size, 32);
+    }
+
+    #[test]
+    fn test_read_data_from_blocks() -> Result<(), ErrorTrace> {
+        let file_resolver: FileResolverReference = build_test_file_resolver();
+        let file_names: [PathComponent; 2] =
+            [PathComponent::from("pv0"), PathComponent::from("pv1")];
+        let extents: [LinuxLvmExtent; 2] = [
+            LinuxLvmExtent {
+                logical_offset: 0,
+                size: 8,
+                values: LinuxLvmExtentValues::Stripe {
+                    physical_offset: 4,
+                    physical_volume_index: 0,
+                },
+            },
+            LinuxLvmExtent {
+                logical_offset: 8,
+                size: 8,
+                values: LinuxLvmExtentValues::Stripe {
+                    physical_offset: 2,
+                    physical_volume_index: 1,
+                },
+            },
+        ];
+        let mut block_reader: LinuxLvmBlockReader =
+            LinuxLvmBlockReader::new(&file_resolver, &file_names, &extents, 16);
+
+        // Test reading across two extents from different physical volumes.
+        let mut data: [u8; 10] = [0; 10];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut data, 4)?;
+        assert_eq!(read_count, 10);
+        assert_eq!(&data, b"89ABijklmn");
+
+        // Test reading past the end of the volume truncates at volume size.
+        let mut tail_data: [u8; 8] = [0; 8];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut tail_data, 12)?;
+        assert_eq!(read_count, 4);
+        assert_eq!(&tail_data[0..4], b"mnop");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_from_blocks_with_errors() {
+        let file_resolver: FileResolverReference = build_test_file_resolver();
+        let file_names: [PathComponent; 2] = [
+            PathComponent::from("pv0"),
+            PathComponent::from("missing_pv"),
+        ];
+        let extents: [LinuxLvmExtent; 3] = [
+            LinuxLvmExtent {
+                logical_offset: 8,
+                size: 4,
+                values: LinuxLvmExtentValues::Stripe {
+                    physical_offset: 0,
+                    physical_volume_index: 0,
+                },
+            },
+            LinuxLvmExtent {
+                logical_offset: 12,
+                size: 4,
+                values: LinuxLvmExtentValues::Stripe {
+                    physical_offset: 0,
+                    physical_volume_index: 1,
+                },
+            },
+            LinuxLvmExtent {
+                logical_offset: 16,
+                size: 4,
+                values: LinuxLvmExtentValues::Stripe {
+                    physical_offset: 0,
+                    physical_volume_index: 5,
+                },
+            },
+        ];
+        let mut block_reader: LinuxLvmBlockReader =
+            LinuxLvmBlockReader::new(&file_resolver, &file_names, &extents, 32);
+
+        // Test with offset before first extent (missing extent).
+        let mut data: [u8; 4] = [0; 4];
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut data, 0);
+        assert!(result.is_err());
+
+        // Test with offset after last extent (missing extent).
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut data, 24);
+        assert!(result.is_err());
+
+        // Test with missing data stream in file resolver.
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut data, 12);
+        assert!(result.is_err());
+
+        // Test with out-of-bounds physical volume index.
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut data, 16);
+        assert!(result.is_err());
+
+        // Test reading beyond available extents while still under total volume size.
+        let mut wide_data: [u8; 16] = [0; 16];
+        let extents_short: [LinuxLvmExtent; 1] = [LinuxLvmExtent {
+            logical_offset: 0,
+            size: 4,
+            values: LinuxLvmExtentValues::Stripe {
+                physical_offset: 0,
+                physical_volume_index: 0,
+            },
+        }];
+        let mut short_reader: LinuxLvmBlockReader =
+            LinuxLvmBlockReader::new(&file_resolver, &file_names, &extents_short, 16);
+        let result: Result<usize, ErrorTrace> =
+            short_reader.read_data_from_blocks(&mut wide_data, 0);
+        assert!(result.is_err());
+    }
+}

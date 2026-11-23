@@ -193,3 +193,119 @@ impl BdeEowRelocationLog {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::open_fake_data_stream;
+
+    /// Builds a synthetic EOW relocation log header for testing.
+    fn build_header(number_of_entries: u16, entry_size: u32) -> [u8; 512] {
+        let mut header: [u8; 512] = [0; 512];
+        header[0..10].copy_from_slice(b"OLRDHEVF2\x00");
+        header[12..14].copy_from_slice(&number_of_entries.to_le_bytes());
+        header[30..34].copy_from_slice(&entry_size.to_le_bytes());
+        header
+    }
+
+    #[test]
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
+        // Build a valid 1-entry relocation log (512 header + 1536 entry + 512 backup header = 2560 bytes).
+        let mut log_data: Vec<u8> = vec![0; 2560];
+        let header: [u8; 512] = build_header(1, 1536);
+        log_data[0..512].copy_from_slice(&header);
+        log_data[2048..2560].copy_from_slice(&header);
+
+        // Sector payload at offset 1024..1536 (512 bytes) with matching CRC-32 checksum.
+        let sector_payload: [u8; 512] = [0x42; 512];
+        log_data[1024..1536].copy_from_slice(&sector_payload);
+        let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
+        crc32_context.update(&sector_payload);
+        let checksum: u32 = crc32_context.finalize();
+
+        // Entry header at 512..1024 and backup entry at 1536..2048.
+        let entry_header: &mut [u8] = &mut log_data[512..1024];
+        entry_header[20..24].copy_from_slice(&512_u32.to_le_bytes());
+        entry_header[24..28].copy_from_slice(&checksum.to_le_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&log_data);
+        let mut relocation_log: BdeEowRelocationLog = BdeEowRelocationLog::new();
+        relocation_log.read_at_position(&data_stream, log_data.len(), SeekFrom::Start(0))?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_at_position_with_errors() {
+        let empty_stream: DataStreamReference = open_fake_data_stream(&[]);
+        let mut relocation_log: BdeEowRelocationLog = BdeEowRelocationLog::new();
+
+        // Test unsupported data sizes (< 1024 and > 16777216).
+        let result: Result<(), ErrorTrace> =
+            relocation_log.read_at_position(&empty_stream, 512, SeekFrom::Start(0));
+        assert!(result.is_err());
+
+        let result: Result<(), ErrorTrace> =
+            relocation_log.read_at_position(&empty_stream, 16777217, SeekFrom::Start(0));
+        assert!(result.is_err());
+
+        // Test invalid header signature.
+        let invalid_header_data: Vec<u8> = vec![0; 1024];
+        let invalid_header_stream: DataStreamReference =
+            open_fake_data_stream(&invalid_header_data);
+        let result: Result<(), ErrorTrace> =
+            relocation_log.read_at_position(&invalid_header_stream, 1024, SeekFrom::Start(0));
+        assert!(result.is_err());
+
+        // Test entry_size < 1024.
+        let mut small_entry_data: Vec<u8> = vec![0; 1024];
+        let header: [u8; 512] = build_header(0, 512);
+        small_entry_data[0..512].copy_from_slice(&header);
+        let stream: DataStreamReference = open_fake_data_stream(&small_entry_data);
+        let result: Result<(), ErrorTrace> =
+            relocation_log.read_at_position(&stream, 1024, SeekFrom::Start(0));
+        assert!(result.is_err());
+
+        // Test number_of_entries out of bounds.
+        let mut too_many_entries: Vec<u8> = vec![0; 2048];
+        let header: [u8; 512] = build_header(5, 1024);
+        too_many_entries[0..512].copy_from_slice(&header);
+        let stream: DataStreamReference = open_fake_data_stream(&too_many_entries);
+        let result: Result<(), ErrorTrace> =
+            relocation_log.read_at_position(&stream, 2048, SeekFrom::Start(0));
+        assert!(result.is_err());
+
+        // Test entry sectors data size out of bounds.
+        let mut out_of_bounds_sectors_data: Vec<u8> = vec![0; 2560];
+        let header: [u8; 512] = build_header(1, 1536);
+        out_of_bounds_sectors_data[0..512].copy_from_slice(&header);
+        let entry_header: &mut [u8] = &mut out_of_bounds_sectors_data[512..1024];
+        entry_header[20..24].copy_from_slice(&4096_u32.to_le_bytes());
+        let stream: DataStreamReference = open_fake_data_stream(&out_of_bounds_sectors_data);
+        let result: Result<(), ErrorTrace> =
+            relocation_log.read_at_position(&stream, 2560, SeekFrom::Start(0));
+        assert!(result.is_err());
+
+        // Test CRC-32 checksum mismatch.
+        let mut invalid_checksum_data: Vec<u8> = vec![0; 2560];
+        let header: [u8; 512] = build_header(1, 1536);
+        invalid_checksum_data[0..512].copy_from_slice(&header);
+        let entry_header: &mut [u8] = &mut invalid_checksum_data[512..1024];
+        entry_header[20..24].copy_from_slice(&512_u32.to_le_bytes());
+        entry_header[24..28].copy_from_slice(&0xdeadbeef_u32.to_le_bytes());
+        let stream: DataStreamReference = open_fake_data_stream(&invalid_checksum_data);
+        let result: Result<(), ErrorTrace> =
+            relocation_log.read_at_position(&stream, 2560, SeekFrom::Start(0));
+        assert!(result.is_err());
+
+        // Test invalid backup header signature.
+        let mut invalid_backup_data: Vec<u8> = vec![0; 1024];
+        let header: [u8; 512] = build_header(0, 1024);
+        invalid_backup_data[0..512].copy_from_slice(&header);
+        let stream: DataStreamReference = open_fake_data_stream(&invalid_backup_data);
+        let result: Result<(), ErrorTrace> =
+            relocation_log.read_at_position(&stream, 1024, SeekFrom::Start(0));
+        assert!(result.is_err());
+    }
+}

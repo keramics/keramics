@@ -56,3 +56,29 @@ impl<'a> Iterator for VolsnapSnapshotsIterator<'a> {
         Some(item)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_next() {
+        let shadow_storage: VolsnapShadowStorage = VolsnapShadowStorage::new();
+
+        // Test with zero snapshots.
+        let mut iterator: VolsnapSnapshotsIterator =
+            VolsnapSnapshotsIterator::new(&shadow_storage, 0);
+        let item: Option<Result<VolsnapSnapshot, ErrorTrace>> = iterator.next();
+        assert!(item.is_none());
+
+        // Test iterating past available snapshots returns error items then None.
+        let mut iterator: VolsnapSnapshotsIterator =
+            VolsnapSnapshotsIterator::new(&shadow_storage, 1);
+        let first_item: Option<Result<VolsnapSnapshot, ErrorTrace>> = iterator.next();
+        assert!(first_item.is_some());
+        let result: Result<VolsnapSnapshot, ErrorTrace> = first_item.unwrap();
+        assert!(result.is_err());
+        let next_item: Option<Result<VolsnapSnapshot, ErrorTrace>> = iterator.next();
+        assert!(next_item.is_none());
+    }
+}

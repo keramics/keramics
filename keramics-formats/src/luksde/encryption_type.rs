@@ -95,3 +95,45 @@ impl fmt::Display for LuksEncryptionType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_set_methods_and_fmt() {
+        let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
+        let string: String = encryption_type.to_string();
+        assert_eq!(string, "N/A (not set)");
+
+        let encryption_method: ByteString = ByteString::from("AES");
+        encryption_type.set_encryption_method(&encryption_method);
+        encryption_type.key_size = 32;
+        let encryption_mode: ByteString = ByteString::from("CBC-ESSIV:SHA256");
+        encryption_type.set_encryption_mode(&encryption_mode);
+        assert_eq!(encryption_type.encryption_method, "aes");
+        assert_eq!(encryption_type.chaining_mode, "cbc");
+        let initialization_vector_mode: Option<&str> =
+            encryption_type.initialization_vector_mode.as_deref();
+        assert_eq!(initialization_vector_mode, Some("essiv"));
+        let initialization_vector_options: Option<&str> =
+            encryption_type.initialization_vector_options.as_deref();
+        assert_eq!(initialization_vector_options, Some("sha256"));
+        let string: String = encryption_type.to_string();
+        assert_eq!(string, "AES-256-CBC");
+
+        let encryption_mode: ByteString = ByteString::from("XTS-PLAIN64");
+        encryption_type.set_encryption_mode(&encryption_mode);
+        assert_eq!(encryption_type.chaining_mode, "xts");
+        let initialization_vector_mode: Option<&str> =
+            encryption_type.initialization_vector_mode.as_deref();
+        assert_eq!(initialization_vector_mode, Some("plain64"));
+        assert_eq!(encryption_type.initialization_vector_options, None);
+
+        let encryption_mode: ByteString = ByteString::from("ECB");
+        encryption_type.set_encryption_mode(&encryption_mode);
+        assert_eq!(encryption_type.chaining_mode, "ecb");
+        assert_eq!(encryption_type.initialization_vector_mode, None);
+        assert_eq!(encryption_type.initialization_vector_options, None);
+    }
+}

@@ -408,14 +408,265 @@ mod tests {
 
         assert_eq!(test_struct.next_line(), Some(&test_data[0..21]));
         assert_eq!(test_struct.next_line(), Some(&test_data[22..31]));
+
+        // Test CRLF line endings, trailing NUL byte, and EOF.
+        let crlf_data: &[u8] = b"line1\r\nline2\x00line3";
+        let mut storage: VmdkDescriptorStorage = VmdkDescriptorStorage::new(crlf_data);
+        let line: Option<&[u8]> = storage.next_line();
+        assert_eq!(line, Some(b"line1".as_slice()));
+        let line: Option<&[u8]> = storage.next_line();
+        assert_eq!(line, None);
+
+        let empty_storage_data: &[u8] = b"";
+        let mut storage: VmdkDescriptorStorage = VmdkDescriptorStorage::new(empty_storage_data);
+        let line: Option<&[u8]> = storage.next_line();
+        assert_eq!(line, None);
     }
 
-    // TODO: add tests for parse_content_identifier_value
-    // TODO: add tests for parse_encoding_value
-    // TODO: add tests for parse_extent
-    // TODO: add tests for parse_file_name
-    // TODO: add tests for parse_integer_value
-    // TODO: add tests for parse_key_value_pair
-    // TODO: add tests for trim
-    // TODO: add tests for to_ascii_lowercase
+    #[test]
+    fn test_parse_content_identifier_value() {
+        let test_cases: [(&[u8], Option<u32>); 4] = [
+            (b"4c069322", Some(0x4c069322)),
+            (b"ffffffff", Some(0xffffffff)),
+            (b"123456789", None),
+            (b"1234567g", None),
+        ];
+        for (input, expected) in test_cases {
+            let value: Option<u32> = VmdkDescriptorStorage::parse_content_identifier_value(input);
+            assert_eq!(value, expected);
+        }
+    }
+
+    #[test]
+    fn test_parse_disk_type_value() {
+        let test_cases: [(&[u8], Option<VmdkDiskType>); 23] = [
+            (b"", None),
+            (b"custom", None),
+            (b"\"custom\"", Some(VmdkDiskType::Custom)),
+            (b"\"fulldevice\"", Some(VmdkDiskType::Device)),
+            (b"\"vmfs\"", Some(VmdkDiskType::VmfsFlat)),
+            (b"\"vmfsraw\"", Some(VmdkDiskType::VmfsRaw)),
+            (b"\"vmfsrawdevicemap\"", Some(VmdkDiskType::VmfsRdm)),
+            (b"\"vmfsrdm\"", Some(VmdkDiskType::VmfsRdm)),
+            (
+                b"\"vmfspassthroughrawdevicemap\"",
+                Some(VmdkDiskType::VmfsRdmp),
+            ),
+            (b"\"vmfsrdmp\"", Some(VmdkDiskType::VmfsRdmp)),
+            (b"\"vmfssparse\"", Some(VmdkDiskType::VmfsSparse)),
+            (b"\"monolithicflat\"", Some(VmdkDiskType::MonolithicFlat)),
+            (b"\"streamoptimized\"", Some(VmdkDiskType::StreamOptimized)),
+            (b"\"2gbmaxextentflat\"", Some(VmdkDiskType::Flat2GbExtent)),
+            (b"\"twogbmaxextentflat\"", Some(VmdkDiskType::Flat2GbExtent)),
+            (
+                b"\"2gbmaxextentsparse\"",
+                Some(VmdkDiskType::Sparse2GbExtent),
+            ),
+            (
+                b"\"twogbmaxextentsparse\"",
+                Some(VmdkDiskType::Sparse2GbExtent),
+            ),
+            (
+                b"\"monolithicsparse\"",
+                Some(VmdkDiskType::MonolithicSparse),
+            ),
+            (
+                b"\"vmfspreallocated\"",
+                Some(VmdkDiskType::VmfsFlatPreAllocated),
+            ),
+            (
+                b"\"partitioneddevice\"",
+                Some(VmdkDiskType::DevicePartitioned),
+            ),
+            (
+                b"\"vmfseagerzeroedthick\"",
+                Some(VmdkDiskType::VmfsFlatZeroed),
+            ),
+            (b"\"vmfsthin\"", Some(VmdkDiskType::VmfsSparseThin)),
+            (b"\"other\"", Some(VmdkDiskType::Unknown)),
+        ];
+        for (input, expected) in test_cases {
+            let disk_type: Option<VmdkDiskType> =
+                VmdkDescriptorStorage::parse_disk_type_value(input);
+            assert_eq!(disk_type, expected);
+        }
+    }
+
+    #[test]
+    fn test_parse_encoding_value() {
+        let encoding: Option<CharacterEncoding> = VmdkDescriptorStorage::parse_encoding_value(b"");
+        assert_eq!(encoding, None);
+        let encoding: Option<CharacterEncoding> =
+            VmdkDescriptorStorage::parse_encoding_value(b"utf-8");
+        assert_eq!(encoding, None);
+
+        let test_cases: [(&[u8], Option<CharacterEncoding>); 31] = [
+            (b"\"windows-936\"", Some(CharacterEncoding::Windows936)),
+            (b"\"iso_8859-1\"", Some(CharacterEncoding::Iso8859_1)),
+            (b"\"iso-8859-2\"", Some(CharacterEncoding::Iso8859_2)),
+            (b"\"iso-8859-3\"", Some(CharacterEncoding::Iso8859_3)),
+            (b"\"iso-8859-4\"", Some(CharacterEncoding::Iso8859_4)),
+            (b"\"iso-8859-5\"", Some(CharacterEncoding::Iso8859_5)),
+            (b"\"iso-8859-6\"", Some(CharacterEncoding::Iso8859_6)),
+            (b"\"iso-8859-7\"", Some(CharacterEncoding::Iso8859_7)),
+            (b"\"iso-8859-8\"", Some(CharacterEncoding::Iso8859_8)),
+            (b"\"iso-8859-9\"", Some(CharacterEncoding::Iso8859_9)),
+            (b"\"iso-8859-10\"", Some(CharacterEncoding::Iso8859_10)),
+            (b"\"iso-8859-11\"", Some(CharacterEncoding::Iso8859_11)),
+            (b"\"iso-8859-13\"", Some(CharacterEncoding::Iso8859_13)),
+            (b"\"iso-8859-14\"", Some(CharacterEncoding::Iso8859_14)),
+            (b"\"iso-8859-15\"", Some(CharacterEncoding::Iso8859_15)),
+            (b"\"iso-8859-16\"", Some(CharacterEncoding::Iso8859_16)),
+            (b"\"koi-8r\"", Some(CharacterEncoding::Koi8R)),
+            (b"\"koi-8u\"", Some(CharacterEncoding::Koi8U)),
+            (b"\"shift_jis\"", Some(CharacterEncoding::Windows932)),
+            (b"\"ms932\"", Some(CharacterEncoding::Windows932)),
+            (b"\"cp874\"", Some(CharacterEncoding::Windows874)),
+            (b"\"windows-949\"", Some(CharacterEncoding::Windows949)),
+            (b"\"windows-1250\"", Some(CharacterEncoding::Windows1250)),
+            (b"\"windows-1251\"", Some(CharacterEncoding::Windows1251)),
+            (b"\"windows-1252\"", Some(CharacterEncoding::Windows1252)),
+            (b"\"windows-1253\"", Some(CharacterEncoding::Windows1253)),
+            (b"\"windows-1254\"", Some(CharacterEncoding::Windows1254)),
+            (b"\"windows-1255\"", Some(CharacterEncoding::Windows1255)),
+            (b"\"windows-1256\"", Some(CharacterEncoding::Windows1256)),
+            (b"\"windows-1257\"", Some(CharacterEncoding::Windows1257)),
+            (b"\"windows-1258\"", Some(CharacterEncoding::Windows1258)),
+        ];
+        for (input, expected) in test_cases.iter() {
+            let encoding: Option<CharacterEncoding> =
+                VmdkDescriptorStorage::parse_encoding_value(input);
+            assert_eq!(encoding, *expected);
+        }
+        let encoding: Option<CharacterEncoding> =
+            VmdkDescriptorStorage::parse_encoding_value(b"\"unknown_encoding\"");
+        assert_eq!(encoding, None);
+    }
+
+    #[test]
+    fn test_parse_extent() {
+        let encoding: CharacterEncoding = CharacterEncoding::Utf8;
+
+        let extent: VmdkDescriptorExtent =
+            VmdkDescriptorStorage::parse_extent(b"RW 8192 SPARSE \"ext2.vmdk\"", &encoding)
+                .unwrap();
+        assert_eq!(
+            extent.access_mode,
+            VmdkDescriptorExtentAccessMode::ReadWrite
+        );
+        assert_eq!(extent.number_of_sectors, 8192);
+        assert_eq!(extent.extent_type, VmdkDescriptorExtentType::Sparse);
+        let expected_file_name: ByteString = ByteString::from("ext2.vmdk");
+        assert_eq!(extent.file_name, Some(expected_file_name));
+        assert_eq!(extent.start_sector, 0);
+
+        let extent: VmdkDescriptorExtent =
+            VmdkDescriptorStorage::parse_extent(b"RDONLY 1024 FLAT \"flat.vmdk\" 64", &encoding)
+                .unwrap();
+        assert_eq!(extent.access_mode, VmdkDescriptorExtentAccessMode::ReadOnly);
+        assert_eq!(extent.extent_type, VmdkDescriptorExtentType::Flat);
+        assert_eq!(extent.start_sector, 64);
+
+        let extent: VmdkDescriptorExtent =
+            VmdkDescriptorStorage::parse_extent(b"NOACCESS 512 ZERO", &encoding).unwrap();
+        assert_eq!(extent.access_mode, VmdkDescriptorExtentAccessMode::NoAccess);
+        assert_eq!(extent.extent_type, VmdkDescriptorExtentType::Zero);
+        assert_eq!(extent.file_name, None);
+
+        let extent_types: [(&[u8], VmdkDescriptorExtentType); 5] = [
+            (
+                b"OTHER 16 VMFS \"a.vmdk\"",
+                VmdkDescriptorExtentType::VmfsFlat,
+            ),
+            (
+                b"RW 16 VMFSRAW \"a.vmdk\"",
+                VmdkDescriptorExtentType::VmfsRaw,
+            ),
+            (
+                b"RW 16 VMFSRDM \"a.vmdk\"",
+                VmdkDescriptorExtentType::VmfsRdm,
+            ),
+            (
+                b"RW 16 VMFSSPARSE \"a.vmdk\"",
+                VmdkDescriptorExtentType::VmfsSparse,
+            ),
+            (
+                b"RW 16 CUSTOM \"a.vmdk\"",
+                VmdkDescriptorExtentType::Unknown,
+            ),
+        ];
+        for (line, expected_type) in extent_types.iter() {
+            let extent: VmdkDescriptorExtent =
+                VmdkDescriptorStorage::parse_extent(line, &encoding).unwrap();
+            assert_eq!(extent.extent_type, *expected_type);
+        }
+
+        // Test invalid extents.
+        let invalid_lines: [&[u8]; 6] = [
+            b"RW 16",
+            b"RW 0 ZERO",
+            b"RW abc ZERO",
+            b"RW 99999999999999999 ZERO",
+            b"RW 16 FLAT \"a.vmdk\" abc",
+            b"RW 16 FLAT \"a.vmdk\" 99999999999999999",
+        ];
+        for line in invalid_lines {
+            let extent: Option<VmdkDescriptorExtent> =
+                VmdkDescriptorStorage::parse_extent(line, &encoding);
+            assert!(extent.is_none());
+        }
+    }
+
+    #[test]
+    fn test_parse_file_name() {
+        let encoding: CharacterEncoding = CharacterEncoding::Utf8;
+
+        let file_name: Option<ByteString> =
+            VmdkDescriptorStorage::parse_file_name(b"\"parent.vmdk\"", &encoding);
+        let expected_file_name: ByteString = ByteString::from("parent.vmdk");
+        assert_eq!(file_name, Some(expected_file_name));
+
+        let file_name: Option<ByteString> =
+            VmdkDescriptorStorage::parse_file_name(b"unquoted", &encoding);
+        assert_eq!(file_name, None);
+    }
+
+    #[test]
+    fn test_parse_integer_value() {
+        let value: Option<u64> = VmdkDescriptorStorage::parse_integer_value(b"12345");
+        assert_eq!(value, Some(12345));
+
+        let value: Option<u64> = VmdkDescriptorStorage::parse_integer_value(b"12a45");
+        assert_eq!(value, None);
+
+        let value: Option<u64> =
+            VmdkDescriptorStorage::parse_integer_value(b"123456789012345678901");
+        assert_eq!(value, None);
+    }
+
+    #[test]
+    fn test_parse_key_value_pair() {
+        let pair: Option<(&[u8], &[u8])> =
+            VmdkDescriptorStorage::parse_key_value_pair(b"  key \t = \x0b value  ");
+        assert_eq!(pair, Some((b"key".as_slice(), b"value".as_slice())));
+
+        let pair: Option<(&[u8], &[u8])> =
+            VmdkDescriptorStorage::parse_key_value_pair(b"no_equals");
+        assert_eq!(pair, None);
+    }
+
+    #[test]
+    fn test_trim() {
+        let result: &[u8] = VmdkDescriptorStorage::trim(b"");
+        assert_eq!(result, b"");
+
+        let result: &[u8] = VmdkDescriptorStorage::trim(b" \t\x0b\x0cabc \t ");
+        assert_eq!(result, b"abc");
+    }
+
+    #[test]
+    fn test_to_ascii_lowercase() {
+        let result: Vec<u8> = VmdkDescriptorStorage::to_ascii_lowercase(b"AbC-123_XyZ");
+        assert_eq!(result, b"abc-123_xyz");
+    }
 }

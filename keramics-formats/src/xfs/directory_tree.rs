@@ -408,3 +408,199 @@ impl XfsDirectoryTree {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::open_fake_data_stream;
+
+    use crate::xfs::enums::XfsExtentType;
+
+    /// Builds a synthetic XFS directory leaf block for testing.
+    fn build_directory_leaf_block(block_size: usize) -> Vec<u8> {
+        let mut block: Vec<u8> = vec![0; block_size];
+        // File system block signature 0xfeeb at offset 8.
+        block[8..10].copy_from_slice(&0xfeeb_u16.to_be_bytes());
+        // Leaf header at offset 12..32: number_of_entries = 3 (".", "..", "entry1").
+        block[12..14].copy_from_slice(&3_u16.to_be_bytes());
+
+        // Entry 0 at offset 32: "." at value_offset 128.
+        block[36..38].copy_from_slice(&128_u16.to_be_bytes());
+        block[38] = 1;
+        block[128..136].copy_from_slice(&10_u64.to_be_bytes());
+        block[136] = b'.';
+
+        // Entry 1 at offset 40: ".." at value_offset 144.
+        block[44..46].copy_from_slice(&144_u16.to_be_bytes());
+        block[46] = 2;
+        block[144..152].copy_from_slice(&11_u64.to_be_bytes());
+        block[152..154].copy_from_slice(b"..");
+
+        // Entry 2 at offset 48: "entry1" at value_offset 160.
+        block[52..54].copy_from_slice(&160_u16.to_be_bytes());
+        block[54] = 6;
+        block[160..168].copy_from_slice(&200_u64.to_be_bytes());
+        block[168..174].copy_from_slice(b"entry1");
+
+        block
+    }
+
+    #[test]
+    fn test_read_entries_branch_and_leaf() -> Result<(), ErrorTrace> {
+        let block_size: usize = 512;
+        let mut image: Vec<u8> = vec![0; 3 * block_size];
+
+        // Block 0: branch node (0xfebe) pointing to logical block 1.
+        let branch: &mut [u8] = &mut image[0..block_size];
+        branch[8..10].copy_from_slice(&0xfebe_u16.to_be_bytes());
+        branch[12..14].copy_from_slice(&1_u16.to_be_bytes());
+        branch[20..24].copy_from_slice(&1_u32.to_be_bytes());
+
+        // Block 1: leaf node (0xfeeb).
+        let leaf: Vec<u8> = build_directory_leaf_block(block_size);
+        let leaf_end_offset: usize = 2 * block_size;
+        image[block_size..leaf_end_offset].copy_from_slice(&leaf);
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let directory_tree: XfsDirectoryTree =
+            XfsDirectoryTree::new(&CharacterEncoding::Utf8, 16, 4, block_size as u32);
+        let extents: [XfsPackedExtent; 1] = [XfsPackedExtent {
+            number_of_blocks: 2,
+            physical_block_number: 0,
+            logical_block_number: 0,
+            extent_type: XfsExtentType::InFile,
+        }];
+        let mut entries: IndexedHashMap<ByteString, XfsDirectoryEntry> = IndexedHashMap::new();
+        directory_tree.read_entries(&data_stream, &extents, &mut entries)?;
+
+        assert_eq!(entries.len(), 1);
+        let entry_name: ByteString = ByteString::from("entry1");
+        let entry: &XfsDirectoryEntry = entries.get_value_by_key(&entry_name).unwrap();
+        assert_eq!(entry.inode_number, 200);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_entries_with_errors() {
+        let block_size: usize = 512;
+        let mut image: Vec<u8> = vec![0; 3 * block_size];
+        // Block 0: unsupported signature 0x1234.
+        image[8..10].copy_from_slice(&0x1234_u16.to_be_bytes());
+        // Block 1: branch pointing back to block 1 (cycle).
+        let block1_end_offset: usize = 2 * block_size;
+        let block1: &mut [u8] = &mut image[block_size..block1_end_offset];
+        block1[8..10].copy_from_slice(&0xfebe_u16.to_be_bytes());
+        block1[12..14].copy_from_slice(&1_u16.to_be_bytes());
+        block1[20..24].copy_from_slice(&1_u32.to_be_bytes());
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let directory_tree: XfsDirectoryTree =
+            XfsDirectoryTree::new(&CharacterEncoding::Utf8, 16, 4, block_size as u32);
+        let mut entries: IndexedHashMap<ByteString, XfsDirectoryEntry> = IndexedHashMap::new();
+
+        // Test missing extent for root block 0.
+        let result: Result<(), ErrorTrace> =
+            directory_tree.read_entries(&data_stream, &[], &mut entries);
+        assert!(result.is_err());
+
+        // Test unsupported signature at block 0.
+        let extents: [XfsPackedExtent; 1] = [XfsPackedExtent {
+            number_of_blocks: 2,
+            physical_block_number: 0,
+            logical_block_number: 0,
+            extent_type: XfsExtentType::InFile,
+        }];
+        let result: Result<(), ErrorTrace> =
+            directory_tree.read_entries(&data_stream, &extents, &mut entries);
+        assert!(result.is_err());
+
+        // Test branch node cycle detection at block 1.
+        let mut read_blocks: HashSet<u32> = HashSet::new();
+        let result: Result<(), ErrorTrace> = directory_tree.read_entries_from_node(
+            &data_stream,
+            1,
+            &extents,
+            &mut entries,
+            &mut read_blocks,
+        );
+        assert!(result.is_err());
+
+        // Test direct branch node errors: wrong signature, short data, entries out of bounds.
+        let mut block: XfsFileSystemBlock = XfsFileSystemBlock::new();
+        block.signature = 0x0000;
+        let mut read_blocks: HashSet<u32> = HashSet::new();
+        let result: Result<(), ErrorTrace> = directory_tree.read_entries_from_branch_node(
+            &block,
+            &data_stream,
+            &extents,
+            &mut entries,
+            &mut read_blocks,
+        );
+        assert!(result.is_err());
+
+        block.signature = 0xfebe;
+        block.data = vec![0; 10];
+        let result: Result<(), ErrorTrace> = directory_tree.read_entries_from_branch_node(
+            &block,
+            &data_stream,
+            &extents,
+            &mut entries,
+            &mut read_blocks,
+        );
+        assert!(result.is_err());
+
+        block.data = vec![0; 20];
+        block.data[12..14].copy_from_slice(&10_u16.to_be_bytes());
+        let result: Result<(), ErrorTrace> = directory_tree.read_entries_from_branch_node(
+            &block,
+            &data_stream,
+            &extents,
+            &mut entries,
+            &mut read_blocks,
+        );
+        assert!(result.is_err());
+
+        // Test direct leaf node errors: wrong signature, short data, entries out of bounds,
+        // value offset out of bounds, value size out of bounds, and zero or out of bounds name size.
+        let mut leaf_block: XfsFileSystemBlock = XfsFileSystemBlock::new();
+        leaf_block.signature = 0x0000;
+        let result: Result<(), ErrorTrace> =
+            directory_tree.read_entries_from_leaf_node(&leaf_block, &mut entries);
+        assert!(result.is_err());
+
+        leaf_block.signature = 0xfeeb;
+        leaf_block.data = vec![0; 20];
+        let result: Result<(), ErrorTrace> =
+            directory_tree.read_entries_from_leaf_node(&leaf_block, &mut entries);
+        assert!(result.is_err());
+
+        leaf_block.data = vec![0; 40];
+        leaf_block.data[12..14].copy_from_slice(&10_u16.to_be_bytes());
+        let result: Result<(), ErrorTrace> =
+            directory_tree.read_entries_from_leaf_node(&leaf_block, &mut entries);
+        assert!(result.is_err());
+
+        // Value offset out of bounds.
+        leaf_block.data = vec![0; 64];
+        leaf_block.data[12..14].copy_from_slice(&1_u16.to_be_bytes());
+        leaf_block.data[36..38].copy_from_slice(&100_u16.to_be_bytes());
+        let result: Result<(), ErrorTrace> =
+            directory_tree.read_entries_from_leaf_node(&leaf_block, &mut entries);
+        assert!(result.is_err());
+
+        // Value end offset out of bounds.
+        leaf_block.data[36..38].copy_from_slice(&60_u16.to_be_bytes());
+        let result: Result<(), ErrorTrace> =
+            directory_tree.read_entries_from_leaf_node(&leaf_block, &mut entries);
+        assert!(result.is_err());
+
+        // Zero name size.
+        leaf_block.data[36..38].copy_from_slice(&48_u16.to_be_bytes());
+        leaf_block.data[38] = 0;
+        let result: Result<(), ErrorTrace> =
+            directory_tree.read_entries_from_leaf_node(&leaf_block, &mut entries);
+        assert!(result.is_err());
+    }
+}

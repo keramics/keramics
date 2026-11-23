@@ -181,9 +181,48 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = CpioFileRecord::new();
+        let mut test_struct: CpioFileRecord = CpioFileRecord::new();
         let result: Result<(), ErrorTrace> =
             CpioNewAsciiFileRecord::read_data(&mut test_struct, &test_data[0..109]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_with_zero_timestamp_and_errors() -> Result<(), ErrorTrace> {
+        // Test with zero modification time (DateTime::NotSet).
+        let mut zero_time_data: Vec<u8> = get_test_data();
+        zero_time_data[46..54].copy_from_slice(b"00000000");
+        let mut test_struct: CpioFileRecord = CpioFileRecord::new();
+        CpioNewAsciiFileRecord::read_data(&mut test_struct, &zero_time_data)?;
+        assert_eq!(test_struct.modification_time, DateTime::NotSet);
+
+        // Test with unsupported signature.
+        let mut invalid_signature: Vec<u8> = get_test_data();
+        invalid_signature[0] = b'X';
+        invalid_signature[6] = b'X';
+        let mut test_struct: CpioFileRecord = CpioFileRecord::new();
+        let result: Result<(), ErrorTrace> =
+            CpioNewAsciiFileRecord::read_data(&mut test_struct, &invalid_signature);
+        assert!(result.is_err());
+
+        // Test with invalid UTF-8 byte in header.
+        let mut invalid_utf8: Vec<u8> = get_test_data();
+        invalid_utf8[10] = 0xff;
+        let mut test_struct: CpioFileRecord = CpioFileRecord::new();
+        let result: Result<(), ErrorTrace> =
+            CpioNewAsciiFileRecord::read_data(&mut test_struct, &invalid_utf8);
+        assert!(result.is_err());
+
+        // Test with invalid hexadecimal characters in each numeric field.
+        for offset in [6, 14, 22, 30, 38, 46, 54, 94, 102] {
+            let mut invalid_hex: Vec<u8> = get_test_data();
+            invalid_hex[offset] = b'Z';
+            let mut test_struct: CpioFileRecord = CpioFileRecord::new();
+            let result: Result<(), ErrorTrace> =
+                CpioNewAsciiFileRecord::read_data(&mut test_struct, &invalid_hex);
+            assert!(result.is_err());
+        }
+
+        Ok(())
     }
 }

@@ -87,6 +87,27 @@ mod tests {
         let name_hash: u32 = ApfsNameHash::calculate(&name)?;
         assert_eq!(name_hash, 0x0000996a);
 
+        // Test stopping at embedded NUL code point.
+        let name_with_null: Utf16String = Utf16String {
+            elements: vec![
+                b'T' as u16,
+                b'e' as u16,
+                b'S' as u16,
+                b't' as u16,
+                0,
+                b'X' as u16,
+            ],
+        };
+        let name_hash_null: u32 = ApfsNameHash::calculate(&name_with_null)?;
+        assert_eq!(name_hash_null, 0x0000996a);
+
+        // Test invalid unpaired UTF-16 surrogate returns error.
+        let invalid_name: Utf16String = Utf16String {
+            elements: vec![0xd800],
+        };
+        let result: Result<u32, ErrorTrace> = ApfsNameHash::calculate(&invalid_name);
+        assert!(result.is_err());
+
         Ok(())
     }
 }

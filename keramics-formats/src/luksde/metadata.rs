@@ -605,6 +605,8 @@ impl LuksMetadata {
 mod tests {
     use super::*;
 
+    use keramics_core::open_fake_data_stream;
+
     #[test]
     fn test_read_text() -> Result<(), ErrorTrace> {
         let test_data: &str = concat!(
@@ -669,6 +671,101 @@ mod tests {
         );
         let mut metadata: LuksMetadata = LuksMetadata::new();
         metadata.parse(test_data)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_with_additional_properties_and_errors() -> Result<(), ErrorTrace> {
+        let test_data: &str = concat!(
+            "{",
+            "  \"keyslots\": {",
+            "    \"0\": {",
+            "      \"type\": \"luks2\",",
+            "      \"key_size\": 32,",
+            "      \"priority\": 1,",
+            "      \"custom_property\": \"value\"",
+            "    }",
+            "  },",
+            "  \"tokens\": {",
+            "    \"type\": \"luks2-keyring\",",
+            "    \"key_description\": \"mykey\"",
+            "  },",
+            "  \"segments\": {",
+            "    \"0\": { \"type\": \"crypt\" }",
+            "  },",
+            "  \"digests\": {",
+            "    \"0\": { \"type\": \"pbkdf2\" }",
+            "  },",
+            "  \"extra_top_level\": true",
+            "}",
+        );
+        let mut metadata: LuksMetadata = LuksMetadata::new();
+        metadata.parse(test_data)?;
+        assert_eq!(metadata.key_slots.len(), 1);
+
+        // Test invalid JSON syntax.
+        let mut metadata: LuksMetadata = LuksMetadata::new();
+        let result: Result<(), ErrorTrace> = metadata.parse("{ invalid }");
+        assert!(result.is_err());
+
+        // Test non-integer keyslot identifier.
+        let result: Result<(), ErrorTrace> =
+            metadata.parse("{ \"keyslots\": { \"abc\": { \"type\": \"luks2\" } } }");
+        assert!(result.is_err());
+
+        // Test non-integer segment identifier.
+        let result: Result<(), ErrorTrace> =
+            metadata.parse("{ \"segments\": { \"abc\": { \"type\": \"crypt\" } } }");
+        assert!(result.is_err());
+
+        // Test non-integer digest identifier.
+        let result: Result<(), ErrorTrace> =
+            metadata.parse("{ \"digests\": { \"abc\": { \"type\": \"pbkdf2\" } } }");
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
+        let mut data: Vec<u8> = b"{ \"tokens\": {} }".to_vec();
+        data.extend_from_slice(&[0; 16]);
+        let data_stream: DataStreamReference = open_fake_data_stream(&data);
+
+        let mut metadata: LuksMetadata = LuksMetadata::new();
+        metadata.read_at_position(&data_stream, data.len() as u64, SeekFrom::Start(0))?;
+
+        // Test unsupported data sizes (0 and > 65536).
+        let result: Result<(), ErrorTrace> =
+            metadata.read_at_position(&data_stream, 0, SeekFrom::Start(0));
+        assert!(result.is_err());
+
+        let result: Result<(), ErrorTrace> =
+            metadata.read_at_position(&data_stream, 65537, SeekFrom::Start(0));
+        assert!(result.is_err());
+
+        // Test invalid UTF-8 bytes.
+        let invalid_utf8_stream: DataStreamReference = open_fake_data_stream(&[0xff, 0xfe, 0xfd]);
+        let result: Result<(), ErrorTrace> =
+            metadata.read_at_position(&invalid_utf8_stream, 3, SeekFrom::Start(0));
+        assert!(result.is_err());
+
+        // Test non-ASCII UTF-8 metadata.
+        let non_ascii_bytes: &[u8] = b"{ \"extra\": \"\xc3\xa9\" }";
+        let non_ascii_stream: DataStreamReference = open_fake_data_stream(non_ascii_bytes);
+        let result: Result<(), ErrorTrace> = metadata.read_at_position(
+            &non_ascii_stream,
+            non_ascii_bytes.len() as u64,
+            SeekFrom::Start(0),
+        );
+        assert!(result.is_err());
+
+        // Test invalid JSON in stream.
+        let invalid_json_stream: DataStreamReference = open_fake_data_stream(b"not json");
+        let result: Result<(), ErrorTrace> =
+            metadata.read_at_position(&invalid_json_stream, 8, SeekFrom::Start(0));
+        assert!(result.is_err());
 
         Ok(())
     }

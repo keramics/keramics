@@ -136,7 +136,7 @@ mod tests {
         let mut temporary_path: PathBuf = env::temp_dir();
         temporary_path.push(format!("keramics_writer_test_{}.bin", process::id()));
 
-        let test_data: Vec<u8> = (0..70000usize).map(|index| (index % 251) as u8).collect();
+        let test_data: Vec<u8> = (0..70000).map(|index| (index % 251) as u8).collect();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let mut data_stream_writer: DataStreamWriter = DataStreamWriter::new();

@@ -275,10 +275,100 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let mut test_struct = ApfsWrappedKek::new();
+        let mut test_struct: ApfsWrappedKek = ApfsWrappedKek::new();
 
         let test_data: Vec<u8> = get_test_data();
-        let result = test_struct.read_data(&test_data[0..1]);
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&test_data[0..1]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_with_errors_and_unlock() -> Result<(), ErrorTrace> {
+        // Test unsupported main tag.
+        let mut invalid_tag_data: Vec<u8> = get_test_data();
+        invalid_tag_data[0] = 0xa4;
+        let mut test_struct: ApfsWrappedKek = ApfsWrappedKek::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&invalid_tag_data);
+        assert!(result.is_err());
+
+        // Test main packed value data size out of bounds.
+        let mut invalid_size_data: Vec<u8> = vec![0xa3, 0x50, 0x00, 0x00];
+        let mut test_struct: ApfsWrappedKek = ApfsWrappedKek::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&invalid_size_data);
+        assert!(result.is_err());
+
+        // Test zero terminator inside packed values.
+        invalid_size_data = vec![0xa3, 0x02, 0x00, 0x00];
+        let mut test_struct: ApfsWrappedKek = ApfsWrappedKek::new();
+        test_struct.read_data(&invalid_size_data)?;
+
+        // Test truncated sub-value header (1 byte remaining).
+        let truncated_sub_value_data: Vec<u8> = vec![0xa3, 0x01, 0x81];
+        let mut test_struct: ApfsWrappedKek = ApfsWrappedKek::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&truncated_sub_value_data);
+        assert!(result.is_err());
+
+        // Test sub-value packed data size out of bounds.
+        let out_of_bounds_sub_value_data: Vec<u8> = vec![0xa3, 0x02, 0x81, 0x10];
+        let mut test_struct: ApfsWrappedKek = ApfsWrappedKek::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&out_of_bounds_sub_value_data);
+        assert!(result.is_err());
+
+        // Test invalid tag 0x81 (volume identifier size != 16).
+        let invalid_volume_identifier_data: Vec<u8> = vec![0xa3, 0x03, 0x81, 0x01, 0x00];
+        let mut test_struct: ApfsWrappedKek = ApfsWrappedKek::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&invalid_volume_identifier_data);
+        assert!(result.is_err());
+
+        // Test invalid tag 0x82 (metadata size < 6).
+        let invalid_metadata_data: Vec<u8> = vec![0xa3, 0x04, 0x82, 0x02, 0x00, 0x00];
+        let mut test_struct: ApfsWrappedKek = ApfsWrappedKek::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&invalid_metadata_data);
+        assert!(result.is_err());
+
+        // Test invalid tag 0x84 (iterations size == 0 or > 8).
+        let zero_iterations_data: Vec<u8> = vec![0xa3, 0x02, 0x84, 0x00];
+        let mut test_struct: ApfsWrappedKek = ApfsWrappedKek::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&zero_iterations_data);
+        assert!(result.is_err());
+
+        let mut excessive_iterations_data: Vec<u8> = vec![0xa3, 0x0b, 0x84, 0x09];
+        excessive_iterations_data.extend_from_slice(&[0; 9]);
+        let mut test_struct: ApfsWrappedKek = ApfsWrappedKek::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&excessive_iterations_data);
+        assert!(result.is_err());
+
+        // Test unlock_with_kek and unlock_with_credential (wrong KEK, invalid KEK size,
+        // non-passphrase credential, and passphrase with 1 iteration).
+        let test_data: Vec<u8> = get_test_data();
+        let mut wrapped_kek: ApfsWrappedKek = ApfsWrappedKek::new();
+        wrapped_kek.read_data(&test_data)?;
+        wrapped_kek.number_of_iterations = 1;
+
+        let unlocked: bool = wrapped_kek.unlock_with_kek(&[0x11; 32])?;
+        assert!(!unlocked);
+
+        let result: Result<bool, ErrorTrace> = wrapped_kek.unlock_with_kek(&[0x11; 5]);
+        assert!(result.is_err());
+
+        let credential: ApfsCredential = ApfsCredential::Passphrase(b"wrong".to_vec());
+        let unlocked: bool = wrapped_kek.unlock_with_credential(&credential)?;
+        assert!(!unlocked);
+
+        wrapped_kek.flags = 0x02;
+        let unlocked: bool = wrapped_kek.unlock_with_credential(&credential)?;
+        assert!(!unlocked);
+
+        let unlocked: bool = wrapped_kek.unlock_with_credential(&ApfsCredential::None)?;
+        assert!(!unlocked);
+
+        let key_data_credential: ApfsCredential = ApfsCredential::KeyData {
+            identifier: vec![0; 16],
+            data: vec![0; 32],
+        };
+        let unlocked: bool = wrapped_kek.unlock_with_credential(&key_data_credential)?;
+        assert!(!unlocked);
+
+        Ok(())
     }
 }

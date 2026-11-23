@@ -297,3 +297,158 @@ impl BlockReader for PdiBlockReader {
         Ok(data_offset)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    use keramics_core::open_fake_data_stream;
+
+    use crate::file_resolver::FileResolver;
+
+    /// In-memory file resolver for testing.
+    struct TestFileResolver {
+        /// Data streams indexed by path component.
+        files: HashMap<PathComponent, DataStreamReference>,
+
+        /// Path component configured to return an error.
+        fail_name: Option<PathComponent>,
+    }
+
+    impl FileResolver for TestFileResolver {
+        /// Retrieves a data stream for the given path components.
+        fn get_data_stream(
+            &self,
+            path_components: &[PathComponent],
+        ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+            if let Some(first_component) = path_components.first() {
+                if self.fail_name.as_ref() == Some(first_component) {
+                    return Err(keramics_core::error_trace_new!("Injected resolver error"));
+                }
+                return Ok(self.files.get(first_component).cloned());
+            }
+            Ok(None)
+        }
+    }
+
+    #[test]
+    fn test_read_data_from_blocks_raw() -> Result<(), ErrorTrace> {
+        let mut files: HashMap<PathComponent, DataStreamReference> = HashMap::new();
+        let extent1_name: PathComponent = PathComponent::from("extent1.raw");
+        let extent1_stream: DataStreamReference = open_fake_data_stream(&[0x11; 512]);
+        files.insert(extent1_name, extent1_stream);
+        let extent2_name: PathComponent = PathComponent::from("extent2.raw");
+        let extent2_stream: DataStreamReference = open_fake_data_stream(&[0x22; 512]);
+        files.insert(extent2_name, extent2_stream);
+        let test_file_resolver: TestFileResolver = TestFileResolver {
+            files,
+            fail_name: None,
+        };
+        let boxed_file_resolver: Box<dyn FileResolver> = Box::new(test_file_resolver);
+        let file_resolver: FileResolverReference = Arc::new(boxed_file_resolver);
+        let extents: [PdiImageExtent; 2] = [
+            PdiImageExtent::new(0, 512, "extent1.raw", PdiExtentType::Raw),
+            PdiImageExtent::new(512, 512, "extent2.raw", PdiExtentType::Raw),
+        ];
+        let mut block_reader: PdiBlockReader =
+            PdiBlockReader::new(&file_resolver, &extents, None, 1024);
+
+        let size: u64 = block_reader.get_size();
+        assert_eq!(size, 1024);
+
+        let mut buffer: Vec<u8> = vec![0; 1024];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut buffer, 0)?;
+        assert_eq!(read_count, 1024);
+        assert_eq!(&buffer[0..512], &[0x11; 512]);
+        assert_eq!(&buffer[512..1024], &[0x22; 512]);
+
+        // Read again from cache and stop at size boundary.
+        let mut tail_buffer: Vec<u8> = vec![0; 1024];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut tail_buffer, 512)?;
+        assert_eq!(read_count, 512);
+        assert_eq!(&tail_buffer[0..512], &[0x22; 512]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_from_blocks_with_errors() {
+        let mut files: HashMap<PathComponent, DataStreamReference> = HashMap::new();
+        let bad_sparse_name: PathComponent = PathComponent::from("bad_sparse.hds");
+        let bad_sparse_stream: DataStreamReference = open_fake_data_stream(&[0; 16]);
+        files.insert(bad_sparse_name, bad_sparse_stream);
+        let extent1_name: PathComponent = PathComponent::from("extent1.raw");
+        let extent1_stream: DataStreamReference = open_fake_data_stream(&[0x11; 512]);
+        files.insert(extent1_name, extent1_stream);
+        let fail_name: PathComponent = PathComponent::from("fail.raw");
+        let test_file_resolver: TestFileResolver = TestFileResolver {
+            files,
+            fail_name: Some(fail_name),
+        };
+        let boxed_file_resolver: Box<dyn FileResolver> = Box::new(test_file_resolver);
+        let file_resolver: FileResolverReference = Arc::new(boxed_file_resolver);
+        let mut buffer: [u8; 512] = [0; 512];
+
+        // Out-of-range offset (before first extent and after last extent).
+        let extents: [PdiImageExtent; 1] = [PdiImageExtent::new(
+            512,
+            512,
+            "extent1.raw",
+            PdiExtentType::Raw,
+        )];
+        let mut block_reader: PdiBlockReader =
+            PdiBlockReader::new(&file_resolver, &extents, None, 2048);
+
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        let result: Result<usize, ErrorTrace> =
+            block_reader.read_data_from_blocks(&mut buffer, 1024);
+        assert!(result.is_err());
+
+        // Missing next extent when read spans beyond available extents.
+        let mut large_buffer: [u8; 1024] = [0; 1024];
+        let result: Result<usize, ErrorTrace> =
+            block_reader.read_data_from_blocks(&mut large_buffer, 512);
+        assert!(result.is_err());
+
+        // Missing extent index in get_extent_file.
+        let result: Result<&mut PdiExtentFile, ErrorTrace> = block_reader.get_extent_file(5);
+        assert!(result.is_err());
+
+        // Missing extent file in resolver.
+        let extents: [PdiImageExtent; 1] = [PdiImageExtent::new(
+            0,
+            512,
+            "missing.raw",
+            PdiExtentType::Raw,
+        )];
+        let mut block_reader: PdiBlockReader =
+            PdiBlockReader::new(&file_resolver, &extents, None, 512);
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        // Resolver error.
+        let extents: [PdiImageExtent; 1] =
+            [PdiImageExtent::new(0, 512, "fail.raw", PdiExtentType::Raw)];
+        let mut block_reader: PdiBlockReader =
+            PdiBlockReader::new(&file_resolver, &extents, None, 512);
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        // Invalid sparse extent file.
+        let extents: [PdiImageExtent; 1] = [PdiImageExtent::new(
+            0,
+            512,
+            "bad_sparse.hds",
+            PdiExtentType::Sparse,
+        )];
+        let mut block_reader: PdiBlockReader =
+            PdiBlockReader::new(&file_resolver, &extents, None, 512);
+        let result: Result<usize, ErrorTrace> = block_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+    }
+}

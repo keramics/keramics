@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn test_seek_out_of_bounds() {
-        let mut data_stream: FakeDataStream = FakeDataStream::new(&[0u8], u64::MAX);
+        let mut data_stream: FakeDataStream = FakeDataStream::new(&[0], u64::MAX);
 
         let result: Result<u64, ErrorTrace> = data_stream.seek(SeekFrom::End(1));
         assert!(result.is_err());

@@ -30,3 +30,41 @@ pub trait DigestHashContext {
     /// Calculates the digest hash of the data.
     fn update(&mut self, data: &[u8]);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Simple digest hash context for testing default trait methods.
+    struct TestDigestHashContext {
+        /// Stored bytes.
+        bytes: Vec<u8>,
+    }
+
+    impl DigestHashContext for TestDigestHashContext {
+        /// Creates a new context.
+        fn new() -> Self {
+            Self { bytes: Vec::new() }
+        }
+
+        /// Finalizes the digest hash calculation.
+        fn finalize(&mut self) -> Vec<u8> {
+            self.bytes.clone()
+        }
+
+        /// Calculates the digest hash of the data.
+        fn update(&mut self, data: &[u8]) {
+            self.bytes.extend_from_slice(data);
+        }
+    }
+
+    #[test]
+    fn test_finalize_into() {
+        let mut context: TestDigestHashContext = TestDigestHashContext::new();
+        context.update(b"test");
+
+        let mut output: [u8; 4] = [0; 4];
+        context.finalize_into(&mut output);
+        assert_eq!(output, *b"test");
+    }
+}

@@ -1115,7 +1115,7 @@ mod tests {
             ExtInfo::print_hierarchy(&data_stream, None, Some(&String::from("/nonexistent")));
         assert!(result.is_err());
 
-        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0u8; 64]);
+        let invalid_stream: DataStreamReference = open_fake_data_stream(&[0; 64]);
         let result: Result<(), ErrorTrace> = ExtInfo::print_file_system(&invalid_stream, None);
         assert!(result.is_err());
         let result: Result<(), ErrorTrace> =

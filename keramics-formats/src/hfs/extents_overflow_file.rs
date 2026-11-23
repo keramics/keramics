@@ -340,7 +340,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_core::open_os_data_stream;
+    use keramics_core::{open_fake_data_stream, open_os_data_stream};
 
     use crate::tests::get_test_data_path;
 
@@ -379,7 +379,164 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_extents_by_identifier_from_node
+    /// Builds a synthetic HFS B-tree node for testing.
+    fn build_hfs_btree_node(node_type: u8, records: &[&[u8]]) -> Vec<u8> {
+        let mut node: Vec<u8> = vec![0; 512];
+        node[8] = node_type;
+        let number_of_records: u16 = records.len() as u16;
+        node[10..12].copy_from_slice(&number_of_records.to_be_bytes());
+
+        let mut data_offset: usize = 14;
+        for (index, record) in records.iter().enumerate() {
+            let data_end_offset: usize = data_offset + record.len();
+            node[data_offset..data_end_offset].copy_from_slice(record);
+            let slot_offset: usize = 512 - ((index + 1) * 2);
+            let slot_end_offset: usize = slot_offset + 2;
+            node[slot_offset..slot_end_offset].copy_from_slice(&(data_offset as u16).to_be_bytes());
+            data_offset = data_end_offset;
+        }
+        let free_slot_offset: usize = 512 - ((records.len() + 1) * 2);
+        let free_slot_end_offset: usize = free_slot_offset + 2;
+        node[free_slot_offset..free_slot_end_offset]
+            .copy_from_slice(&(data_offset as u16).to_be_bytes());
+        node
+    }
+
+    /// Builds a synthetic HFS B-tree header node for testing.
+    fn build_header_node(root_node_number: u32) -> Vec<u8> {
+        let mut node: Vec<u8> = vec![0; 512];
+        node[8] = 0x01;
+        node[16..20].copy_from_slice(&root_node_number.to_be_bytes());
+        node[32..34].copy_from_slice(&512_u16.to_be_bytes());
+        node
+    }
+
+    #[test]
+    fn test_get_extents_by_identifier_branch_and_leaf() -> Result<(), ErrorTrace> {
+        let mut image: Vec<u8> = vec![0; 5 * 512];
+        let header_node: Vec<u8> = build_header_node(1);
+        image[0..512].copy_from_slice(&header_node);
+
+        // Build index records (12-byte HFS+ key + 4-byte sub-node number).
+        // Entry 0 (identifier 0x10) points to empty leaf node 4; entry 1 (identifier 0x20) points to leaf node 2.
+        let mut index_record_1: Vec<u8> = vec![
+            0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00,
+        ];
+        index_record_1.extend_from_slice(&4_u32.to_be_bytes());
+
+        let mut index_record_2: Vec<u8> = vec![
+            0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00,
+        ];
+        index_record_2.extend_from_slice(&2_u32.to_be_bytes());
+
+        let mut index_record_3: Vec<u8> = vec![
+            0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00,
+        ];
+        index_record_3.extend_from_slice(&3_u32.to_be_bytes());
+
+        let index_node: Vec<u8> =
+            build_hfs_btree_node(0x00, &[&index_record_1, &index_record_2, &index_record_3]);
+        image[512..1024].copy_from_slice(&index_node);
+
+        // Build leaf node 2 with two records: identifier 0x20 and identifier 0x30.
+        let mut leaf_record_1: Vec<u8> = vec![0; 76];
+        leaf_record_1[0..12].copy_from_slice(&[
+            0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00,
+        ]);
+        leaf_record_1[12..16].copy_from_slice(&100_u32.to_be_bytes());
+        leaf_record_1[16..20].copy_from_slice(&4_u32.to_be_bytes());
+        leaf_record_1[20..24].copy_from_slice(&200_u32.to_be_bytes());
+        leaf_record_1[24..28].copy_from_slice(&2_u32.to_be_bytes());
+
+        let mut leaf_record_2: Vec<u8> = vec![0; 76];
+        leaf_record_2[0..12].copy_from_slice(&[
+            0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x00, 0x00, 0x00, 0x00,
+        ]);
+        let leaf_node: Vec<u8> = build_hfs_btree_node(0xff, &[&leaf_record_1, &leaf_record_2]);
+        image[1024..1536].copy_from_slice(&leaf_node);
+
+        // Node 3: MapNode (unsupported node type).
+        let map_node: Vec<u8> = build_hfs_btree_node(0x02, &[]);
+        image[1536..2048].copy_from_slice(&map_node);
+
+        // Node 4: Empty LeafNode.
+        let empty_leaf_node: Vec<u8> = build_hfs_btree_node(0xff, &[]);
+        image[2048..2560].copy_from_slice(&empty_leaf_node);
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let block_ranges: Vec<HfsBlockRange> = vec![HfsBlockRange::new(0, 0, 5)];
+        let mut extents_overflow_file: HfsExtentsOverflowFile = HfsExtentsOverflowFile::new();
+        extents_overflow_file.initialize(
+            &HfsFormat::HfsPlus,
+            512,
+            image.len() as u64,
+            block_ranges,
+            &data_stream,
+        )?;
+
+        // Lookup identifier 0x20 traverses index node 1 -> leaf node 2 (stops at 0x30).
+        let mut extents: Vec<HfsExtentDescriptor> = Vec::new();
+        extents_overflow_file.get_extents_by_identifier(&data_stream, 0x20, &mut extents)?;
+        assert_eq!(extents.len(), 2);
+        assert_eq!(extents[0].block_number, 100);
+        assert_eq!(extents[0].number_of_blocks, 4);
+        assert_eq!(extents[1].block_number, 200);
+        assert_eq!(extents[1].number_of_blocks, 2);
+
+        // Lookup identifier 0x40 reaches MapNode 3 and returns an error.
+        let mut error_extents: Vec<HfsExtentDescriptor> = Vec::new();
+        let result: Result<(), ErrorTrace> =
+            extents_overflow_file.get_extents_by_identifier(&data_stream, 0x40, &mut error_extents);
+        assert!(result.is_err());
+
+        // Test cycle detection when node was already read.
+        let mut read_node_numbers: HashSet<u32> = HashSet::new();
+        read_node_numbers.insert(2);
+        let result: Result<(), ErrorTrace> = extents_overflow_file
+            .get_extents_by_identifier_from_node(
+                &data_stream,
+                2,
+                0x20,
+                &mut error_extents,
+                &mut read_node_numbers,
+            );
+        assert!(result.is_err());
+
+        // Test root_node_number == 0 returns Ok(()).
+        let empty_file: HfsExtentsOverflowFile = HfsExtentsOverflowFile::new();
+        empty_file.get_extents_by_identifier(&data_stream, 0x20, &mut error_extents)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_extents_overflow_record() -> Result<(), ErrorTrace> {
+        // Test standard HFS record (20 bytes: 8-byte key + three 4-byte descriptors).
+        let mut hfs_file: HfsExtentsOverflowFile = HfsExtentsOverflowFile::new();
+        hfs_file.btree_file.format = HfsFormat::Hfs;
+        let mut hfs_record: Vec<u8> = vec![0; 20];
+        hfs_record[8..10].copy_from_slice(&12_u16.to_be_bytes());
+        hfs_record[10..12].copy_from_slice(&3_u16.to_be_bytes());
+        let mut extents: Vec<HfsExtentDescriptor> = Vec::new();
+        hfs_file.read_extents_overflow_record(&hfs_record, &mut extents)?;
+        assert_eq!(extents.len(), 1);
+        assert_eq!(extents[0].block_number, 12);
+        assert_eq!(extents[0].number_of_blocks, 3);
+
+        // Test truncated HFS record error.
+        let result: Result<(), ErrorTrace> =
+            hfs_file.read_extents_overflow_record(&[0; 10], &mut extents);
+        assert!(result.is_err());
+
+        // Test truncated HFS+ record error.
+        let mut hfsplus_file: HfsExtentsOverflowFile = HfsExtentsOverflowFile::new();
+        hfsplus_file.btree_file.format = HfsFormat::HfsPlus;
+        let result: Result<(), ErrorTrace> =
+            hfsplus_file.read_extents_overflow_record(&[0; 20], &mut extents);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     #[test]
     fn test_initialize() -> Result<(), ErrorTrace> {
@@ -394,6 +551,4 @@ mod tests {
             &data_stream,
         )
     }
-
-    // TODO: add tests for read_attribute_record
 }

@@ -317,3 +317,154 @@ impl LuksEncryption {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_types::ByteString;
+
+    #[test]
+    fn test_get_diffuser_context_and_merge() {
+        for hashing_method in ["sha1", "sha224", "sha256", "sha512"] {
+            let mut diffuser: LuksDiffuserContext =
+                LuksEncryption::get_diffuser_context(hashing_method).unwrap();
+            let split_data: Vec<u8> = vec![0xaa; 32];
+            let mut merged_data: [u8; 16] = [0; 16];
+            diffuser.merge(2, &split_data, &mut merged_data);
+            assert_ne!(merged_data, [0; 16]);
+        }
+        let unknown_diffuser: Option<LuksDiffuserContext> =
+            LuksEncryption::get_diffuser_context("unknown");
+        assert!(unknown_diffuser.is_none());
+    }
+
+    #[test]
+    fn test_get_key_derivation_context_and_derive_key() -> Result<(), ErrorTrace> {
+        let salt: [u8; 8] = [0x01; 8];
+
+        for hashing_method in ["sha1", "sha224", "sha256", "sha512"] {
+            let mut context: LuksKeyDerivationContext =
+                LuksEncryption::get_key_derivation_context(hashing_method, &salt, 1)?.unwrap();
+            let mut derived_key: [u8; 16] = [0; 16];
+            context.derive_key(b"password", &mut derived_key)?;
+            assert_ne!(derived_key, [0; 16]);
+        }
+        let unknown: Option<LuksKeyDerivationContext> =
+            LuksEncryption::get_key_derivation_context("unknown", &salt, 1)?;
+        assert!(unknown.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_derive_initialization_vector() -> Result<(), ErrorTrace> {
+        let mut initialization_vector: [u8; 16] = [0; 16];
+
+        LuksInitializationVectorContext::Benbi
+            .derive_initialization_vector(3, &mut initialization_vector)?;
+        let expected_bytes: [u8; 8] = ((3_u64 << 5) + 1).to_be_bytes();
+        assert_eq!(&initialization_vector[0..8], &expected_bytes);
+
+        initialization_vector.fill(0x55);
+        LuksInitializationVectorContext::Null
+            .derive_initialization_vector(3, &mut initialization_vector)?;
+        assert_eq!(initialization_vector, [0x55; 16]);
+
+        initialization_vector.fill(0);
+        LuksInitializationVectorContext::Plain32
+            .derive_initialization_vector(0x01020304, &mut initialization_vector)?;
+        let expected_bytes: [u8; 4] = 0x01020304_u32.to_le_bytes();
+        assert_eq!(&initialization_vector[0..4], &expected_bytes);
+
+        initialization_vector.fill(0);
+        LuksInitializationVectorContext::Plain64
+            .derive_initialization_vector(0x0102030405060708, &mut initialization_vector)?;
+        let expected_bytes: [u8; 8] = 0x0102030405060708_u64.to_le_bytes();
+        assert_eq!(&initialization_vector[0..8], &expected_bytes);
+
+        let mut essiv_aes: AesContext = AesContext::new();
+        essiv_aes.set_key(&[0x33; 16])?;
+        let essiv_context: LuksInitializationVectorContext =
+            LuksInitializationVectorContext::Essiv(essiv_aes);
+        initialization_vector.fill(0);
+        essiv_context.derive_initialization_vector(1, &mut initialization_vector)?;
+        assert_ne!(initialization_vector, [0; 16]);
+
+        // Test ESSIV with invalid short initialization vector output buffer.
+        let mut short_initialization_vector: [u8; 8] = [0; 8];
+        let result: Result<(), ErrorTrace> =
+            essiv_context.derive_initialization_vector(1, &mut short_initialization_vector);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_encryption_context() -> Result<(), ErrorTrace> {
+        let key16: [u8; 16] = [0x11; 16];
+        let key32: [u8; 32] = [0x22; 32];
+
+        // Test all supported cipher, chaining, and initialization vector combinations.
+        let valid_modes: [(&str, &str, &[u8]); 11] = [
+            ("aes", "cbc-benbi", &key16),
+            ("aes", "cbc-essiv:sha1", &key16),
+            ("aes", "cbc-essiv:sha224", &key16),
+            ("aes", "cbc-essiv:sha256", &key16),
+            ("aes", "ecb-essiv:sha256", &key16),
+            ("aes", "cbc-null", &key16),
+            ("aes", "cbc-plain", &key16),
+            ("aes", "cbc-plain64", &key16),
+            ("aes", "ecb", &key16),
+            ("aes", "xts-plain64", &key32),
+            ("aes", "xts-plain", &key32),
+        ];
+        for (method, mode, key) in valid_modes {
+            let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
+            let encryption_method: ByteString = ByteString::from(method);
+            let encryption_mode: ByteString = ByteString::from(mode);
+            encryption_type.set_encryption_method(&encryption_method);
+            encryption_type.set_encryption_mode(&encryption_mode);
+            let context: Option<LuksEncryptionContext> =
+                LuksEncryption::get_encryption_context(&encryption_type, key)?;
+            assert!(context.is_some());
+        }
+
+        // Test unsupported cipher, chaining mode, initialization vector modes,
+        // and invalid initialization vector options returning None.
+        let unsupported_modes: [(&str, &str, &[u8]); 10] = [
+            ("twofish", "cbc-plain", &key16),
+            ("aes", "ctr-plain", &key16),
+            ("aes", "cbc-benbi:opt", &key16),
+            ("aes", "xts-essiv:sha256", &key32),
+            ("aes", "cbc-essiv:unknown", &key16),
+            ("aes", "cbc-essiv", &key16),
+            ("aes", "cbc-null:opt", &key16),
+            ("aes", "cbc-plain:opt", &key16),
+            ("aes", "cbc-plain64:opt", &key16),
+            ("aes", "cbc-unknown", &key16),
+        ];
+        for (method, mode, key) in unsupported_modes {
+            let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
+            let encryption_method: ByteString = ByteString::from(method);
+            let encryption_mode: ByteString = ByteString::from(mode);
+            encryption_type.set_encryption_method(&encryption_method);
+            encryption_type.set_encryption_mode(&encryption_mode);
+            let context: Option<LuksEncryptionContext> =
+                LuksEncryption::get_encryption_context(&encryption_type, key)?;
+            assert!(context.is_none());
+        }
+
+        // Test invalid key length returning error.
+        let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
+        let encryption_method: ByteString = ByteString::from("aes");
+        let encryption_mode: ByteString = ByteString::from("cbc-plain");
+        encryption_type.set_encryption_method(&encryption_method);
+        encryption_type.set_encryption_mode(&encryption_mode);
+        let result: Result<Option<LuksEncryptionContext>, ErrorTrace> =
+            LuksEncryption::get_encryption_context(&encryption_type, &[0; 5]);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+}

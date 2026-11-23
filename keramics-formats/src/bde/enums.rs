@@ -49,3 +49,25 @@ impl fmt::Display for BdeKeyProtectorType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fmt() {
+        let cases: [(BdeKeyProtectorType, &str); 7] = [
+            (BdeKeyProtectorType::ClearKey, "Clear key"),
+            (BdeKeyProtectorType::ExternalKey, "External key"),
+            (BdeKeyProtectorType::Passphrase, "Passphrase (or password)"),
+            (BdeKeyProtectorType::RecoveryPassword, "Recovery password"),
+            (BdeKeyProtectorType::Tpm, "TPM"),
+            (BdeKeyProtectorType::TpmAndPin, "TPM and pin"),
+            (BdeKeyProtectorType::Unknown(0x1234), "Unknown: 0x1234"),
+        ];
+        for (protector_type, expected_string) in cases {
+            let string: String = protector_type.to_string();
+            assert_eq!(string, expected_string);
+        }
+    }
+}

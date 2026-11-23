@@ -53,3 +53,23 @@ impl PdiSegmentFileDescriptor {
         &self.snapshot_identifier
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_getters() {
+        let identifier: Uuid = Uuid::from_be_bytes(&[1; 16]);
+        let path: String = String::from("disk.hds");
+        let descriptor: PdiSegmentFileDescriptor =
+            PdiSegmentFileDescriptor::new(path, PdiSegmentFileType::Compressed, identifier.clone());
+
+        let path: &str = descriptor.get_path();
+        assert_eq!(path, "disk.hds");
+        let file_type: &PdiSegmentFileType = descriptor.get_file_type();
+        assert_eq!(file_type, &PdiSegmentFileType::Compressed);
+        let snapshot_identifier: &Uuid = descriptor.get_snapshot_identifier();
+        assert_eq!(snapshot_identifier, &identifier);
+    }
+}

@@ -66,6 +66,8 @@ or `#!/usr/bin/env bash`).
   `"...".as_bytes()` or ASCII byte vectors like `vec![0x74, 0x65, 0x73, 0x74]` when representing
   ASCII `ByteString` elements or byte patterns. Reserve `vec![0x80]` / `vec![0xff]` for empty or
   non-ASCII raw byte sequences.
+* Write hexadecimal literals in lowercase without underscore digit separators (for example,
+  `0x000000ffffffffff` instead of `0x0000_00ff_ffff_ffff`).
 
 ### Type Annotations and Bindings
 
@@ -77,6 +79,34 @@ let mut offset: u64 = 0;
 let path: Path = Path::from("/testdir1/testfile1");
 ```
 
+* Avoid nesting function calls or struct creations directly inside other function calls; bind
+  intermediate values to explicit, typed `let` variables first:
+
+```rust
+let entry_name: ByteString = ByteString::from("entry1");
+let entry: &XfsDirectoryEntry = entries.get_value_by_key(&entry_name).unwrap();
+
+let data_run: NtfsDataRun = NtfsDataRun {
+    block_number: 0,
+    number_of_blocks: 1,
+    run_type: NtfsDataRunType::InFile,
+};
+cluster_group.data_runs.push(data_run);
+```
+
+* Avoid arithmetic inside square-bracket slice or index expressions; compute end or start offsets
+  in explicit, typed local variables first:
+
+```rust
+let data_end_offset: usize = data_offset + record.len();
+node[data_offset..data_end_offset].copy_from_slice(record);
+```
+
+* Omit type suffixes on integer literals whenever the type can be inferred from context or a `let`
+  type annotation (for example, write `1024` instead of `1024u64`). When a type suffix is required
+  on a literal (for example, when calling methods directly on it), use the trailing underscore form
+  (for example, `1024_u64.to_be_bytes()` or `0xdeadbeef_u32.to_le_bytes()` instead of
+  `1024u64.to_be_bytes()` or `0xdeadbeefu32.to_le_bytes()`).
 * Discard unused return values with `_ = expression;` rather than `let _ = expression;`.
 
 ### Imports and Module Organization
@@ -136,10 +166,14 @@ match self.encryption_context.decrypt_sector(sector_physical_offset, &mut sector
   * `test_<method_name>`
   * `test_<method_name>_with_<condition>` (for example,
     `test_read_data_with_unsupported_data_size`)
-* When asserting that a call returns an error, split the function call and the `.is_err()` check
-  across separate lines by storing the return value in a local variable named `result`:
+* Move function and method calls out of `assert!`, `assert_eq!`, and `assert_ne!` macros by storing
+  the return value in an explicit, typed local variable first (name the local variable `result`
+  when checking `.is_err()`):
 
 ```rust
+let size: u64 = block_reader.get_size();
+assert_eq!(size, 1024);
+
 let result: Result<(), ErrorTrace> = test_struct.read_data(&test_data);
 assert!(result.is_err());
 ```
