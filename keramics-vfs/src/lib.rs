@@ -34,6 +34,7 @@ mod types;
 mod apfs;
 mod apm;
 mod bde;
+mod bsdlabel;
 mod ewf;
 mod fake;
 mod gpt;

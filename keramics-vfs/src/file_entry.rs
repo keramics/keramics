@@ -32,6 +32,7 @@ use keramics_types::Ucs2String;
 use super::apfs::ApfsContainerFileEntry;
 use super::apm::ApmFileEntry;
 use super::bde::BdeFileEntry;
+use super::bsdlabel::BsdDiskLabelFileEntry;
 use super::data_fork::VfsDataFork;
 use super::data_forks::VfsDataForksIterator;
 use super::enums::{VfsFileType, VfsType};
@@ -64,6 +65,7 @@ pub enum VfsFileEntry {
     ApfsContainer(ApfsContainerFileEntry),
     Apm(ApmFileEntry),
     Bde(BdeFileEntry),
+    BsdDiskLabel(BsdDiskLabelFileEntry),
     ExFat(ExFatFileEntry),
     Ext(ExtFileEntry),
     Ewf(EwfFileEntry),
@@ -98,6 +100,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Gpt(_)
@@ -133,6 +136,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
@@ -168,6 +172,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Gpt(_)
@@ -205,6 +210,7 @@ impl VfsFileEntry {
             | VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
@@ -245,6 +251,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
@@ -298,6 +305,7 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_file_type(),
             VfsFileEntry::Bde(bde_file_entry) => bde_file_entry.get_file_type(),
+            VfsFileEntry::BsdDiskLabel(bsdlabel_file_entry) => bsdlabel_file_entry.get_file_type(),
             VfsFileEntry::Luksde(luks_file_entry) => luks_file_entry.get_file_type(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_file_type(),
             VfsFileEntry::ExFat(exfat_file_entry) => {
@@ -399,6 +407,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Gpt(_)
@@ -434,6 +443,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
@@ -470,6 +480,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
@@ -510,6 +521,7 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Apm(apm_file_entry) => Some(apm_file_entry.get_name()),
             VfsFileEntry::Bde(bde_file_entry) => Some(bde_file_entry.get_name()),
+            VfsFileEntry::BsdDiskLabel(bsdlabel_file_entry) => Some(bsdlabel_file_entry.get_name()),
             VfsFileEntry::Luksde(luks_file_entry) => Some(luks_file_entry.get_name()),
             VfsFileEntry::Ewf(ewf_file_entry) => Some(ewf_file_entry.get_name()),
             VfsFileEntry::ExFat(exfat_file_entry) => {
@@ -566,6 +578,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
@@ -603,6 +616,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
@@ -641,6 +655,7 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_size(),
             VfsFileEntry::Bde(bde_file_entry) => bde_file_entry.get_size(),
+            VfsFileEntry::BsdDiskLabel(bsdlabel_file_entry) => bsdlabel_file_entry.get_size(),
             VfsFileEntry::Luksde(luks_file_entry) => luks_file_entry.get_size(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_size(),
             VfsFileEntry::ExFat(exfat_file_entry) => exfat_file_entry.get_size(),
@@ -677,6 +692,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
@@ -789,6 +805,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_) => VfsType::ApfsContainer,
             VfsFileEntry::Apm(_) => VfsType::Apm,
             VfsFileEntry::Bde(_) => VfsType::Bde,
+            VfsFileEntry::BsdDiskLabel(_) => VfsType::BsdDiskLabel,
             VfsFileEntry::Luksde(_) => VfsType::Luksde,
             VfsFileEntry::Ewf(_) => VfsType::Ewf,
             VfsFileEntry::ExFat(_) => VfsType::ExFat,
@@ -837,6 +854,10 @@ impl VfsFileEntry {
             VfsFileEntry::Bde(bde_file_entry) => match bde_file_entry {
                 BdeFileEntry::Root { .. } => 0,
                 BdeFileEntry::UnlockedVolume { .. } => 1,
+            },
+            VfsFileEntry::BsdDiskLabel(bsdlabel_file_entry) => match bsdlabel_file_entry {
+                BsdDiskLabelFileEntry::Partition { .. } => 1,
+                BsdDiskLabelFileEntry::Root { .. } => 0,
             },
             VfsFileEntry::Luksde(luks_file_entry) => match luks_file_entry {
                 LuksFileEntry::Root { .. } => 0,
@@ -989,6 +1010,7 @@ impl VfsFileEntry {
             VfsFileEntry::Apfs(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
@@ -1082,6 +1104,9 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_data_stream(),
             VfsFileEntry::Bde(bde_file_entry) => bde_file_entry.get_data_stream(),
+            VfsFileEntry::BsdDiskLabel(bsdlabel_file_entry) => {
+                bsdlabel_file_entry.get_data_stream()
+            }
             VfsFileEntry::Luksde(luks_file_entry) => luks_file_entry.get_data_stream(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_data_stream(),
             VfsFileEntry::ExFat(exfat_file_entry) => exfat_file_entry.get_data_stream(),
@@ -1133,6 +1158,7 @@ impl VfsFileEntry {
             | VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
@@ -1180,6 +1206,7 @@ impl VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
@@ -1268,6 +1295,9 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.is_root_file_entry(),
             VfsFileEntry::Bde(bde_file_entry) => bde_file_entry.is_root_file_entry(),
+            VfsFileEntry::BsdDiskLabel(bsdlabel_file_entry) => {
+                bsdlabel_file_entry.is_root_file_entry()
+            }
             VfsFileEntry::Luksde(luks_file_entry) => luks_file_entry.is_root_file_entry(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.is_root_file_entry(),
             VfsFileEntry::ExFat(exfat_file_entry) => exfat_file_entry.is_root_directory(),
@@ -1312,6 +1342,7 @@ impl ExtendedAttributeIterator for VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
@@ -1362,6 +1393,7 @@ impl ExtendedAttributeIterator for VfsFileEntry {
             VfsFileEntry::ApfsContainer(_)
             | VfsFileEntry::Apm(_)
             | VfsFileEntry::Bde(_)
+            | VfsFileEntry::BsdDiskLabel(_)
             | VfsFileEntry::Luksde(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::ExFat(_)
@@ -1437,6 +1469,9 @@ impl FileEntryIterator for VfsFileEntry {
             )),
             VfsFileEntry::Bde(bde_file_entry) => Ok(VfsFileEntry::Bde(
                 bde_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::BsdDiskLabel(bsdlabel_file_entry) => Ok(VfsFileEntry::BsdDiskLabel(
+                bsdlabel_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
             VfsFileEntry::Luksde(luks_file_entry) => Ok(VfsFileEntry::Luksde(
                 luks_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
@@ -1541,6 +1576,9 @@ impl FileEntryIterator for VfsFileEntry {
             }
             VfsFileEntry::Bde(bde_file_entry) => {
                 Ok(bde_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::BsdDiskLabel(bsdlabel_file_entry) => {
+                Ok(bsdlabel_file_entry.get_number_of_sub_file_entries())
             }
             VfsFileEntry::Luksde(luks_file_entry) => {
                 Ok(luks_file_entry.get_number_of_sub_file_entries())
@@ -3081,6 +3119,337 @@ mod tests {
     #[test]
     fn test_sub_file_entries_with_bde() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_bde_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    // Tests with bsdlabel.
+
+    fn get_bsdlabel_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::BsdDiskLabel);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let path_string: String = get_test_data_path("bsdlabel/bsdlabel.raw");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_bsdlabel_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_bsdlabel_file_system()?;
+
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier();
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("bsdlabel1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 4186112);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_data_forks_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let mut vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_name_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let name: Option<PathComponent> = None;
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_some());
+
+        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extended_attributes_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let mut extended_attributes_iterator: VfsExtendedAttributesIterator =
+            vfs_file_entry.extended_attributes();
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 1);
+
+        let mut vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/bsdlabel1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_sub_file_entry_by_index_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+
+        let name: Option<PathComponent> = sub_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("bsdlabel1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_bsdlabel_file_entry("/")?;
 
         let mut sub_file_entries_iterator: VfsFileEntriesIterator =
             vfs_file_entry.sub_file_entries();
@@ -11596,6 +11965,12 @@ mod tests {
             (get_apm_file_entry("/apm1")?, VfsType::Apm, false),
             (get_bde_file_entry("/")?, VfsType::Bde, true),
             (get_bde_file_entry("/bde1")?, VfsType::Bde, false),
+            (get_bsdlabel_file_entry("/")?, VfsType::BsdDiskLabel, true),
+            (
+                get_bsdlabel_file_entry("/bsdlabel1")?,
+                VfsType::BsdDiskLabel,
+                false,
+            ),
             (get_ewf_file_entry("/")?, VfsType::Ewf, true),
             (get_ewf_file_entry("/ewf1")?, VfsType::Ewf, false),
             (get_exfat_file_entry("/")?, VfsType::ExFat, true),

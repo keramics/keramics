@@ -18,6 +18,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::apfs::{ApfsContainer, ApfsCredential, ApfsVolume};
 use keramics_formats::apm::ApmVolumeSystem;
 use keramics_formats::bde::BdeEncryptedVolume;
+use keramics_formats::bsdlabel::BsdDiskLabelVolumeSystem;
 use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::fat::FatFileSystem;
@@ -133,6 +134,7 @@ impl VfsScanner {
         self.phase1_volume_system_scanner.add_apfs_signatures();
         self.phase1_volume_system_scanner.add_apm_signatures();
         self.phase1_volume_system_scanner.add_bde_signatures();
+        self.phase1_volume_system_scanner.add_bsdlabel_signatures();
         self.phase1_volume_system_scanner.add_gpt_signatures();
         self.phase1_volume_system_scanner.add_linuxlvm_signatures();
         self.phase1_volume_system_scanner.add_luksde_signatures();
@@ -185,6 +187,7 @@ impl VfsScanner {
         }
         self.sub_volume_system_scanner.add_apfs_signatures();
         self.sub_volume_system_scanner.add_bde_signatures();
+        self.sub_volume_system_scanner.add_bsdlabel_signatures();
         self.sub_volume_system_scanner.add_linuxlvm_signatures();
         self.sub_volume_system_scanner.add_luksde_signatures();
         self.sub_volume_system_scanner.add_sgilabel_signatures();
@@ -223,6 +226,7 @@ impl VfsScanner {
             FormatIdentifier::Apfs => Some(VfsType::ApfsContainer),
             FormatIdentifier::Apm => Some(VfsType::Apm),
             FormatIdentifier::Bde => Some(VfsType::Bde),
+            FormatIdentifier::BsdDiskLabel => Some(VfsType::BsdDiskLabel),
             FormatIdentifier::Ewf => Some(VfsType::Ewf),
             FormatIdentifier::ExFat => Some(VfsType::ExFat),
             FormatIdentifier::Ext => Some(VfsType::Ext),
@@ -466,6 +470,7 @@ impl VfsScanner {
                 "Unsupported VFS location type"
             )),
             VfsType::Apm
+            | VfsType::BsdDiskLabel
             | VfsType::Gpt
             | VfsType::LinuxLvm
             | VfsType::Luksde
@@ -900,6 +905,9 @@ impl VfsScanner {
             Some(FormatIdentifier::Apfs) => return Ok(Some(FormatIdentifier::Apfs)),
             Some(FormatIdentifier::Apm) => return Ok(Some(FormatIdentifier::Apm)),
             Some(FormatIdentifier::Bde) => return Ok(Some(FormatIdentifier::Bde)),
+            Some(FormatIdentifier::BsdDiskLabel) => {
+                return Ok(Some(FormatIdentifier::BsdDiskLabel));
+            }
             Some(FormatIdentifier::Gpt) => return Ok(Some(FormatIdentifier::Gpt)),
             Some(FormatIdentifier::LinuxLvm) => return Ok(Some(FormatIdentifier::LinuxLvm)),
             Some(FormatIdentifier::Luks) => return Ok(Some(FormatIdentifier::Luks)),
@@ -1011,7 +1019,11 @@ impl VfsScanner {
             };
 
         match vfs_type {
-            VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel
+            VfsType::Apm
+            | VfsType::BsdDiskLabel
+            | VfsType::Gpt
+            | VfsType::Mbr
+            | VfsType::SgiDiskLabel
                 if scan_options.partitions == VfsScanOptionGroup::NotSet =>
             {
                 // TODO: invoke mediator to ask which partitions to include.
@@ -1025,7 +1037,11 @@ impl VfsScanner {
             let vfs_type: &VfsType = scan_node.get_type();
 
             match vfs_type {
-                VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel
+                VfsType::Apm
+                | VfsType::BsdDiskLabel
+                | VfsType::Gpt
+                | VfsType::Mbr
+                | VfsType::SgiDiskLabel
                     if scan_options.partitions != VfsScanOptionGroup::NotSet
                         && !scan_options.partitions.contains_index(volume_index + 1) =>
                 {
@@ -1299,6 +1315,39 @@ impl VfsScanner {
                             );
                             return Err(error);
                         }
+                    }
+                }
+            }
+            VfsType::BsdDiskLabel => {
+                let mut bsdlabel_volume_system: BsdDiskLabelVolumeSystem =
+                    BsdDiskLabelVolumeSystem::new();
+
+                match bsdlabel_volume_system.open_from_vfs(file_system, path) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open bsdlabel volume system"
+                        );
+                        return Err(error);
+                    }
+                }
+                let number_of_partitions: usize = bsdlabel_volume_system.get_number_of_partitions();
+
+                match self.scan_for_volume_system_sub_nodes(
+                    scan_options,
+                    vfs_location,
+                    scan_node,
+                    BsdDiskLabelVolumeSystem::PATH_PREFIX,
+                    number_of_partitions,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan bsdlabel volume system"
+                        );
+                        return Err(error);
                     }
                 }
             }
@@ -2404,6 +2453,21 @@ mod tests {
     // TODO: add test for BDE
 
     #[test]
+    fn test_scan_for_volume_system_format_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        let path_string: String = get_test_data_path("bsdlabel/bsdlabel.raw");
+        let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
+        let format_identifier: FormatIdentifier = format_scanner
+            .scan_for_volume_system_format(&data_stream)?
+            .unwrap();
+
+        assert_eq!(format_identifier, FormatIdentifier::BsdDiskLabel);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_scan_for_volume_system_format_with_gpt() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
@@ -2465,10 +2529,11 @@ mod tests {
 
     #[test]
     fn test_get_vfs_type() {
-        let mappings: [(FormatIdentifier, Option<VfsType>); 27] = [
+        let mappings: [(FormatIdentifier, Option<VfsType>); 28] = [
             (FormatIdentifier::Apfs, Some(VfsType::ApfsContainer)),
             (FormatIdentifier::Apm, Some(VfsType::Apm)),
             (FormatIdentifier::Bde, Some(VfsType::Bde)),
+            (FormatIdentifier::BsdDiskLabel, Some(VfsType::BsdDiskLabel)),
             (FormatIdentifier::Ewf, Some(VfsType::Ewf)),
             (FormatIdentifier::ExFat, Some(VfsType::ExFat)),
             (FormatIdentifier::Ext, Some(VfsType::Ext)),
@@ -2621,9 +2686,10 @@ mod tests {
         let format_scanner: VfsScanner = get_format_scanner()?;
         let scan_options: VfsScanOptions = VfsScanOptions::new();
 
-        let test_cases: [(&str, VfsType); 12] = [
+        let test_cases: [(&str, VfsType); 13] = [
             ("apm/apm.dmg", VfsType::Apm),
             ("apfs/apfs_encrypted.raw", VfsType::ApfsContainer),
+            ("bsdlabel/bsdlabel.raw", VfsType::BsdDiskLabel),
             ("linuxlvm/lvm2.raw", VfsType::LinuxLvm),
             ("luksde/luks1.raw", VfsType::Luksde),
             ("mbr/mbr.raw", VfsType::Mbr),
