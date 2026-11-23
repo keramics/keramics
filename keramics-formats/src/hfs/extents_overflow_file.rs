@@ -379,24 +379,30 @@ mod tests {
         Ok(())
     }
 
+    /// Builds a synthetic HFS B-tree node for testing.
     fn build_hfs_btree_node(node_type: u8, records: &[&[u8]]) -> Vec<u8> {
         let mut node: Vec<u8> = vec![0; 512];
         node[8] = node_type;
-        node[10..12].copy_from_slice(&(records.len() as u16).to_be_bytes());
+        let number_of_records: u16 = records.len() as u16;
+        node[10..12].copy_from_slice(&number_of_records.to_be_bytes());
 
         let mut data_offset: usize = 14;
         for (index, record) in records.iter().enumerate() {
-            node[data_offset..data_offset + record.len()].copy_from_slice(record);
+            let data_end_offset: usize = data_offset + record.len();
+            node[data_offset..data_end_offset].copy_from_slice(record);
             let slot_offset: usize = 512 - ((index + 1) * 2);
-            node[slot_offset..slot_offset + 2].copy_from_slice(&(data_offset as u16).to_be_bytes());
-            data_offset += record.len();
+            let slot_end_offset: usize = slot_offset + 2;
+            node[slot_offset..slot_end_offset].copy_from_slice(&(data_offset as u16).to_be_bytes());
+            data_offset = data_end_offset;
         }
         let free_slot_offset: usize = 512 - ((records.len() + 1) * 2);
-        node[free_slot_offset..free_slot_offset + 2]
+        let free_slot_end_offset: usize = free_slot_offset + 2;
+        node[free_slot_offset..free_slot_end_offset]
             .copy_from_slice(&(data_offset as u16).to_be_bytes());
         node
     }
 
+    /// Builds a synthetic HFS B-tree header node for testing.
     fn build_header_node(root_node_number: u32) -> Vec<u8> {
         let mut node: Vec<u8> = vec![0; 512];
         node[8] = 0x01;
@@ -412,7 +418,7 @@ mod tests {
         image[0..512].copy_from_slice(&header_node);
 
         // Build index records (12-byte HFS+ key + 4-byte sub-node number).
-        // Entry 0 (id 0x10) points to empty leaf node 4; entry 1 (id 0x20) points to leaf node 2.
+        // Entry 0 (identifier 0x10) points to empty leaf node 4; entry 1 (identifier 0x20) points to leaf node 2.
         let mut index_record_1: Vec<u8> = vec![
             0x00, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00,
         ];

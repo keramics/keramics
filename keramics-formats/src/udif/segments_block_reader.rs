@@ -330,9 +330,9 @@ mod tests {
         files.insert(bad_file_name, bad_data_stream);
         let mut invalid_encrypted: Vec<u8> = vec![0; 64];
         invalid_encrypted[0..8].copy_from_slice(CDSAENCR_CONTAINER_HEADER_SIGNATURE);
-        let enc_file_name: String = String::from("enc.dmg");
-        let enc_data_stream: DataStreamReference = open_fake_data_stream(&invalid_encrypted);
-        files.insert(enc_file_name, enc_data_stream);
+        let encrypted_file_name: String = String::from("enc.dmg");
+        let encrypted_data_stream: DataStreamReference = open_fake_data_stream(&invalid_encrypted);
+        files.insert(encrypted_file_name, encrypted_data_stream);
         let fail_name: String = String::from("fail.dmg");
         let test_file_resolver: TestFileResolver = TestFileResolver {
             files,

@@ -523,6 +523,7 @@ mod tests {
 
     use crate::xfs::enums::XfsExtentType;
 
+    /// Builds a synthetic XFS attributes leaf block for testing.
     fn build_attributes_leaf_block(
         format_version: u16,
         block_size: usize,
@@ -536,20 +537,27 @@ mod tests {
             (0x3bee, 56, 80)
         };
         block[8..10].copy_from_slice(&signature.to_be_bytes());
-        block[header_offset..header_offset + 2].copy_from_slice(&1_u16.to_be_bytes());
+        let header_end_offset: usize = header_offset + 2;
+        block[header_offset..header_end_offset].copy_from_slice(&1_u16.to_be_bytes());
 
         // Leaf entry: hash(4) + value_offset(2) + attribute_flags(1, 0x01 = local) + pad(1).
         let value_offset: u16 = 256;
-        block[entry_offset + 4..entry_offset + 6].copy_from_slice(&value_offset.to_be_bytes());
-        block[entry_offset + 6] = 0x01;
+        let entry_value_offset: usize = entry_offset + 4;
+        let entry_flags_offset: usize = entry_offset + 6;
+        block[entry_value_offset..entry_flags_offset].copy_from_slice(&value_offset.to_be_bytes());
+        block[entry_flags_offset] = 0x01;
 
         // Local value at offset 256: value_data_size(2) + name_size(1) + name + value_data.
         let value_start: usize = value_offset as usize;
-        block[value_start..value_start + 2].copy_from_slice(&(value.len() as u16).to_be_bytes());
-        block[value_start + 2] = name.len() as u8;
-        block[value_start + 3..value_start + 3 + name.len()].copy_from_slice(name);
-        block[value_start + 3 + name.len()..value_start + 3 + name.len() + value.len()]
-            .copy_from_slice(value);
+        let name_size_offset: usize = value_start + 2;
+        let name_offset: usize = value_start + 3;
+        let name_end_offset: usize = name_offset + name.len();
+        let value_end_offset: usize = name_end_offset + value.len();
+        let value_data_size: u16 = value.len() as u16;
+        block[value_start..name_size_offset].copy_from_slice(&value_data_size.to_be_bytes());
+        block[name_size_offset] = name.len() as u8;
+        block[name_offset..name_end_offset].copy_from_slice(name);
+        block[name_end_offset..value_end_offset].copy_from_slice(value);
 
         block
     }
@@ -568,13 +576,17 @@ mod tests {
                 };
             // Block 0: branch node pointing to logical block 1.
             image[8..10].copy_from_slice(&branch_signature.to_be_bytes());
-            image[header_offset..header_offset + 2].copy_from_slice(&1_u16.to_be_bytes());
-            image[entry_offset + 4..entry_offset + 8].copy_from_slice(&1_u32.to_be_bytes());
+            let header_end_offset: usize = header_offset + 2;
+            image[header_offset..header_end_offset].copy_from_slice(&1_u16.to_be_bytes());
+            let entry_block_offset: usize = entry_offset + 4;
+            let entry_block_end_offset: usize = entry_offset + 8;
+            image[entry_block_offset..entry_block_end_offset].copy_from_slice(&1_u32.to_be_bytes());
 
             // Block 1: leaf node with a local inline attribute.
             let leaf: Vec<u8> =
                 build_attributes_leaf_block(format_version, block_size, b"attr1", b"val1");
-            image[block_size..2 * block_size].copy_from_slice(&leaf);
+            let leaf_end_offset: usize = 2 * block_size;
+            image[block_size..leaf_end_offset].copy_from_slice(&leaf);
 
             let data_stream: DataStreamReference = open_fake_data_stream(&image);
             let attributes_tree: XfsAttributesTree = XfsAttributesTree::new(
@@ -607,9 +619,11 @@ mod tests {
         let block_size: usize = 512;
         let mut image: Vec<u8> = vec![0; 2 * block_size];
         image[8..10].copy_from_slice(&0x1234_u16.to_be_bytes());
-        image[block_size + 8..block_size + 10].copy_from_slice(&0xfebe_u16.to_be_bytes());
-        image[block_size + 12..block_size + 14].copy_from_slice(&1_u16.to_be_bytes());
-        image[block_size + 20..block_size + 24].copy_from_slice(&1_u32.to_be_bytes());
+        let block1_end_offset: usize = 2 * block_size;
+        let block1: &mut [u8] = &mut image[block_size..block1_end_offset];
+        block1[8..10].copy_from_slice(&0xfebe_u16.to_be_bytes());
+        block1[12..14].copy_from_slice(&1_u16.to_be_bytes());
+        block1[20..24].copy_from_slice(&1_u32.to_be_bytes());
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);
         let attributes_tree_v4: XfsAttributesTree =
@@ -645,7 +659,7 @@ mod tests {
         );
         assert!(result.is_err());
 
-        // Test branch node errors for v4 and v5 (wrong signature, short data, entries OOB).
+        // Test branch node errors for v4 and v5 (wrong signature, short data, entries out of bounds).
         for (tree, valid_signature, header_offset) in [
             (&attributes_tree_v4, 0xfebe, 12),
             (&attributes_tree_v5, 0x3ebe, 56),
@@ -674,7 +688,8 @@ mod tests {
             assert!(result.is_err());
 
             block.data = vec![0; header_offset + 12];
-            block.data[header_offset..header_offset + 2].copy_from_slice(&10_u16.to_be_bytes());
+            let header_end_offset: usize = header_offset + 2;
+            block.data[header_offset..header_end_offset].copy_from_slice(&10_u16.to_be_bytes());
             let result: Result<(), ErrorTrace> = tree.read_attributes_from_branch_node(
                 &block,
                 &data_stream,

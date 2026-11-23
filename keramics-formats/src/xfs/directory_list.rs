@@ -190,6 +190,7 @@ mod tests {
 
     use keramics_core::open_fake_data_stream;
 
+    /// Builds a synthetic XFS XD2D directory data block for testing.
     fn build_xd2d_block(block_size: usize, inode_number: u64, name: &[u8]) -> Vec<u8> {
         let mut data: Vec<u8> = vec![0; block_size];
         // Version 2 data block header ("XD2D", 16 bytes).
@@ -198,14 +199,17 @@ mod tests {
         // Used entry at offset 16: inode (8 bytes BE) + name_size (1 byte) + name + padding + tag (2 bytes).
         data[16..24].copy_from_slice(&inode_number.to_be_bytes());
         data[24] = name.len() as u8;
-        data[25..25 + name.len()].copy_from_slice(name);
+        let name_end_offset: usize = 25 + name.len();
+        data[25..name_end_offset].copy_from_slice(name);
 
         let entry_size: usize = 9 + name.len() + 2;
         let aligned_entry_size: usize = (entry_size + 7) & !7;
         let unused_offset: usize = 16 + aligned_entry_size;
         let unused_size: u16 = (block_size - unused_offset) as u16;
-        data[unused_offset..unused_offset + 2].copy_from_slice(&[0xff, 0xff]);
-        data[unused_offset + 2..unused_offset + 4].copy_from_slice(&unused_size.to_be_bytes());
+        let unused_size_offset: usize = unused_offset + 2;
+        let unused_end_offset: usize = unused_offset + 4;
+        data[unused_offset..unused_size_offset].copy_from_slice(&[0xff, 0xff]);
+        data[unused_size_offset..unused_end_offset].copy_from_slice(&unused_size.to_be_bytes());
 
         data
     }
@@ -215,7 +219,8 @@ mod tests {
         let block_size: usize = 512;
         let mut image: Vec<u8> = vec![0; 4 * block_size];
         let block_data: Vec<u8> = build_xd2d_block(block_size, 128, b"file1.txt");
-        image[block_size..2 * block_size].copy_from_slice(&block_data);
+        let block_end_offset: usize = 2 * block_size;
+        image[block_size..block_end_offset].copy_from_slice(&block_data);
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);
         let directory_list: XfsDirectoryList = XfsDirectoryList::new(

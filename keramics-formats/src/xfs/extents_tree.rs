@@ -358,6 +358,7 @@ mod tests {
 
     use keramics_core::open_fake_data_stream;
 
+    /// Builds a synthetic 16-byte packed XFS extent for testing.
     fn build_packed_extent_bytes(
         logical_block_number: u64,
         physical_block_number: u64,
@@ -378,17 +379,21 @@ mod tests {
         let mut image: Vec<u8> = vec![0; 4 * block_size];
 
         // Block 1: v4 branch node ("BMAP", level=1, number_of_records=1, pointing to block 2).
-        let branch: &mut [u8] = &mut image[block_size..2 * block_size];
+        let branch_end_offset: usize = 2 * block_size;
+        let branch: &mut [u8] = &mut image[block_size..branch_end_offset];
         branch[0..4].copy_from_slice(XFS_EXTENT_TREE_SIGNATURE);
         branch[4..6].copy_from_slice(&1_u16.to_be_bytes());
         branch[6..8].copy_from_slice(&1_u16.to_be_bytes());
         let number_of_pairs: usize = (block_size - 24) / 16;
         let values_offset: usize = 24 + (number_of_pairs * 8);
+        let values_end_offset: usize = values_offset + 8;
         branch[24..32].copy_from_slice(&0_u64.to_be_bytes());
-        branch[values_offset..values_offset + 8].copy_from_slice(&2_u64.to_be_bytes());
+        branch[values_offset..values_end_offset].copy_from_slice(&2_u64.to_be_bytes());
 
         // Block 2: v4 leaf node ("BMAP", level=0, number_of_records=1).
-        let leaf: &mut [u8] = &mut image[2 * block_size..3 * block_size];
+        let leaf_offset: usize = 2 * block_size;
+        let leaf_end_offset: usize = 3 * block_size;
+        let leaf: &mut [u8] = &mut image[leaf_offset..leaf_end_offset];
         leaf[0..4].copy_from_slice(XFS_EXTENT_TREE_SIGNATURE);
         leaf[4..6].copy_from_slice(&0_u16.to_be_bytes());
         leaf[6..8].copy_from_slice(&1_u16.to_be_bytes());
@@ -421,7 +426,8 @@ mod tests {
         let mut image: Vec<u8> = vec![0; 3 * block_size];
 
         // Block 1: v5 leaf node ("BMA3", 72-byte header, level=0, number_of_records=1).
-        let leaf: &mut [u8] = &mut image[block_size..2 * block_size];
+        let leaf_end_offset: usize = 2 * block_size;
+        let leaf: &mut [u8] = &mut image[block_size..leaf_end_offset];
         leaf[0..4].copy_from_slice(XFS_EXTENT_TREE_V5_SIGNATURE);
         leaf[4..6].copy_from_slice(&0_u16.to_be_bytes());
         leaf[6..8].copy_from_slice(&1_u16.to_be_bytes());
@@ -455,16 +461,21 @@ mod tests {
         let mut image: Vec<u8> = vec![0; 4 * block_size];
 
         // Block 1: unsupported signature.
-        image[block_size..block_size + 4].copy_from_slice(b"XXXX");
+        let block1_signature_end_offset: usize = block_size + 4;
+        image[block_size..block1_signature_end_offset].copy_from_slice(b"XXXX");
 
         // Block 2: branch node with record count out of bounds.
-        let invalid_count_branch: &mut [u8] = &mut image[2 * block_size..3 * block_size];
+        let block2_offset: usize = 2 * block_size;
+        let block2_end_offset: usize = 3 * block_size;
+        let invalid_count_branch: &mut [u8] = &mut image[block2_offset..block2_end_offset];
         invalid_count_branch[0..4].copy_from_slice(XFS_EXTENT_TREE_SIGNATURE);
         invalid_count_branch[4..6].copy_from_slice(&1_u16.to_be_bytes());
         invalid_count_branch[6..8].copy_from_slice(&100_u16.to_be_bytes());
 
         // Block 3: branch node with sub-block number 0.
-        let zero_child_branch: &mut [u8] = &mut image[3 * block_size..4 * block_size];
+        let block3_offset: usize = 3 * block_size;
+        let block3_end_offset: usize = 4 * block_size;
+        let zero_child_branch: &mut [u8] = &mut image[block3_offset..block3_end_offset];
         zero_child_branch[0..4].copy_from_slice(XFS_EXTENT_TREE_SIGNATURE);
         zero_child_branch[4..6].copy_from_slice(&1_u16.to_be_bytes());
         zero_child_branch[6..8].copy_from_slice(&1_u16.to_be_bytes());

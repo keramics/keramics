@@ -194,15 +194,22 @@ mod tests {
         }
     }
 
+    /// Builds a test file resolver with two synthetic physical volume data streams.
     fn build_test_file_resolver() -> FileResolverReference {
         let mut file_resolver: TestFileResolver = TestFileResolver::new();
-        let pv0_name: PathComponent = PathComponent::from("pv0");
-        let pv0_stream: DataStreamReference = open_fake_data_stream(b"0123456789ABCDEF");
-        file_resolver.data_streams.insert(pv0_name, pv0_stream);
+        let physical_volume0_name: PathComponent = PathComponent::from("pv0");
+        let physical_volume0_stream: DataStreamReference =
+            open_fake_data_stream(b"0123456789ABCDEF");
+        file_resolver
+            .data_streams
+            .insert(physical_volume0_name, physical_volume0_stream);
 
-        let pv1_name: PathComponent = PathComponent::from("pv1");
-        let pv1_stream: DataStreamReference = open_fake_data_stream(b"ghijklmnopqrstuv");
-        file_resolver.data_streams.insert(pv1_name, pv1_stream);
+        let physical_volume1_name: PathComponent = PathComponent::from("pv1");
+        let physical_volume1_stream: DataStreamReference =
+            open_fake_data_stream(b"ghijklmnopqrstuv");
+        file_resolver
+            .data_streams
+            .insert(physical_volume1_name, physical_volume1_stream);
 
         let boxed_file_resolver: Box<dyn FileResolver> = Box::new(file_resolver);
         FileResolverReference::new(boxed_file_resolver)

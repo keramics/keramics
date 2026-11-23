@@ -431,6 +431,7 @@ mod tests {
         }
     }
 
+    /// Creates a synthetic VMDK descriptor extent for testing.
     fn create_extent(
         media_start_sector: u64,
         number_of_sectors: u64,
@@ -456,9 +457,9 @@ mod tests {
         let extent1_name: String = String::from("extent1.raw");
         let extent1_stream: DataStreamReference = open_fake_data_stream(&[0xaa; 512]);
         files.insert(extent1_name, extent1_stream);
-        let alt_extent2_name: String = String::from("alt_extent2.raw");
-        let alt_extent2_stream: DataStreamReference = open_fake_data_stream(&[0xbb; 512]);
-        files.insert(alt_extent2_name, alt_extent2_stream);
+        let alternate_extent2_name: String = String::from("alt_extent2.raw");
+        let alternate_extent2_stream: DataStreamReference = open_fake_data_stream(&[0xbb; 512]);
+        files.insert(alternate_extent2_name, alternate_extent2_stream);
         let test_file_resolver: TestFileResolver = TestFileResolver {
             files,
             fail_name: None,
@@ -476,7 +477,8 @@ mod tests {
             Some("ignored.raw"),
             VmdkDescriptorExtentType::VmfsFlat,
         );
-        extent3.alternate_file_name = Some(PathComponent::from("alt_extent2.raw"));
+        let alternate_file_name: PathComponent = PathComponent::from("alt_extent2.raw");
+        extent3.alternate_file_name = Some(alternate_file_name);
 
         let extents: [VmdkDescriptorExtent; 3] = [extent1, extent2, extent3];
         let mut block_reader: VmdkBlockReader =

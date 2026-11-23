@@ -200,6 +200,7 @@ mod tests {
 
     use keramics_core::open_fake_data_stream;
 
+    /// Builds a synthetic EOW relocation log header for testing.
     fn build_header(number_of_entries: u16, entry_size: u32) -> [u8; 512] {
         let mut header: [u8; 512] = [0; 512];
         header[0..10].copy_from_slice(b"OLRDHEVF2\x00");
@@ -224,8 +225,9 @@ mod tests {
         let checksum: u32 = crc32_context.finalize();
 
         // Entry header at 512..1024 and backup entry at 1536..2048.
-        log_data[512 + 20..512 + 24].copy_from_slice(&512_u32.to_le_bytes());
-        log_data[512 + 24..512 + 28].copy_from_slice(&checksum.to_le_bytes());
+        let entry_header: &mut [u8] = &mut log_data[512..1024];
+        entry_header[20..24].copy_from_slice(&512_u32.to_le_bytes());
+        entry_header[24..28].copy_from_slice(&checksum.to_le_bytes());
 
         let data_stream: DataStreamReference = open_fake_data_stream(&log_data);
         let mut relocation_log: BdeEowRelocationLog = BdeEowRelocationLog::new();
@@ -278,7 +280,8 @@ mod tests {
         let mut out_of_bounds_sectors_data: Vec<u8> = vec![0; 2560];
         let header: [u8; 512] = build_header(1, 1536);
         out_of_bounds_sectors_data[0..512].copy_from_slice(&header);
-        out_of_bounds_sectors_data[512 + 20..512 + 24].copy_from_slice(&4096_u32.to_le_bytes());
+        let entry_header: &mut [u8] = &mut out_of_bounds_sectors_data[512..1024];
+        entry_header[20..24].copy_from_slice(&4096_u32.to_le_bytes());
         let stream: DataStreamReference = open_fake_data_stream(&out_of_bounds_sectors_data);
         let result: Result<(), ErrorTrace> =
             relocation_log.read_at_position(&stream, 2560, SeekFrom::Start(0));
@@ -288,8 +291,9 @@ mod tests {
         let mut invalid_checksum_data: Vec<u8> = vec![0; 2560];
         let header: [u8; 512] = build_header(1, 1536);
         invalid_checksum_data[0..512].copy_from_slice(&header);
-        invalid_checksum_data[512 + 20..512 + 24].copy_from_slice(&512_u32.to_le_bytes());
-        invalid_checksum_data[512 + 24..512 + 28].copy_from_slice(&0xdeadbeef_u32.to_le_bytes());
+        let entry_header: &mut [u8] = &mut invalid_checksum_data[512..1024];
+        entry_header[20..24].copy_from_slice(&512_u32.to_le_bytes());
+        entry_header[24..28].copy_from_slice(&0xdeadbeef_u32.to_le_bytes());
         let stream: DataStreamReference = open_fake_data_stream(&invalid_checksum_data);
         let result: Result<(), ErrorTrace> =
             relocation_log.read_at_position(&stream, 2560, SeekFrom::Start(0));

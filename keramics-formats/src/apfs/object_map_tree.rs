@@ -356,6 +356,7 @@ mod tests {
 
     use keramics_core::open_fake_data_stream;
 
+    /// Builds a synthetic APFS object map B-tree node for testing.
     fn build_object_map_node(
         is_root: bool,
         is_leaf: bool,
@@ -374,7 +375,8 @@ mod tests {
             flags |= 0x0002;
         }
         node[32..34].copy_from_slice(&flags.to_le_bytes());
-        node[36..40].copy_from_slice(&(entries.len() as u32).to_le_bytes());
+        let number_of_entries: u32 = entries.len() as u32;
+        node[36..40].copy_from_slice(&number_of_entries.to_le_bytes());
         let entries_data_size: u16 = (entries.len() * 4) as u16;
         node[40..42].copy_from_slice(&0_u16.to_le_bytes());
         node[42..44].copy_from_slice(&entries_data_size.to_le_bytes());
@@ -394,49 +396,57 @@ mod tests {
         {
             value_back_offset += value_bytes.len();
             let entry_offset: usize = 56 + (index * 4);
-            node[entry_offset..entry_offset + 2]
+            let entry_mid_offset: usize = entry_offset + 2;
+            let entry_end_offset: usize = entry_offset + 4;
+            node[entry_offset..entry_mid_offset]
                 .copy_from_slice(&(key_relative_offset as u16).to_le_bytes());
-            node[entry_offset + 2..entry_offset + 4]
+            node[entry_mid_offset..entry_end_offset]
                 .copy_from_slice(&(value_back_offset as u16).to_le_bytes());
 
             let key_offset: usize = keys_data_offset + key_relative_offset;
-            node[key_offset..key_offset + 8].copy_from_slice(&object_identifier.to_le_bytes());
-            node[key_offset + 8..key_offset + 16]
+            let key_mid_offset: usize = key_offset + 8;
+            let key_end_offset: usize = key_offset + 16;
+            node[key_offset..key_mid_offset].copy_from_slice(&object_identifier.to_le_bytes());
+            node[key_mid_offset..key_end_offset]
                 .copy_from_slice(&transaction_identifier.to_le_bytes());
             key_relative_offset += 16;
 
             let value_offset: usize = data_end_offset - value_back_offset;
-            node[value_offset..value_offset + value_bytes.len()].copy_from_slice(value_bytes);
+            let value_end_offset: usize = value_offset + value_bytes.len();
+            node[value_offset..value_end_offset].copy_from_slice(value_bytes);
         }
         node
     }
 
     #[test]
     fn test_get_value_by_identifier_branch_and_leaf() -> Result<(), ErrorTrace> {
-        // Block 1: root branch node pointing to leaf block 2 (for id >= 10) and leaf block 3 (for id >= 100).
+        // Block 1: root branch node pointing to leaf block 2 (for identifier >= 10)
+        // and leaf block 3 (for identifier >= 100).
         let branch_entries: [(u64, u64, Vec<u8>); 2] = [
             (10, 1, 2_u64.to_le_bytes().to_vec()),
             (100, 1, 3_u64.to_le_bytes().to_vec()),
         ];
         let branch_node: Vec<u8> = build_object_map_node(true, false, &branch_entries);
-        // Block 2: leaf node with two entries for object 10 (tx 1 and tx 5) and one for object 20.
-        let mut value_tx1: Vec<u8> = vec![0; 16];
-        value_tx1[4..8].copy_from_slice(&4096_u32.to_le_bytes());
-        value_tx1[8..16].copy_from_slice(&500_u64.to_le_bytes());
+        // Block 2: leaf node with two entries for object 10 (transaction 1 and transaction 5)
+        // and one for object 20.
+        let mut value_transaction1: Vec<u8> = vec![0; 16];
+        value_transaction1[4..8].copy_from_slice(&4096_u32.to_le_bytes());
+        value_transaction1[8..16].copy_from_slice(&500_u64.to_le_bytes());
 
-        let mut value_tx5: Vec<u8> = vec![0; 16];
-        value_tx5[4..8].copy_from_slice(&4096_u32.to_le_bytes());
-        value_tx5[8..16].copy_from_slice(&600_u64.to_le_bytes());
+        let mut value_transaction5: Vec<u8> = vec![0; 16];
+        value_transaction5[4..8].copy_from_slice(&4096_u32.to_le_bytes());
+        value_transaction5[8..16].copy_from_slice(&600_u64.to_le_bytes());
 
-        let mut value_obj20: Vec<u8> = vec![0; 16];
-        value_obj20[4..8].copy_from_slice(&4096_u32.to_le_bytes());
-        value_obj20[8..16].copy_from_slice(&700_u64.to_le_bytes());
+        let mut value_object20: Vec<u8> = vec![0; 16];
+        value_object20[4..8].copy_from_slice(&4096_u32.to_le_bytes());
+        value_object20[8..16].copy_from_slice(&700_u64.to_le_bytes());
 
-        let leaf_node: Vec<u8> = build_object_map_node(
-            false,
-            true,
-            &[(10, 1, value_tx1), (10, 5, value_tx5), (20, 1, value_obj20)],
-        );
+        let leaf_entries: [(u64, u64, Vec<u8>); 3] = [
+            (10, 1, value_transaction1),
+            (10, 5, value_transaction5),
+            (20, 1, value_object20),
+        ];
+        let leaf_node: Vec<u8> = build_object_map_node(false, true, &leaf_entries);
         let mut image: Vec<u8> = vec![0; 4 * 4096];
         image[4096..8192].copy_from_slice(&branch_node);
         image[8192..12288].copy_from_slice(&leaf_node);
@@ -445,11 +455,11 @@ mod tests {
         let mut tree: ApfsObjectMapTree = ApfsObjectMapTree::new();
         tree.initialize(4096, 1);
 
-        // Lookup object 10 at transaction 3 should select tx 1 (physical block 500).
+        // Lookup object 10 at transaction 3 should select transaction 1 (physical block 500).
         let value: ApfsObjectMapValue = tree.get_value_by_identifier(&data_stream, 10, 3)?.unwrap();
         assert_eq!(value.physical_address, 500);
 
-        // Lookup object 10 at transaction 5 (hitting node cache) should select tx 5 (600).
+        // Lookup object 10 at transaction 5 (hitting node cache) should select transaction 5 (600).
         let value: ApfsObjectMapValue = tree.get_value_by_identifier(&data_stream, 10, 5)?.unwrap();
         assert_eq!(value.physical_address, 600);
 
@@ -473,27 +483,27 @@ mod tests {
         // Block 2: wrong object subtype.
         let mut wrong_subtype_node: Vec<u8> = build_object_map_node(true, true, &[]);
         wrong_subtype_node[28..32].copy_from_slice(&0x0000000e_u32.to_le_bytes());
-        image[2 * 4096..3 * 4096].copy_from_slice(&wrong_subtype_node);
+        image[8192..12288].copy_from_slice(&wrong_subtype_node);
 
         // Block 3: missing fixed-size flag (0x0004).
         let mut wrong_flags_node: Vec<u8> = build_object_map_node(true, true, &[]);
         wrong_flags_node[32..34].copy_from_slice(&0x0003_u16.to_le_bytes());
-        image[3 * 4096..4 * 4096].copy_from_slice(&wrong_flags_node);
+        image[12288..16384].copy_from_slice(&wrong_flags_node);
 
         // Block 4: unsupported footer node size.
         let mut wrong_footer_size_node: Vec<u8> = build_object_map_node(true, true, &[]);
         wrong_footer_size_node[4060..4064].copy_from_slice(&8192_u32.to_le_bytes());
-        image[4 * 4096..5 * 4096].copy_from_slice(&wrong_footer_size_node);
+        image[16384..20480].copy_from_slice(&wrong_footer_size_node);
 
         // Block 5: missing footer (root object type without root flag 0x0001).
         let mut missing_footer_node: Vec<u8> = build_object_map_node(false, true, &[]);
         missing_footer_node[24..28].copy_from_slice(&0x40000002_u32.to_le_bytes());
-        image[5 * 4096..6 * 4096].copy_from_slice(&missing_footer_node);
+        image[20480..24576].copy_from_slice(&missing_footer_node);
 
         // Block 6: branch node referencing itself (cycle detection).
         let cycle_entries: [(u64, u64, Vec<u8>); 1] = [(1, 1, 6_u64.to_le_bytes().to_vec())];
         let cycle_node: Vec<u8> = build_object_map_node(true, false, &cycle_entries);
-        image[6 * 4096..7 * 4096].copy_from_slice(&cycle_node);
+        image[24576..28672].copy_from_slice(&cycle_node);
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);
 

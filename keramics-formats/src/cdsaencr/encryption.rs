@@ -468,7 +468,7 @@ mod tests {
         let context: CdsaEncrCipherContext = CdsaEncrCipherContext::None;
 
         let mut data: Vec<u8> = vec![0; 16];
-        let result = context.decrypt(&[], &[0; 16], &mut data);
+        let result: Result<(), ErrorTrace> = context.decrypt(&[], &[0; 16], &mut data);
         assert!(result.is_err());
     }
 

@@ -417,6 +417,7 @@ mod tests {
 
     use crate::xfs::enums::XfsExtentType;
 
+    /// Builds a synthetic XFS directory leaf block for testing.
     fn build_directory_leaf_block(block_size: usize) -> Vec<u8> {
         let mut block: Vec<u8> = vec![0; block_size];
         // File system block signature 0xfeeb at offset 8.
@@ -458,7 +459,8 @@ mod tests {
 
         // Block 1: leaf node (0xfeeb).
         let leaf: Vec<u8> = build_directory_leaf_block(block_size);
-        image[block_size..2 * block_size].copy_from_slice(&leaf);
+        let leaf_end_offset: usize = 2 * block_size;
+        image[block_size..leaf_end_offset].copy_from_slice(&leaf);
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);
         let directory_tree: XfsDirectoryTree =
@@ -487,9 +489,11 @@ mod tests {
         // Block 0: unsupported signature 0x1234.
         image[8..10].copy_from_slice(&0x1234_u16.to_be_bytes());
         // Block 1: branch pointing back to block 1 (cycle).
-        image[block_size + 8..block_size + 10].copy_from_slice(&0xfebe_u16.to_be_bytes());
-        image[block_size + 12..block_size + 14].copy_from_slice(&1_u16.to_be_bytes());
-        image[block_size + 20..block_size + 24].copy_from_slice(&1_u32.to_be_bytes());
+        let block1_end_offset: usize = 2 * block_size;
+        let block1: &mut [u8] = &mut image[block_size..block1_end_offset];
+        block1[8..10].copy_from_slice(&0xfebe_u16.to_be_bytes());
+        block1[12..14].copy_from_slice(&1_u16.to_be_bytes());
+        block1[20..24].copy_from_slice(&1_u32.to_be_bytes());
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);
         let directory_tree: XfsDirectoryTree =
@@ -558,8 +562,8 @@ mod tests {
         );
         assert!(result.is_err());
 
-        // Test direct leaf node errors: wrong signature, short data, entries OOB,
-        // value offset OOB, value size OOB, zero/OOB name size.
+        // Test direct leaf node errors: wrong signature, short data, entries out of bounds,
+        // value offset out of bounds, value size out of bounds, and zero or out of bounds name size.
         let mut leaf_block: XfsFileSystemBlock = XfsFileSystemBlock::new();
         leaf_block.signature = 0x0000;
         let result: Result<(), ErrorTrace> =

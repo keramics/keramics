@@ -405,7 +405,7 @@ mod tests {
         let key16: [u8; 16] = [0x11; 16];
         let key32: [u8; 32] = [0x22; 32];
 
-        // Test all supported cipher / chaining / IV combinations.
+        // Test all supported cipher, chaining, and initialization vector combinations.
         let valid_modes: [(&str, &str, &[u8]); 11] = [
             ("aes", "cbc-benbi", &key16),
             ("aes", "cbc-essiv:sha1", &key16),
@@ -430,7 +430,8 @@ mod tests {
             assert!(context.is_some());
         }
 
-        // Test unsupported cipher, chaining mode, IV modes, and invalid IV options returning None.
+        // Test unsupported cipher, chaining mode, initialization vector modes,
+        // and invalid initialization vector options returning None.
         let unsupported_modes: [(&str, &str, &[u8]); 10] = [
             ("twofish", "cbc-plain", &key16),
             ("aes", "ctr-plain", &key16),

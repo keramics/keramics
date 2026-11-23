@@ -94,6 +94,14 @@ let data_run: NtfsDataRun = NtfsDataRun {
 cluster_group.data_runs.push(data_run);
 ```
 
+* Avoid arithmetic inside square-bracket slice or index expressions; compute end or start offsets
+  in explicit, typed local variables first:
+
+```rust
+let data_end_offset: usize = data_offset + record.len();
+node[data_offset..data_end_offset].copy_from_slice(record);
+```
+
 * Omit type suffixes on integer literals whenever the type can be inferred from context or a `let`
   type annotation (for example, write `1024` instead of `1024u64`). When a type suffix is required
   on a literal (for example, when calling methods directly on it), use the trailing underscore form

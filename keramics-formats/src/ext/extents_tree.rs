@@ -357,7 +357,8 @@ mod tests {
         // Descriptor 0: logical=2 (creates sparse gap 0..2), number_of_blocks=4, physical=10.
         // Descriptor 1: logical=6, number_of_blocks=32768 + 2 (uninitialized -> sparse), physical=20.
         // Descriptor 2: logical=8, number_of_blocks=2, physical=0 (sparse).
-        let leaf: &mut [u8] = &mut image[block_size..2 * block_size];
+        let leaf_end_offset: usize = 2 * block_size;
+        let leaf: &mut [u8] = &mut image[block_size..leaf_end_offset];
         leaf[0..2].copy_from_slice(&0xf30a_u16.to_le_bytes());
         leaf[2..4].copy_from_slice(&3_u16.to_le_bytes());
         leaf[4..6].copy_from_slice(&4_u16.to_le_bytes());

@@ -552,7 +552,8 @@ mod tests {
         // Raw DEFLATE stored block (BFINAL=1, BTYPE=00, LEN=16, NLEN=0xffef, 16 bytes of 0xcc).
         let mut deflate_data: Vec<u8> = vec![0x01, 0x10, 0x00, 0xef, 0xff];
         deflate_data.extend_from_slice(&[0xcc; 16]);
-        image[1536..1536 + deflate_data.len()].copy_from_slice(&deflate_data);
+        let deflate_end_offset: usize = 1536 + deflate_data.len();
+        image[1536..deflate_end_offset].copy_from_slice(&deflate_data);
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);
         let mut backing_data: Vec<u8> = vec![0; 4096];

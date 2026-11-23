@@ -550,10 +550,12 @@ mod tests {
 
     use std::path::PathBuf;
 
+    use keramics_core::mediator::Mediator;
     use keramics_core::{open_fake_data_stream, open_os_data_stream};
 
     use crate::tests::get_test_data_path;
 
+    /// Builds a format scanner initialized with all supported format signatures.
     fn build_all_signatures_scanner() -> Result<FormatScanner, ErrorTrace> {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apfs_signatures();
@@ -655,7 +657,8 @@ mod tests {
         ];
         for (offset, signature, expected_identifier) in header_cases {
             let mut buffer: Vec<u8> = vec![0; offset + signature.len() + 64];
-            buffer[offset..offset + signature.len()].copy_from_slice(signature);
+            let end_offset: usize = offset + signature.len();
+            buffer[offset..end_offset].copy_from_slice(signature);
             let stream: DataStreamReference = open_fake_data_stream(&buffer);
             let results: HashSet<FormatIdentifier> = format_scanner.scan_data_stream(&stream)?;
             let has_identifier: bool = results.contains(&expected_identifier);
@@ -678,8 +681,9 @@ mod tests {
         ];
         for (distance_from_end, signature, expected_identifier) in footer_cases {
             let mut buffer: Vec<u8> = vec![0; 1024];
-            let start: usize = buffer.len() - distance_from_end;
-            buffer[start..start + signature.len()].copy_from_slice(signature);
+            let start_offset: usize = buffer.len() - distance_from_end;
+            let end_offset: usize = start_offset + signature.len();
+            buffer[start_offset..end_offset].copy_from_slice(signature);
             let stream: DataStreamReference = open_fake_data_stream(&buffer);
             let results: HashSet<FormatIdentifier> = format_scanner.scan_data_stream(&stream)?;
             let has_identifier: bool = results.contains(&expected_identifier);
@@ -687,7 +691,8 @@ mod tests {
         }
 
         // Test small stream shorter than footer range with debug output enabled.
-        keramics_core::mediator::Mediator { debug_output: true }.make_current();
+        let mediator: Mediator = Mediator { debug_output: true };
+        mediator.make_current();
         let tiny_stream: DataStreamReference = open_fake_data_stream(&[0; 16]);
         let results: HashSet<FormatIdentifier> = format_scanner.scan_data_stream(&tiny_stream)?;
         assert!(results.is_empty());

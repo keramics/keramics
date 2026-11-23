@@ -455,24 +455,30 @@ mod tests {
         Ok(())
     }
 
+    /// Builds a synthetic HFS B-tree node for testing.
     fn build_hfs_btree_node(node_type: u8, records: &[&[u8]]) -> Vec<u8> {
         let mut node: Vec<u8> = vec![0; 512];
         node[8] = node_type;
-        node[10..12].copy_from_slice(&(records.len() as u16).to_be_bytes());
+        let number_of_records: u16 = records.len() as u16;
+        node[10..12].copy_from_slice(&number_of_records.to_be_bytes());
 
         let mut data_offset: usize = 14;
         for (index, record) in records.iter().enumerate() {
-            node[data_offset..data_offset + record.len()].copy_from_slice(record);
+            let data_end_offset: usize = data_offset + record.len();
+            node[data_offset..data_end_offset].copy_from_slice(record);
             let slot_offset: usize = 512 - ((index + 1) * 2);
-            node[slot_offset..slot_offset + 2].copy_from_slice(&(data_offset as u16).to_be_bytes());
-            data_offset += record.len();
+            let slot_end_offset: usize = slot_offset + 2;
+            node[slot_offset..slot_end_offset].copy_from_slice(&(data_offset as u16).to_be_bytes());
+            data_offset = data_end_offset;
         }
         let free_slot_offset: usize = 512 - ((records.len() + 1) * 2);
-        node[free_slot_offset..free_slot_offset + 2]
+        let free_slot_end_offset: usize = free_slot_offset + 2;
+        node[free_slot_offset..free_slot_end_offset]
             .copy_from_slice(&(data_offset as u16).to_be_bytes());
         node
     }
 
+    /// Builds a synthetic HFS attribute key for testing.
     fn build_attribute_key(identifier: u32, logical_block_number: u32, name: &str) -> Vec<u8> {
         let utf16_units: Vec<u16> = name.encode_utf16().collect();
         let key_data_size: u16 = (12 + (utf16_units.len() * 2)) as u16;
@@ -480,10 +486,12 @@ mod tests {
         key[0..2].copy_from_slice(&key_data_size.to_be_bytes());
         key[4..8].copy_from_slice(&identifier.to_be_bytes());
         key[8..12].copy_from_slice(&logical_block_number.to_be_bytes());
-        key[12..14].copy_from_slice(&(utf16_units.len() as u16).to_be_bytes());
+        let number_of_units: u16 = utf16_units.len() as u16;
+        key[12..14].copy_from_slice(&number_of_units.to_be_bytes());
         for (index, unit) in utf16_units.iter().enumerate() {
             let offset: usize = 14 + (index * 2);
-            key[offset..offset + 2].copy_from_slice(&unit.to_be_bytes());
+            let end_offset: usize = offset + 2;
+            key[offset..end_offset].copy_from_slice(&unit.to_be_bytes());
         }
         key
     }
@@ -544,7 +552,8 @@ mod tests {
         image[16..20].copy_from_slice(&1_u32.to_be_bytes());
         image[32..34].copy_from_slice(&512_u16.to_be_bytes());
 
-        // Node 1: Index node pointing to empty leaf 5 (id 10), leaf 2 (id 20), and map node 3 (id 50).
+        // Node 1: Index node pointing to empty leaf 5 (identifier 10), leaf 2 (identifier 20),
+        // and map node 3 (identifier 50).
         let mut index_record_1: Vec<u8> = build_attribute_key(10, 0, "a");
         index_record_1.extend_from_slice(&5_u32.to_be_bytes());
         let mut index_record_2: Vec<u8> = build_attribute_key(20, 0, "a");
@@ -555,7 +564,8 @@ mod tests {
             build_hfs_btree_node(0x00, &[&index_record_1, &index_record_2, &index_record_3]);
         image[512..1024].copy_from_slice(&index_node);
 
-        // Node 2: Leaf node with ForkData + Extents for id 20 ("big"), and InlineData for id 30 ("end").
+        // Node 2: Leaf node with ForkData + Extents for identifier 20 ("big"),
+        // and InlineData for identifier 30 ("end").
         let mut fork_record: Vec<u8> = build_attribute_key(20, 0, "big");
         fork_record.extend_from_slice(&0x00000020_u32.to_be_bytes());
         fork_record.extend_from_slice(&[0; 84]);
@@ -576,8 +586,8 @@ mod tests {
         let map_node: Vec<u8> = build_hfs_btree_node(0x02, &[]);
         image[1536..2048].copy_from_slice(&map_node);
 
-        // Node 4: Leaf node with orphan Extents record (missing ForkData) for id 40,
-        // and duplicate inline record for id 41.
+        // Node 4: Leaf node with orphan Extents record (missing ForkData) for identifier 40,
+        // and duplicate inline record for identifier 41.
         let mut orphan_extents: Vec<u8> = build_attribute_key(40, 8, "orphan");
         orphan_extents.extend_from_slice(&0x00000030_u32.to_be_bytes());
         orphan_extents.extend_from_slice(&[0; 68]);
@@ -620,7 +630,7 @@ mod tests {
         attributes_file.get_attributes_by_identifier(&data_stream, 20, &mut attributes)?;
         assert_eq!(attributes.len(), 1);
 
-        // Unsupported node type error via index lookup for id 50.
+        // Unsupported node type error via index lookup for identifier 50.
         let mut error_attributes: IndexedHashMap<HfsString, HfsAttributeRecord> =
             IndexedHashMap::new();
         let result: Result<(), ErrorTrace> =
