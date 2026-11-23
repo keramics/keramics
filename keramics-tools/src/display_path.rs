@@ -254,6 +254,7 @@ impl DisplayPath {
             } => {
                 let path_string: String = match vfs_type {
                     VfsType::ApfsContainer
+                    | VfsType::BsdDiskLabel
                     | VfsType::Gpt
                     | VfsType::LinuxLvm
                     | VfsType::Mbr
@@ -304,9 +305,11 @@ impl DisplayPath {
                                 return Err(error);
                             }
                         },
-                        VfsType::Apm | VfsType::Gpt | VfsType::Mbr | VfsType::SgiDiskLabel => {
-                            Some(path_string)
-                        }
+                        VfsType::Apm
+                        | VfsType::BsdDiskLabel
+                        | VfsType::Gpt
+                        | VfsType::Mbr
+                        | VfsType::SgiDiskLabel => Some(path_string),
                         _ => None,
                     }
                 } else {
@@ -378,6 +381,15 @@ impl DisplayPath {
                 _ => path.to_string(),
             },
             DisplayPathType::Index => match vfs_file_entry {
+                VfsFileEntry::BsdDiskLabel(bsdlabel_file_entry) => {
+                    match bsdlabel_file_entry.get_partition_number() {
+                        Some(partition_number) => format!("/p{}", partition_number),
+                        None => {
+                            let path_string: String = path.to_string();
+                            path_string.replace("bsdlabel", "p")
+                        }
+                    }
+                }
                 VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_partition_number() {
                     Some(partition_number) => format!("/p{}", partition_number),
                     None => {
@@ -545,6 +557,15 @@ mod tests {
             apm_os_location.new_with_layer(&VfsType::Apm, Path::from("/apm1"));
         assert_eq!(display_path.get_path(&apm_location)?, "/p1");
 
+        // Test BSD disklabel display path.
+        let bsd_os_location: VfsLocation = VfsLocation::from("../test_data/bsdlabel/bsdlabel.raw");
+        let bsd_location: VfsLocation =
+            bsd_os_location.new_with_layer(&VfsType::BsdDiskLabel, Path::from("/bsdlabel1"));
+        assert_eq!(display_path.get_path(&bsd_location)?, "/p1");
+        display_path.set_volume_path_type(&DisplayPathType::Identifier);
+        assert_eq!(display_path.get_path(&bsd_location)?, "/bsdlabel1");
+        display_path.set_volume_path_type(&DisplayPathType::Index);
+
         // Test MBR display path.
         let mbr_os_location: VfsLocation = VfsLocation::from("../test_data/mbr/mbr.raw");
         let mbr_location: VfsLocation =
@@ -665,6 +686,15 @@ mod tests {
             vfs_resolver.get_file_entry_by_location(&mbr_root)?.unwrap();
         assert_eq!(
             display_path.get_path_component(&Path::from("/mbr1"), &mbr_root_entry),
+            "/p1"
+        );
+
+        let bsd_root: VfsLocation =
+            bsd_os_location.new_with_layer(&VfsType::BsdDiskLabel, Path::from("/"));
+        let bsd_root_entry: VfsFileEntry =
+            vfs_resolver.get_file_entry_by_location(&bsd_root)?.unwrap();
+        assert_eq!(
+            display_path.get_path_component(&Path::from("/bsdlabel1"), &bsd_root_entry),
             "/p1"
         );
 

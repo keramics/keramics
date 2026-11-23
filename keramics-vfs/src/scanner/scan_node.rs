@@ -80,6 +80,7 @@ impl VfsScanNode {
             VfsType::ApfsContainer
             | VfsType::Apm
             | VfsType::Bde
+            | VfsType::BsdDiskLabel
             | VfsType::Ewf
             | VfsType::Fake
             | VfsType::Gpt
@@ -157,6 +158,7 @@ mod tests {
             VfsType::ApfsContainer,
             VfsType::Apm,
             VfsType::Bde,
+            VfsType::BsdDiskLabel,
             VfsType::Ewf,
             VfsType::Fake,
             VfsType::Gpt,

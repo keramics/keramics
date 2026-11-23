@@ -764,10 +764,20 @@ impl PyVfsResolver {
 #[pyo3(name = "VfsType")]
 #[derive(Clone, Debug, Hash, PartialEq)]
 pub enum PyVfsType {
+    #[pyo3(name = "APFS")]
+    Apfs,
+    #[pyo3(name = "APFS_CONTAINER")]
+    ApfsContainer,
     #[pyo3(name = "APM")]
     Apm,
+    #[pyo3(name = "BDE")]
+    Bde,
+    #[pyo3(name = "BSDLABEL")]
+    BsdDiskLabel,
     #[pyo3(name = "EWF")]
     Ewf,
+    #[pyo3(name = "EXFAT")]
+    ExFat,
     #[pyo3(name = "EXT")]
     Ext,
     #[pyo3(name = "FAKE")]
@@ -776,20 +786,44 @@ pub enum PyVfsType {
     Fat,
     #[pyo3(name = "GPT")]
     Gpt,
+    #[pyo3(name = "HFS")]
+    Hfs,
+    #[pyo3(name = "LINUX_LVM")]
+    LinuxLvm,
+    #[pyo3(name = "LUKSDE")]
+    Luksde,
     #[pyo3(name = "MBR")]
     Mbr,
+    #[pyo3(name = "NTFS")]
+    Ntfs,
     #[pyo3(name = "OS")]
     Os,
+    #[pyo3(name = "PDI")]
+    Pdi,
     #[pyo3(name = "QCOW")]
     Qcow,
+    #[pyo3(name = "SGILABEL")]
+    SgiDiskLabel,
+    #[pyo3(name = "SPARSE_BUNDLE")]
+    SparseBundle,
     #[pyo3(name = "SPARSE_IMAGE")]
     SparseImage,
+    #[pyo3(name = "SPLIT_RAW")]
+    SplitRaw,
     #[pyo3(name = "UDIF")]
     Udif,
+    #[pyo3(name = "VDI")]
+    Vdi,
     #[pyo3(name = "VHD")]
     Vhd,
     #[pyo3(name = "VHDX")]
     Vhdx,
+    #[pyo3(name = "VMDK")]
+    Vmdk,
+    #[pyo3(name = "VOLSNAP")]
+    Volsnap,
+    #[pyo3(name = "XFS")]
+    Xfs,
 }
 
 impl From<&PyVfsType> for VfsType {
@@ -797,19 +831,36 @@ impl From<&PyVfsType> for VfsType {
     #[inline(always)]
     fn from(vfs_type: &PyVfsType) -> Self {
         match vfs_type {
+            PyVfsType::Apfs => VfsType::Apfs,
+            PyVfsType::ApfsContainer => VfsType::ApfsContainer,
             PyVfsType::Apm => VfsType::Apm,
+            PyVfsType::Bde => VfsType::Bde,
+            PyVfsType::BsdDiskLabel => VfsType::BsdDiskLabel,
             PyVfsType::Ewf => VfsType::Ewf,
+            PyVfsType::ExFat => VfsType::ExFat,
             PyVfsType::Ext => VfsType::Ext,
             PyVfsType::Fake => VfsType::Fake,
             PyVfsType::Fat => VfsType::Fat,
             PyVfsType::Gpt => VfsType::Gpt,
+            PyVfsType::Hfs => VfsType::Hfs,
+            PyVfsType::LinuxLvm => VfsType::LinuxLvm,
+            PyVfsType::Luksde => VfsType::Luksde,
             PyVfsType::Mbr => VfsType::Mbr,
+            PyVfsType::Ntfs => VfsType::Ntfs,
             PyVfsType::Os => VfsType::Os,
+            PyVfsType::Pdi => VfsType::Pdi,
             PyVfsType::Qcow => VfsType::Qcow,
+            PyVfsType::SgiDiskLabel => VfsType::SgiDiskLabel,
+            PyVfsType::SparseBundle => VfsType::SparseBundle,
             PyVfsType::SparseImage => VfsType::SparseImage,
+            PyVfsType::SplitRaw => VfsType::SplitRaw,
             PyVfsType::Udif => VfsType::Udif,
+            PyVfsType::Vdi => VfsType::Vdi,
             PyVfsType::Vhd => VfsType::Vhd,
             PyVfsType::Vhdx => VfsType::Vhdx,
+            PyVfsType::Vmdk => VfsType::Vmdk,
+            PyVfsType::Volsnap => VfsType::Volsnap,
+            PyVfsType::Xfs => VfsType::Xfs,
         }
     }
 }
@@ -837,18 +888,47 @@ mod tests {
 
     #[test]
     fn test_vfs_type_from_py_vfs_type() {
+        assert_eq!(VfsType::from(&PyVfsType::Apfs), VfsType::Apfs);
+        assert_eq!(
+            VfsType::from(&PyVfsType::ApfsContainer),
+            VfsType::ApfsContainer
+        );
         assert_eq!(VfsType::from(&PyVfsType::Apm), VfsType::Apm);
+        assert_eq!(VfsType::from(&PyVfsType::Bde), VfsType::Bde);
+        assert_eq!(
+            VfsType::from(&PyVfsType::BsdDiskLabel),
+            VfsType::BsdDiskLabel
+        );
         assert_eq!(VfsType::from(&PyVfsType::Ewf), VfsType::Ewf);
+        assert_eq!(VfsType::from(&PyVfsType::ExFat), VfsType::ExFat);
         assert_eq!(VfsType::from(&PyVfsType::Ext), VfsType::Ext);
         assert_eq!(VfsType::from(&PyVfsType::Fake), VfsType::Fake);
         assert_eq!(VfsType::from(&PyVfsType::Fat), VfsType::Fat);
         assert_eq!(VfsType::from(&PyVfsType::Gpt), VfsType::Gpt);
+        assert_eq!(VfsType::from(&PyVfsType::Hfs), VfsType::Hfs);
+        assert_eq!(VfsType::from(&PyVfsType::LinuxLvm), VfsType::LinuxLvm);
+        assert_eq!(VfsType::from(&PyVfsType::Luksde), VfsType::Luksde);
         assert_eq!(VfsType::from(&PyVfsType::Mbr), VfsType::Mbr);
+        assert_eq!(VfsType::from(&PyVfsType::Ntfs), VfsType::Ntfs);
         assert_eq!(VfsType::from(&PyVfsType::Os), VfsType::Os);
+        assert_eq!(VfsType::from(&PyVfsType::Pdi), VfsType::Pdi);
         assert_eq!(VfsType::from(&PyVfsType::Qcow), VfsType::Qcow);
+        assert_eq!(
+            VfsType::from(&PyVfsType::SgiDiskLabel),
+            VfsType::SgiDiskLabel
+        );
+        assert_eq!(
+            VfsType::from(&PyVfsType::SparseBundle),
+            VfsType::SparseBundle
+        );
         assert_eq!(VfsType::from(&PyVfsType::SparseImage), VfsType::SparseImage);
+        assert_eq!(VfsType::from(&PyVfsType::SplitRaw), VfsType::SplitRaw);
         assert_eq!(VfsType::from(&PyVfsType::Udif), VfsType::Udif);
+        assert_eq!(VfsType::from(&PyVfsType::Vdi), VfsType::Vdi);
         assert_eq!(VfsType::from(&PyVfsType::Vhd), VfsType::Vhd);
         assert_eq!(VfsType::from(&PyVfsType::Vhdx), VfsType::Vhdx);
+        assert_eq!(VfsType::from(&PyVfsType::Vmdk), VfsType::Vmdk);
+        assert_eq!(VfsType::from(&PyVfsType::Volsnap), VfsType::Volsnap);
+        assert_eq!(VfsType::from(&PyVfsType::Xfs), VfsType::Xfs);
     }
 }

@@ -496,19 +496,36 @@ class TestLocation(TestClass):
         assert os_location is not None
 
         for vfs_type in [
+            vfs.VfsType.APFS,
+            vfs.VfsType.APFS_CONTAINER,
             vfs.VfsType.APM,
+            vfs.VfsType.BDE,
+            vfs.VfsType.BSDLABEL,
             vfs.VfsType.EWF,
+            vfs.VfsType.EXFAT,
             vfs.VfsType.EXT,
             vfs.VfsType.FAKE,
             vfs.VfsType.FAT,
             vfs.VfsType.GPT,
+            vfs.VfsType.HFS,
+            vfs.VfsType.LINUX_LVM,
+            vfs.VfsType.LUKSDE,
             vfs.VfsType.MBR,
+            vfs.VfsType.NTFS,
             vfs.VfsType.OS,
+            vfs.VfsType.PDI,
             vfs.VfsType.QCOW,
+            vfs.VfsType.SGILABEL,
+            vfs.VfsType.SPARSE_BUNDLE,
             vfs.VfsType.SPARSE_IMAGE,
+            vfs.VfsType.SPLIT_RAW,
             vfs.VfsType.UDIF,
+            vfs.VfsType.VDI,
             vfs.VfsType.VHD,
             vfs.VfsType.VHDX,
+            vfs.VfsType.VMDK,
+            vfs.VfsType.VOLSNAP,
+            vfs.VfsType.XFS,
         ]:
             location = vfs.VfsLocation.new_base_from_string(vfs_type, "/")
             assert location is not None
@@ -730,19 +747,36 @@ class TestResolver(TestClass):
 
         # Test resolving across additional supported VFS layer types.
         for relative_path, vfs_type, layer_path in [
+            ("apfs/apfs.raw", vfs.VfsType.APFS_CONTAINER, "/apfs1"),
             ("apm/apm.dmg", vfs.VfsType.APM, "/apm1"),
+            ("bsdlabel/bsdlabel.raw", vfs.VfsType.BSDLABEL, "/bsdlabel1"),
             ("ewf/ext2.E01", vfs.VfsType.EWF, "/ewf1"),
+            ("exfat/exfat.raw", vfs.VfsType.EXFAT, "/testdir1/testfile1"),
             ("fat/fat12.raw", vfs.VfsType.FAT, "/testdir1/testfile1"),
             ("gpt/gpt.raw", vfs.VfsType.GPT, "/gpt1"),
+            ("hfs/hfsplus.raw", vfs.VfsType.HFS, "/testdir1/testfile1"),
+            ("linuxlvm/lvm2.raw", vfs.VfsType.LINUX_LVM, "/lvm1"),
             ("mbr/mbr.raw", vfs.VfsType.MBR, "/mbr1"),
+            ("ntfs/ntfs.raw", vfs.VfsType.NTFS, "/testdir1/testfile1"),
+            ("pdi/hfsplus.hdd/DiskDescriptor.xml", vfs.VfsType.PDI, "/pdi1"),
+            ("sgilabel/sgilabel.raw", vfs.VfsType.SGILABEL, "/sgilabel1"),
+            (
+                "sparsebundle/hfsplus.sparsebundle",
+                vfs.VfsType.SPARSE_BUNDLE,
+                "/sparsebundle1",
+            ),
             (
                 "sparseimage/hfsplus.sparseimage",
                 vfs.VfsType.SPARSE_IMAGE,
                 "/sparseimage1",
             ),
+            ("splitraw/ext2.raw.000", vfs.VfsType.SPLIT_RAW, "/raw1"),
             ("udif/hfsplus_zlib.dmg", vfs.VfsType.UDIF, "/udif1"),
+            ("vdi/ext2.vdi", vfs.VfsType.VDI, "/vdi1"),
             ("vhd/ext2.vhd", vfs.VfsType.VHD, "/vhd1"),
             ("vhdx/ext2.vhdx", vfs.VfsType.VHDX, "/vhdx1"),
+            ("vmdk/ext2.vmdk", vfs.VfsType.VMDK, "/vmdk1"),
+            ("xfs/xfs.raw", vfs.VfsType.XFS, "/testdir1/testfile1"),
         ]:
             base_location = vfs.VfsLocation.new_base_from_string(
                 vfs.VfsType.OS, self.get_test_data_path(relative_path)
@@ -752,6 +786,31 @@ class TestResolver(TestClass):
             )
             layer_file_entry = resolver.get_file_entry_by_location(layer_location)
             assert layer_file_entry is not None
+
+        apfs_base_location = vfs.VfsLocation.new_base_from_string(
+            vfs.VfsType.OS, self.get_test_data_path("apfs/apfs.raw")
+        )
+        apfs_container_location = apfs_base_location.new_with_layer_from_string(
+            vfs.VfsType.APFS_CONTAINER, "/apfs1"
+        )
+        apfs_location = apfs_container_location.new_with_layer_from_string(
+            vfs.VfsType.APFS, "/testdir1/testfile1"
+        )
+        assert resolver.get_file_entry_by_location(apfs_location) is not None
+
+        volsnap_base_location = vfs.VfsLocation.new_base_from_string(
+            vfs.VfsType.OS, self.get_test_data_path("volsnap/volsnap.vhd")
+        )
+        volsnap_vhd_location = volsnap_base_location.new_with_layer_from_string(
+            vfs.VfsType.VHD, "/vhd1"
+        )
+        volsnap_mbr_location = volsnap_vhd_location.new_with_layer_from_string(
+            vfs.VfsType.MBR, "/mbr1"
+        )
+        volsnap_location = volsnap_mbr_location.new_with_layer_from_string(
+            vfs.VfsType.VOLSNAP, "/volsnap1"
+        )
+        assert resolver.get_file_entry_by_location(volsnap_location) is not None
 
     def test_open_file_system(self):
         resolver = vfs.VfsResolver()
@@ -783,19 +842,36 @@ class TestResolver(TestClass):
 class TestType(TestClass):
     def test_hash(self):
         vfs_types = [
+            vfs.VfsType.APFS,
+            vfs.VfsType.APFS_CONTAINER,
             vfs.VfsType.APM,
+            vfs.VfsType.BDE,
+            vfs.VfsType.BSDLABEL,
             vfs.VfsType.EWF,
+            vfs.VfsType.EXFAT,
             vfs.VfsType.EXT,
             vfs.VfsType.FAKE,
             vfs.VfsType.FAT,
             vfs.VfsType.GPT,
+            vfs.VfsType.HFS,
+            vfs.VfsType.LINUX_LVM,
+            vfs.VfsType.LUKSDE,
             vfs.VfsType.MBR,
+            vfs.VfsType.NTFS,
             vfs.VfsType.OS,
+            vfs.VfsType.PDI,
             vfs.VfsType.QCOW,
+            vfs.VfsType.SGILABEL,
+            vfs.VfsType.SPARSE_BUNDLE,
             vfs.VfsType.SPARSE_IMAGE,
+            vfs.VfsType.SPLIT_RAW,
             vfs.VfsType.UDIF,
+            vfs.VfsType.VDI,
             vfs.VfsType.VHD,
             vfs.VfsType.VHDX,
+            vfs.VfsType.VMDK,
+            vfs.VfsType.VOLSNAP,
+            vfs.VfsType.XFS,
         ]
         for vfs_type in vfs_types:
             assert isinstance(hash(vfs_type), int)

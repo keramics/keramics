@@ -881,6 +881,12 @@ impl ImageTool {
                         _ => path_string,
                     }
                 }
+                VfsFileEntry::BsdDiskLabel(bsdlabel_file_entry) => {
+                    match bsdlabel_file_entry.get_partition_number() {
+                        Some(partition_number) => format!("/p{}", partition_number),
+                        None => path.to_string(),
+                    }
+                }
                 VfsFileEntry::Gpt(gpt_file_entry) => {
                     let path_string: String = match gpt_file_entry.get_partition_number() {
                         Some(partition_number) => format!("/p{}", partition_number),

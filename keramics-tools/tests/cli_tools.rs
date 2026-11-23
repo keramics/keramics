@@ -572,6 +572,7 @@ fn test_keramicsimage_commands() {
 
     let success_cases: Vec<Vec<&str>> = vec![
         // Test hierarchy subcommand.
+        vec!["../test_data/bsdlabel/bsdlabel.raw", "hierarchy"],
         vec!["../test_data/gpt/gpt.raw", "hierarchy"],
         vec!["../test_data/mbr/mbr.raw", "hierarchy"],
         vec!["../test_data/apfs/apfs.raw", "hierarchy"],

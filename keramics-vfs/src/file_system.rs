@@ -24,6 +24,7 @@ use keramics_formats::{Path, PathComponent};
 use super::apfs::{ApfsContainerFileEntry, ApfsContainerFileSystem};
 use super::apm::{ApmFileEntry, ApmFileSystem};
 use super::bde::{BdeFileEntry, BdeFileSystem};
+use super::bsdlabel::{BsdDiskLabelFileEntry, BsdDiskLabelFileSystem};
 use super::enums::VfsType;
 use super::ewf::{EwfFileEntry, EwfFileSystem};
 use super::fake::FakeFileSystem;
@@ -54,6 +55,7 @@ pub enum VfsFileSystem {
     ApfsContainer(ApfsContainerFileSystem),
     Apm(ApmFileSystem),
     Bde(BdeFileSystem),
+    BsdDiskLabel(BsdDiskLabelFileSystem),
     Ewf(EwfFileSystem),
     ExFat(ExFatFileSystem),
     Ext(ExtFileSystem),
@@ -89,6 +91,7 @@ impl VfsFileSystem {
             VfsType::ApfsContainer => VfsFileSystem::ApfsContainer(ApfsContainerFileSystem::new()),
             VfsType::Apm => VfsFileSystem::Apm(ApmFileSystem::new()),
             VfsType::Bde => VfsFileSystem::Bde(BdeFileSystem::new()),
+            VfsType::BsdDiskLabel => VfsFileSystem::BsdDiskLabel(BsdDiskLabelFileSystem::new()),
             VfsType::Ewf => VfsFileSystem::Ewf(EwfFileSystem::new()),
             VfsType::ExFat => VfsFileSystem::ExFat(ExFatFileSystem::new()),
             VfsType::Ext => VfsFileSystem::Ext(ExtFileSystem::new()),
@@ -139,6 +142,9 @@ impl VfsFileSystem {
             }
             VfsFileSystem::Apm(apm_file_system) => Ok(apm_file_system.file_entry_exists(path)),
             VfsFileSystem::Bde(bde_file_system) => Ok(bde_file_system.file_entry_exists(path)),
+            VfsFileSystem::BsdDiskLabel(bsdlabel_file_system) => {
+                Ok(bsdlabel_file_system.file_entry_exists(path))
+            }
             VfsFileSystem::Ewf(ewf_file_system) => Ok(ewf_file_system.file_entry_exists(path)),
             VfsFileSystem::ExFat(exfat_file_system) => {
                 match exfat_file_system.get_file_entry_by_path(path) {
@@ -348,6 +354,14 @@ impl VfsFileSystem {
                     None => Ok(None),
                 }
             }
+            VfsFileSystem::BsdDiskLabel(bsdlabel_file_system) => {
+                match bsdlabel_file_system.get_file_entry_by_path(path)? {
+                    Some(bsdlabel_file_entry) => {
+                        Ok(Some(VfsFileEntry::BsdDiskLabel(bsdlabel_file_entry)))
+                    }
+                    None => Ok(None),
+                }
+            }
             VfsFileSystem::Ewf(ewf_file_system) => {
                 match ewf_file_system.get_file_entry_by_path(path)? {
                     Some(ewf_file_entry) => Ok(Some(VfsFileEntry::Ewf(ewf_file_entry))),
@@ -547,6 +561,12 @@ impl VfsFileSystem {
 
                 Ok(Some(VfsFileEntry::Bde(bde_file_entry)))
             }
+            VfsFileSystem::BsdDiskLabel(bsdlabel_file_system) => {
+                let bsdlabel_file_entry: BsdDiskLabelFileEntry =
+                    bsdlabel_file_system.get_root_file_entry();
+
+                Ok(Some(VfsFileEntry::BsdDiskLabel(bsdlabel_file_entry)))
+            }
             VfsFileSystem::Ewf(ewf_file_system) => {
                 let ewf_file_entry: EwfFileEntry = ewf_file_system.get_root_file_entry();
 
@@ -731,6 +751,7 @@ impl VfsFileSystem {
             VfsFileSystem::ApfsContainer(_) => VfsType::ApfsContainer,
             VfsFileSystem::Apm(_) => VfsType::Apm,
             VfsFileSystem::Bde(_) => VfsType::Bde,
+            VfsFileSystem::BsdDiskLabel(_) => VfsType::BsdDiskLabel,
             VfsFileSystem::Ewf(_) => VfsType::Ewf,
             VfsFileSystem::ExFat(_) => VfsType::ExFat,
             VfsFileSystem::Ext(_) => VfsType::Ext,
@@ -784,6 +805,9 @@ impl VfsFileSystem {
             }
             VfsFileSystem::Bde(bde_file_system) => {
                 bde_file_system.open(parent_file_system, vfs_location)
+            }
+            VfsFileSystem::BsdDiskLabel(bsdlabel_file_system) => {
+                bsdlabel_file_system.open(parent_file_system, vfs_location)
             }
             VfsFileSystem::Ewf(ewf_file_system) => {
                 ewf_file_system.open(parent_file_system, vfs_location)
@@ -1562,6 +1586,71 @@ mod tests {
     #[test]
     fn test_get_file_entry_by_path_with_bde_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_bde_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with bsdlabel.
+
+    fn get_bsdlabel_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::BsdDiskLabel);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("bsdlabel/bsdlabel.raw");
+        let vfs_location: VfsLocation = VfsLocation::from(&path_string);
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_bsdlabel() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_bsdlabel_file_system()?;
+
+        let path: Path = Path::from("/bsdlabel1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
+
+        let path: Path = Path::from("/bogus2");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_bsdlabel_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_bsdlabel_file_system()?;
+
+        let path: Path = Path::from("/bogus2");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_bsdlabel_partition() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_bsdlabel_file_system()?;
+
+        let path: Path = Path::from("/bsdlabel1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_bsdlabel_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_bsdlabel_file_system()?;
 
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -3113,6 +3202,7 @@ mod tests {
             VfsType::ApfsContainer,
             VfsType::Apm,
             VfsType::Bde,
+            VfsType::BsdDiskLabel,
             VfsType::Ewf,
             VfsType::ExFat,
             VfsType::Ext,
@@ -3151,6 +3241,7 @@ mod tests {
             get_apfs_container_file_system()?,
             get_apm_file_system()?,
             get_bde_file_system()?,
+            get_bsdlabel_file_system()?,
             get_ewf_file_system()?,
             get_exfat_file_system()?,
             get_ext_file_system()?,

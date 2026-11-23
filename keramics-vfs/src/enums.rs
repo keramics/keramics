@@ -33,6 +33,7 @@ pub enum VfsType {
     ApfsContainer,
     Apm,
     Bde,
+    BsdDiskLabel,
     ExFat,
     Ext,
     Ewf,
@@ -68,6 +69,7 @@ impl fmt::Display for VfsType {
             VfsType::ApfsContainer => "APFS-Container",
             VfsType::Apm => "APM",
             VfsType::Bde => "BDE",
+            VfsType::BsdDiskLabel => "bsdlabel",
             VfsType::ExFat => "exFAT",
             VfsType::Ext => "ext",
             VfsType::Ewf => "EWF",
@@ -119,6 +121,10 @@ mod tests {
         let vfs_type: VfsType = VfsType::Bde;
         let string: String = vfs_type.to_string();
         assert_eq!(string, "BDE");
+
+        let vfs_type: VfsType = VfsType::BsdDiskLabel;
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "bsdlabel");
 
         let vfs_type: VfsType = VfsType::ExFat;
         let string: String = vfs_type.to_string();
