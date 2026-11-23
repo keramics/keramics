@@ -61,11 +61,9 @@ mod tests {
     #[test]
     fn test_getters() {
         let identifier: Uuid = Uuid::from_be_bytes(&[1; 16]);
-        let descriptor: PdiSegmentFileDescriptor = PdiSegmentFileDescriptor::new(
-            String::from("disk.hds"),
-            PdiSegmentFileType::Compressed,
-            identifier.clone(),
-        );
+        let path: String = String::from("disk.hds");
+        let descriptor: PdiSegmentFileDescriptor =
+            PdiSegmentFileDescriptor::new(path, PdiSegmentFileType::Compressed, identifier.clone());
 
         assert_eq!(descriptor.get_path(), "disk.hds");
         assert_eq!(descriptor.get_file_type(), &PdiSegmentFileType::Compressed);

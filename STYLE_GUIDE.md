@@ -79,6 +79,21 @@ let mut offset: u64 = 0;
 let path: Path = Path::from("/testdir1/testfile1");
 ```
 
+* Avoid nesting function calls or struct creations directly inside other function calls; bind
+  intermediate values to explicit, typed `let` variables first:
+
+```rust
+let entry_name: ByteString = ByteString::from("entry1");
+let entry: &XfsDirectoryEntry = entries.get_value_by_key(&entry_name).unwrap();
+
+let data_run: NtfsDataRun = NtfsDataRun {
+    block_number: 0,
+    number_of_blocks: 1,
+    run_type: NtfsDataRunType::InFile,
+};
+cluster_group.data_runs.push(data_run);
+```
+
 * Omit type suffixes on integer literals whenever the type can be inferred from context or a `let`
   type annotation (for example, write `1024` instead of `1024u64`). When a type suffix is required
   on a literal (for example, when calling methods directly on it), use the trailing underscore form

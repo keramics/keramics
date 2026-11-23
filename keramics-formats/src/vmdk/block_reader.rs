@@ -437,10 +437,11 @@ mod tests {
         file_name: Option<&str>,
         extent_type: VmdkDescriptorExtentType,
     ) -> VmdkDescriptorExtent {
+        let file_name: Option<ByteString> = file_name.map(ByteString::from);
         let mut extent: VmdkDescriptorExtent = VmdkDescriptorExtent::new(
             0,
             number_of_sectors,
-            file_name.map(ByteString::from),
+            file_name,
             extent_type,
             VmdkDescriptorExtentAccessMode::ReadWrite,
         );
@@ -452,18 +453,18 @@ mod tests {
     #[test]
     fn test_read_data_from_blocks_flat_and_zero() -> Result<(), ErrorTrace> {
         let mut files: HashMap<String, DataStreamReference> = HashMap::new();
-        files.insert(
-            String::from("extent1.raw"),
-            open_fake_data_stream(&vec![0xaa; 512]),
-        );
-        files.insert(
-            String::from("alt_extent2.raw"),
-            open_fake_data_stream(&vec![0xbb; 512]),
-        );
-        let file_resolver: FileResolverReference = Arc::new(Box::new(TestFileResolver {
+        let extent1_name: String = String::from("extent1.raw");
+        let extent1_stream: DataStreamReference = open_fake_data_stream(&[0xaa; 512]);
+        files.insert(extent1_name, extent1_stream);
+        let alt_extent2_name: String = String::from("alt_extent2.raw");
+        let alt_extent2_stream: DataStreamReference = open_fake_data_stream(&[0xbb; 512]);
+        files.insert(alt_extent2_name, alt_extent2_stream);
+        let test_file_resolver: TestFileResolver = TestFileResolver {
             files,
             fail_name: None,
-        }));
+        };
+        let boxed_file_resolver: Box<dyn FileResolver> = Box::new(test_file_resolver);
+        let file_resolver: FileResolverReference = Arc::new(boxed_file_resolver);
 
         let extent1: VmdkDescriptorExtent =
             create_extent(0, 1, Some("extent1.raw"), VmdkDescriptorExtentType::Flat);
@@ -502,18 +503,19 @@ mod tests {
     #[test]
     fn test_read_data_from_blocks_with_errors() {
         let mut files: HashMap<String, DataStreamReference> = HashMap::new();
-        files.insert(
-            String::from("bad_sparse.vmdk"),
-            open_fake_data_stream(&[0; 16]),
-        );
-        files.insert(
-            String::from("bad_cowd.vmdk"),
-            open_fake_data_stream(&[0; 16]),
-        );
-        let file_resolver: FileResolverReference = Arc::new(Box::new(TestFileResolver {
+        let bad_sparse_name: String = String::from("bad_sparse.vmdk");
+        let bad_sparse_stream: DataStreamReference = open_fake_data_stream(&[0; 16]);
+        files.insert(bad_sparse_name, bad_sparse_stream);
+        let bad_cowd_name: String = String::from("bad_cowd.vmdk");
+        let bad_cowd_stream: DataStreamReference = open_fake_data_stream(&[0; 16]);
+        files.insert(bad_cowd_name, bad_cowd_stream);
+        let fail_name: String = String::from("fail.raw");
+        let test_file_resolver: TestFileResolver = TestFileResolver {
             files,
-            fail_name: Some(String::from("fail.raw")),
-        }));
+            fail_name: Some(fail_name),
+        };
+        let boxed_file_resolver: Box<dyn FileResolver> = Box::new(test_file_resolver);
+        let file_resolver: FileResolverReference = Arc::new(boxed_file_resolver);
 
         let mut buffer: [u8; 512] = [0; 512];
 

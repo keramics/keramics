@@ -393,8 +393,8 @@ mod tests {
         let mut wrapped_key: CdsaEncrPassphraseWrappedKey = CdsaEncrPassphraseWrappedKey::new();
         wrapped_key.read_data(&test_data)?;
         wrapped_key.key_derivation_method = 9999;
-        let result: Result<bool, ErrorTrace> =
-            wrapped_key.unlock_with_credential(&CdsaEncrCredential::Passphrase(b"pass".to_vec()));
+        let credential: CdsaEncrCredential = CdsaEncrCredential::Passphrase(b"pass".to_vec());
+        let result: Result<bool, ErrorTrace> = wrapped_key.unlock_with_credential(&credential);
         assert!(result.is_err());
 
         // Test unlock_with_kek with unsupported encryption type.
@@ -413,8 +413,8 @@ mod tests {
 
         // Test unlock_with_credential with valid PBKDF2 and 1 iteration.
         wrapped_key.number_of_iterations = 1;
-        let result: Result<bool, ErrorTrace> =
-            wrapped_key.unlock_with_credential(&CdsaEncrCredential::Passphrase(b"wrong".to_vec()));
+        let credential: CdsaEncrCredential = CdsaEncrCredential::Passphrase(b"wrong".to_vec());
+        let result: Result<bool, ErrorTrace> = wrapped_key.unlock_with_credential(&credential);
         assert!(result.is_err());
 
         Ok(())

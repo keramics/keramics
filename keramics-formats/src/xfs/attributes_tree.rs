@@ -594,9 +594,8 @@ mod tests {
             attributes_tree.read_attributes(&data_stream, &extents, &mut attributes)?;
 
             assert_eq!(attributes.len(), 1);
-            let attribute: &XfsAttribute = attributes
-                .get_value_by_key(&ByteString::from("user.attr1"))
-                .unwrap();
+            let attribute_name: ByteString = ByteString::from("user.attr1");
+            let attribute: &XfsAttribute = attributes.get_value_by_key(&attribute_name).unwrap();
             let XfsAttribute::InlineData(data) = attribute;
             assert_eq!(data, b"val1");
         }

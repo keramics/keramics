@@ -327,11 +327,16 @@ mod tests {
     #[test]
     fn test_read_data_from_blocks_corrupt_and_errors() -> Result<(), ErrorTrace> {
         let mut files: HashMap<String, DataStreamReference> = HashMap::new();
-        files.insert(String::from("bad.E01"), open_fake_data_stream(&[0; 16]));
-        let file_resolver: FileResolverReference = Arc::new(Box::new(TestFileResolver {
+        let bad_file_name: String = String::from("bad.E01");
+        let bad_data_stream: DataStreamReference = open_fake_data_stream(&[0; 16]);
+        files.insert(bad_file_name, bad_data_stream);
+        let fail_name: String = String::from("fail.E01");
+        let test_file_resolver: TestFileResolver = TestFileResolver {
             files,
-            fail_name: Some(String::from("fail.E01")),
-        }));
+            fail_name: Some(fail_name),
+        };
+        let boxed_file_resolver: Box<dyn FileResolver> = Box::new(test_file_resolver);
+        let file_resolver: FileResolverReference = Arc::new(boxed_file_resolver);
 
         // Test missing block range (binary search miss before and after).
         let ranges: [EwfBlockRange; 1] = [EwfBlockRange::new(
@@ -359,21 +364,25 @@ mod tests {
         assert!(result.is_err());
 
         // Test corrupt chunk when segment file is pre-populated in cache.
-        reader.segment_file_cache.insert(1, EwfFile::new());
+        let ewf_file: EwfFile = EwfFile::new();
+        reader.segment_file_cache.insert(1, ewf_file);
         let read_count: usize = reader.read_data_from_blocks(&mut buffer, 512)?;
         assert_eq!(read_count, 512);
         assert_eq!(buffer, [0x00; 512]);
 
         // Test reading beyond available block ranges returns error.
+        let gap_ranges: [EwfBlockRange; 1] =
+            [EwfBlockRange::new(0, 1, 0, 512, EwfBlockRangeType::Corrupt)];
         let mut reader_with_gap: EwfBlockReader = EwfBlockReader::new(
             &file_resolver,
             "missing",
             Some(&EwfNamingSchema::E01UpperCase),
             512,
-            &[EwfBlockRange::new(0, 1, 0, 512, EwfBlockRangeType::Corrupt)],
+            &gap_ranges,
             1024,
         );
-        reader_with_gap.segment_file_cache.insert(1, EwfFile::new());
+        let ewf_file: EwfFile = EwfFile::new();
+        reader_with_gap.segment_file_cache.insert(1, ewf_file);
         let mut large_buffer: [u8; 1024] = [0; 1024];
         let result: Result<usize, ErrorTrace> =
             reader_with_gap.read_data_from_blocks(&mut large_buffer, 0);
@@ -397,36 +406,39 @@ mod tests {
         }
 
         // Test InFile and Compressed read errors on empty EwfFile (no data stream).
+        let in_file_ranges: [EwfBlockRange; 1] =
+            [EwfBlockRange::new(0, 1, 0, 512, EwfBlockRangeType::InFile)];
         let mut reader_in_file: EwfBlockReader = EwfBlockReader::new(
             &file_resolver,
             "missing",
             Some(&EwfNamingSchema::E01UpperCase),
             512,
-            &[EwfBlockRange::new(0, 1, 0, 512, EwfBlockRangeType::InFile)],
+            &in_file_ranges,
             512,
         );
-        reader_in_file.segment_file_cache.insert(1, EwfFile::new());
+        let ewf_file: EwfFile = EwfFile::new();
+        reader_in_file.segment_file_cache.insert(1, ewf_file);
         let result: Result<usize, ErrorTrace> =
             reader_in_file.read_data_from_blocks(&mut buffer, 0);
         assert!(result.is_err());
 
+        let compressed_ranges: [EwfBlockRange; 1] = [EwfBlockRange::new(
+            0,
+            1,
+            0,
+            512,
+            EwfBlockRangeType::Compressed,
+        )];
         let mut reader_compressed: EwfBlockReader = EwfBlockReader::new(
             &file_resolver,
             "missing",
             Some(&EwfNamingSchema::E01UpperCase),
             512,
-            &[EwfBlockRange::new(
-                0,
-                1,
-                0,
-                512,
-                EwfBlockRangeType::Compressed,
-            )],
+            &compressed_ranges,
             512,
         );
-        reader_compressed
-            .segment_file_cache
-            .insert(1, EwfFile::new());
+        let ewf_file: EwfFile = EwfFile::new();
+        reader_compressed.segment_file_cache.insert(1, ewf_file);
         let result: Result<usize, ErrorTrace> =
             reader_compressed.read_data_from_blocks(&mut buffer, 0);
         assert!(result.is_err());

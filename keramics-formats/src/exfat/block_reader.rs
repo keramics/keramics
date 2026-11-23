@@ -233,8 +233,10 @@ mod tests {
         image[1536..2048].fill(0xbb);
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let block_allocation_table: ExFatBlockAllocationTable =
+            ExFatBlockAllocationTable::new(0, 16, 512, 512);
         let block_allocation_table: Arc<ExFatBlockAllocationTable> =
-            Arc::new(ExFatBlockAllocationTable::new(0, 16, 512, 512));
+            Arc::new(block_allocation_table);
 
         let mut block_reader: ExFatBlockReader = ExFatBlockReader::new(&data_stream, 512, 1024);
         block_reader.open(&block_allocation_table, 2, false)?;

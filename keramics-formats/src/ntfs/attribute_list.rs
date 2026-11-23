@@ -215,11 +215,12 @@ mod tests {
         cluster_data[0..test_data.len()].copy_from_slice(&test_data);
         let cluster_stream: DataStreamReference = open_fake_data_stream(&cluster_data);
         let mut cluster_group: NtfsClusterGroup = NtfsClusterGroup::new(0, 0);
-        cluster_group.data_runs.push(NtfsDataRun {
+        let data_run: NtfsDataRun = NtfsDataRun {
             block_number: 0,
             number_of_blocks: 1,
             run_type: NtfsDataRunType::InFile,
-        });
+        };
+        cluster_group.data_runs.push(data_run);
         let mut non_resident_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
         non_resident_attribute.attribute_type = NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST;
         non_resident_attribute.non_resident_flag = 1;

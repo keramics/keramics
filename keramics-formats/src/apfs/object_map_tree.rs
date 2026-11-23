@@ -414,14 +414,11 @@ mod tests {
     #[test]
     fn test_get_value_by_identifier_branch_and_leaf() -> Result<(), ErrorTrace> {
         // Block 1: root branch node pointing to leaf block 2 (for id >= 10) and leaf block 3 (for id >= 100).
-        let branch_node: Vec<u8> = build_object_map_node(
-            true,
-            false,
-            &[
-                (10, 1, 2_u64.to_le_bytes().to_vec()),
-                (100, 1, 3_u64.to_le_bytes().to_vec()),
-            ],
-        );
+        let branch_entries: [(u64, u64, Vec<u8>); 2] = [
+            (10, 1, 2_u64.to_le_bytes().to_vec()),
+            (100, 1, 3_u64.to_le_bytes().to_vec()),
+        ];
+        let branch_node: Vec<u8> = build_object_map_node(true, false, &branch_entries);
         // Block 2: leaf node with two entries for object 10 (tx 1 and tx 5) and one for object 20.
         let mut value_tx1: Vec<u8> = vec![0; 16];
         value_tx1[4..8].copy_from_slice(&4096_u32.to_le_bytes());
@@ -494,8 +491,8 @@ mod tests {
         image[5 * 4096..6 * 4096].copy_from_slice(&missing_footer_node);
 
         // Block 6: branch node referencing itself (cycle detection).
-        let cycle_node: Vec<u8> =
-            build_object_map_node(true, false, &[(1, 1, 6_u64.to_le_bytes().to_vec())]);
+        let cycle_entries: [(u64, u64, Vec<u8>); 1] = [(1, 1, 6_u64.to_le_bytes().to_vec())];
+        let cycle_node: Vec<u8> = build_object_map_node(true, false, &cycle_entries);
         image[6 * 4096..7 * 4096].copy_from_slice(&cycle_node);
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);

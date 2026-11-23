@@ -408,7 +408,8 @@ mod tests {
     #[test]
     fn test_get_extents_by_identifier_branch_and_leaf() -> Result<(), ErrorTrace> {
         let mut image: Vec<u8> = vec![0; 5 * 512];
-        image[0..512].copy_from_slice(&build_header_node(1));
+        let header_node: Vec<u8> = build_header_node(1);
+        image[0..512].copy_from_slice(&header_node);
 
         // Build index records (12-byte HFS+ key + 4-byte sub-node number).
         // Entry 0 (id 0x10) points to empty leaf node 4; entry 1 (id 0x20) points to leaf node 2.
@@ -449,18 +450,21 @@ mod tests {
         image[1024..1536].copy_from_slice(&leaf_node);
 
         // Node 3: MapNode (unsupported node type).
-        image[1536..2048].copy_from_slice(&build_hfs_btree_node(0x02, &[]));
+        let map_node: Vec<u8> = build_hfs_btree_node(0x02, &[]);
+        image[1536..2048].copy_from_slice(&map_node);
 
         // Node 4: Empty LeafNode.
-        image[2048..2560].copy_from_slice(&build_hfs_btree_node(0xff, &[]));
+        let empty_leaf_node: Vec<u8> = build_hfs_btree_node(0xff, &[]);
+        image[2048..2560].copy_from_slice(&empty_leaf_node);
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let block_ranges: Vec<HfsBlockRange> = vec![HfsBlockRange::new(0, 0, 5)];
         let mut extents_overflow_file: HfsExtentsOverflowFile = HfsExtentsOverflowFile::new();
         extents_overflow_file.initialize(
             &HfsFormat::HfsPlus,
             512,
             image.len() as u64,
-            vec![HfsBlockRange::new(0, 0, 5)],
+            block_ranges,
             &data_stream,
         )?;
 

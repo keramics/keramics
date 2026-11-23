@@ -196,8 +196,9 @@ mod tests {
         // Test AES-CBC without diffuser.
         let mut aes_context: AesContext = AesContext::new();
         aes_context.set_key(&[0x11; 16])?;
+        let cipher_context: BdeCipherContext = BdeCipherContext::AesCbc(aes_context);
         let cbc_context: BdeEncryptionContext =
-            BdeEncryptionContext::new(512, BdeCipherContext::AesCbc(aes_context), None);
+            BdeEncryptionContext::new(512, cipher_context, None);
 
         let mut sectors_data: Vec<u8> = vec![0xaa; 1024];
         cbc_context.decrypt_sectors_in_place(512, &mut sectors_data)?;
@@ -208,11 +209,9 @@ mod tests {
         aes_context.set_key(&[0x11; 16])?;
         let mut diffuser_context: AesContext = AesContext::new();
         diffuser_context.set_key(&[0x22; 16])?;
-        let diffuser_encryption_context: BdeEncryptionContext = BdeEncryptionContext::new(
-            512,
-            BdeCipherContext::AesCbc(aes_context),
-            Some(diffuser_context),
-        );
+        let cipher_context: BdeCipherContext = BdeCipherContext::AesCbc(aes_context);
+        let diffuser_encryption_context: BdeEncryptionContext =
+            BdeEncryptionContext::new(512, cipher_context, Some(diffuser_context));
         let mut sector_data: Vec<u8> = vec![0xbb; 512];
         diffuser_encryption_context.decrypt_sector(512, &mut sector_data)?;
         assert_ne!(sector_data, vec![0xbb; 512]);
@@ -220,8 +219,9 @@ mod tests {
         // Test AES-XTS decryption.
         let mut xts_context: AesXtsContext = AesXtsContext::new();
         xts_context.set_keys(&[0x33; 16], &[0x44; 16])?;
+        let cipher_context: BdeCipherContext = BdeCipherContext::AesXts(xts_context);
         let xts_encryption_context: BdeEncryptionContext =
-            BdeEncryptionContext::new(512, BdeCipherContext::AesXts(xts_context), None);
+            BdeEncryptionContext::new(512, cipher_context, None);
         let mut xts_data: Vec<u8> = vec![0xcc; 1024];
         xts_encryption_context.decrypt_sectors_in_place(0, &mut xts_data)?;
         assert_ne!(xts_data, vec![0xcc; 1024]);

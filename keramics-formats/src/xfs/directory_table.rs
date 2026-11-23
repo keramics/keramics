@@ -279,13 +279,9 @@ mod tests {
         let mut entries: IndexedHashMap<ByteString, XfsDirectoryEntry> = IndexedHashMap::new();
         test_struct.read_data(false, false, &v1_data, &mut entries)?;
         assert_eq!(entries.len(), 1);
-        assert_eq!(
-            entries
-                .get_value_by_key(&ByteString::from("test"))
-                .unwrap()
-                .inode_number,
-            256
-        );
+        let entry_name: ByteString = ByteString::from("test");
+        let entry: &XfsDirectoryEntry = entries.get_value_by_key(&entry_name).unwrap();
+        assert_eq!(entry.inode_number, 256);
 
         // Build 64-bit version 2 directory table with file type byte.
         // Header: 1-byte 32-bit count (0), 1-byte 64-bit count (1), 8-byte parent inode.
@@ -301,13 +297,9 @@ mod tests {
         let mut entries: IndexedHashMap<ByteString, XfsDirectoryEntry> = IndexedHashMap::new();
         test_struct.read_data(true, true, &v2_64bit_data, &mut entries)?;
         assert_eq!(entries.len(), 1);
-        assert_eq!(
-            entries
-                .get_value_by_key(&ByteString::from("file1"))
-                .unwrap()
-                .inode_number,
-            512
-        );
+        let entry_name: ByteString = ByteString::from("file1");
+        let entry: &XfsDirectoryEntry = entries.get_value_by_key(&entry_name).unwrap();
+        assert_eq!(entry.inode_number, 512);
 
         // Test entry name offset out of bounds on version 1 table.
         let mut truncated_v1_data: Vec<u8> = vec![0; 10];

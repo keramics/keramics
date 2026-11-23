@@ -351,22 +351,22 @@ mod tests {
         let result: Result<bool, ErrorTrace> = wrapped_kek.unlock_with_kek(&[0x11; 5]);
         assert!(result.is_err());
 
-        let unlocked: bool =
-            wrapped_kek.unlock_with_credential(&ApfsCredential::Passphrase(b"wrong".to_vec()))?;
+        let credential: ApfsCredential = ApfsCredential::Passphrase(b"wrong".to_vec());
+        let unlocked: bool = wrapped_kek.unlock_with_credential(&credential)?;
         assert!(!unlocked);
 
         wrapped_kek.flags = 0x02;
-        let unlocked: bool =
-            wrapped_kek.unlock_with_credential(&ApfsCredential::Passphrase(b"wrong".to_vec()))?;
+        let unlocked: bool = wrapped_kek.unlock_with_credential(&credential)?;
         assert!(!unlocked);
 
         let unlocked: bool = wrapped_kek.unlock_with_credential(&ApfsCredential::None)?;
         assert!(!unlocked);
 
-        let unlocked: bool = wrapped_kek.unlock_with_credential(&ApfsCredential::KeyData {
+        let key_data_credential: ApfsCredential = ApfsCredential::KeyData {
             identifier: vec![0; 16],
             data: vec![0; 32],
-        })?;
+        };
+        let unlocked: bool = wrapped_kek.unlock_with_credential(&key_data_credential)?;
         assert!(!unlocked);
 
         Ok(())

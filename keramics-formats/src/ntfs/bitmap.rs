@@ -643,11 +643,12 @@ mod tests {
         non_resident_attribute.non_resident_flag = 1;
         non_resident_attribute.data_size = 4096;
         let mut cluster_group: NtfsClusterGroup = NtfsClusterGroup::new(0, 0);
-        cluster_group.data_runs.push(NtfsDataRun {
+        let data_run: NtfsDataRun = NtfsDataRun {
             block_number: 1,
             number_of_blocks: 1,
             run_type: NtfsDataRunType::InFile,
-        });
+        };
+        cluster_group.data_runs.push(data_run);
         non_resident_attribute
             .data_cluster_groups
             .push(cluster_group);
@@ -671,9 +672,10 @@ mod tests {
         let mut invalid_first_virtual_cluster_number_attribute: NtfsMftAttribute =
             NtfsMftAttribute::new();
         invalid_first_virtual_cluster_number_attribute.non_resident_flag = 1;
+        let invalid_cluster_group: NtfsClusterGroup = NtfsClusterGroup::new(1, 1);
         invalid_first_virtual_cluster_number_attribute
             .data_cluster_groups
-            .push(NtfsClusterGroup::new(1, 1));
+            .push(invalid_cluster_group);
         let mut bitmap: NtfsBitmap = NtfsBitmap::new(4096, 4096);
         let result: Result<(), ErrorTrace> = bitmap.initialize(
             &data_stream,
@@ -685,11 +687,12 @@ mod tests {
         let mut sparse_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
         sparse_attribute.non_resident_flag = 1;
         let mut sparse_group: NtfsClusterGroup = NtfsClusterGroup::new(0, 0);
-        sparse_group.data_runs.push(NtfsDataRun {
+        let sparse_data_run: NtfsDataRun = NtfsDataRun {
             block_number: 0,
             number_of_blocks: 1,
             run_type: NtfsDataRunType::Sparse,
-        });
+        };
+        sparse_group.data_runs.push(sparse_data_run);
         sparse_attribute.data_cluster_groups.push(sparse_group);
         let mut bitmap: NtfsBitmap = NtfsBitmap::new(4096, 4096);
         let result: Result<(), ErrorTrace> = bitmap.initialize(&data_stream, &sparse_attribute);
@@ -700,11 +703,14 @@ mod tests {
             NtfsMftAttribute::new();
         invalid_last_virtual_cluster_number_attribute.non_resident_flag = 1;
         let mut invalid_last_cluster_group: NtfsClusterGroup = NtfsClusterGroup::new(0, 5);
-        invalid_last_cluster_group.data_runs.push(NtfsDataRun {
+        let invalid_last_data_run: NtfsDataRun = NtfsDataRun {
             block_number: 1,
             number_of_blocks: 1,
             run_type: NtfsDataRunType::InFile,
-        });
+        };
+        invalid_last_cluster_group
+            .data_runs
+            .push(invalid_last_data_run);
         invalid_last_virtual_cluster_number_attribute
             .data_cluster_groups
             .push(invalid_last_cluster_group);

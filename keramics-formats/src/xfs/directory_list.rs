@@ -256,9 +256,8 @@ mod tests {
         )?;
 
         assert_eq!(entries.len(), 1);
-        let entry: &XfsDirectoryEntry = entries
-            .get_value_by_key(&ByteString::from("file1.txt"))
-            .unwrap();
+        let entry_name: ByteString = ByteString::from("file1.txt");
+        let entry: &XfsDirectoryEntry = entries.get_value_by_key(&entry_name).unwrap();
         assert_eq!(entry.inode_number, 128);
 
         // Test stopping early when data_size is smaller than extent size.

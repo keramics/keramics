@@ -205,10 +205,11 @@ mod tests {
         // Test fork descriptor with overflow lookup when root_node_number is 0.
         let mut fork_descriptor: HfsForkDescriptor = HfsForkDescriptor::new();
         fork_descriptor.number_of_blocks = 10;
-        fork_descriptor.extents.push(HfsExtentDescriptor {
+        let extent: HfsExtentDescriptor = HfsExtentDescriptor {
             block_number: 2,
             number_of_blocks: 4,
-        });
+        };
+        fork_descriptor.extents.push(extent);
         let mut block_ranges: HfsBlockRanges = HfsBlockRanges::new();
         block_ranges.read_fork_descriptor(
             0,
@@ -221,10 +222,11 @@ mod tests {
 
         // Test fork descriptor error propagation on block number overflow.
         let mut invalid_fork_descriptor: HfsForkDescriptor = HfsForkDescriptor::new();
-        invalid_fork_descriptor.extents.push(HfsExtentDescriptor {
+        let invalid_extent: HfsExtentDescriptor = HfsExtentDescriptor {
             block_number: u32::MAX,
             number_of_blocks: 1,
-        });
+        };
+        invalid_fork_descriptor.extents.push(invalid_extent);
         let mut block_ranges: HfsBlockRanges = HfsBlockRanges::new();
         let result: Result<(), ErrorTrace> = block_ranges.read_fork_descriptor(
             1,

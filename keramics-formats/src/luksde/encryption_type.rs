@@ -105,9 +105,11 @@ mod tests {
         let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
         assert_eq!(encryption_type.to_string(), "N/A (not set)");
 
-        encryption_type.set_encryption_method(&ByteString::from("AES"));
+        let encryption_method: ByteString = ByteString::from("AES");
+        encryption_type.set_encryption_method(&encryption_method);
         encryption_type.key_size = 32;
-        encryption_type.set_encryption_mode(&ByteString::from("CBC-ESSIV:SHA256"));
+        let encryption_mode: ByteString = ByteString::from("CBC-ESSIV:SHA256");
+        encryption_type.set_encryption_mode(&encryption_mode);
         assert_eq!(encryption_type.encryption_method, "aes");
         assert_eq!(encryption_type.chaining_mode, "cbc");
         assert_eq!(
@@ -120,7 +122,8 @@ mod tests {
         );
         assert_eq!(encryption_type.to_string(), "AES-256-CBC");
 
-        encryption_type.set_encryption_mode(&ByteString::from("XTS-PLAIN64"));
+        let encryption_mode: ByteString = ByteString::from("XTS-PLAIN64");
+        encryption_type.set_encryption_mode(&encryption_mode);
         assert_eq!(encryption_type.chaining_mode, "xts");
         assert_eq!(
             encryption_type.initialization_vector_mode.as_deref(),
@@ -128,7 +131,8 @@ mod tests {
         );
         assert_eq!(encryption_type.initialization_vector_options, None);
 
-        encryption_type.set_encryption_mode(&ByteString::from("ECB"));
+        let encryption_mode: ByteString = ByteString::from("ECB");
+        encryption_type.set_encryption_mode(&encryption_mode);
         assert_eq!(encryption_type.chaining_mode, "ecb");
         assert_eq!(encryption_type.initialization_vector_mode, None);
         assert_eq!(encryption_type.initialization_vector_options, None);

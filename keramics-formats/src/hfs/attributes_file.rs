@@ -551,10 +551,9 @@ mod tests {
         index_record_2.extend_from_slice(&2_u32.to_be_bytes());
         let mut index_record_3: Vec<u8> = build_attribute_key(50, 0, "a");
         index_record_3.extend_from_slice(&3_u32.to_be_bytes());
-        image[512..1024].copy_from_slice(&build_hfs_btree_node(
-            0x00,
-            &[&index_record_1, &index_record_2, &index_record_3],
-        ));
+        let index_node: Vec<u8> =
+            build_hfs_btree_node(0x00, &[&index_record_1, &index_record_2, &index_record_3]);
+        image[512..1024].copy_from_slice(&index_node);
 
         // Node 2: Leaf node with ForkData + Extents for id 20 ("big"), and InlineData for id 30 ("end").
         let mut fork_record: Vec<u8> = build_attribute_key(20, 0, "big");
@@ -569,13 +568,13 @@ mod tests {
         next_record.extend_from_slice(&0x00000010_u32.to_be_bytes());
         next_record.extend_from_slice(&[0; 12]);
 
-        image[1024..1536].copy_from_slice(&build_hfs_btree_node(
-            0xff,
-            &[&fork_record, &extents_record, &next_record],
-        ));
+        let leaf_node: Vec<u8> =
+            build_hfs_btree_node(0xff, &[&fork_record, &extents_record, &next_record]);
+        image[1024..1536].copy_from_slice(&leaf_node);
 
         // Node 3: MapNode (unsupported node type).
-        image[1536..2048].copy_from_slice(&build_hfs_btree_node(0x02, &[]));
+        let map_node: Vec<u8> = build_hfs_btree_node(0x02, &[]);
+        image[1536..2048].copy_from_slice(&map_node);
 
         // Node 4: Leaf node with orphan Extents record (missing ForkData) for id 40,
         // and duplicate inline record for id 41.
@@ -591,7 +590,7 @@ mod tests {
         nonzero_inline.extend_from_slice(&0x00000010_u32.to_be_bytes());
         nonzero_inline.extend_from_slice(&[0; 12]);
 
-        image[2048..2560].copy_from_slice(&build_hfs_btree_node(
+        let error_leaf_node: Vec<u8> = build_hfs_btree_node(
             0xff,
             &[
                 &orphan_extents,
@@ -599,18 +598,21 @@ mod tests {
                 &duplicate_inline,
                 &nonzero_inline,
             ],
-        ));
+        );
+        image[2048..2560].copy_from_slice(&error_leaf_node);
 
         // Node 5: Empty LeafNode.
-        image[2560..3072].copy_from_slice(&build_hfs_btree_node(0xff, &[]));
+        let empty_leaf_node: Vec<u8> = build_hfs_btree_node(0xff, &[]);
+        image[2560..3072].copy_from_slice(&empty_leaf_node);
 
         let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let block_ranges: Vec<HfsBlockRange> = vec![HfsBlockRange::new(0, 0, 6)];
         let mut attributes_file: HfsAttributesFile = HfsAttributesFile::new();
         attributes_file.initialize(
             &HfsFormat::HfsPlus,
             512,
             image.len() as u64,
-            vec![HfsBlockRange::new(0, 0, 6)],
+            block_ranges,
             &data_stream,
         )?;
 

@@ -473,9 +473,8 @@ mod tests {
         directory_tree.read_entries(&data_stream, &extents, &mut entries)?;
 
         assert_eq!(entries.len(), 1);
-        let entry: &XfsDirectoryEntry = entries
-            .get_value_by_key(&ByteString::from("entry1"))
-            .unwrap();
+        let entry_name: ByteString = ByteString::from("entry1");
+        let entry: &XfsDirectoryEntry = entries.get_value_by_key(&entry_name).unwrap();
         assert_eq!(entry.inode_number, 200);
 
         Ok(())

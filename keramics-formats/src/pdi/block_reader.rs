@@ -337,18 +337,18 @@ mod tests {
     #[test]
     fn test_read_data_from_blocks_raw() -> Result<(), ErrorTrace> {
         let mut files: HashMap<PathComponent, DataStreamReference> = HashMap::new();
-        files.insert(
-            PathComponent::from("extent1.raw"),
-            open_fake_data_stream(&vec![0x11; 512]),
-        );
-        files.insert(
-            PathComponent::from("extent2.raw"),
-            open_fake_data_stream(&vec![0x22; 512]),
-        );
-        let file_resolver: FileResolverReference = Arc::new(Box::new(TestFileResolver {
+        let extent1_name: PathComponent = PathComponent::from("extent1.raw");
+        let extent1_stream: DataStreamReference = open_fake_data_stream(&[0x11; 512]);
+        files.insert(extent1_name, extent1_stream);
+        let extent2_name: PathComponent = PathComponent::from("extent2.raw");
+        let extent2_stream: DataStreamReference = open_fake_data_stream(&[0x22; 512]);
+        files.insert(extent2_name, extent2_stream);
+        let test_file_resolver: TestFileResolver = TestFileResolver {
             files,
             fail_name: None,
-        }));
+        };
+        let boxed_file_resolver: Box<dyn FileResolver> = Box::new(test_file_resolver);
+        let file_resolver: FileResolverReference = Arc::new(boxed_file_resolver);
         let extents: [PdiImageExtent; 2] = [
             PdiImageExtent::new(0, 512, "extent1.raw", PdiExtentType::Raw),
             PdiImageExtent::new(512, 512, "extent2.raw", PdiExtentType::Raw),
@@ -376,18 +376,19 @@ mod tests {
     #[test]
     fn test_read_data_from_blocks_with_errors() {
         let mut files: HashMap<PathComponent, DataStreamReference> = HashMap::new();
-        files.insert(
-            PathComponent::from("bad_sparse.hds"),
-            open_fake_data_stream(&[0; 16]),
-        );
-        files.insert(
-            PathComponent::from("extent1.raw"),
-            open_fake_data_stream(&vec![0x11; 512]),
-        );
-        let file_resolver: FileResolverReference = Arc::new(Box::new(TestFileResolver {
+        let bad_sparse_name: PathComponent = PathComponent::from("bad_sparse.hds");
+        let bad_sparse_stream: DataStreamReference = open_fake_data_stream(&[0; 16]);
+        files.insert(bad_sparse_name, bad_sparse_stream);
+        let extent1_name: PathComponent = PathComponent::from("extent1.raw");
+        let extent1_stream: DataStreamReference = open_fake_data_stream(&[0x11; 512]);
+        files.insert(extent1_name, extent1_stream);
+        let fail_name: PathComponent = PathComponent::from("fail.raw");
+        let test_file_resolver: TestFileResolver = TestFileResolver {
             files,
-            fail_name: Some(PathComponent::from("fail.raw")),
-        }));
+            fail_name: Some(fail_name),
+        };
+        let boxed_file_resolver: Box<dyn FileResolver> = Box::new(test_file_resolver);
+        let file_resolver: FileResolverReference = Arc::new(boxed_file_resolver);
         let mut buffer: [u8; 512] = [0; 512];
 
         // Out-of-range offset (before first extent and after last extent).

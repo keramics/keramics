@@ -392,7 +392,8 @@ mod tests {
         leaf[0..4].copy_from_slice(XFS_EXTENT_TREE_SIGNATURE);
         leaf[4..6].copy_from_slice(&0_u16.to_be_bytes());
         leaf[6..8].copy_from_slice(&1_u16.to_be_bytes());
-        leaf[24..40].copy_from_slice(&build_packed_extent_bytes(0, 10, 4));
+        let extent_bytes: [u8; 16] = build_packed_extent_bytes(0, 10, 4);
+        leaf[24..40].copy_from_slice(&extent_bytes);
 
         // Root node inline data: header (level=2, number_of_records=1) + key (8) + value (block 1).
         let mut root_node_data: Vec<u8> = vec![0; 20];
@@ -424,7 +425,8 @@ mod tests {
         leaf[0..4].copy_from_slice(XFS_EXTENT_TREE_V5_SIGNATURE);
         leaf[4..6].copy_from_slice(&0_u16.to_be_bytes());
         leaf[6..8].copy_from_slice(&1_u16.to_be_bytes());
-        leaf[72..88].copy_from_slice(&build_packed_extent_bytes(2, 20, 3));
+        let extent_bytes: [u8; 16] = build_packed_extent_bytes(2, 20, 3);
+        leaf[72..88].copy_from_slice(&extent_bytes);
 
         let mut root_node_data: Vec<u8> = vec![0; 20];
         root_node_data[0..2].copy_from_slice(&1_u16.to_be_bytes());

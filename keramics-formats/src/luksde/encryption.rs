@@ -422,8 +422,10 @@ mod tests {
         ];
         for (method, mode, key) in valid_modes {
             let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
-            encryption_type.set_encryption_method(&ByteString::from(method));
-            encryption_type.set_encryption_mode(&ByteString::from(mode));
+            let encryption_method: ByteString = ByteString::from(method);
+            let encryption_mode: ByteString = ByteString::from(mode);
+            encryption_type.set_encryption_method(&encryption_method);
+            encryption_type.set_encryption_mode(&encryption_mode);
             let context: Option<LuksEncryptionContext> =
                 LuksEncryption::get_encryption_context(&encryption_type, key)?;
             assert!(context.is_some());
@@ -444,8 +446,10 @@ mod tests {
         ];
         for (method, mode, key) in unsupported_modes {
             let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
-            encryption_type.set_encryption_method(&ByteString::from(method));
-            encryption_type.set_encryption_mode(&ByteString::from(mode));
+            let encryption_method: ByteString = ByteString::from(method);
+            let encryption_mode: ByteString = ByteString::from(mode);
+            encryption_type.set_encryption_method(&encryption_method);
+            encryption_type.set_encryption_mode(&encryption_mode);
             let context: Option<LuksEncryptionContext> =
                 LuksEncryption::get_encryption_context(&encryption_type, key)?;
             assert!(context.is_none());
@@ -453,8 +457,10 @@ mod tests {
 
         // Test invalid key length returning error.
         let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
-        encryption_type.set_encryption_method(&ByteString::from("aes"));
-        encryption_type.set_encryption_mode(&ByteString::from("cbc-plain"));
+        let encryption_method: ByteString = ByteString::from("aes");
+        let encryption_mode: ByteString = ByteString::from("cbc-plain");
+        encryption_type.set_encryption_method(&encryption_method);
+        encryption_type.set_encryption_mode(&encryption_mode);
         let result: Result<Option<LuksEncryptionContext>, ErrorTrace> =
             LuksEncryption::get_encryption_context(&encryption_type, &[0; 5]);
         assert!(result.is_err());
