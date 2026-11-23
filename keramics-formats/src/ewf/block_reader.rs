@@ -354,7 +354,8 @@ mod tests {
             &ranges,
             1024,
         );
-        assert_eq!(reader.get_size(), 1024);
+        let size: u64 = reader.get_size();
+        assert_eq!(size, 1024);
 
         let mut buffer: [u8; 512] = [0xff; 512];
         let result: Result<usize, ErrorTrace> = reader.read_data_from_blocks(&mut buffer, 0);

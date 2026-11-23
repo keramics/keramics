@@ -412,131 +412,93 @@ mod tests {
         // Test CRLF line endings, trailing NUL byte, and EOF.
         let crlf_data: &[u8] = b"line1\r\nline2\x00line3";
         let mut storage: VmdkDescriptorStorage = VmdkDescriptorStorage::new(crlf_data);
-        assert_eq!(storage.next_line(), Some(b"line1".as_slice()));
-        assert_eq!(storage.next_line(), None);
+        let line: Option<&[u8]> = storage.next_line();
+        assert_eq!(line, Some(b"line1".as_slice()));
+        let line: Option<&[u8]> = storage.next_line();
+        assert_eq!(line, None);
 
         let empty_storage_data: &[u8] = b"";
         let mut storage: VmdkDescriptorStorage = VmdkDescriptorStorage::new(empty_storage_data);
-        assert_eq!(storage.next_line(), None);
+        let line: Option<&[u8]> = storage.next_line();
+        assert_eq!(line, None);
     }
 
     #[test]
     fn test_parse_content_identifier_value() {
-        assert_eq!(
-            VmdkDescriptorStorage::parse_content_identifier_value(b"4c069322"),
-            Some(0x4c069322)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_content_identifier_value(b"ffffffff"),
-            Some(0xffffffff)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_content_identifier_value(b"123456789"),
-            None
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_content_identifier_value(b"1234567g"),
-            None
-        );
+        let test_cases: [(&[u8], Option<u32>); 4] = [
+            (b"4c069322", Some(0x4c069322)),
+            (b"ffffffff", Some(0xffffffff)),
+            (b"123456789", None),
+            (b"1234567g", None),
+        ];
+        for (input, expected) in test_cases {
+            let value: Option<u32> = VmdkDescriptorStorage::parse_content_identifier_value(input);
+            assert_eq!(value, expected);
+        }
     }
 
     #[test]
     fn test_parse_disk_type_value() {
-        assert_eq!(VmdkDescriptorStorage::parse_disk_type_value(b""), None);
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"custom"),
-            None
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"custom\""),
-            Some(VmdkDiskType::Custom)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"fulldevice\""),
-            Some(VmdkDiskType::Device)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"vmfs\""),
-            Some(VmdkDiskType::VmfsFlat)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"vmfsraw\""),
-            Some(VmdkDiskType::VmfsRaw)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"vmfsrawdevicemap\""),
-            Some(VmdkDiskType::VmfsRdm)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"vmfsrdm\""),
-            Some(VmdkDiskType::VmfsRdm)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"vmfspassthroughrawdevicemap\""),
-            Some(VmdkDiskType::VmfsRdmp)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"vmfsrdmp\""),
-            Some(VmdkDiskType::VmfsRdmp)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"vmfssparse\""),
-            Some(VmdkDiskType::VmfsSparse)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"monolithicflat\""),
-            Some(VmdkDiskType::MonolithicFlat)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"streamoptimized\""),
-            Some(VmdkDiskType::StreamOptimized)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"2gbmaxextentflat\""),
-            Some(VmdkDiskType::Flat2GbExtent)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"twogbmaxextentflat\""),
-            Some(VmdkDiskType::Flat2GbExtent)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"2gbmaxextentsparse\""),
-            Some(VmdkDiskType::Sparse2GbExtent)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"twogbmaxextentsparse\""),
-            Some(VmdkDiskType::Sparse2GbExtent)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"monolithicsparse\""),
-            Some(VmdkDiskType::MonolithicSparse)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"vmfspreallocated\""),
-            Some(VmdkDiskType::VmfsFlatPreAllocated)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"partitioneddevice\""),
-            Some(VmdkDiskType::DevicePartitioned)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"vmfseagerzeroedthick\""),
-            Some(VmdkDiskType::VmfsFlatZeroed)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"vmfsthin\""),
-            Some(VmdkDiskType::VmfsSparseThin)
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_disk_type_value(b"\"other\""),
-            Some(VmdkDiskType::Unknown)
-        );
+        let test_cases: [(&[u8], Option<VmdkDiskType>); 23] = [
+            (b"", None),
+            (b"custom", None),
+            (b"\"custom\"", Some(VmdkDiskType::Custom)),
+            (b"\"fulldevice\"", Some(VmdkDiskType::Device)),
+            (b"\"vmfs\"", Some(VmdkDiskType::VmfsFlat)),
+            (b"\"vmfsraw\"", Some(VmdkDiskType::VmfsRaw)),
+            (b"\"vmfsrawdevicemap\"", Some(VmdkDiskType::VmfsRdm)),
+            (b"\"vmfsrdm\"", Some(VmdkDiskType::VmfsRdm)),
+            (
+                b"\"vmfspassthroughrawdevicemap\"",
+                Some(VmdkDiskType::VmfsRdmp),
+            ),
+            (b"\"vmfsrdmp\"", Some(VmdkDiskType::VmfsRdmp)),
+            (b"\"vmfssparse\"", Some(VmdkDiskType::VmfsSparse)),
+            (b"\"monolithicflat\"", Some(VmdkDiskType::MonolithicFlat)),
+            (b"\"streamoptimized\"", Some(VmdkDiskType::StreamOptimized)),
+            (b"\"2gbmaxextentflat\"", Some(VmdkDiskType::Flat2GbExtent)),
+            (b"\"twogbmaxextentflat\"", Some(VmdkDiskType::Flat2GbExtent)),
+            (
+                b"\"2gbmaxextentsparse\"",
+                Some(VmdkDiskType::Sparse2GbExtent),
+            ),
+            (
+                b"\"twogbmaxextentsparse\"",
+                Some(VmdkDiskType::Sparse2GbExtent),
+            ),
+            (
+                b"\"monolithicsparse\"",
+                Some(VmdkDiskType::MonolithicSparse),
+            ),
+            (
+                b"\"vmfspreallocated\"",
+                Some(VmdkDiskType::VmfsFlatPreAllocated),
+            ),
+            (
+                b"\"partitioneddevice\"",
+                Some(VmdkDiskType::DevicePartitioned),
+            ),
+            (
+                b"\"vmfseagerzeroedthick\"",
+                Some(VmdkDiskType::VmfsFlatZeroed),
+            ),
+            (b"\"vmfsthin\"", Some(VmdkDiskType::VmfsSparseThin)),
+            (b"\"other\"", Some(VmdkDiskType::Unknown)),
+        ];
+        for (input, expected) in test_cases {
+            let disk_type: Option<VmdkDiskType> =
+                VmdkDescriptorStorage::parse_disk_type_value(input);
+            assert_eq!(disk_type, expected);
+        }
     }
 
     #[test]
     fn test_parse_encoding_value() {
-        assert_eq!(VmdkDescriptorStorage::parse_encoding_value(b""), None);
-        assert_eq!(VmdkDescriptorStorage::parse_encoding_value(b"utf-8"), None);
+        let encoding: Option<CharacterEncoding> = VmdkDescriptorStorage::parse_encoding_value(b"");
+        assert_eq!(encoding, None);
+        let encoding: Option<CharacterEncoding> =
+            VmdkDescriptorStorage::parse_encoding_value(b"utf-8");
+        assert_eq!(encoding, None);
 
         let test_cases: [(&[u8], Option<CharacterEncoding>); 31] = [
             (b"\"windows-936\"", Some(CharacterEncoding::Windows936)),
@@ -572,15 +534,13 @@ mod tests {
             (b"\"windows-1258\"", Some(CharacterEncoding::Windows1258)),
         ];
         for (input, expected) in test_cases.iter() {
-            assert_eq!(
-                VmdkDescriptorStorage::parse_encoding_value(input),
-                *expected
-            );
+            let encoding: Option<CharacterEncoding> =
+                VmdkDescriptorStorage::parse_encoding_value(input);
+            assert_eq!(encoding, *expected);
         }
-        assert_eq!(
-            VmdkDescriptorStorage::parse_encoding_value(b"\"unknown_encoding\""),
-            None
-        );
+        let encoding: Option<CharacterEncoding> =
+            VmdkDescriptorStorage::parse_encoding_value(b"\"unknown_encoding\"");
+        assert_eq!(encoding, None);
     }
 
     #[test]
@@ -596,7 +556,8 @@ mod tests {
         );
         assert_eq!(extent.number_of_sectors, 8192);
         assert_eq!(extent.extent_type, VmdkDescriptorExtentType::Sparse);
-        assert_eq!(extent.file_name, Some(ByteString::from("ext2.vmdk")));
+        let expected_file_name: ByteString = ByteString::from("ext2.vmdk");
+        assert_eq!(extent.file_name, Some(expected_file_name));
         assert_eq!(extent.start_sector, 0);
 
         let extent: VmdkDescriptorExtent =
@@ -641,74 +602,71 @@ mod tests {
         }
 
         // Test invalid extents.
-        assert!(VmdkDescriptorStorage::parse_extent(b"RW 16", &encoding).is_none());
-        assert!(VmdkDescriptorStorage::parse_extent(b"RW 0 ZERO", &encoding).is_none());
-        assert!(VmdkDescriptorStorage::parse_extent(b"RW abc ZERO", &encoding).is_none());
-        assert!(
-            VmdkDescriptorStorage::parse_extent(b"RW 99999999999999999 ZERO", &encoding).is_none()
-        );
-        assert!(
-            VmdkDescriptorStorage::parse_extent(b"RW 16 FLAT \"a.vmdk\" abc", &encoding).is_none()
-        );
-        assert!(
-            VmdkDescriptorStorage::parse_extent(
-                b"RW 16 FLAT \"a.vmdk\" 99999999999999999",
-                &encoding
-            )
-            .is_none()
-        );
+        let invalid_lines: [&[u8]; 6] = [
+            b"RW 16",
+            b"RW 0 ZERO",
+            b"RW abc ZERO",
+            b"RW 99999999999999999 ZERO",
+            b"RW 16 FLAT \"a.vmdk\" abc",
+            b"RW 16 FLAT \"a.vmdk\" 99999999999999999",
+        ];
+        for line in invalid_lines {
+            let extent: Option<VmdkDescriptorExtent> =
+                VmdkDescriptorStorage::parse_extent(line, &encoding);
+            assert!(extent.is_none());
+        }
     }
 
     #[test]
     fn test_parse_file_name() {
         let encoding: CharacterEncoding = CharacterEncoding::Utf8;
 
-        assert_eq!(
-            VmdkDescriptorStorage::parse_file_name(b"\"parent.vmdk\"", &encoding),
-            Some(ByteString::from("parent.vmdk"))
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_file_name(b"unquoted", &encoding),
-            None
-        );
+        let file_name: Option<ByteString> =
+            VmdkDescriptorStorage::parse_file_name(b"\"parent.vmdk\"", &encoding);
+        let expected_file_name: ByteString = ByteString::from("parent.vmdk");
+        assert_eq!(file_name, Some(expected_file_name));
+
+        let file_name: Option<ByteString> =
+            VmdkDescriptorStorage::parse_file_name(b"unquoted", &encoding);
+        assert_eq!(file_name, None);
     }
 
     #[test]
     fn test_parse_integer_value() {
-        assert_eq!(
-            VmdkDescriptorStorage::parse_integer_value(b"12345"),
-            Some(12345)
-        );
-        assert_eq!(VmdkDescriptorStorage::parse_integer_value(b"12a45"), None);
-        assert_eq!(
-            VmdkDescriptorStorage::parse_integer_value(b"123456789012345678901"),
-            None
-        );
+        let value: Option<u64> = VmdkDescriptorStorage::parse_integer_value(b"12345");
+        assert_eq!(value, Some(12345));
+
+        let value: Option<u64> = VmdkDescriptorStorage::parse_integer_value(b"12a45");
+        assert_eq!(value, None);
+
+        let value: Option<u64> =
+            VmdkDescriptorStorage::parse_integer_value(b"123456789012345678901");
+        assert_eq!(value, None);
     }
 
     #[test]
     fn test_parse_key_value_pair() {
-        assert_eq!(
-            VmdkDescriptorStorage::parse_key_value_pair(b"  key \t = \x0b value  "),
-            Some((b"key".as_slice(), b"value".as_slice()))
-        );
-        assert_eq!(
-            VmdkDescriptorStorage::parse_key_value_pair(b"no_equals"),
-            None
-        );
+        let pair: Option<(&[u8], &[u8])> =
+            VmdkDescriptorStorage::parse_key_value_pair(b"  key \t = \x0b value  ");
+        assert_eq!(pair, Some((b"key".as_slice(), b"value".as_slice())));
+
+        let pair: Option<(&[u8], &[u8])> =
+            VmdkDescriptorStorage::parse_key_value_pair(b"no_equals");
+        assert_eq!(pair, None);
     }
 
     #[test]
     fn test_trim() {
-        assert_eq!(VmdkDescriptorStorage::trim(b""), b"");
-        assert_eq!(VmdkDescriptorStorage::trim(b" \t\x0b\x0cabc \t "), b"abc");
+        let result: &[u8] = VmdkDescriptorStorage::trim(b"");
+        assert_eq!(result, b"");
+
+        let result: &[u8] = VmdkDescriptorStorage::trim(b" \t\x0b\x0cabc \t ");
+        assert_eq!(result, b"abc");
     }
 
     #[test]
     fn test_to_ascii_lowercase() {
-        assert_eq!(
-            VmdkDescriptorStorage::to_ascii_lowercase(b"AbC-123_XyZ"),
-            b"abc-123_xyz"
-        );
+        let result: Vec<u8> = VmdkDescriptorStorage::to_ascii_lowercase(b"AbC-123_XyZ");
+        assert_eq!(result, b"abc-123_xyz");
     }
 }

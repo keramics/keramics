@@ -158,7 +158,8 @@ mod tests {
         test_struct.name = ByteString::from("TestDir1.txt");
 
         let lookup_name: Ucs2String = test_struct.get_lookup_name();
-        assert_eq!(lookup_name, Ucs2String::from("TESTDIR1.TXT"));
+        let expected_name: Ucs2String = Ucs2String::from("TESTDIR1.TXT");
+        assert_eq!(lookup_name, expected_name);
     }
 
     #[test]

@@ -482,7 +482,8 @@ mod tests {
         let mut block_reader: VmdkBlockReader =
             VmdkBlockReader::new(&file_resolver, 512, &extents, None, 1536);
 
-        assert_eq!(block_reader.get_size(), 1536);
+        let size: u64 = block_reader.get_size();
+        assert_eq!(size, 1536);
 
         let mut buffer: Vec<u8> = vec![0xff; 1536];
         let read_count: usize = block_reader.read_data_from_blocks(&mut buffer, 0)?;

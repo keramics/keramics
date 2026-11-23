@@ -56,21 +56,18 @@ mod tests {
 
     #[test]
     fn test_fmt() {
-        assert_eq!(BdeKeyProtectorType::ClearKey.to_string(), "Clear key");
-        assert_eq!(BdeKeyProtectorType::ExternalKey.to_string(), "External key");
-        assert_eq!(
-            BdeKeyProtectorType::Passphrase.to_string(),
-            "Passphrase (or password)"
-        );
-        assert_eq!(
-            BdeKeyProtectorType::RecoveryPassword.to_string(),
-            "Recovery password"
-        );
-        assert_eq!(BdeKeyProtectorType::Tpm.to_string(), "TPM");
-        assert_eq!(BdeKeyProtectorType::TpmAndPin.to_string(), "TPM and pin");
-        assert_eq!(
-            BdeKeyProtectorType::Unknown(0x1234).to_string(),
-            "Unknown: 0x1234"
-        );
+        let cases: [(BdeKeyProtectorType, &str); 7] = [
+            (BdeKeyProtectorType::ClearKey, "Clear key"),
+            (BdeKeyProtectorType::ExternalKey, "External key"),
+            (BdeKeyProtectorType::Passphrase, "Passphrase (or password)"),
+            (BdeKeyProtectorType::RecoveryPassword, "Recovery password"),
+            (BdeKeyProtectorType::Tpm, "TPM"),
+            (BdeKeyProtectorType::TpmAndPin, "TPM and pin"),
+            (BdeKeyProtectorType::Unknown(0x1234), "Unknown: 0x1234"),
+        ];
+        for (protector_type, expected_string) in cases {
+            let string: String = protector_type.to_string();
+            assert_eq!(string, expected_string);
+        }
     }
 }

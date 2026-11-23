@@ -578,7 +578,8 @@ mod tests {
             Some(backing_stream),
             4096,
         );
-        assert_eq!(reader.get_size(), 4096);
+        let size: u64 = reader.get_size();
+        assert_eq!(size, 4096);
 
         // Read across plain (0..512), backing (512..1024), compressed (1024..1536),
         // backing (1536..2048), and sparse L1 (2048..2560).

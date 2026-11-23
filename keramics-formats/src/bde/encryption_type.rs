@@ -79,9 +79,12 @@ mod tests {
         ];
         for (method, expected_fvek_size, expected_key_size, expected_display) in cases {
             let encryption_type: BdeEncryptionType = BdeEncryptionType::new(method);
-            assert_eq!(encryption_type.get_fvek_size(), expected_fvek_size);
-            assert_eq!(encryption_type.get_key_size(), expected_key_size);
-            assert_eq!(encryption_type.to_string(), expected_display);
+            let fvek_size: usize = encryption_type.get_fvek_size();
+            assert_eq!(fvek_size, expected_fvek_size);
+            let key_size: usize = encryption_type.get_key_size();
+            assert_eq!(key_size, expected_key_size);
+            let string: String = encryption_type.to_string();
+            assert_eq!(string, expected_display);
         }
     }
 }

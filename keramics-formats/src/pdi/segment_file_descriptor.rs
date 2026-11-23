@@ -65,8 +65,11 @@ mod tests {
         let descriptor: PdiSegmentFileDescriptor =
             PdiSegmentFileDescriptor::new(path, PdiSegmentFileType::Compressed, identifier.clone());
 
-        assert_eq!(descriptor.get_path(), "disk.hds");
-        assert_eq!(descriptor.get_file_type(), &PdiSegmentFileType::Compressed);
-        assert_eq!(descriptor.get_snapshot_identifier(), &identifier);
+        let path: &str = descriptor.get_path();
+        assert_eq!(path, "disk.hds");
+        let file_type: &PdiSegmentFileType = descriptor.get_file_type();
+        assert_eq!(file_type, &PdiSegmentFileType::Compressed);
+        let snapshot_identifier: &Uuid = descriptor.get_snapshot_identifier();
+        assert_eq!(snapshot_identifier, &identifier);
     }
 }

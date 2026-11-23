@@ -215,7 +215,8 @@ mod tests {
             ExFatBlockAllocationTable::new(0x00100000, 8144, 0x00200000, 512),
         );
         block_reader.open(&block_allocation_table, 18, true)?;
-        assert_eq!(block_reader.get_size(), 11358);
+        let size: u64 = block_reader.get_size();
+        assert_eq!(size, 11358);
 
         Ok(())
     }
@@ -240,7 +241,8 @@ mod tests {
 
         let mut block_reader: ExFatBlockReader = ExFatBlockReader::new(&data_stream, 512, 1024);
         block_reader.open(&block_allocation_table, 2, false)?;
-        assert_eq!(block_reader.get_size(), 1024);
+        let size: u64 = block_reader.get_size();
+        assert_eq!(size, 1024);
         assert_eq!(block_reader.block_ranges.len(), 2);
 
         let mut buffer: Vec<u8> = vec![0; 1024];

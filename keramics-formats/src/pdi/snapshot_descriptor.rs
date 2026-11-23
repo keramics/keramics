@@ -54,11 +54,14 @@ mod tests {
         let descriptor: PdiSnapshotDescriptor =
             PdiSnapshotDescriptor::new(identifier.clone(), Some(parent_identifier.clone()));
 
-        assert_eq!(descriptor.get_identifier(), &identifier);
-        assert_eq!(descriptor.get_parent_identifier(), Some(&parent_identifier));
+        let snapshot_identifier: &Uuid = descriptor.get_identifier();
+        assert_eq!(snapshot_identifier, &identifier);
+        let snapshot_parent_identifier: Option<&Uuid> = descriptor.get_parent_identifier();
+        assert_eq!(snapshot_parent_identifier, Some(&parent_identifier));
 
         let root_descriptor: PdiSnapshotDescriptor =
             PdiSnapshotDescriptor::new(identifier.clone(), None);
-        assert_eq!(root_descriptor.get_parent_identifier(), None);
+        let root_parent_identifier: Option<&Uuid> = root_descriptor.get_parent_identifier();
+        assert_eq!(root_parent_identifier, None);
     }
 }

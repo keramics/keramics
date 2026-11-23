@@ -158,10 +158,14 @@ match self.encryption_context.decrypt_sector(sector_physical_offset, &mut sector
   * `test_<method_name>`
   * `test_<method_name>_with_<condition>` (for example,
     `test_read_data_with_unsupported_data_size`)
-* When asserting that a call returns an error, split the function call and the `.is_err()` check
-  across separate lines by storing the return value in a local variable named `result`:
+* Move function and method calls out of `assert!`, `assert_eq!`, and `assert_ne!` macros by storing
+  the return value in an explicit, typed local variable first (name the local variable `result`
+  when checking `.is_err()`):
 
 ```rust
+let size: u64 = block_reader.get_size();
+assert_eq!(size, 1024);
+
 let result: Result<(), ErrorTrace> = test_struct.read_data(&test_data);
 assert!(result.is_err());
 ```

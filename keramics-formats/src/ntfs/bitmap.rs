@@ -625,11 +625,16 @@ mod tests {
         let mut bitmap: NtfsBitmap = NtfsBitmap::new(4096, 4096);
         bitmap.initialize(&empty_stream, &resident_attribute)?;
 
-        assert!(bitmap.check_if_set(0)?);
-        assert!(!bitmap.check_if_set(1)?);
-        assert!(bitmap.check_if_set(2)?);
-        assert!(bitmap.check_if_set(9)?);
-        assert!(!bitmap.check_if_set(15)?);
+        let is_set: bool = bitmap.check_if_set(0)?;
+        assert!(is_set);
+        let is_set: bool = bitmap.check_if_set(1)?;
+        assert!(!is_set);
+        let is_set: bool = bitmap.check_if_set(2)?;
+        assert!(is_set);
+        let is_set: bool = bitmap.check_if_set(9)?;
+        assert!(is_set);
+        let is_set: bool = bitmap.check_if_set(15)?;
+        assert!(!is_set);
 
         let result: Result<bool, ErrorTrace> = bitmap.check_if_set(16);
         assert!(result.is_err());
@@ -656,9 +661,12 @@ mod tests {
         let mut bitmap: NtfsBitmap = NtfsBitmap::new(4096, 4096);
         bitmap.initialize(&data_stream, &non_resident_attribute)?;
 
-        assert!(bitmap.check_if_set(0)?);
-        assert!(bitmap.check_if_set(1)?);
-        assert!(!bitmap.check_if_set(2)?);
+        let is_set: bool = bitmap.check_if_set(0)?;
+        assert!(is_set);
+        let is_set: bool = bitmap.check_if_set(1)?;
+        assert!(is_set);
+        let is_set: bool = bitmap.check_if_set(2)?;
+        assert!(!is_set);
 
         // Test compressed non-resident $BITMAP error.
         let mut compressed_attribute: NtfsMftAttribute = NtfsMftAttribute::new();

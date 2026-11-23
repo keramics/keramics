@@ -748,15 +748,12 @@ mod tests {
         xml_plist.parse(test_data)?;
 
         let hashmap: &HashMap<String, PlistObject> = xml_plist.root_object.as_hashmap().unwrap();
-        assert_eq!(hashmap.get("flag_true").unwrap().as_boolean(), Some(&true));
-        assert_eq!(
-            hashmap.get("flag_false").unwrap().as_boolean(),
-            Some(&false)
-        );
-        assert_eq!(
-            hashmap.get("ratio").unwrap().as_floating_point(),
-            Some(&3.25)
-        );
+        let flag_true: Option<&bool> = hashmap.get("flag_true").unwrap().as_boolean();
+        assert_eq!(flag_true, Some(&true));
+        let flag_false: Option<&bool> = hashmap.get("flag_false").unwrap().as_boolean();
+        assert_eq!(flag_false, Some(&false));
+        let ratio: Option<&f64> = hashmap.get("ratio").unwrap().as_floating_point();
+        assert_eq!(ratio, Some(&3.25));
         let items: &[PlistObject] = hashmap.get("items").unwrap().as_slice().unwrap();
         assert_eq!(items.len(), 5);
 

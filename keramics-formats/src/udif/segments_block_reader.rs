@@ -350,7 +350,8 @@ mod tests {
             &[],
             1024,
         );
-        assert_eq!(reader.get_size(), 1024);
+        let size: u64 = reader.get_size();
+        assert_eq!(size, 1024);
 
         let mut buffer: [u8; 512] = [0; 512];
         // Test out-of-range offsets before and after segment range.

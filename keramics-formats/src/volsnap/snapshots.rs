@@ -68,7 +68,8 @@ mod tests {
         // Test with zero snapshots.
         let mut iterator: VolsnapSnapshotsIterator =
             VolsnapSnapshotsIterator::new(&shadow_storage, 0);
-        assert!(iterator.next().is_none());
+        let item: Option<Result<VolsnapSnapshot, ErrorTrace>> = iterator.next();
+        assert!(item.is_none());
 
         // Test iterating past available snapshots returns error items then None.
         let mut iterator: VolsnapSnapshotsIterator =
@@ -77,6 +78,7 @@ mod tests {
         assert!(first_item.is_some());
         let result: Result<VolsnapSnapshot, ErrorTrace> = first_item.unwrap();
         assert!(result.is_err());
-        assert!(iterator.next().is_none());
+        let next_item: Option<Result<VolsnapSnapshot, ErrorTrace>> = iterator.next();
+        assert!(next_item.is_none());
     }
 }

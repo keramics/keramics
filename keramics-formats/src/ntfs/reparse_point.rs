@@ -140,16 +140,20 @@ mod tests {
     #[test]
     fn test_get_reparse_tag() {
         let test_struct: NtfsReparsePoint = NtfsReparsePoint::new(0x80000017);
-        assert_eq!(test_struct.get_reparse_tag(), 0x80000017);
+        let reparse_tag: u32 = test_struct.get_reparse_tag();
+        assert_eq!(reparse_tag, 0x80000017);
 
         let junction: NtfsReparsePoint = NtfsReparsePoint::new(0xa0000003);
-        assert_eq!(junction.get_reparse_tag(), 0xa0000003);
+        let reparse_tag: u32 = junction.get_reparse_tag();
+        assert_eq!(reparse_tag, 0xa0000003);
 
         let symbolic_link: NtfsReparsePoint = NtfsReparsePoint::new(0xa000000c);
-        assert_eq!(symbolic_link.get_reparse_tag(), 0xa000000c);
+        let reparse_tag: u32 = symbolic_link.get_reparse_tag();
+        assert_eq!(reparse_tag, 0xa000000c);
 
         let undefined: NtfsReparsePoint = NtfsReparsePoint::new(0x12345678);
-        assert_eq!(undefined.get_reparse_tag(), 0x12345678);
+        let reparse_tag: u32 = undefined.get_reparse_tag();
+        assert_eq!(reparse_tag, 0x12345678);
     }
 
     #[test]
@@ -222,7 +226,8 @@ mod tests {
         undefined_attribute.resident_data = vec![0x78, 0x56, 0x34, 0x12, 0x00, 0x00, 0x00, 0x00];
         let undefined_point: NtfsReparsePoint =
             NtfsReparsePoint::from_attribute(&undefined_attribute)?;
-        assert_eq!(undefined_point.get_reparse_tag(), 0x12345678);
+        let reparse_tag: u32 = undefined_point.get_reparse_tag();
+        assert_eq!(reparse_tag, 0x12345678);
 
         // Test unsupported attribute type error.
         let mut wrong_type_attribute: NtfsMftAttribute = NtfsMftAttribute::new();

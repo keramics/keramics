@@ -153,7 +153,8 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(&[]);
         let block_reader: XfsBlockReader = XfsBlockReader::new(&data_stream, 4, 512, &[], 1024);
 
-        assert_eq!(block_reader.get_size(), 1024);
+        let size: u64 = block_reader.get_size();
+        assert_eq!(size, 1024);
     }
 
     #[test]

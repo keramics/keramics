@@ -356,7 +356,8 @@ mod tests {
         let mut block_reader: PdiBlockReader =
             PdiBlockReader::new(&file_resolver, &extents, None, 1024);
 
-        assert_eq!(block_reader.get_size(), 1024);
+        let size: u64 = block_reader.get_size();
+        assert_eq!(size, 1024);
 
         let mut buffer: Vec<u8> = vec![0; 1024];
         let read_count: usize = block_reader.read_data_from_blocks(&mut buffer, 0)?;

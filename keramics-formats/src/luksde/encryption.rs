@@ -334,7 +334,9 @@ mod tests {
             diffuser.merge(2, &split_data, &mut merged_data);
             assert_ne!(merged_data, [0; 16]);
         }
-        assert!(LuksEncryption::get_diffuser_context("unknown").is_none());
+        let unknown_diffuser: Option<LuksDiffuserContext> =
+            LuksEncryption::get_diffuser_context("unknown");
+        assert!(unknown_diffuser.is_none());
     }
 
     #[test]
@@ -361,10 +363,8 @@ mod tests {
 
         LuksInitializationVectorContext::Benbi
             .derive_initialization_vector(3, &mut initialization_vector)?;
-        assert_eq!(
-            &initialization_vector[0..8],
-            &((3_u64 << 5) + 1).to_be_bytes()
-        );
+        let expected_bytes: [u8; 8] = ((3_u64 << 5) + 1).to_be_bytes();
+        assert_eq!(&initialization_vector[0..8], &expected_bytes);
 
         initialization_vector.fill(0x55);
         LuksInitializationVectorContext::Null
@@ -374,15 +374,14 @@ mod tests {
         initialization_vector.fill(0);
         LuksInitializationVectorContext::Plain32
             .derive_initialization_vector(0x01020304, &mut initialization_vector)?;
-        assert_eq!(&initialization_vector[0..4], &0x01020304_u32.to_le_bytes());
+        let expected_bytes: [u8; 4] = 0x01020304_u32.to_le_bytes();
+        assert_eq!(&initialization_vector[0..4], &expected_bytes);
 
         initialization_vector.fill(0);
         LuksInitializationVectorContext::Plain64
             .derive_initialization_vector(0x0102030405060708, &mut initialization_vector)?;
-        assert_eq!(
-            &initialization_vector[0..8],
-            &0x0102030405060708_u64.to_le_bytes()
-        );
+        let expected_bytes: [u8; 8] = 0x0102030405060708_u64.to_le_bytes();
+        assert_eq!(&initialization_vector[0..8], &expected_bytes);
 
         let mut essiv_aes: AesContext = AesContext::new();
         essiv_aes.set_key(&[0x33; 16])?;

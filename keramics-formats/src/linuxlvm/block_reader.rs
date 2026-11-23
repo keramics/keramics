@@ -214,7 +214,8 @@ mod tests {
         let block_reader: LinuxLvmBlockReader =
             LinuxLvmBlockReader::new(&file_resolver, &[], &[], 32);
 
-        assert_eq!(block_reader.get_size(), 32);
+        let size: u64 = block_reader.get_size();
+        assert_eq!(size, 32);
     }
 
     #[test]

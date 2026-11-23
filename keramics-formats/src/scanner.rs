@@ -658,11 +658,11 @@ mod tests {
             buffer[offset..offset + signature.len()].copy_from_slice(signature);
             let stream: DataStreamReference = open_fake_data_stream(&buffer);
             let results: HashSet<FormatIdentifier> = format_scanner.scan_data_stream(&stream)?;
+            let has_identifier: bool = results.contains(&expected_identifier);
             assert!(
-                results.contains(&expected_identifier),
+                has_identifier,
                 "Expected {:?} at offset {}",
-                expected_identifier,
-                offset
+                expected_identifier, offset
             );
         }
 
@@ -682,7 +682,8 @@ mod tests {
             buffer[start..start + signature.len()].copy_from_slice(signature);
             let stream: DataStreamReference = open_fake_data_stream(&buffer);
             let results: HashSet<FormatIdentifier> = format_scanner.scan_data_stream(&stream)?;
-            assert!(results.contains(&expected_identifier));
+            let has_identifier: bool = results.contains(&expected_identifier);
+            assert!(has_identifier);
         }
 
         // Test small stream shorter than footer range with debug output enabled.
