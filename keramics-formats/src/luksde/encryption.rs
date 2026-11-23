@@ -13,11 +13,12 @@
 
 use keramics_core::ErrorTrace;
 use keramics_encryption::{
-    AesContext, AesXtsContext, CryptContext, CryptEcb, Pbkdf2HmacSha1Context,
-    Pbkdf2HmacSha224Context, Pbkdf2HmacSha256Context, Pbkdf2HmacSha512Context,
+    AesContext, AesXtsContext, Argon2Context, Argon2Type, CryptContext, CryptEcb,
+    Pbkdf2HmacSha1Context, Pbkdf2HmacSha224Context, Pbkdf2HmacSha256Context,
+    Pbkdf2HmacSha384Context, Pbkdf2HmacSha512Context,
 };
 use keramics_hashes::{
-    DigestHashContext, Sha1Context, Sha224Context, Sha256Context, Sha512Context,
+    DigestHashContext, Sha1Context, Sha224Context, Sha256Context, Sha384Context, Sha512Context,
 };
 
 use super::cipher_context::LuksCipherContext;
@@ -30,6 +31,7 @@ pub enum LuksDiffuserContext {
     Sha1(LuksDiffuser<Sha1Context, 20>),
     Sha224(LuksDiffuser<Sha224Context, 28>),
     Sha256(LuksDiffuser<Sha256Context, 32>),
+    Sha384(LuksDiffuser<Sha384Context, 48>),
     Sha512(LuksDiffuser<Sha512Context, 64>),
 }
 
@@ -44,6 +46,9 @@ impl LuksDiffuserContext {
                 diffuser.merge(number_of_stripes, split_data, data)
             }
             LuksDiffuserContext::Sha256(diffuser) => {
+                diffuser.merge(number_of_stripes, split_data, data)
+            }
+            LuksDiffuserContext::Sha384(diffuser) => {
                 diffuser.merge(number_of_stripes, split_data, data)
             }
             LuksDiffuserContext::Sha512(diffuser) => {
@@ -107,9 +112,11 @@ impl LuksInitializationVectorContext {
 
 /// Linux Unified Key Setup (LUKS) Disk Encryption key derivation context.
 pub enum LuksKeyDerivationContext {
+    Argon2(Argon2Context),
     Pbkdf2HmacSha1(Pbkdf2HmacSha1Context),
     Pbkdf2HmacSha224(Pbkdf2HmacSha224Context),
     Pbkdf2HmacSha256(Pbkdf2HmacSha256Context),
+    Pbkdf2HmacSha384(Pbkdf2HmacSha384Context),
     Pbkdf2HmacSha512(Pbkdf2HmacSha512Context),
 }
 
@@ -117,11 +124,15 @@ impl LuksKeyDerivationContext {
     /// Derives a key from the password.
     pub fn derive_key(&mut self, password: &[u8], key: &mut [u8]) -> Result<(), ErrorTrace> {
         match self {
+            LuksKeyDerivationContext::Argon2(context) => context.derive_key(password, key),
             LuksKeyDerivationContext::Pbkdf2HmacSha1(context) => context.derive_key(password, key),
             LuksKeyDerivationContext::Pbkdf2HmacSha224(context) => {
                 context.derive_key(password, key)
             }
             LuksKeyDerivationContext::Pbkdf2HmacSha256(context) => {
+                context.derive_key(password, key)
+            }
+            LuksKeyDerivationContext::Pbkdf2HmacSha384(context) => {
                 context.derive_key(password, key)
             }
             LuksKeyDerivationContext::Pbkdf2HmacSha512(context) => {
@@ -135,17 +146,27 @@ impl LuksKeyDerivationContext {
 pub struct LuksEncryption {}
 
 impl LuksEncryption {
-    /// Retrieves a digest hash context.
-    fn get_digest_hash_context(hashing_method: &str) -> Option<Box<dyn DigestHashContext>> {
-        // TODO: ripemd160
-        // TODO: wd256
-        match hashing_method {
-            "sha1" => Some(Box::new(Sha1Context::new())),
-            "sha224" => Some(Box::new(Sha224Context::new())),
-            "sha256" => Some(Box::new(Sha256Context::new())),
-            "sha512" => Some(Box::new(Sha512Context::new())),
-            _ => None,
-        }
+    /// Retrieves an Argon2 key derivation context.
+    pub fn get_argon2_key_derivation_context(
+        kdf_type: &str,
+        salt: &[u8],
+        number_of_iterations: u32,
+        memory_size_kib: u32,
+        parallelism: u32,
+    ) -> Option<LuksKeyDerivationContext> {
+        let argon2_type: Argon2Type = match kdf_type {
+            "argon2i" => Argon2Type::Argon2i,
+            "argon2id" => Argon2Type::Argon2id,
+            _ => return None,
+        };
+        let context: Argon2Context = Argon2Context::new(
+            argon2_type,
+            salt,
+            number_of_iterations,
+            memory_size_kib,
+            parallelism,
+        );
+        Some(LuksKeyDerivationContext::Argon2(context))
     }
 
     /// Retrieves a diffuser context.
@@ -162,9 +183,28 @@ impl LuksEncryption {
             "sha256" => Some(LuksDiffuserContext::Sha256(
                 LuksDiffuser::<Sha256Context, 32>::new(),
             )),
+            "sha384" => Some(LuksDiffuserContext::Sha384(
+                LuksDiffuser::<Sha384Context, 48>::new(),
+            )),
             "sha512" => Some(LuksDiffuserContext::Sha512(
                 LuksDiffuser::<Sha512Context, 64>::new(),
             )),
+            _ => None,
+        }
+    }
+
+    /// Retrieves a digest hash context.
+    pub(super) fn get_digest_hash_context(
+        hashing_method: &str,
+    ) -> Option<Box<dyn DigestHashContext>> {
+        // TODO: ripemd160
+        // TODO: wd256
+        match hashing_method {
+            "sha1" => Some(Box::new(Sha1Context::new())),
+            "sha224" => Some(Box::new(Sha224Context::new())),
+            "sha256" => Some(Box::new(Sha256Context::new())),
+            "sha384" => Some(Box::new(Sha384Context::new())),
+            "sha512" => Some(Box::new(Sha512Context::new())),
             _ => None,
         }
     }
@@ -252,6 +292,9 @@ impl LuksEncryption {
                 let digest_hash: Vec<u8> = digest_context.finalize();
                 let digest_hash_size: usize = digest_hash.len();
 
+                if digest_hash_size > 32 {
+                    return Ok(None);
+                }
                 let mut essiv_key: [u8; 32] = [0; 32];
                 essiv_key[0..digest_hash_size].copy_from_slice(&digest_hash);
 
@@ -309,6 +352,9 @@ impl LuksEncryption {
             ))),
             "sha256" => Ok(Some(LuksKeyDerivationContext::Pbkdf2HmacSha256(
                 Pbkdf2HmacSha256Context::new(salt, number_of_iterations),
+            ))),
+            "sha384" => Ok(Some(LuksKeyDerivationContext::Pbkdf2HmacSha384(
+                Pbkdf2HmacSha384Context::new(salt, number_of_iterations),
             ))),
             "sha512" => Ok(Some(LuksKeyDerivationContext::Pbkdf2HmacSha512(
                 Pbkdf2HmacSha512Context::new(salt, number_of_iterations),

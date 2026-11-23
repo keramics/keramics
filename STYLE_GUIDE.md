@@ -297,6 +297,9 @@ Format specifications live in `docs/formats/src/<format>.md`, are listed in
 * Document binary structures with `| Offset | Size | Value | Description |` tables, using escaped
   byte signatures (for example, `"\x50\x4d" or "PM"`) and hex values (`0x00`).
 * Document flag and enumeration tables with `| Value | Identifier | Description |` columns.
+* Write string literals, JSON property names, and string values using regular double quotes (for
+  example, "reencrypt" or "aes-xts-plain64") without surrounding backticks; reserve inline backticks
+  for formulas, expressions, commands, or characters that require Markdown escaping.
 * Add explicit heading anchors (`{#section_name}`) when linking between sections within a
   specification.
 * Use blockquotes starting with `> Note that ...` for format caveats and edge cases.

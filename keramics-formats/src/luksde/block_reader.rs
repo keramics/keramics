@@ -36,6 +36,9 @@ pub struct LuksBlockReader {
     /// Encryption context.
     encryption_context: Arc<LuksEncryptionContext>,
 
+    /// Initialization vector tweak.
+    initialization_vector_tweak: u64,
+
     /// Decrypted sector cache.
     sector_cache: LruCache<u64, Vec<u8>>,
 
@@ -50,6 +53,7 @@ impl LuksBlockReader {
         bytes_per_sector: u16,
         encrypted_data_offset: u64,
         encryption_context: &Arc<LuksEncryptionContext>,
+        initialization_vector_tweak: u64,
         size: u64,
     ) -> Self {
         Self {
@@ -57,6 +61,7 @@ impl LuksBlockReader {
             bytes_per_sector,
             encrypted_data_offset,
             encryption_context: encryption_context.clone(),
+            initialization_vector_tweak,
             sector_cache: LruCache::new(64),
             size,
         }
@@ -76,9 +81,11 @@ impl LuksBlockReader {
             SeekFrom::Start(sector_data_offset)
         );
         let mut sector_data: Vec<u8> = vec![0; self.bytes_per_sector as usize];
+        let initialization_vector_sector_number: u64 =
+            self.initialization_vector_tweak.wrapping_add(sector_number);
 
         match self.encryption_context.decrypt_sector(
-            sector_number,
+            initialization_vector_sector_number,
             &encrypted_data,
             &mut sector_data,
         ) {

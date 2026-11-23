@@ -46,16 +46,9 @@ impl LuksEncryptionType {
         }
     }
 
-    /// Sets the encryption method.
-    pub(super) fn set_encryption_method(&mut self, encryption_method: &ByteString) {
-        self.encryption_method = encryption_method.to_string().to_lowercase()
-    }
-
-    /// Sets the encryption mode.
-    pub(super) fn set_encryption_mode(&mut self, encryption_mode: &ByteString) {
-        let mode_string: String = encryption_mode.to_string().to_lowercase();
-
-        match mode_string.as_str().split_once('-') {
+    /// Sets the encryption mode from a lowercase mode string.
+    fn parse_encryption_mode(&mut self, mode_string: &str) {
+        match mode_string.split_once('-') {
             Some((chaining_mode, remainder)) => {
                 self.chaining_mode = chaining_mode.to_string();
 
@@ -71,7 +64,36 @@ impl LuksEncryptionType {
                 }
             }
             None => {
-                self.chaining_mode = mode_string;
+                self.chaining_mode = mode_string.to_string();
+                self.initialization_vector_mode = None;
+                self.initialization_vector_options = None;
+            }
+        }
+    }
+
+    /// Sets the encryption method.
+    pub(super) fn set_encryption_method(&mut self, encryption_method: &ByteString) {
+        self.encryption_method = encryption_method.to_string().to_lowercase();
+    }
+
+    /// Sets the encryption mode.
+    pub(super) fn set_encryption_mode(&mut self, encryption_mode: &ByteString) {
+        let mode_string: String = encryption_mode.to_string().to_lowercase();
+        self.parse_encryption_mode(mode_string.as_str());
+    }
+
+    /// Sets the encryption method and mode from a combined LUKS2 encryption string.
+    pub(super) fn set_encryption_string(&mut self, encryption_string: &str) {
+        let lowercase_string: String = encryption_string.to_lowercase();
+
+        match lowercase_string.split_once('-') {
+            Some((encryption_method, encryption_mode)) => {
+                self.encryption_method = encryption_method.to_string();
+                self.parse_encryption_mode(encryption_mode);
+            }
+            None => {
+                self.encryption_method = lowercase_string;
+                self.chaining_mode = String::new();
                 self.initialization_vector_mode = None;
                 self.initialization_vector_options = None;
             }
@@ -101,18 +123,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_set_methods_and_fmt() {
+    fn test_set_encryption_string_and_fmt() {
         let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
         let string: String = encryption_type.to_string();
         assert_eq!(string, "N/A (not set)");
 
-        let encryption_method: ByteString = ByteString::from("AES");
-        encryption_type.set_encryption_method(&encryption_method);
+        encryption_type.set_encryption_string("aes-xts-plain64");
+        encryption_type.key_size = 64;
+        assert_eq!(encryption_type.encryption_method, "aes");
+        assert_eq!(encryption_type.chaining_mode, "xts");
+        let initialization_vector_mode: Option<&str> =
+            encryption_type.initialization_vector_mode.as_deref();
+        assert_eq!(initialization_vector_mode, Some("plain64"));
+        assert_eq!(encryption_type.initialization_vector_options, None);
+        let string: String = encryption_type.to_string();
+        assert_eq!(string, "AES-512-XTS");
+
+        encryption_type.set_encryption_string("aes-cbc-essiv:sha256");
         encryption_type.key_size = 32;
-        let encryption_mode: ByteString = ByteString::from("CBC-ESSIV:SHA256");
-        encryption_type.set_encryption_mode(&encryption_mode);
         assert_eq!(encryption_type.encryption_method, "aes");
         assert_eq!(encryption_type.chaining_mode, "cbc");
+
         let initialization_vector_mode: Option<&str> =
             encryption_type.initialization_vector_mode.as_deref();
         assert_eq!(initialization_vector_mode, Some("essiv"));

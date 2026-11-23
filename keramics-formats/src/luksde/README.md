@@ -7,20 +7,18 @@ Supported features:
 
 | Category | Feature(s) |
 | --- | --- |
-| Format versions | 1 |
+| Format versions | 1, 2 |
 | Encryption methods | AES (AES-CBC, AES-ECB, AES-XTS) |
-| Initialization Vector (IV) modes | benbi, ESSIV (SHA1, SHA256), null, plain, plain64 |
-| Key derivation methods | PBKDF2 |
-| Hashing methods | SHA-1, SHA-224, SHA-256, SHA-512 |
-| Unlock credentials | Passphrase |
+| Initialization Vector (IV) modes | benbi, ESSIV (SHA-1, SHA-224, SHA-256), null, plain, plain64 |
+| Key derivation methods | Argon2 (argon2i, argon2id), PBKDF2 |
+| Hashing methods | SHA-1, SHA-224, SHA-256, SHA-384, SHA-512 |
+| Unlock credentials | Key data (master key), Passphrase |
 
 Unsupported features:
 
 | Category | Feature(s) |
 | --- | --- |
-| Format versions | 2 |
 | Encryption methods | anubis, ARC4 (ARC4-CBC, ARC4-ECB), Blowfish (Blowfish-CBC, Blowfish-ECB), cast5, cast6, Serpent (Serpent-CBC, Serpent-ECB), twofish |
 | Initialization Vector (IV) modes | lmk, plumb |
-| Key derivation methods | Argon2 (argon2i, argon2id) |
-| Hashing methods | RIPEMD160 |
-| Unlock credentials | Master key |
+| Hashing methods | RIPEMD-160 |
+| LUKS2 features | Authenticated encryption (integrity), linear segments, online re-encryption, tokens |
