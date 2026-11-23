@@ -1722,6 +1722,7 @@ mod tests {
             "        \"time\": 10,",
             "        \"memory\": 1048576,",
             "        \"cpus\": 4,",
+            // typos:ignore
             "        \"salt\": \"+woyOmaaWcKoJgywldnIH6o9mkA4zwZnsE\\/Y2fvoNdI=\"",
             "      }",
             "    }",
