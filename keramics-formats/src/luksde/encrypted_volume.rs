@@ -26,7 +26,10 @@ use super::encryption::{LuksDiffuserContext, LuksEncryption, LuksKeyDerivationCo
 use super::encryption_context::LuksEncryptionContext;
 use super::encryption_type::LuksEncryptionType;
 use super::key_slot::LuksKeySlot;
-use super::metadata::{LuksMetadata, LuksMetadataDigest, LuksMetadataKeySlot, LuksMetadataSegment};
+use super::metadata::LuksMetadata;
+use super::metadata_digest::LuksMetadataDigest;
+use super::metadata_key_slot::LuksMetadataKeySlot;
+use super::metadata_segment::LuksMetadataSegment;
 use super::volume_header_v1::LuksVolumeHeaderV1;
 use super::volume_header_v2::LuksVolumeHeaderV2;
 
@@ -1389,7 +1392,8 @@ mod tests {
         assert!(unlocked);
         assert!(!encrypted_volume.is_locked);
 
-        // Verify decrypted volume contents contain the ext2 superblock signature and label.
+        // Verify decrypted volume contents contain the ext2 superblock signature, label,
+        // and valid group descriptor table in sector 1 (offset 4096).
         let volume_stream: DataStreamReference = encrypted_volume.get_data_stream().unwrap();
         let mut superblock: [u8; 256] = [0; 256];
         keramics_core::data_stream_read_exact_at_position!(
@@ -1399,6 +1403,15 @@ mod tests {
         );
         assert_eq!(&superblock[56..58], &[0x53, 0xef]);
         assert_eq!(&superblock[120..129], b"ext2_test");
+
+        let mut ext_file_system: crate::ext::ExtFileSystem = crate::ext::ExtFileSystem::new();
+        ext_file_system.read_data_stream(&volume_stream)?;
+        let root_directory: Option<crate::ext::ExtFileEntry> =
+            ext_file_system.get_root_directory()?;
+        assert!(root_directory.is_some());
+        let file_entry: Option<crate::ext::ExtFileEntry> =
+            ext_file_system.get_file_entry_by_path(&crate::Path::from("/testdir1/testfile1"))?;
+        assert!(file_entry.is_some());
 
         Ok(())
     }

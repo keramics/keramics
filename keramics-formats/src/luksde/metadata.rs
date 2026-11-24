@@ -24,6 +24,11 @@ use keramics_core::DataStreamReference;
 use keramics_core::ErrorTrace;
 use keramics_encodings::Base64Context;
 
+use super::metadata_configuration::LuksMetadataConfiguration;
+use super::metadata_digest::LuksMetadataDigest;
+use super::metadata_key_slot::LuksMetadataKeySlot;
+use super::metadata_segment::LuksMetadataSegment;
+
 /// Maximum LUKS2 JSON metadata area size (4092 KiB).
 const LUKS2_MAXIMUM_JSON_METADATA_SIZE: u64 = 4190208;
 
@@ -31,206 +36,10 @@ const LUKS2_MAXIMUM_JSON_METADATA_SIZE: u64 = 4190208;
 #[grammar = "src/luksde/metadata.pest"]
 struct LuksMetadataParser {}
 
-/// Linux Unified Key Setup (LUKS) version 2 metadata configuration object.
-#[derive(Clone, Debug, PartialEq)]
-pub struct LuksMetadataConfig {
-    /// JSON area size in bytes.
-    pub json_size: u64,
-
-    /// Keyslots area size in bytes.
-    pub keyslots_size: u64,
-
-    /// Configuration flags.
-    pub flags: Vec<String>,
-}
-
-impl LuksMetadataConfig {
-    /// Creates a new metadata configuration object.
-    pub fn new() -> Self {
-        Self {
-            json_size: 0,
-            keyslots_size: 0,
-            flags: Vec::new(),
-        }
-    }
-}
-
-/// Linux Unified Key Setup (LUKS) version 2 metadata digest object.
-#[derive(Clone, Debug, PartialEq)]
-pub struct LuksMetadataDigest {
-    /// Digest identifier.
-    pub identifier: String,
-
-    /// Digest type (for example, "pbkdf2").
-    pub digest_type: String,
-
-    /// Keyslot identifiers validated by this digest.
-    pub keyslots: Vec<String>,
-
-    /// Segment identifiers validated by this digest.
-    pub segments: Vec<String>,
-
-    /// Hashing method.
-    pub hashing_method: String,
-
-    /// Number of iterations.
-    pub number_of_iterations: u32,
-
-    /// Salt.
-    pub salt: Vec<u8>,
-
-    /// Expected digest bytes.
-    pub digest: Vec<u8>,
-}
-
-impl LuksMetadataDigest {
-    /// Creates a new metadata digest object.
-    pub fn new(identifier: String) -> Self {
-        Self {
-            identifier,
-            digest_type: String::new(),
-            keyslots: Vec::new(),
-            segments: Vec::new(),
-            hashing_method: String::new(),
-            number_of_iterations: 0,
-            salt: Vec::new(),
-            digest: Vec::new(),
-        }
-    }
-}
-
-/// Linux Unified Key Setup (LUKS) version 2 metadata keyslot object.
-#[derive(Clone, Debug, PartialEq)]
-pub struct LuksMetadataKeySlot {
-    /// Keyslot identifier.
-    pub identifier: String,
-
-    /// Keyslot type (for example, "luks2" or "reencrypt").
-    pub keyslot_type: String,
-
-    /// Master key size in bytes.
-    pub key_size: usize,
-
-    /// Optional priority (0 = ignore, 1 = normal, 2 = high).
-    pub priority: Option<i64>,
-
-    /// Anti-forensic diffuser type (for example, "luks1").
-    pub af_type: String,
-
-    /// Anti-forensic diffuser hashing method.
-    pub af_hashing_method: String,
-
-    /// Anti-forensic diffuser number of stripes.
-    pub af_number_of_stripes: u32,
-
-    /// Keyslot area type (for example, "raw").
-    pub area_type: String,
-
-    /// Keyslot area offset in bytes.
-    pub area_offset: u64,
-
-    /// Keyslot area size in bytes.
-    pub area_size: u64,
-
-    /// Keyslot area encryption specification.
-    pub area_encryption: String,
-
-    /// Keyslot area key size in bytes.
-    pub area_key_size: usize,
-
-    /// Key derivation function type (for example, "pbkdf2", "argon2i", "argon2id").
-    pub kdf_type: String,
-
-    /// PBKDF2 hashing method.
-    pub kdf_hashing_method: String,
-
-    /// PBKDF2 number of iterations.
-    pub kdf_number_of_iterations: u32,
-
-    /// Argon2 time cost (number of iterations).
-    pub kdf_time: u32,
-
-    /// Argon2 memory cost in KiB.
-    pub kdf_memory: u32,
-
-    /// Argon2 parallelism (number of threads/lanes).
-    pub kdf_cpus: u32,
-
-    /// Key derivation salt.
-    pub kdf_salt: Vec<u8>,
-}
-
-impl LuksMetadataKeySlot {
-    /// Creates a new metadata keyslot object.
-    pub fn new(identifier: String) -> Self {
-        Self {
-            identifier,
-            keyslot_type: String::new(),
-            key_size: 0,
-            priority: None,
-            af_type: String::new(),
-            af_hashing_method: String::new(),
-            af_number_of_stripes: 0,
-            area_type: String::new(),
-            area_offset: 0,
-            area_size: 0,
-            area_encryption: String::new(),
-            area_key_size: 0,
-            kdf_type: String::new(),
-            kdf_hashing_method: String::new(),
-            kdf_number_of_iterations: 0,
-            kdf_time: 0,
-            kdf_memory: 0,
-            kdf_cpus: 0,
-            kdf_salt: Vec::new(),
-        }
-    }
-}
-
-/// Linux Unified Key Setup (LUKS) version 2 metadata segment object.
-#[derive(Clone, Debug, PartialEq)]
-pub struct LuksMetadataSegment {
-    /// Segment identifier.
-    pub identifier: String,
-
-    /// Segment type (for example, "crypt" or "linear").
-    pub segment_type: String,
-
-    /// Segment offset in bytes.
-    pub offset: u64,
-
-    /// Segment size in bytes (`None` for "dynamic").
-    pub size: Option<u64>,
-
-    /// Initialization vector tweak value.
-    pub initialization_vector_tweak: u64,
-
-    /// Segment encryption specification.
-    pub encryption: String,
-
-    /// Sector size in bytes.
-    pub sector_size: u16,
-}
-
-impl LuksMetadataSegment {
-    /// Creates a new metadata segment object.
-    pub fn new(identifier: String) -> Self {
-        Self {
-            identifier,
-            segment_type: String::new(),
-            offset: 0,
-            size: None,
-            initialization_vector_tweak: 0,
-            encryption: String::new(),
-            sector_size: 0,
-        }
-    }
-}
-
 /// Linux Unified Key Setup (LUKS) Disk Encryption metadata.
 pub struct LuksMetadata {
     /// Configuration.
-    pub config: LuksMetadataConfig,
+    pub configuration: LuksMetadataConfiguration,
 
     /// Digests.
     pub digests: Vec<LuksMetadataDigest>,
@@ -246,7 +55,7 @@ impl LuksMetadata {
     /// Creates new metadata.
     pub fn new() -> Self {
         Self {
-            config: LuksMetadataConfig::new(),
+            configuration: LuksMetadataConfiguration::new(),
             digests: Vec::new(),
             key_slots: Vec::new(),
             segments: Vec::new(),
@@ -496,8 +305,8 @@ impl LuksMetadata {
         Ok(())
     }
 
-    /// Parses a config object.
-    fn parse_config_object(&mut self, inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
+    /// Parses a configuration object.
+    fn parse_configuration_object(&mut self, inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
         for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
 
@@ -509,44 +318,46 @@ impl LuksMetadata {
                             Err(mut error) => {
                                 keramics_core::error_trace_add_frame!(
                                     error,
-                                    "Unable to parse config JSON property"
+                                    "Unable to parse configuration JSON property"
                                 );
                                 return Err(error);
                             }
                         };
                     match identifier {
                         "flags" => {
-                            self.config.flags = match Self::parse_string_array_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse config flags property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
+                            self.configuration.flags =
+                                match Self::parse_string_array_pair(value_pair) {
+                                    Ok(value) => value,
+                                    Err(mut error) => {
+                                        keramics_core::error_trace_add_frame!(
+                                            error,
+                                            "Unable to parse configuration flags property"
+                                        );
+                                        return Err(error);
+                                    }
+                                };
                         }
                         "json_size" => {
-                            self.config.json_size = match Self::parse_u64_string_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse config JSON size property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "keyslots_size" => {
-                            self.config.keyslots_size =
+                            self.configuration.json_size =
                                 match Self::parse_u64_string_pair(value_pair) {
                                     Ok(value) => value,
                                     Err(mut error) => {
                                         keramics_core::error_trace_add_frame!(
                                             error,
-                                            "Unable to parse config keyslots size property"
+                                            "Unable to parse configuration JSON size property"
+                                        );
+                                        return Err(error);
+                                    }
+                                };
+                        }
+                        "keyslots_size" => {
+                            self.configuration.keyslots_size =
+                                match Self::parse_u64_string_pair(value_pair) {
+                                    Ok(value) => value,
+                                    Err(mut error) => {
+                                        keramics_core::error_trace_add_frame!(
+                                            error,
+                                            "Unable to parse configuration keyslots size property"
                                         );
                                         return Err(error);
                                     }
@@ -557,7 +368,7 @@ impl LuksMetadata {
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported config object rule: {:?}",
+                        "Unsupported configuration object rule: {:?}",
                         rule
                     )));
                 }
@@ -1467,16 +1278,18 @@ impl LuksMetadata {
 
             match rule {
                 Rule::EOI => {}
-                Rule::config_object => match self.parse_config_object(token_pair.into_inner()) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to parse config object"
-                        );
-                        return Err(error);
+                Rule::config_object => {
+                    match self.parse_configuration_object(token_pair.into_inner()) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to parse configuration object"
+                            );
+                            return Err(error);
+                        }
                     }
-                },
+                }
                 Rule::digests_object => match self.parse_digests_object(token_pair.into_inner()) {
                     Ok(_) => {}
                     Err(mut error) => {
@@ -1776,8 +1589,8 @@ mod tests {
         let mut metadata: LuksMetadata = LuksMetadata::new();
         metadata.parse(test_data)?;
 
-        assert_eq!(metadata.config.json_size, 12288);
-        assert_eq!(metadata.config.keyslots_size, 262144);
+        assert_eq!(metadata.configuration.json_size, 12288);
+        assert_eq!(metadata.configuration.keyslots_size, 262144);
 
         let number_of_key_slots: usize = metadata.key_slots.len();
         assert_eq!(number_of_key_slots, 1);
@@ -1891,8 +1704,8 @@ mod tests {
         let mut metadata: LuksMetadata = LuksMetadata::new();
         metadata.read_at_position(&data_stream, data_size, SeekFrom::Start(0))?;
 
-        assert_eq!(metadata.config.json_size, 12288);
-        assert_eq!(metadata.config.keyslots_size, 262144);
+        assert_eq!(metadata.configuration.json_size, 12288);
+        assert_eq!(metadata.configuration.keyslots_size, 262144);
 
         // Test with unsupported data sizes (0 and > LUKS2_MAXIMUM_JSON_METADATA_SIZE).
         let result: Result<(), ErrorTrace> =
@@ -2017,7 +1830,7 @@ mod tests {
             String::from("allow-discards"),
             String::from("submit-from-crypt-cpus"),
         ];
-        assert_eq!(metadata.config.flags, expected_flags);
+        assert_eq!(metadata.configuration.flags, expected_flags);
         assert_eq!(metadata.segments[0].size, Some(65536));
         assert_eq!(metadata.segments[0].initialization_vector_tweak, 4);
         assert_eq!(metadata.key_slots[0].kdf_hashing_method, "sha256");

@@ -54,6 +54,12 @@ pub struct Argon2Context {
 
     /// Parallelism (number of lanes).
     parallelism: u32,
+
+    /// Optional secret value.
+    secret: Vec<u8>,
+
+    /// Optional associated data.
+    associated_data: Vec<u8>,
 }
 
 impl Argon2Context {
@@ -71,7 +77,19 @@ impl Argon2Context {
             number_of_iterations,
             memory_size_kib,
             parallelism,
+            secret: Vec::new(),
+            associated_data: Vec::new(),
         }
+    }
+
+    /// Sets the optional associated data.
+    pub fn set_associated_data(&mut self, associated_data: &[u8]) {
+        self.associated_data = associated_data.to_vec();
+    }
+
+    /// Sets the optional secret value.
+    pub fn set_secret(&mut self, secret: &[u8]) {
+        self.secret = secret.to_vec();
     }
 
     /// Computes the variable-length BLAKE2b hash function `H'` defined in RFC 9106.
@@ -269,7 +287,8 @@ impl Argon2Context {
         let argon2_type_bytes: [u8; 4] = (self.argon2_type as u32).to_le_bytes();
         let password_size_bytes: [u8; 4] = (password.len() as u32).to_le_bytes();
         let salt_size_bytes: [u8; 4] = (self.salt.len() as u32).to_le_bytes();
-        let zero_bytes: [u8; 4] = 0_u32.to_le_bytes();
+        let secret_size_bytes: [u8; 4] = (self.secret.len() as u32).to_le_bytes();
+        let associated_data_size_bytes: [u8; 4] = (self.associated_data.len() as u32).to_le_bytes();
 
         let mut hash_context: Blake2bContext = Blake2bContext::new();
         hash_context.update(&parallelism_bytes);
@@ -282,9 +301,10 @@ impl Argon2Context {
         hash_context.update(password);
         hash_context.update(&salt_size_bytes);
         hash_context.update(&self.salt);
-        // Empty secret key and associated data.
-        hash_context.update(&zero_bytes);
-        hash_context.update(&zero_bytes);
+        hash_context.update(&secret_size_bytes);
+        hash_context.update(&self.secret);
+        hash_context.update(&associated_data_size_bytes);
+        hash_context.update(&self.associated_data);
 
         let mut initial_hash: [u8; 64] = [0; 64];
         hash_context.finalize_into(&mut initial_hash);

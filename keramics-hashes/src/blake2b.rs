@@ -64,27 +64,50 @@ pub struct Blake2bContext {
 
     /// Current hash state values.
     hash_values: [u64; 8],
+
+    /// Optional secret key (0..=64 bytes).
+    key: Vec<u8>,
 }
 
 impl Blake2bContext {
     /// Creates a new context with a specific digest output size.
     pub fn new_with_digest_size(digest_size: usize) -> Result<Self, ErrorTrace> {
+        Self::new_with_key(digest_size, &[])
+    }
+
+    /// Creates a new context with a specific digest output size and key.
+    pub fn new_with_key(digest_size: usize, key: &[u8]) -> Result<Self, ErrorTrace> {
         if digest_size == 0 || digest_size > 64 {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported digest size: {} value out of bounds",
                 digest_size
             )));
         }
+        let key_size: usize = key.len();
+        if key_size > 64 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported key size: {} value out of bounds",
+                key_size
+            )));
+        }
+        let mut block: [u8; 128] = [0; 128];
+        let block_offset: usize = if key_size > 0 {
+            block[0..key_size].copy_from_slice(key);
+            128
+        } else {
+            0
+        };
         let mut hash_values: [u64; 8] = BLAKE2B_INITIAL_VECTOR;
-        hash_values[0] ^= 0x01010000 ^ (digest_size as u64);
+        hash_values[0] ^= 0x01010000 ^ ((key_size as u64) << 8) ^ (digest_size as u64);
 
         Ok(Self {
-            block: [0; 128],
-            block_offset: 0,
+            block,
+            block_offset,
             digest_size,
             hash_count_low: 0,
             hash_count_high: 0,
             hash_values,
+            key: key.to_vec(),
         })
     }
 
@@ -230,11 +253,17 @@ impl Blake2bContext {
     /// Resets the context state for reuse.
     fn reset(&mut self) {
         self.block = [0; 128];
-        self.block_offset = 0;
+        let key_size: usize = self.key.len();
+        self.block_offset = if key_size > 0 {
+            self.block[0..key_size].copy_from_slice(&self.key);
+            128
+        } else {
+            0
+        };
         self.hash_count_low = 0;
         self.hash_count_high = 0;
         self.hash_values = BLAKE2B_INITIAL_VECTOR;
-        self.hash_values[0] ^= 0x01010000 ^ (self.digest_size as u64);
+        self.hash_values[0] ^= 0x01010000 ^ ((key_size as u64) << 8) ^ (self.digest_size as u64);
     }
 }
 
@@ -254,6 +283,7 @@ impl DigestHashContext for Blake2bContext {
             hash_count_low: 0,
             hash_count_high: 0,
             hash_values,
+            key: Vec::new(),
         }
     }
 
@@ -335,6 +365,35 @@ mod tests {
 
         let result: Result<Blake2bContext, ErrorTrace> = Blake2bContext::new_with_digest_size(65);
         assert!(result.is_err());
+
+        let oversized_key: [u8; 65] = [0; 65];
+        let result: Result<Blake2bContext, ErrorTrace> =
+            Blake2bContext::new_with_key(64, &oversized_key);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_new_with_key_and_reset() -> Result<(), ErrorTrace> {
+        let key: [u8; 64] = core::array::from_fn(|index| index as u8);
+        let mut test_context: Blake2bContext = Blake2bContext::new_with_key(64, &key)?;
+        test_context.update(&[]);
+        let first_hash: Vec<u8> = test_context.finalize();
+
+        let first_hash_string: String = format_as_string(&first_hash);
+        assert_eq!(
+            first_hash_string,
+            "10ebb67700b1868efb4417987acf4690ae9d972fb7a590c2f02871799aaa4786b5e996e8f0f4eb981fc214b005f42d2ff4233499391653df7aefcbc13fc51568"
+        );
+        // Verify context resets with the key intact for subsequent hashing.
+        test_context.update(&[0x00]);
+        let second_hash: Vec<u8> = test_context.finalize();
+
+        let second_hash_string: String = format_as_string(&second_hash);
+        assert_eq!(
+            second_hash_string,
+            "961f6dd1e4dd30f63901690c512e78e4b45e4742ed197c3c5e45c549fd25f2e4187b0bc9fe30492b16b0d0bc4ef9b0f34c7003fac09a5ef1532e69430234cebd"
+        );
+        Ok(())
     }
 
     #[test]

@@ -81,8 +81,10 @@ impl LuksBlockReader {
             SeekFrom::Start(sector_data_offset)
         );
         let mut sector_data: Vec<u8> = vec![0; self.bytes_per_sector as usize];
-        let initialization_vector_sector_number: u64 =
-            self.initialization_vector_tweak.wrapping_add(sector_number);
+        // dm-crypt counts IV sector offsets in 512-byte sectors even for larger sector sizes.
+        let initialization_vector_sector_number: u64 = self
+            .initialization_vector_tweak
+            .wrapping_add(sector_number * ((self.bytes_per_sector as u64) / 512));
 
         match self.encryption_context.decrypt_sector(
             initialization_vector_sector_number,
@@ -235,6 +237,24 @@ mod tests {
         let mut empty_buffer: [u8; 0] = [];
         let empty_read_count: usize = block_reader.read_data_from_blocks(&mut empty_buffer, 0)?;
         assert_eq!(empty_read_count, 0);
+
+        // Test 4096-byte sectors use 512-byte IV sector offsets (sector 1 -> IV offset 8).
+        let large_sector_raw: Vec<u8> = vec![0x33; 8192];
+        let large_sector_stream: DataStreamReference = open_fake_data_stream(&large_sector_raw);
+        let mut large_sector_reader: LuksBlockReader =
+            LuksBlockReader::new(&large_sector_stream, 4096, 0, &encryption_context, 0, 8192);
+        let mut decrypted_sector_1: Vec<u8> = vec![0; 4096];
+        let read_count: usize =
+            large_sector_reader.read_data_from_blocks(&mut decrypted_sector_1, 4096)?;
+        assert_eq!(read_count, 4096);
+
+        let mut expected_sector_1: Vec<u8> = vec![0; 4096];
+        encryption_context.decrypt_sector(
+            8,
+            &large_sector_raw[4096..8192],
+            &mut expected_sector_1,
+        )?;
+        assert_eq!(decrypted_sector_1, expected_sector_1);
 
         // Test with truncated underlying data stream.
         let short_stream: DataStreamReference = open_fake_data_stream(&[0; 128]);
