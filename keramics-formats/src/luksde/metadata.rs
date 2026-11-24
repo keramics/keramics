@@ -106,16 +106,10 @@ impl LuksMetadata {
             match rule {
                 Rule::EOI => {}
                 Rule::top_level_property => {
-                    match self.parse_top_level_property(token_pair.into_inner()) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to parse top level property"
-                            );
-                            return Err(error);
-                        }
-                    }
+                    Self::with_error_frame(
+                        self.parse_top_level_property(token_pair.into_inner()),
+                        "Unable to parse top level property",
+                    )?;
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -136,70 +130,38 @@ impl LuksMetadata {
     ) -> Result<(), ErrorTrace> {
         for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
-
-            match rule {
-                Rule::json_property => {
-                    let (identifier, value_pair): (&str, Pair<Rule>) =
-                        match Self::parse_json_property_pair(token_pair.into_inner()) {
-                            Ok(result) => result,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to parse anti-forensic JSON property"
-                                );
-                                return Err(error);
-                            }
-                        };
-                    match identifier {
-                        "hash" => {
-                            let hash_string: String = match Self::parse_json_string_pair(value_pair)
-                            {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse anti-forensic hash property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            key_slot.af_hashing_method = hash_string.to_lowercase();
-                        }
-                        "stripes" => {
-                            key_slot.af_number_of_stripes = match Self::parse_u32_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse anti-forensic stripes property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "type" => {
-                            let type_string: String = match Self::parse_json_string_pair(value_pair)
-                            {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse anti-forensic type property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            key_slot.af_type = type_string.to_lowercase();
-                        }
-                        _ => {}
-                    }
+            if rule != Rule::json_property {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported af object rule: {:?}",
+                    rule
+                )));
+            }
+            let (identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
+                Self::parse_json_property_pair(token_pair.into_inner()),
+                "Unable to parse anti-forensic JSON property",
+            )?;
+            match identifier {
+                "hash" => {
+                    let hash_string: String = Self::with_error_frame(
+                        Self::parse_json_string_pair(value_pair),
+                        "Unable to parse anti-forensic hash property",
+                    )?;
+                    key_slot.af_hashing_method = hash_string.to_lowercase();
                 }
-                _ => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported af object rule: {:?}",
-                        rule
-                    )));
+                "stripes" => {
+                    key_slot.af_number_of_stripes = Self::with_error_frame(
+                        Self::parse_u32_pair(value_pair),
+                        "Unable to parse anti-forensic stripes property",
+                    )?;
                 }
+                "type" => {
+                    let type_string: String = Self::with_error_frame(
+                        Self::parse_json_string_pair(value_pair),
+                        "Unable to parse anti-forensic type property",
+                    )?;
+                    key_slot.af_type = type_string.to_lowercase();
+                }
+                _ => {}
             }
         }
         Ok(())
@@ -213,93 +175,50 @@ impl LuksMetadata {
     ) -> Result<(), ErrorTrace> {
         for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
-
-            match rule {
-                Rule::json_property => {
-                    let (identifier, value_pair): (&str, Pair<Rule>) =
-                        match Self::parse_json_property_pair(token_pair.into_inner()) {
-                            Ok(result) => result,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to parse area JSON property"
-                                );
-                                return Err(error);
-                            }
-                        };
-                    match identifier {
-                        "encryption" => {
-                            let encryption: String = match Self::parse_json_string_pair(value_pair)
-                            {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse area encryption property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            key_slot.area_encryption = encryption.to_lowercase();
-                        }
-                        "key_size" => {
-                            key_slot.area_key_size = match Self::parse_usize_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse area key size property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "offset" => {
-                            key_slot.area_offset = match Self::parse_u64_string_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse area offset property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "size" => {
-                            key_slot.area_size = match Self::parse_u64_string_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse area size property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "type" => {
-                            let area_type: String = match Self::parse_json_string_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse area type property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            key_slot.area_type = area_type.to_lowercase();
-                        }
-                        _ => {}
-                    }
+            if rule != Rule::json_property {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported area object rule: {:?}",
+                    rule
+                )));
+            }
+            let (identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
+                Self::parse_json_property_pair(token_pair.into_inner()),
+                "Unable to parse area JSON property",
+            )?;
+            match identifier {
+                "encryption" => {
+                    let encryption: String = Self::with_error_frame(
+                        Self::parse_json_string_pair(value_pair),
+                        "Unable to parse area encryption property",
+                    )?;
+                    key_slot.area_encryption = encryption.to_lowercase();
                 }
-                _ => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported area object rule: {:?}",
-                        rule
-                    )));
+                "key_size" => {
+                    key_slot.area_key_size = Self::with_error_frame(
+                        Self::parse_usize_pair(value_pair),
+                        "Unable to parse area key size property",
+                    )?;
                 }
+                "offset" => {
+                    key_slot.area_offset = Self::with_error_frame(
+                        Self::parse_u64_string_pair(value_pair),
+                        "Unable to parse area offset property",
+                    )?;
+                }
+                "size" => {
+                    key_slot.area_size = Self::with_error_frame(
+                        Self::parse_u64_string_pair(value_pair),
+                        "Unable to parse area size property",
+                    )?;
+                }
+                "type" => {
+                    let area_type: String = Self::with_error_frame(
+                        Self::parse_json_string_pair(value_pair),
+                        "Unable to parse area type property",
+                    )?;
+                    key_slot.area_type = area_type.to_lowercase();
+                }
+                _ => {}
             }
         }
         Ok(())
@@ -309,69 +228,36 @@ impl LuksMetadata {
     fn parse_configuration_object(&mut self, inner_pairs: Pairs<Rule>) -> Result<(), ErrorTrace> {
         for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
-
-            match rule {
-                Rule::json_property => {
-                    let (identifier, value_pair): (&str, Pair<Rule>) =
-                        match Self::parse_json_property_pair(token_pair.into_inner()) {
-                            Ok(result) => result,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to parse configuration JSON property"
-                                );
-                                return Err(error);
-                            }
-                        };
-                    match identifier {
-                        "flags" => {
-                            self.configuration.flags =
-                                match Self::parse_string_array_pair(value_pair) {
-                                    Ok(value) => value,
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            "Unable to parse configuration flags property"
-                                        );
-                                        return Err(error);
-                                    }
-                                };
-                        }
-                        "json_size" => {
-                            self.configuration.json_size =
-                                match Self::parse_u64_string_pair(value_pair) {
-                                    Ok(value) => value,
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            "Unable to parse configuration JSON size property"
-                                        );
-                                        return Err(error);
-                                    }
-                                };
-                        }
-                        "keyslots_size" => {
-                            self.configuration.keyslots_size =
-                                match Self::parse_u64_string_pair(value_pair) {
-                                    Ok(value) => value,
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            "Unable to parse configuration keyslots size property"
-                                        );
-                                        return Err(error);
-                                    }
-                                };
-                        }
-                        _ => {}
-                    }
+            if rule != Rule::json_property {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported configuration object rule: {:?}",
+                    rule
+                )));
+            }
+            let (identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
+                Self::parse_json_property_pair(token_pair.into_inner()),
+                "Unable to parse configuration JSON property",
+            )?;
+            match identifier {
+                "flags" => {
+                    self.configuration.flags = Self::with_error_frame(
+                        Self::parse_string_array_pair(value_pair),
+                        "Unable to parse configuration flags property",
+                    )?;
                 }
-                _ => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported configuration object rule: {:?}",
-                        rule
-                    )));
+                "json_size" => {
+                    self.configuration.json_size = Self::with_error_frame(
+                        Self::parse_u64_string_pair(value_pair),
+                        "Unable to parse configuration JSON size property",
+                    )?;
                 }
+                "keyslots_size" => {
+                    self.configuration.keyslots_size = Self::with_error_frame(
+                        Self::parse_u64_string_pair(value_pair),
+                        "Unable to parse configuration keyslots size property",
+                    )?;
+                }
+                _ => {}
             }
         }
         Ok(())
@@ -387,138 +273,70 @@ impl LuksMetadata {
 
         for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
-
-            match rule {
-                Rule::json_property => {
-                    let (property_identifier, value_pair): (&str, Pair<Rule>) =
-                        match Self::parse_json_property_pair(token_pair.into_inner()) {
-                            Ok(result) => result,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to parse digest JSON property"
-                                );
-                                return Err(error);
-                            }
-                        };
-                    match property_identifier {
-                        "digest" => {
-                            let encoded: String = match Self::parse_json_string_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse digest value property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            digest.digest = match Self::decode_base64_string(encoded.as_str()) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to decode digest value"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "hash" => {
-                            let hash_string: String = match Self::parse_json_string_pair(value_pair)
-                            {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse digest hash property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            digest.hashing_method = hash_string.to_lowercase();
-                        }
-                        "iterations" => {
-                            digest.number_of_iterations = match Self::parse_u32_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse digest iterations property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "keyslots" => {
-                            digest.keyslots = match Self::parse_string_array_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse digest keyslots property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "salt" => {
-                            let encoded: String = match Self::parse_json_string_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse digest salt property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            digest.salt = match Self::decode_base64_string(encoded.as_str()) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to decode digest salt"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "segments" => {
-                            digest.segments = match Self::parse_string_array_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse digest segments property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "type" => {
-                            let digest_type: String = match Self::parse_json_string_pair(value_pair)
-                            {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse digest type property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            digest.digest_type = digest_type.to_lowercase();
-                        }
-                        _ => {}
-                    }
+            if rule != Rule::json_property {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported digest object rule: {:?}",
+                    rule
+                )));
+            }
+            let (property_identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
+                Self::parse_json_property_pair(token_pair.into_inner()),
+                "Unable to parse digest JSON property",
+            )?;
+            match property_identifier {
+                "digest" => {
+                    let encoded: String = Self::with_error_frame(
+                        Self::parse_json_string_pair(value_pair),
+                        "Unable to parse digest value property",
+                    )?;
+                    digest.digest = Self::with_error_frame(
+                        Self::decode_base64_string(encoded.as_str()),
+                        "Unable to decode digest value",
+                    )?;
                 }
-                _ => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported digest object rule: {:?}",
-                        rule
-                    )));
+                "hash" => {
+                    let hash_string: String = Self::with_error_frame(
+                        Self::parse_json_string_pair(value_pair),
+                        "Unable to parse digest hash property",
+                    )?;
+                    digest.hashing_method = hash_string.to_lowercase();
                 }
+                "iterations" => {
+                    digest.number_of_iterations = Self::with_error_frame(
+                        Self::parse_u32_pair(value_pair),
+                        "Unable to parse digest iterations property",
+                    )?;
+                }
+                "keyslots" => {
+                    digest.keyslots = Self::with_error_frame(
+                        Self::parse_string_array_pair(value_pair),
+                        "Unable to parse digest keyslots property",
+                    )?;
+                }
+                "salt" => {
+                    let encoded: String = Self::with_error_frame(
+                        Self::parse_json_string_pair(value_pair),
+                        "Unable to parse digest salt property",
+                    )?;
+                    digest.salt = Self::with_error_frame(
+                        Self::decode_base64_string(encoded.as_str()),
+                        "Unable to decode digest salt",
+                    )?;
+                }
+                "segments" => {
+                    digest.segments = Self::with_error_frame(
+                        Self::parse_string_array_pair(value_pair),
+                        "Unable to parse digest segments property",
+                    )?;
+                }
+                "type" => {
+                    let digest_type: String = Self::with_error_frame(
+                        Self::parse_json_string_pair(value_pair),
+                        "Unable to parse digest type property",
+                    )?;
+                    digest.digest_type = digest_type.to_lowercase();
+                }
+                _ => {}
             }
         }
         Ok(digest)
@@ -531,16 +349,10 @@ impl LuksMetadata {
 
             match rule {
                 Rule::digests_property => {
-                    match self.parse_digests_property(token_pair.into_inner()) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to parse digests property"
-                            );
-                            return Err(error);
-                        }
-                    }
+                    Self::with_error_frame(
+                        self.parse_digests_property(token_pair.into_inner()),
+                        "Unable to parse digests property",
+                    )?;
                 }
                 Rule::json_property => {}
                 _ => {
@@ -669,128 +481,66 @@ impl LuksMetadata {
     ) -> Result<(), ErrorTrace> {
         for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
-
-            match rule {
-                Rule::json_property => {
-                    let (identifier, value_pair): (&str, Pair<Rule>) =
-                        match Self::parse_json_property_pair(token_pair.into_inner()) {
-                            Ok(result) => result,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to parse kdf JSON property"
-                                );
-                                return Err(error);
-                            }
-                        };
-                    match identifier {
-                        "cpus" => {
-                            key_slot.kdf_cpus = match Self::parse_u32_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse kdf cpus property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "hash" => {
-                            let hash_string: String = match Self::parse_json_string_pair(value_pair)
-                            {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse kdf hash property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            key_slot.kdf_hashing_method = hash_string.to_lowercase();
-                        }
-                        "iterations" => {
-                            key_slot.kdf_number_of_iterations =
-                                match Self::parse_u32_pair(value_pair) {
-                                    Ok(value) => value,
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            "Unable to parse kdf iterations property"
-                                        );
-                                        return Err(error);
-                                    }
-                                };
-                        }
-                        "memory" => {
-                            key_slot.kdf_memory = match Self::parse_u32_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse kdf memory property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "salt" => {
-                            let encoded: String = match Self::parse_json_string_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse kdf salt property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            key_slot.kdf_salt = match Self::decode_base64_string(encoded.as_str()) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to decode kdf salt"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "time" => {
-                            key_slot.kdf_time = match Self::parse_u32_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse kdf time property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "type" => {
-                            let kdf_type: String = match Self::parse_json_string_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse kdf type property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            key_slot.kdf_type = kdf_type.to_lowercase();
-                        }
-                        _ => {}
-                    }
+            if rule != Rule::json_property {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported kdf object rule: {:?}",
+                    rule
+                )));
+            }
+            let (identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
+                Self::parse_json_property_pair(token_pair.into_inner()),
+                "Unable to parse kdf JSON property",
+            )?;
+            match identifier {
+                "cpus" => {
+                    key_slot.kdf_cpus = Self::with_error_frame(
+                        Self::parse_u32_pair(value_pair),
+                        "Unable to parse kdf cpus property",
+                    )?;
                 }
-                _ => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported kdf object rule: {:?}",
-                        rule
-                    )));
+                "hash" => {
+                    let hash_string: String = Self::with_error_frame(
+                        Self::parse_json_string_pair(value_pair),
+                        "Unable to parse kdf hash property",
+                    )?;
+                    key_slot.kdf_hashing_method = hash_string.to_lowercase();
                 }
+                "iterations" => {
+                    key_slot.kdf_number_of_iterations = Self::with_error_frame(
+                        Self::parse_u32_pair(value_pair),
+                        "Unable to parse kdf iterations property",
+                    )?;
+                }
+                "memory" => {
+                    key_slot.kdf_memory = Self::with_error_frame(
+                        Self::parse_u32_pair(value_pair),
+                        "Unable to parse kdf memory property",
+                    )?;
+                }
+                "salt" => {
+                    let encoded: String = Self::with_error_frame(
+                        Self::parse_json_string_pair(value_pair),
+                        "Unable to parse kdf salt property",
+                    )?;
+                    key_slot.kdf_salt = Self::with_error_frame(
+                        Self::decode_base64_string(encoded.as_str()),
+                        "Unable to decode kdf salt",
+                    )?;
+                }
+                "time" => {
+                    key_slot.kdf_time = Self::with_error_frame(
+                        Self::parse_u32_pair(value_pair),
+                        "Unable to parse kdf time property",
+                    )?;
+                }
+                "type" => {
+                    let kdf_type: String = Self::with_error_frame(
+                        Self::parse_json_string_pair(value_pair),
+                        "Unable to parse kdf type property",
+                    )?;
+                    key_slot.kdf_type = kdf_type.to_lowercase();
+                }
+                _ => {}
             }
         }
         Ok(())
@@ -809,16 +559,10 @@ impl LuksMetadata {
 
             match rule {
                 Rule::keyslot_property => {
-                    match self.parse_keyslot_property(token_pair.into_inner(), &mut key_slot) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to parse keyslot property"
-                            );
-                            return Err(error);
-                        }
-                    }
+                    Self::with_error_frame(
+                        self.parse_keyslot_property(token_pair.into_inner(), &mut key_slot),
+                        "Unable to parse keyslot property",
+                    )?;
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -846,84 +590,53 @@ impl LuksMetadata {
         let rule: Rule = token_pair.as_rule();
 
         match rule {
-            Rule::af_object => match self.parse_af_object(token_pair.into_inner(), key_slot) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to parse anti-forensic object"
-                    );
-                    return Err(error);
-                }
-            },
-            Rule::area_object => match self.parse_area_object(token_pair.into_inner(), key_slot) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to parse area object");
-                    return Err(error);
-                }
-            },
+            Rule::af_object => {
+                Self::with_error_frame(
+                    self.parse_af_object(token_pair.into_inner(), key_slot),
+                    "Unable to parse anti-forensic object",
+                )?;
+            }
+            Rule::area_object => {
+                Self::with_error_frame(
+                    self.parse_area_object(token_pair.into_inner(), key_slot),
+                    "Unable to parse area object",
+                )?;
+            }
             Rule::json_property => {
-                let (identifier, value_pair): (&str, Pair<Rule>) =
-                    match Self::parse_json_property_pair(token_pair.into_inner()) {
-                        Ok(result) => result,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to parse JSON property"
-                            );
-                            return Err(error);
-                        }
-                    };
+                let (identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
+                    Self::parse_json_property_pair(token_pair.into_inner()),
+                    "Unable to parse JSON property",
+                )?;
                 match identifier {
                     "key_size" => {
-                        key_slot.key_size = match Self::parse_usize_pair(value_pair) {
-                            Ok(value) => value,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to parse keyslot key size property"
-                                );
-                                return Err(error);
-                            }
-                        };
+                        key_slot.key_size = Self::with_error_frame(
+                            Self::parse_usize_pair(value_pair),
+                            "Unable to parse keyslot key size property",
+                        )?;
                     }
                     "priority" => {
-                        let priority: i64 = match Self::parse_i64_pair(value_pair) {
-                            Ok(value) => value,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to parse keyslot priority property"
-                                );
-                                return Err(error);
-                            }
-                        };
+                        let priority: i64 = Self::with_error_frame(
+                            Self::parse_i64_pair(value_pair),
+                            "Unable to parse keyslot priority property",
+                        )?;
                         key_slot.priority = Some(priority);
                     }
                     "type" => {
-                        let keyslot_type: String = match Self::parse_json_string_pair(value_pair) {
-                            Ok(value) => value,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to parse keyslot type property"
-                                );
-                                return Err(error);
-                            }
-                        };
+                        let keyslot_type: String = Self::with_error_frame(
+                            Self::parse_json_string_pair(value_pair),
+                            "Unable to parse keyslot type property",
+                        )?;
                         key_slot.keyslot_type = keyslot_type.to_lowercase();
                     }
                     _ => {}
                 }
             }
-            Rule::kdf_object => match self.parse_kdf_object(token_pair.into_inner(), key_slot) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to parse kdf object");
-                    return Err(error);
-                }
-            },
+            Rule::kdf_object => {
+                Self::with_error_frame(
+                    self.parse_kdf_object(token_pair.into_inner(), key_slot),
+                    "Unable to parse kdf object",
+                )?;
+            }
             _ => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unsupported keyslot property rule: {:?}",
@@ -941,16 +654,10 @@ impl LuksMetadata {
 
             match rule {
                 Rule::keyslots_property => {
-                    match self.parse_keyslots_property(token_pair.into_inner()) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to parse keyslots property"
-                            );
-                            return Err(error);
-                        }
-                    }
+                    Self::with_error_frame(
+                        self.parse_keyslots_property(token_pair.into_inner()),
+                        "Unable to parse keyslots property",
+                    )?;
                 }
                 Rule::json_property => {}
                 _ => {
@@ -1030,129 +737,74 @@ impl LuksMetadata {
 
         for token_pair in inner_pairs {
             let rule: Rule = token_pair.as_rule();
-
-            match rule {
-                Rule::json_property => {
-                    let (property_identifier, value_pair): (&str, Pair<Rule>) =
-                        match Self::parse_json_property_pair(token_pair.into_inner()) {
-                            Ok(result) => result,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to parse segment JSON property"
-                                );
-                                return Err(error);
-                            }
-                        };
-                    match property_identifier {
-                        "encryption" => {
-                            let encryption: String = match Self::parse_json_string_pair(value_pair)
-                            {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse segment encryption property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            segment.encryption = encryption.to_lowercase();
-                        }
-                        "iv_tweak" => {
-                            segment.initialization_vector_tweak = match Self::parse_u64_string_pair(
-                                value_pair,
-                            ) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse segment initialization vector tweak property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "offset" => {
-                            segment.offset = match Self::parse_u64_string_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse segment offset property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "sector_size" => {
-                            segment.sector_size = match Self::parse_u16_pair(value_pair) {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse segment sector size property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
-                        "size" => {
-                            let size_string: String = match Self::parse_json_string_pair(value_pair)
-                            {
-                                Ok(value) => value,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to parse segment size property"
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            if size_string == "dynamic" {
-                                segment.size = None;
-                            } else {
-                                let parsed_size: u64 = match size_string.parse::<u64>() {
-                                    Ok(size) => size,
-                                    Err(error) => {
-                                        return Err(keramics_core::error_trace_new_with_error!(
-                                            format!(
-                                                "Unable to convert segment size: {} to u64",
-                                                size_string
-                                            ),
-                                            error
-                                        ));
-                                    }
-                                };
-                                segment.size = Some(parsed_size);
-                            }
-                        }
-                        "type" => {
-                            let segment_type: String =
-                                match Self::parse_json_string_pair(value_pair) {
-                                    Ok(value) => value,
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            "Unable to parse segment type property"
-                                        );
-                                        return Err(error);
-                                    }
-                                };
-                            segment.segment_type = segment_type.to_lowercase();
-                        }
-                        _ => {}
-                    }
+            if rule != Rule::json_property {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported segment object rule: {:?}",
+                    rule
+                )));
+            }
+            let (property_identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
+                Self::parse_json_property_pair(token_pair.into_inner()),
+                "Unable to parse segment JSON property",
+            )?;
+            match property_identifier {
+                "encryption" => {
+                    let encryption: String = Self::with_error_frame(
+                        Self::parse_json_string_pair(value_pair),
+                        "Unable to parse segment encryption property",
+                    )?;
+                    segment.encryption = encryption.to_lowercase();
                 }
-                _ => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported segment object rule: {:?}",
-                        rule
-                    )));
+                "iv_tweak" => {
+                    segment.initialization_vector_tweak = Self::with_error_frame(
+                        Self::parse_u64_string_pair(value_pair),
+                        "Unable to parse segment initialization vector tweak property",
+                    )?;
                 }
+                "offset" => {
+                    segment.offset = Self::with_error_frame(
+                        Self::parse_u64_string_pair(value_pair),
+                        "Unable to parse segment offset property",
+                    )?;
+                }
+                "sector_size" => {
+                    segment.sector_size = Self::with_error_frame(
+                        Self::parse_u16_pair(value_pair),
+                        "Unable to parse segment sector size property",
+                    )?;
+                }
+                "size" => {
+                    segment.size = Self::parse_segment_size(value_pair)?;
+                }
+                "type" => {
+                    let segment_type: String = Self::with_error_frame(
+                        Self::parse_json_string_pair(value_pair),
+                        "Unable to parse segment type property",
+                    )?;
+                    segment.segment_type = segment_type.to_lowercase();
+                }
+                _ => {}
             }
         }
         Ok(segment)
+    }
+
+    /// Parses a segment size property (`"dynamic"` or a u64 byte count).
+    fn parse_segment_size(value_pair: Pair<Rule>) -> Result<Option<u64>, ErrorTrace> {
+        let size_string: String = Self::with_error_frame(
+            Self::parse_json_string_pair(value_pair),
+            "Unable to parse segment size property",
+        )?;
+        if size_string == "dynamic" {
+            return Ok(None);
+        }
+        match size_string.parse::<u64>() {
+            Ok(size) => Ok(Some(size)),
+            Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                format!("Unable to convert segment size: {} to u64", size_string),
+                error
+            )),
+        }
     }
 
     /// Parses a segments object.
@@ -1162,16 +814,10 @@ impl LuksMetadata {
 
             match rule {
                 Rule::segments_property => {
-                    match self.parse_segments_property(token_pair.into_inner()) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to parse segments property"
-                            );
-                            return Err(error);
-                        }
-                    }
+                    Self::with_error_frame(
+                        self.parse_segments_property(token_pair.into_inner()),
+                        "Unable to parse segments property",
+                    )?;
                 }
                 Rule::json_property => {}
                 _ => {
@@ -1279,61 +925,35 @@ impl LuksMetadata {
             match rule {
                 Rule::EOI => {}
                 Rule::config_object => {
-                    match self.parse_configuration_object(token_pair.into_inner()) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to parse configuration object"
-                            );
-                            return Err(error);
-                        }
-                    }
+                    Self::with_error_frame(
+                        self.parse_configuration_object(token_pair.into_inner()),
+                        "Unable to parse configuration object",
+                    )?;
                 }
-                Rule::digests_object => match self.parse_digests_object(token_pair.into_inner()) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to parse digests object"
-                        );
-                        return Err(error);
-                    }
-                },
+                Rule::digests_object => {
+                    Self::with_error_frame(
+                        self.parse_digests_object(token_pair.into_inner()),
+                        "Unable to parse digests object",
+                    )?;
+                }
                 Rule::keyslots_object => {
-                    match self.parse_keyslots_object(token_pair.into_inner()) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to parse keyslots object"
-                            );
-                            return Err(error);
-                        }
-                    }
+                    Self::with_error_frame(
+                        self.parse_keyslots_object(token_pair.into_inner()),
+                        "Unable to parse keyslots object",
+                    )?;
                 }
                 Rule::segments_object => {
-                    match self.parse_segments_object(token_pair.into_inner()) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to parse segments object"
-                            );
-                            return Err(error);
-                        }
-                    }
+                    Self::with_error_frame(
+                        self.parse_segments_object(token_pair.into_inner()),
+                        "Unable to parse segments object",
+                    )?;
                 }
-                Rule::tokens_object => match self.parse_tokens_object(token_pair.into_inner()) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to parse tokens object"
-                        );
-                        return Err(error);
-                    }
-                },
+                Rule::tokens_object => {
+                    Self::with_error_frame(
+                        self.parse_tokens_object(token_pair.into_inner()),
+                        "Unable to parse tokens object",
+                    )?;
+                }
                 Rule::json_property => {}
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -1482,6 +1102,24 @@ impl LuksMetadata {
         self.parse(trimmed_string)
     }
 
+    /// Unescapes a single JSON escape sequence character.
+    fn unescape_json_character(escaped: char, result: &mut String) {
+        match escaped {
+            '"' => result.push('"'),
+            '\\' => result.push('\\'),
+            '/' => result.push('/'),
+            'b' => result.push('\u{0008}'),
+            'f' => result.push('\u{000c}'),
+            'n' => result.push('\n'),
+            'r' => result.push('\r'),
+            't' => result.push('\t'),
+            other => {
+                result.push('\\');
+                result.push(other);
+            }
+        }
+    }
+
     /// Unescapes standard JSON string escape sequences.
     fn unescape_json_string(value: &str) -> String {
         if !value.contains('\\') {
@@ -1491,28 +1129,26 @@ impl LuksMetadata {
         let mut chars: Chars = value.chars();
 
         while let Some(character) = chars.next() {
-            if character == '\\' {
-                if let Some(escaped) = chars.next() {
-                    match escaped {
-                        '"' => result.push('"'),
-                        '\\' => result.push('\\'),
-                        '/' => result.push('/'),
-                        'b' => result.push('\u{0008}'),
-                        'f' => result.push('\u{000c}'),
-                        'n' => result.push('\n'),
-                        'r' => result.push('\r'),
-                        't' => result.push('\t'),
-                        other => {
-                            result.push('\\');
-                            result.push(other);
-                        }
-                    }
-                }
-            } else {
+            if character != '\\' {
                 result.push(character);
+                continue;
+            }
+            if let Some(escaped) = chars.next() {
+                Self::unescape_json_character(escaped, &mut result);
             }
         }
         result
+    }
+
+    /// Adds a context frame to an error result.
+    fn with_error_frame<T>(result: Result<T, ErrorTrace>, message: &str) -> Result<T, ErrorTrace> {
+        match result {
+            Ok(value) => Ok(value),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, message);
+                Err(error)
+            }
+        }
     }
 }
 

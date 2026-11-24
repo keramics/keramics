@@ -257,6 +257,49 @@ impl LuksEncryption {
         }))
     }
 
+    /// Retrieves an ESSIV initialization vector context.
+    fn get_essiv_initialization_vector_context(
+        encryption_type: &LuksEncryptionType,
+        key: &[u8],
+    ) -> Result<Option<LuksInitializationVectorContext>, ErrorTrace> {
+        if encryption_type.encryption_method.as_str() != "aes"
+            || (encryption_type.chaining_mode.as_str() != "cbc"
+                && encryption_type.chaining_mode.as_str() != "ecb")
+        {
+            return Ok(None);
+        }
+        let hashing_method: &str = match encryption_type.initialization_vector_options.as_deref() {
+            Some(method) => method,
+            None => return Ok(None),
+        };
+        let mut digest_context: Box<dyn DigestHashContext> =
+            match Self::get_digest_hash_context(hashing_method) {
+                Some(context) => context,
+                None => return Ok(None),
+            };
+        digest_context.update(key);
+
+        let digest_hash: Vec<u8> = digest_context.finalize();
+        let digest_hash_size: usize = digest_hash.len();
+
+        if digest_hash_size > 32 {
+            return Ok(None);
+        }
+        let mut essiv_key: [u8; 32] = [0; 32];
+        essiv_key[0..digest_hash_size].copy_from_slice(&digest_hash);
+
+        let mut essiv_context: AesContext = AesContext::new();
+
+        match essiv_context.set_key(&essiv_key) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to set key in ESSIV context");
+                return Err(error);
+            }
+        }
+        Ok(Some(LuksInitializationVectorContext::Essiv(essiv_context)))
+    }
+
     /// Retrieves an initialization vector context.
     fn get_initialization_vector_context(
         encryption_type: &LuksEncryptionType,
@@ -264,73 +307,21 @@ impl LuksEncryption {
     ) -> Result<Option<LuksInitializationVectorContext>, ErrorTrace> {
         // TODO: lmk
         // TODO: plumb
-        match encryption_type.initialization_vector_mode.as_deref() {
-            Some("benbi") => {
-                if encryption_type.initialization_vector_options.is_some() {
-                    return Ok(None);
-                }
-                Ok(Some(LuksInitializationVectorContext::Benbi))
-            }
-            Some("essiv") => {
-                if encryption_type.encryption_method.as_str() != "aes"
-                    || (encryption_type.chaining_mode.as_str() != "cbc"
-                        && encryption_type.chaining_mode.as_str() != "ecb")
-                {
-                    return Ok(None);
-                }
-                let mut digest_context: Box<dyn DigestHashContext> = match &encryption_type
-                    .initialization_vector_options
-                {
-                    Some(hashing_method) => match Self::get_digest_hash_context(hashing_method) {
-                        Some(context) => context,
-                        None => return Ok(None),
-                    },
-                    None => return Ok(None),
-                };
-                digest_context.update(key);
-
-                let digest_hash: Vec<u8> = digest_context.finalize();
-                let digest_hash_size: usize = digest_hash.len();
-
-                if digest_hash_size > 32 {
-                    return Ok(None);
-                }
-                let mut essiv_key: [u8; 32] = [0; 32];
-                essiv_key[0..digest_hash_size].copy_from_slice(&digest_hash);
-
-                let mut essiv_context: AesContext = AesContext::new();
-
-                match essiv_context.set_key(&essiv_key) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to set key in ESSIV context"
-                        );
-                        return Err(error);
-                    }
-                }
-                Ok(Some(LuksInitializationVectorContext::Essiv(essiv_context)))
-            }
-            Some("null") => {
-                if encryption_type.initialization_vector_options.is_some() {
-                    return Ok(None);
-                }
-                Ok(Some(LuksInitializationVectorContext::Null))
-            }
-            Some("plain") => {
-                if encryption_type.initialization_vector_options.is_some() {
-                    return Ok(None);
-                }
-                Ok(Some(LuksInitializationVectorContext::Plain32))
-            }
-            Some("plain64") => {
-                if encryption_type.initialization_vector_options.is_some() {
-                    return Ok(None);
-                }
-                Ok(Some(LuksInitializationVectorContext::Plain64))
-            }
-            None => Ok(Some(LuksInitializationVectorContext::Null)),
+        let mode: &str = match encryption_type.initialization_vector_mode.as_deref() {
+            Some(mode) => mode,
+            None => return Ok(Some(LuksInitializationVectorContext::Null)),
+        };
+        if mode == "essiv" {
+            return Self::get_essiv_initialization_vector_context(encryption_type, key);
+        }
+        if encryption_type.initialization_vector_options.is_some() {
+            return Ok(None);
+        }
+        match mode {
+            "benbi" => Ok(Some(LuksInitializationVectorContext::Benbi)),
+            "null" => Ok(Some(LuksInitializationVectorContext::Null)),
+            "plain" => Ok(Some(LuksInitializationVectorContext::Plain32)),
+            "plain64" => Ok(Some(LuksInitializationVectorContext::Plain64)),
             _ => Ok(None),
         }
     }

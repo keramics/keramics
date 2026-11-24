@@ -128,6 +128,37 @@ impl LuksEncryptedVolume {
         }
     }
 
+    /// Decrypts encrypted key material sector by sector.
+    fn decrypt_key_material_sectors(
+        encryption_context: &LuksEncryptionContext,
+        key_material: &[u8],
+        sector_size: usize,
+    ) -> Result<Vec<u8>, ErrorTrace> {
+        let key_material_size: usize = key_material.len();
+        let mut split_master_key_data: Vec<u8> = vec![0; key_material_size];
+
+        for (sector_number, data_offset) in (0..key_material_size).step_by(sector_size).enumerate()
+        {
+            let data_end_offset: usize = data_offset + sector_size;
+
+            match encryption_context.decrypt_sector(
+                sector_number as u64,
+                &key_material[data_offset..data_end_offset],
+                &mut split_master_key_data[data_offset..data_end_offset],
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to decrypt key material sector: {}", sector_number)
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        Ok(split_master_key_data)
+    }
+
     /// Derives the master key from a key slot and user key.
     fn derive_master_key(
         &self,
@@ -182,29 +213,11 @@ impl LuksEncryptedVolume {
                     return Err(error);
                 }
             };
-        let mut split_master_key_data: Vec<u8> = vec![0; key_material_size];
-
-        for (sector_number, data_offset) in (0..key_material_size)
-            .step_by(self.bytes_per_sector as usize)
-            .enumerate()
-        {
-            let data_end_offset: usize = data_offset + (self.bytes_per_sector as usize);
-
-            match encryption_context.decrypt_sector(
-                sector_number as u64,
-                &key_material[data_offset..data_end_offset],
-                &mut split_master_key_data[data_offset..data_end_offset],
-            ) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!("Unable to decrypt key material sector: {}", sector_number)
-                    );
-                    return Err(error);
-                }
-            }
-        }
+        let split_master_key_data: Vec<u8> = Self::decrypt_key_material_sectors(
+            &encryption_context,
+            &key_material,
+            self.bytes_per_sector as usize,
+        )?;
         let mut diffuser_context: LuksDiffuserContext =
             match LuksEncryption::get_diffuser_context(&self.hashing_method) {
                 Some(context) => context,
@@ -227,37 +240,9 @@ impl LuksEncryptedVolume {
         user_key: &[u8],
         key: &mut [u8],
     ) -> Result<(), ErrorTrace> {
-        if key_slot.af_type != "luks1" {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported anti-forensic diffuser type: {}",
-                key_slot.af_type
-            )));
-        }
-        if key_slot.af_number_of_stripes == 0 || key_slot.af_number_of_stripes > 4000 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported number of stripes - value out of bounds"
-            ));
-        }
-        if key_slot.area_type != "raw" {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported key slot area type: {}",
-                key_slot.area_type
-            )));
-        }
         // LUKS2 keyslot binary areas are always encrypted in 512-byte sectors.
         let key_slot_sector_size: usize = 512;
-        let key_material_size: usize = key_slot.key_size * (key_slot.af_number_of_stripes as usize);
-
-        if (key_material_size as u64) > key_slot.area_size {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported key material size - exceeds key slot area size"
-            ));
-        }
-        if !key_material_size.is_multiple_of(key_slot_sector_size) {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported key material size - not a multiple of 512 bytes"
-            ));
-        }
+        let key_material_size: usize = Self::validate_key_slot_v2(key_slot, key_slot_sector_size)?;
         let mut key_material: Vec<u8> = vec![0; key_material_size];
 
         let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
@@ -295,29 +280,11 @@ impl LuksEncryptedVolume {
                     return Err(error);
                 }
             };
-        let mut split_master_key_data: Vec<u8> = vec![0; key_material_size];
-
-        for (sector_number, data_offset) in (0..key_material_size)
-            .step_by(key_slot_sector_size)
-            .enumerate()
-        {
-            let data_end_offset: usize = data_offset + key_slot_sector_size;
-
-            match encryption_context.decrypt_sector(
-                sector_number as u64,
-                &key_material[data_offset..data_end_offset],
-                &mut split_master_key_data[data_offset..data_end_offset],
-            ) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!("Unable to decrypt key material sector: {}", sector_number)
-                    );
-                    return Err(error);
-                }
-            }
-        }
+        let split_master_key_data: Vec<u8> = Self::decrypt_key_material_sectors(
+            &encryption_context,
+            &key_material,
+            key_slot_sector_size,
+        )?;
         let mut diffuser_context: LuksDiffuserContext =
             match LuksEncryption::get_diffuser_context(key_slot.af_hashing_method.as_str()) {
                 Some(context) => context,
@@ -444,6 +411,86 @@ impl LuksEncryptedVolume {
         Ok(())
     }
 
+    /// Scans standard LUKS2 backup header offsets for the newest valid backup metadata area.
+    fn find_backup_v2_metadata_area(
+        data_stream: &DataStreamReference,
+        data_stream_size: u64,
+    ) -> Option<(LuksVolumeHeaderV2, Vec<u8>)> {
+        let mut recovered: Option<(LuksVolumeHeaderV2, Vec<u8>)> = None;
+
+        for backup_offset in LUKS2_BACKUP_HEADER_OFFSETS {
+            if backup_offset + 4096 > data_stream_size {
+                break;
+            }
+            let Ok((backup_header, backup_json)) =
+                Self::read_v2_metadata_area(data_stream, data_stream_size, backup_offset, true)
+            else {
+                continue;
+            };
+            let is_newer: bool = recovered.as_ref().is_none_or(|(current_header, _)| {
+                backup_header.sequence_identifier > current_header.sequence_identifier
+            });
+            if is_newer {
+                recovered = Some((backup_header, backup_json));
+            }
+        }
+        recovered
+    }
+
+    /// Finds the volume key size for a LUKS2 digest by checking its associated key slots.
+    fn find_digest_key_size_v2(
+        digest: &LuksMetadataDigest,
+        key_slots: &[LuksMetadataKeySlot],
+    ) -> Option<usize> {
+        for keyslot_identifier in digest.keyslots.iter() {
+            if let Some(key_slot) = key_slots
+                .iter()
+                .find(|slot| slot.identifier == *keyslot_identifier && slot.keyslot_type == "luks2")
+            {
+                return Some(key_slot.key_size);
+            }
+        }
+        None
+    }
+
+    /// Finds a matching key data credential for this volume.
+    fn find_key_data_credential(&self, credentials: &[LuksCredential]) -> Option<Vec<u8>> {
+        for credential in credentials.iter() {
+            let LuksCredential::KeyData { identifier, data } = credential else {
+                continue;
+            };
+            if identifier.len() != 16 || data.len() != self.key_size {
+                continue;
+            }
+            let volume_identifier: Uuid = Uuid::from_be_bytes(identifier);
+            if volume_identifier == self.volume_identifier {
+                return Some(data.to_vec());
+            }
+        }
+        None
+    }
+
+    /// Determines the volume key size for a LUKS2 segment from associated key slots.
+    fn find_segment_key_size_v2(metadata: &LuksMetadata, segment_identifier: &str) -> usize {
+        for digest in metadata.digests.iter() {
+            if !digest
+                .segments
+                .iter()
+                .any(|segment| segment == segment_identifier)
+            {
+                continue;
+            }
+            if let Some(key_size) = Self::find_digest_key_size_v2(digest, &metadata.key_slots) {
+                return key_size;
+            }
+        }
+        metadata
+            .key_slots
+            .iter()
+            .find(|slot| slot.keyslot_type == "luks2")
+            .map_or(0, |slot| slot.key_size)
+    }
+
     /// Retrieves the bytes per sector.
     pub fn get_bytes_per_sector(&self) -> u16 {
         self.bytes_per_sector
@@ -484,6 +531,25 @@ impl LuksEncryptedVolume {
         &self.volume_identifier
     }
 
+    /// Validates and retrieves the volume size for a LUKS2 data segment.
+    fn get_segment_volume_size_v2(
+        segment: &LuksMetadataSegment,
+        data_stream_size: u64,
+    ) -> Result<u64, ErrorTrace> {
+        match segment.size {
+            Some(segment_size) => {
+                if segment.offset.saturating_add(segment_size) > data_stream_size {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid segment size: {} value out of bounds",
+                        segment_size
+                    )));
+                }
+                Ok(segment_size)
+            }
+            None => Ok(data_stream_size - segment.offset),
+        }
+    }
+
     /// Retrieves the volume label.
     pub fn get_volume_label(&self) -> Option<&ByteString> {
         if self.volume_label.is_empty() {
@@ -501,6 +567,31 @@ impl LuksEncryptedVolume {
     /// Determines if the container is locked.
     pub fn is_locked(&self) -> bool {
         self.is_locked
+    }
+
+    /// Reads the newest valid LUKS2 metadata area, falling back to backup headers when needed.
+    fn read_best_v2_metadata_area(
+        data_stream: &DataStreamReference,
+        data_stream_size: u64,
+    ) -> Result<(LuksVolumeHeaderV2, Vec<u8>), ErrorTrace> {
+        let (primary_header, primary_json): (LuksVolumeHeaderV2, Vec<u8>) =
+            match Self::read_v2_metadata_area(data_stream, data_stream_size, 0, false) {
+                Ok(result) => result,
+                Err(primary_error) => {
+                    return Self::find_backup_v2_metadata_area(data_stream, data_stream_size)
+                        .ok_or(primary_error);
+                }
+            };
+        // Check backup header at metadata_area_size; prefer higher sequence_identifier.
+        let backup_offset: u64 = primary_header.metadata_area_size;
+        match Self::read_v2_metadata_area(data_stream, data_stream_size, backup_offset, true) {
+            Ok((backup_header, backup_json))
+                if backup_header.sequence_identifier > primary_header.sequence_identifier =>
+            {
+                Ok((backup_header, backup_json))
+            }
+            _ => Ok((primary_header, primary_json)),
+        }
     }
 
     /// Reads the encrypted volume from a data stream.
@@ -525,224 +616,16 @@ impl LuksEncryptedVolume {
         self.bytes_per_sector = 512;
         self.format_version = bytes_to_u16_be!(data, 6);
 
-        let volume_identifier_string: String;
-        let volume_size: u64;
-
-        match &self.format_version {
-            1 => {
-                keramics_core::debug_trace_structure!(LuksVolumeHeaderV1::debug_read_data(&data));
-
-                let mut volume_header: LuksVolumeHeaderV1 = LuksVolumeHeaderV1::new();
-
-                match volume_header.read_data(&data) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to read version 1 volume header at offset: {} (0x{:08x})",
-                                offset, offset
-                            ),
-                        );
-                        return Err(error);
-                    }
-                }
-                volume_identifier_string = volume_header.volume_identifier.to_string();
-
-                let encrypted_data_offset: u64 = (volume_header.encrypted_data_start_sector as u64)
-                    * (self.bytes_per_sector as u64);
-
-                if encrypted_data_offset >= data_stream_size {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Invalid encrypted data offset: {} (0x{:08x}) value out of bounds",
-                        encrypted_data_offset, encrypted_data_offset
-                    )));
-                }
-                self.encryption_type
-                    .set_encryption_method(&volume_header.encryption_method);
-                self.encryption_type
-                    .set_encryption_mode(&volume_header.encryption_mode);
-                self.encryption_type.key_size = volume_header.key_size as usize;
-
-                self.hashing_method = volume_header.hashing_method.to_string().to_lowercase();
-                self.salt = volume_header.salt;
-                self.number_of_iterations = volume_header.number_of_iterations;
-
-                self.key_size = volume_header.key_size as usize;
-                self.validation_hash = volume_header.validation_hash;
-                self.key_slots = volume_header.key_slots;
-                self.initialization_vector_tweak = 0;
-                self.encrypted_data_offset = encrypted_data_offset;
-                volume_size = data_stream_size - encrypted_data_offset;
-            }
-            2 => {
-                let primary_result: Result<(LuksVolumeHeaderV2, Vec<u8>), ErrorTrace> =
-                    Self::read_v2_metadata_area(data_stream, data_stream_size, 0, false);
-
-                let (volume_header, json_data): (LuksVolumeHeaderV2, Vec<u8>) = match primary_result
-                {
-                    Ok((primary_header, primary_json)) => {
-                        // Check backup header at metadata_area_size; prefer higher sequence_identifier.
-                        let backup_offset: u64 = primary_header.metadata_area_size;
-                        match Self::read_v2_metadata_area(
-                            data_stream,
-                            data_stream_size,
-                            backup_offset,
-                            true,
-                        ) {
-                            Ok((backup_header, backup_json))
-                                if backup_header.sequence_identifier
-                                    > primary_header.sequence_identifier =>
-                            {
-                                (backup_header, backup_json)
-                            }
-                            _ => (primary_header, primary_json),
-                        }
-                    }
-                    Err(primary_error) => {
-                        let mut recovered: Option<(LuksVolumeHeaderV2, Vec<u8>)> = None;
-
-                        for backup_offset in LUKS2_BACKUP_HEADER_OFFSETS {
-                            if backup_offset + 4096 > data_stream_size {
-                                break;
-                            }
-                            if let Ok((backup_header, backup_json)) = Self::read_v2_metadata_area(
-                                data_stream,
-                                data_stream_size,
-                                backup_offset,
-                                true,
-                            ) {
-                                let should_replace: bool = match &recovered {
-                                    Some((current_header, _)) => {
-                                        backup_header.sequence_identifier
-                                            > current_header.sequence_identifier
-                                    }
-                                    None => true,
-                                };
-                                if should_replace {
-                                    recovered = Some((backup_header, backup_json));
-                                }
-                            }
-                        }
-                        match recovered {
-                            Some(result) => result,
-                            None => return Err(primary_error),
-                        }
-                    }
-                };
-                volume_identifier_string = volume_header.volume_identifier.to_string();
-                self.volume_label = volume_header.volume_label;
-
-                let mut metadata: LuksMetadata = LuksMetadata::new();
-
-                match metadata.read_data(&json_data) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read JSON metadata"
-                        );
-                        return Err(error);
-                    }
-                }
-                let segment: &LuksMetadataSegment = match metadata
-                    .segments
-                    .iter()
-                    .find(|segment| segment.identifier == "0")
-                    .or_else(|| {
-                        metadata
-                            .segments
-                            .iter()
-                            .find(|segment| segment.segment_type == "crypt")
-                    }) {
-                    Some(segment) => segment,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Missing data segment in LUKS2 metadata"
-                        ));
-                    }
-                };
-                if segment.segment_type != "crypt" {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported LUKS2 segment type: {}",
-                        segment.segment_type
-                    )));
-                }
-                if segment.sector_size != 512
-                    && segment.sector_size != 1024
-                    && segment.sector_size != 2048
-                    && segment.sector_size != 4096
-                {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported bytes per sector: {}",
-                        segment.sector_size
-                    )));
-                }
-                if segment.offset >= data_stream_size {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Invalid encrypted data offset: {} (0x{:08x}) value out of bounds",
-                        segment.offset, segment.offset
-                    )));
-                }
-                volume_size = match segment.size {
-                    Some(segment_size) => {
-                        if segment.offset.saturating_add(segment_size) > data_stream_size {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Invalid segment size: {} value out of bounds",
-                                segment_size
-                            )));
-                        }
-                        segment_size
-                    }
-                    None => data_stream_size - segment.offset,
-                };
-                // Determine volume key size from a keyslot associated with this segment.
-                let segment_identifier: String = segment.identifier.clone();
-                let mut key_size: usize = 0;
-
-                for digest in metadata.digests.iter() {
-                    if digest.segments.contains(&segment_identifier) {
-                        for keyslot_identifier in digest.keyslots.iter() {
-                            if let Some(key_slot) = metadata.key_slots.iter().find(|slot| {
-                                slot.identifier == *keyslot_identifier
-                                    && slot.keyslot_type == "luks2"
-                            }) {
-                                key_size = key_slot.key_size;
-                                break;
-                            }
-                        }
-                    }
-                    if key_size != 0 {
-                        break;
-                    }
-                }
-                if key_size == 0 {
-                    if let Some(key_slot) = metadata
-                        .key_slots
-                        .iter()
-                        .find(|slot| slot.keyslot_type == "luks2")
-                    {
-                        key_size = key_slot.key_size;
-                    }
-                }
-                self.bytes_per_sector = segment.sector_size;
-                self.key_size = key_size;
-                self.encryption_type
-                    .set_encryption_string(segment.encryption.as_str());
-                self.encryption_type.key_size = key_size;
-                self.encrypted_data_offset = segment.offset;
-                self.initialization_vector_tweak = segment.initialization_vector_tweak;
-                self.segment_identifier = segment_identifier;
-                self.metadata_key_slots = metadata.key_slots;
-                self.metadata_digests = metadata.digests;
-            }
+        let (volume_identifier_string, volume_size): (String, u64) = match &self.format_version {
+            1 => self.read_volume_header_v1(&data, offset, data_stream_size)?,
+            2 => self.read_volume_header_v2(data_stream, data_stream_size)?,
             _ => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unsupported format version: {}",
                     self.format_version
                 )));
             }
-        }
+        };
         self.volume_identifier = match Uuid::from_string(volume_identifier_string.as_str()) {
             Ok(uuid) => uuid,
             Err(mut error) => {
@@ -865,223 +748,402 @@ impl LuksEncryptedVolume {
         Ok((volume_header, json_data))
     }
 
+    /// Reads and populates volume metadata from a LUKS1 header.
+    fn read_volume_header_v1(
+        &mut self,
+        data: &[u8; 4096],
+        offset: u64,
+        data_stream_size: u64,
+    ) -> Result<(String, u64), ErrorTrace> {
+        keramics_core::debug_trace_structure!(LuksVolumeHeaderV1::debug_read_data(data));
+
+        let mut volume_header: LuksVolumeHeaderV1 = LuksVolumeHeaderV1::new();
+
+        match volume_header.read_data(data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read version 1 volume header at offset: {} (0x{:08x})",
+                        offset, offset
+                    ),
+                );
+                return Err(error);
+            }
+        }
+        let volume_identifier_string: String = volume_header.volume_identifier.to_string();
+        let encrypted_data_offset: u64 =
+            (volume_header.encrypted_data_start_sector as u64) * (self.bytes_per_sector as u64);
+
+        if encrypted_data_offset >= data_stream_size {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid encrypted data offset: {} (0x{:08x}) value out of bounds",
+                encrypted_data_offset, encrypted_data_offset
+            )));
+        }
+        self.encryption_type
+            .set_encryption_method(&volume_header.encryption_method);
+        self.encryption_type
+            .set_encryption_mode(&volume_header.encryption_mode);
+        self.encryption_type.key_size = volume_header.key_size as usize;
+
+        self.hashing_method = volume_header.hashing_method.to_string().to_lowercase();
+        self.salt = volume_header.salt;
+        self.number_of_iterations = volume_header.number_of_iterations;
+
+        self.key_size = volume_header.key_size as usize;
+        self.validation_hash = volume_header.validation_hash;
+        self.key_slots = volume_header.key_slots;
+        self.initialization_vector_tweak = 0;
+        self.encrypted_data_offset = encrypted_data_offset;
+
+        let volume_size: u64 = data_stream_size - encrypted_data_offset;
+        Ok((volume_identifier_string, volume_size))
+    }
+
+    /// Reads and populates volume metadata from a LUKS2 header and JSON area.
+    fn read_volume_header_v2(
+        &mut self,
+        data_stream: &DataStreamReference,
+        data_stream_size: u64,
+    ) -> Result<(String, u64), ErrorTrace> {
+        let (volume_header, json_data): (LuksVolumeHeaderV2, Vec<u8>) =
+            Self::read_best_v2_metadata_area(data_stream, data_stream_size)?;
+
+        let volume_identifier_string: String = volume_header.volume_identifier.to_string();
+        self.volume_label = volume_header.volume_label;
+
+        let mut metadata: LuksMetadata = LuksMetadata::new();
+
+        match metadata.read_data(&json_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read JSON metadata");
+                return Err(error);
+            }
+        }
+        let segment: &LuksMetadataSegment = match metadata
+            .segments
+            .iter()
+            .find(|segment| segment.identifier == "0")
+            .or_else(|| {
+                metadata
+                    .segments
+                    .iter()
+                    .find(|segment| segment.segment_type == "crypt")
+            }) {
+            Some(segment) => segment,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Missing data segment in LUKS2 metadata"
+                ));
+            }
+        };
+        if segment.segment_type != "crypt" {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported LUKS2 segment type: {}",
+                segment.segment_type
+            )));
+        }
+        if !matches!(segment.sector_size, 512 | 1024 | 2048 | 4096) {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported bytes per sector: {}",
+                segment.sector_size
+            )));
+        }
+        if segment.offset >= data_stream_size {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid encrypted data offset: {} (0x{:08x}) value out of bounds",
+                segment.offset, segment.offset
+            )));
+        }
+        let volume_size: u64 = Self::get_segment_volume_size_v2(segment, data_stream_size)?;
+        let segment_identifier: String = segment.identifier.clone();
+        let key_size: usize =
+            Self::find_segment_key_size_v2(&metadata, segment_identifier.as_str());
+
+        self.bytes_per_sector = segment.sector_size;
+        self.key_size = key_size;
+        self.encryption_type
+            .set_encryption_string(segment.encryption.as_str());
+        self.encryption_type.key_size = key_size;
+        self.encrypted_data_offset = segment.offset;
+        self.initialization_vector_tweak = segment.initialization_vector_tweak;
+        self.segment_identifier = segment_identifier;
+        self.metadata_key_slots = metadata.key_slots;
+        self.metadata_digests = metadata.digests;
+
+        Ok((volume_identifier_string, volume_size))
+    }
+
     /// Unlocks a locked volume.
     pub fn unlock(&mut self, credentials: &[LuksCredential]) -> Result<bool, ErrorTrace> {
         if !self.is_locked {
             return Ok(true);
         }
-        let mut master_key: Vec<u8> = vec![0; self.key_size];
-        let mut master_key_unlocked: bool = false;
-
         // Check for key data credentials first to skip key derivation if not needed.
-        for credential in credentials.iter() {
-            if let LuksCredential::KeyData { identifier, data } = credential {
-                if identifier.len() != 16 {
-                    continue;
+        let master_key: Option<Vec<u8>> = match self.find_key_data_credential(credentials) {
+            Some(key) => Some(key),
+            None => self.unlock_with_passphrases(credentials)?,
+        };
+        let Some(master_key) = master_key else {
+            return Ok(false);
+        };
+        keramics_core::debug_trace_data!("LuksMasterKey", 0, &master_key, master_key.len());
+
+        let encryption_context: LuksEncryptionContext =
+            match LuksEncryption::get_encryption_context(&self.encryption_type, &master_key) {
+                Ok(Some(context)) => context,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported encryption type: {}",
+                        self.encryption_type
+                    )));
                 }
-                let volume_identifier: Uuid = Uuid::from_be_bytes(identifier);
-
-                if volume_identifier != self.volume_identifier {
-                    continue;
-                }
-                if data.len() != self.key_size {
-                    continue;
-                }
-                master_key = data.to_vec();
-                master_key_unlocked = true;
-                break;
-            }
-        }
-        if !master_key_unlocked {
-            for credential in credentials.iter() {
-                if let LuksCredential::Passphrase(passphrase) = credential {
-                    match self.format_version {
-                        1 => {
-                            for key_slot in self.key_slots.iter() {
-                                if key_slot.number_of_stripes == 0 {
-                                    return Err(keramics_core::error_trace_new!(
-                                        "Unsupported key slot - number of stripes not set"
-                                    ));
-                                }
-                                let mut user_key: Vec<u8> = vec![0; self.key_size];
-
-                                match self.derive_user_key(key_slot, passphrase, &mut user_key) {
-                                    Ok(_) => {}
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            "Unable to derive user key"
-                                        );
-                                        return Err(error);
-                                    }
-                                }
-                                match self.derive_master_key(key_slot, &user_key, &mut master_key) {
-                                    Ok(_) => {}
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            "Unable to derive master key"
-                                        );
-                                        return Err(error);
-                                    }
-                                }
-                                let mut key_derivation_context: LuksKeyDerivationContext =
-                                    match LuksEncryption::get_key_derivation_context(
-                                        self.hashing_method.as_str(),
-                                        &self.salt,
-                                        self.number_of_iterations as usize,
-                                    ) {
-                                        Ok(Some(context)) => context,
-                                        Ok(None) => {
-                                            return Err(keramics_core::error_trace_new!(format!(
-                                                "Unsupported key derivation method: {}",
-                                                self.hashing_method
-                                            )));
-                                        }
-                                        Err(mut error) => {
-                                            keramics_core::error_trace_add_frame!(
-                                                error,
-                                                format!(
-                                                    "Unable to retrieve key derivation context for method: {}",
-                                                    self.hashing_method
-                                                )
-                                            );
-                                            return Err(error);
-                                        }
-                                    };
-                                let mut master_key_validation_hash: [u8; 20] = [0; 20];
-
-                                match key_derivation_context
-                                    .derive_key(&master_key, &mut master_key_validation_hash)
-                                {
-                                    Ok(_) => {}
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            "Unable to derive validation hash from master key"
-                                        );
-                                        return Err(error);
-                                    }
-                                }
-                                if master_key_validation_hash == self.validation_hash.as_slice() {
-                                    master_key_unlocked = true;
-                                    break;
-                                }
-                            }
-                        }
-                        2 => {
-                            let mut ordered_slots: Vec<&LuksMetadataKeySlot> = self
-                                .metadata_key_slots
-                                .iter()
-                                .filter(|slot| slot.keyslot_type == "luks2")
-                                .collect();
-                            ordered_slots.sort_by(|left, right| {
-                                let left_priority: i64 = left.priority.unwrap_or(1);
-                                let right_priority: i64 = right.priority.unwrap_or(1);
-                                right_priority.cmp(&left_priority)
-                            });
-
-                            for key_slot in ordered_slots {
-                                let digest: &LuksMetadataDigest =
-                                    match self.metadata_digests.iter().find(|digest| {
-                                        digest.keyslots.contains(&key_slot.identifier)
-                                            && digest.segments.contains(&self.segment_identifier)
-                                    }) {
-                                        Some(digest) => digest,
-                                        None => continue,
-                                    };
-                                let mut user_key: Vec<u8> = vec![0; key_slot.area_key_size];
-
-                                match self.derive_user_key_v2(key_slot, passphrase, &mut user_key) {
-                                    Ok(_) => {}
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            format!(
-                                                "Unable to derive user key for key slot: {}",
-                                                key_slot.identifier
-                                            )
-                                        );
-                                        return Err(error);
-                                    }
-                                }
-                                let mut candidate_master_key: Vec<u8> = vec![0; key_slot.key_size];
-
-                                match self.derive_master_key_v2(
-                                    key_slot,
-                                    &user_key,
-                                    &mut candidate_master_key,
-                                ) {
-                                    Ok(_) => {}
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            format!(
-                                                "Unable to derive master key for key slot: {}",
-                                                key_slot.identifier
-                                            )
-                                        );
-                                        return Err(error);
-                                    }
-                                }
-                                let is_valid: bool = match Self::validate_master_key_v2(
-                                    digest,
-                                    &candidate_master_key,
-                                ) {
-                                    Ok(is_valid) => is_valid,
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            format!(
-                                                "Unable to validate master key for digest: {}",
-                                                digest.identifier
-                                            )
-                                        );
-                                        return Err(error);
-                                    }
-                                };
-                                if is_valid {
-                                    master_key = candidate_master_key;
-                                    master_key_unlocked = true;
-                                    break;
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                    if master_key_unlocked {
-                        break;
-                    }
-                }
-            }
-        }
-        if master_key_unlocked {
-            keramics_core::debug_trace_data!("LuksMasterKey", 0, &master_key, master_key.len());
-
-            let encryption_context: LuksEncryptionContext =
-                match LuksEncryption::get_encryption_context(&self.encryption_type, &master_key) {
-                    Ok(Some(context)) => context,
-                    Ok(None) => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Unsupported encryption type: {}",
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve encryption context for type: {}",
                             self.encryption_type
-                        )));
-                    }
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve encryption context for type: {}",
-                                self.encryption_type
-                            )
-                        );
-                        return Err(error);
-                    }
-                };
-            self.encryption_context = Some(Arc::new(encryption_context));
-            self.is_locked = false;
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+        self.encryption_context = Some(Arc::new(encryption_context));
+        self.is_locked = false;
+
+        Ok(true)
+    }
+
+    /// Attempts to derive and validate the master key from a LUKS1 key slot.
+    fn unlock_key_slot_v1(
+        &self,
+        key_slot: &LuksKeySlot,
+        passphrase: &[u8],
+    ) -> Result<Option<Vec<u8>>, ErrorTrace> {
+        if key_slot.number_of_stripes == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported key slot - number of stripes not set"
+            ));
         }
-        Ok(!self.is_locked)
+        let mut user_key: Vec<u8> = vec![0; self.key_size];
+
+        match self.derive_user_key(key_slot, passphrase, &mut user_key) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to derive user key");
+                return Err(error);
+            }
+        }
+        let mut master_key: Vec<u8> = vec![0; self.key_size];
+
+        match self.derive_master_key(key_slot, &user_key, &mut master_key) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to derive master key");
+                return Err(error);
+            }
+        }
+        if self.validate_master_key_v1(&master_key)? {
+            Ok(Some(master_key))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Attempts to derive and validate the master key from a LUKS2 key slot and digest.
+    fn unlock_key_slot_v2(
+        &self,
+        key_slot: &LuksMetadataKeySlot,
+        digest: &LuksMetadataDigest,
+        passphrase: &[u8],
+    ) -> Result<Option<Vec<u8>>, ErrorTrace> {
+        let mut user_key: Vec<u8> = vec![0; key_slot.area_key_size];
+
+        match self.derive_user_key_v2(key_slot, passphrase, &mut user_key) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to derive user key for key slot: {}",
+                        key_slot.identifier
+                    )
+                );
+                return Err(error);
+            }
+        }
+        let mut candidate_master_key: Vec<u8> = vec![0; key_slot.key_size];
+
+        match self.derive_master_key_v2(key_slot, &user_key, &mut candidate_master_key) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to derive master key for key slot: {}",
+                        key_slot.identifier
+                    )
+                );
+                return Err(error);
+            }
+        }
+        let is_valid: bool = match Self::validate_master_key_v2(digest, &candidate_master_key) {
+            Ok(is_valid) => is_valid,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to validate master key for digest: {}",
+                        digest.identifier
+                    )
+                );
+                return Err(error);
+            }
+        };
+        if is_valid {
+            Ok(Some(candidate_master_key))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Attempts to unlock a LUKS1 volume using a passphrase.
+    fn unlock_with_passphrase_v1(&self, passphrase: &[u8]) -> Result<Option<Vec<u8>>, ErrorTrace> {
+        for key_slot in self.key_slots.iter() {
+            if let Some(master_key) = self.unlock_key_slot_v1(key_slot, passphrase)? {
+                return Ok(Some(master_key));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Attempts to unlock a LUKS2 volume using a passphrase.
+    fn unlock_with_passphrase_v2(&self, passphrase: &[u8]) -> Result<Option<Vec<u8>>, ErrorTrace> {
+        let mut ordered_slots: Vec<&LuksMetadataKeySlot> = self
+            .metadata_key_slots
+            .iter()
+            .filter(|slot| slot.keyslot_type == "luks2")
+            .collect();
+        ordered_slots.sort_by(|left, right| {
+            let left_priority: i64 = left.priority.unwrap_or(1);
+            let right_priority: i64 = right.priority.unwrap_or(1);
+            right_priority.cmp(&left_priority)
+        });
+        for key_slot in ordered_slots {
+            let Some(digest) = self.metadata_digests.iter().find(|digest| {
+                digest.keyslots.contains(&key_slot.identifier)
+                    && digest.segments.contains(&self.segment_identifier)
+            }) else {
+                continue;
+            };
+            if let Some(master_key) = self.unlock_key_slot_v2(key_slot, digest, passphrase)? {
+                return Ok(Some(master_key));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Attempts to unlock the volume using passphrase credentials.
+    fn unlock_with_passphrases(
+        &self,
+        credentials: &[LuksCredential],
+    ) -> Result<Option<Vec<u8>>, ErrorTrace> {
+        for credential in credentials.iter() {
+            let LuksCredential::Passphrase(passphrase) = credential else {
+                continue;
+            };
+            let master_key: Option<Vec<u8>> = match self.format_version {
+                1 => self.unlock_with_passphrase_v1(passphrase)?,
+                2 => self.unlock_with_passphrase_v2(passphrase)?,
+                _ => None,
+            };
+            if master_key.is_some() {
+                return Ok(master_key);
+            }
+        }
+        Ok(None)
+    }
+
+    /// Validates LUKS2 key slot parameters and returns the key material size in bytes.
+    fn validate_key_slot_v2(
+        key_slot: &LuksMetadataKeySlot,
+        key_slot_sector_size: usize,
+    ) -> Result<usize, ErrorTrace> {
+        if key_slot.af_type != "luks1" {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported anti-forensic diffuser type: {}",
+                key_slot.af_type
+            )));
+        }
+        if key_slot.af_number_of_stripes == 0 || key_slot.af_number_of_stripes > 4000 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported number of stripes - value out of bounds"
+            ));
+        }
+        if key_slot.area_type != "raw" {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported key slot area type: {}",
+                key_slot.area_type
+            )));
+        }
+        let key_material_size: usize = key_slot.key_size * (key_slot.af_number_of_stripes as usize);
+
+        if (key_material_size as u64) > key_slot.area_size {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported key material size - exceeds key slot area size"
+            ));
+        }
+        if !key_material_size.is_multiple_of(key_slot_sector_size) {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported key material size - not a multiple of 512 bytes"
+            ));
+        }
+        Ok(key_material_size)
+    }
+
+    /// Validates a derived master key against the LUKS1 header validation hash.
+    fn validate_master_key_v1(&self, master_key: &[u8]) -> Result<bool, ErrorTrace> {
+        let mut key_derivation_context: LuksKeyDerivationContext =
+            match LuksEncryption::get_key_derivation_context(
+                self.hashing_method.as_str(),
+                &self.salt,
+                self.number_of_iterations as usize,
+            ) {
+                Ok(Some(context)) => context,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported key derivation method: {}",
+                        self.hashing_method
+                    )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve key derivation context for method: {}",
+                            self.hashing_method
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+        let mut master_key_validation_hash: [u8; 20] = [0; 20];
+
+        match key_derivation_context.derive_key(master_key, &mut master_key_validation_hash) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to derive validation hash from master key"
+                );
+                return Err(error);
+            }
+        }
+        Ok(master_key_validation_hash == self.validation_hash.as_slice())
     }
 
     /// Validates a derived master key against a LUKS2 digest object.

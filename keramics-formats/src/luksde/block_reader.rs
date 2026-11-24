@@ -67,6 +67,36 @@ impl LuksBlockReader {
         }
     }
 
+    /// Retrieves decrypted sector data from the cache, reading and caching it if needed.
+    fn get_sector_data(
+        &mut self,
+        sector_number: u64,
+        sector_offset: u64,
+    ) -> Result<&[u8], ErrorTrace> {
+        if !self.sector_cache.contains(&sector_number) {
+            let sector_data_offset: u64 = self.encrypted_data_offset + sector_offset;
+
+            let sector_data: Vec<u8> = match self.read_sector(sector_number, sector_data_offset) {
+                Ok(data) => data,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to read sector: {}", sector_number)
+                    );
+                    return Err(error);
+                }
+            };
+            self.sector_cache.insert(sector_number, sector_data);
+        }
+        match self.sector_cache.get(&sector_number) {
+            Some(data) => Ok(data),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Unable to retrieve sector: {} from cache",
+                sector_number
+            ))),
+        }
+    }
+
     /// Reads and decrypts a sector.
     fn read_sector(
         &mut self,
@@ -125,10 +155,7 @@ impl BlockReader for LuksBlockReader {
         let mut sector_number: u64 = current_offset / (self.bytes_per_sector as u64);
         let mut sector_offset: u64 = sector_number * (self.bytes_per_sector as u64);
 
-        while data_offset < read_size {
-            if current_offset >= self.size {
-                break;
-            }
+        while data_offset < read_size && current_offset < self.size {
             let range_relative_offset: u64 = current_offset - sector_offset;
             let range_remainder_size: u64 = (self.bytes_per_sector as u64) - range_relative_offset;
 
@@ -138,31 +165,8 @@ impl BlockReader for LuksBlockReader {
             if range_read_size == 0 {
                 break;
             }
-            if !self.sector_cache.contains(&sector_number) {
-                let sector_data_offset: u64 = self.encrypted_data_offset + sector_offset;
+            let range_data: &[u8] = self.get_sector_data(sector_number, sector_offset)?;
 
-                let sector_data: Vec<u8> = match self.read_sector(sector_number, sector_data_offset)
-                {
-                    Ok(data) => data,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to read sector: {}", sector_number)
-                        );
-                        return Err(error);
-                    }
-                };
-                self.sector_cache.insert(sector_number, sector_data);
-            }
-            let range_data: &[u8] = match self.sector_cache.get(&sector_number) {
-                Some(data) => data,
-                None => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unable to retrieve sector: {} from cache",
-                        sector_number
-                    )));
-                }
-            };
             let data_end_offset: usize = data_offset + range_read_size;
             let range_data_offset: usize = range_relative_offset as usize;
             let range_data_end_offset: usize = range_data_offset + range_read_size;

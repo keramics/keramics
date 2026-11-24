@@ -82,16 +82,6 @@ impl Argon2Context {
         }
     }
 
-    /// Sets the optional associated data.
-    pub fn set_associated_data(&mut self, associated_data: &[u8]) {
-        self.associated_data = associated_data.to_vec();
-    }
-
-    /// Sets the optional secret value.
-    pub fn set_secret(&mut self, secret: &[u8]) {
-        self.secret = secret.to_vec();
-    }
-
     /// Computes the variable-length BLAKE2b hash function `H'` defined in RFC 9106.
     fn blake2b_long(input: &[u8], output: &mut [u8]) -> Result<(), ErrorTrace> {
         let output_length: usize = output.len();
@@ -217,23 +207,22 @@ impl Argon2Context {
 
     /// Computes a data-independent address block for Argon2i / Argon2id.
     fn compute_address_block(
-        pass: u64,
-        lane: u64,
-        slice: u64,
-        memory_blocks: u64,
-        number_of_iterations: u64,
-        argon2_type: u64,
+        &self,
+        pass: usize,
+        lane: usize,
+        slice: usize,
+        memory_blocks: usize,
         counter: u64,
         address_block: &mut [u64; 128],
     ) {
         let zero_block: [u64; 128] = [0; 128];
         let mut input_block: [u64; 128] = [0; 128];
-        input_block[0] = pass;
-        input_block[1] = lane;
-        input_block[2] = slice;
-        input_block[3] = memory_blocks;
-        input_block[4] = number_of_iterations;
-        input_block[5] = argon2_type;
+        input_block[0] = pass as u64;
+        input_block[1] = lane as u64;
+        input_block[2] = slice as u64;
+        input_block[3] = memory_blocks as u64;
+        input_block[4] = self.number_of_iterations as u64;
+        input_block[5] = self.argon2_type as u64;
         input_block[6] = counter;
 
         let mut intermediate_block: [u64; 128] = [0; 128];
@@ -241,44 +230,8 @@ impl Argon2Context {
         Self::compress_block(&zero_block, &intermediate_block, address_block);
     }
 
-    /// Derives a key from the password.
-    pub fn derive_key(&self, password: &[u8], key: &mut [u8]) -> Result<(), ErrorTrace> {
-        let key_size: usize = key.len();
-        if key_size < 4 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid key size - value too small"
-            ));
-        }
-        if self.salt.len() < 8 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid salt size - value too small"
-            ));
-        }
-        if self.number_of_iterations == 0 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid context - number of iterations value out of bounds"
-            ));
-        }
-        if self.parallelism == 0 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid context - parallelism value out of bounds"
-            ));
-        }
-        let parallelism: usize = self.parallelism as usize;
-        let minimum_memory: u32 = self.parallelism.saturating_mul(8);
-
-        if self.memory_size_kib < minimum_memory {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid context - memory size value out of bounds"
-            ));
-        }
-        let lane_length: usize = ((self.memory_size_kib as usize)
-            / (ARGON2_SYNC_POINTS * parallelism))
-            * ARGON2_SYNC_POINTS;
-        let segment_length: usize = lane_length / ARGON2_SYNC_POINTS;
-        let memory_blocks: usize = lane_length * parallelism;
-
-        // Calculate H_0 using BLAKE2b-512.
+    /// Calculates the initial BLAKE2b-512 hash `H_0`.
+    fn compute_initial_hash(&self, password: &[u8], key_size: usize) -> [u8; 64] {
         let parallelism_bytes: [u8; 4] = self.parallelism.to_le_bytes();
         let key_size_bytes: [u8; 4] = (key_size as u32).to_le_bytes();
         let memory_size_bytes: [u8; 4] = self.memory_size_kib.to_le_bytes();
@@ -308,170 +261,188 @@ impl Argon2Context {
 
         let mut initial_hash: [u8; 64] = [0; 64];
         hash_context.finalize_into(&mut initial_hash);
+        initial_hash
+    }
 
-        let mut memory: Vec<[u64; 128]> = vec![[0; 128]; memory_blocks];
-
-        // Initialize the first two blocks of each lane.
-        let mut block_seed: [u8; 72] = [0; 72];
-        block_seed[0..64].copy_from_slice(&initial_hash);
-        let mut block_bytes: [u8; 1024] = [0; 1024];
-
-        for lane in 0..parallelism {
-            let lane_bytes: [u8; 4] = (lane as u32).to_le_bytes();
-            block_seed[68..72].copy_from_slice(&lane_bytes);
-
-            for block_index in 0..2 {
-                let block_index_bytes: [u8; 4] = (block_index as u32).to_le_bytes();
-                block_seed[64..68].copy_from_slice(&block_index_bytes);
-
-                match Self::blake2b_long(&block_seed, &mut block_bytes) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to initialize Argon2 memory block"
-                        );
-                        return Err(error);
-                    }
-                }
-                let memory_index: usize = (lane * lane_length) + block_index;
-                for word_index in 0..128 {
-                    let byte_offset: usize = word_index * 8;
-                    memory[memory_index][word_index] = bytes_to_u64_le!(block_bytes, byte_offset);
-                }
-            }
+    /// Computes the number of referenceable blocks `|W|` for the current position.
+    fn compute_reference_area_size(
+        pass: usize,
+        slice: usize,
+        segment_length: usize,
+        lane_length: usize,
+        index: usize,
+        same_lane: bool,
+    ) -> usize {
+        if pass == 0 && slice == 0 {
+            return index - 1;
         }
-        let mut address_block: [u64; 128] = [0; 128];
-        let mut new_block: [u64; 128] = [0; 128];
+        let base_size: usize = if pass == 0 {
+            slice * segment_length
+        } else {
+            lane_length - segment_length
+        };
+        if same_lane {
+            base_size + index - 1
+        } else if index == 0 {
+            base_size - 1
+        } else {
+            base_size
+        }
+    }
+
+    /// Computes the global memory block index of the reference block `B[l][z]`.
+    fn compute_reference_memory_index(
+        &self,
+        pass: usize,
+        slice: usize,
+        lane: usize,
+        index: usize,
+        lane_length: usize,
+        pseudo_random: u64,
+    ) -> usize {
+        let parallelism: usize = self.parallelism as usize;
+        let segment_length: usize = lane_length / ARGON2_SYNC_POINTS;
+        let pseudo_random_low: u64 = (pseudo_random as u32) as u64;
+        let pseudo_random_high: usize = (pseudo_random >> 32) as usize;
+
+        let reference_lane: usize = if pass == 0 && slice == 0 {
+            lane
+        } else {
+            pseudo_random_high % parallelism
+        };
+        let same_lane: bool = reference_lane == lane;
+        let reference_area_size: usize = Self::compute_reference_area_size(
+            pass,
+            slice,
+            segment_length,
+            lane_length,
+            index,
+            same_lane,
+        );
+        let squared: u64 = (pseudo_random_low * pseudo_random_low) >> 32;
+        let scaled: u64 = ((reference_area_size as u64) * squared) >> 32;
+        let relative_position: usize = (reference_area_size - 1) - (scaled as usize);
+
+        let start_position: usize = if pass != 0 && slice != (ARGON2_SYNC_POINTS - 1) {
+            (slice + 1) * segment_length
+        } else {
+            0
+        };
+        let reference_offset: usize = (start_position + relative_position) % lane_length;
+        (reference_lane * lane_length) + reference_offset
+    }
+
+    /// Derives a key from the password.
+    pub fn derive_key(&self, password: &[u8], key: &mut [u8]) -> Result<(), ErrorTrace> {
+        let key_size: usize = key.len();
+        self.validate_parameters(key_size)?;
+
+        let parallelism: usize = self.parallelism as usize;
+        let lane_length: usize = ((self.memory_size_kib as usize)
+            / (ARGON2_SYNC_POINTS * parallelism))
+            * ARGON2_SYNC_POINTS;
+        let memory_blocks: usize = lane_length * parallelism;
+
+        let initial_hash: [u8; 64] = self.compute_initial_hash(password, key_size);
+        let mut memory: Vec<[u64; 128]> = vec![[0; 128]; memory_blocks];
+        self.initialize_memory(&initial_hash, lane_length, &mut memory)?;
 
         for pass in 0..(self.number_of_iterations as usize) {
-            for slice in 0..ARGON2_SYNC_POINTS {
-                let data_independent: bool = match self.argon2_type {
-                    Argon2Type::Argon2d => false,
-                    Argon2Type::Argon2i => true,
-                    Argon2Type::Argon2id => pass == 0 && slice < 2,
-                };
-                for lane in 0..parallelism {
-                    let mut address_counter: u64 = 0;
+            self.fill_pass(&mut memory, pass, lane_length);
+        }
+        Self::finalize_key(&memory, lane_length, parallelism, key)
+    }
 
-                    if data_independent && pass == 0 && slice == 0 {
-                        address_counter = 1;
-                        Self::compute_address_block(
-                            pass as u64,
-                            lane as u64,
-                            slice as u64,
-                            memory_blocks as u64,
-                            self.number_of_iterations as u64,
-                            self.argon2_type as u64,
-                            address_counter,
-                            &mut address_block,
-                        );
-                    }
-                    let starting_index: usize = if pass == 0 && slice == 0 { 2 } else { 0 };
-                    let lane_base: usize = lane * lane_length;
+    /// Executes a single pass across all slices and lanes.
+    fn fill_pass(&self, memory: &mut [[u64; 128]], pass: usize, lane_length: usize) {
+        let parallelism: usize = self.parallelism as usize;
 
-                    for index in starting_index..segment_length {
-                        if data_independent && (index % 128 == 0) {
-                            address_counter += 1;
-                            Self::compute_address_block(
-                                pass as u64,
-                                lane as u64,
-                                slice as u64,
-                                memory_blocks as u64,
-                                self.number_of_iterations as u64,
-                                self.argon2_type as u64,
-                                address_counter,
-                                &mut address_block,
-                            );
-                        }
-                        let current_offset: usize = (slice * segment_length) + index;
-                        let previous_offset: usize = if current_offset == 0 {
-                            lane_length - 1
-                        } else {
-                            current_offset - 1
-                        };
-                        let previous_memory_index: usize = lane_base + previous_offset;
-
-                        let pseudo_random: u64 = if data_independent {
-                            let address_index: usize = index % 128;
-                            address_block[address_index]
-                        } else {
-                            memory[previous_memory_index][0]
-                        };
-                        let pseudo_random_low: u64 = (pseudo_random as u32) as u64;
-                        let pseudo_random_high: usize = (pseudo_random >> 32) as usize;
-
-                        let reference_lane: usize = if pass == 0 && slice == 0 {
-                            lane
-                        } else {
-                            pseudo_random_high % parallelism
-                        };
-                        let same_lane: bool = reference_lane == lane;
-                        let reference_area_size: usize = if pass == 0 {
-                            if slice == 0 {
-                                index - 1
-                            } else if same_lane {
-                                (slice * segment_length) + index - 1
-                            } else if index == 0 {
-                                (slice * segment_length) - 1
-                            } else {
-                                slice * segment_length
-                            }
-                        } else if same_lane {
-                            lane_length - segment_length + index - 1
-                        } else if index == 0 {
-                            lane_length - segment_length - 1
-                        } else {
-                            lane_length - segment_length
-                        };
-                        let squared: u64 = (pseudo_random_low * pseudo_random_low) >> 32;
-                        let scaled: u64 = ((reference_area_size as u64) * squared) >> 32;
-                        let relative_position: usize =
-                            (reference_area_size - 1) - (scaled as usize);
-
-                        let start_position: usize =
-                            if pass != 0 && slice != (ARGON2_SYNC_POINTS - 1) {
-                                (slice + 1) * segment_length
-                            } else {
-                                0
-                            };
-                        let reference_offset: usize =
-                            (start_position + relative_position) % lane_length;
-                        let reference_memory_index: usize =
-                            (reference_lane * lane_length) + reference_offset;
-                        let current_memory_index: usize = lane_base + current_offset;
-
-                        Self::compress_block(
-                            &memory[previous_memory_index],
-                            &memory[reference_memory_index],
-                            &mut new_block,
-                        );
-                        if pass == 0 {
-                            memory[current_memory_index] = new_block;
-                        } else {
-                            for word_index in 0..128 {
-                                memory[current_memory_index][word_index] ^= new_block[word_index];
-                            }
-                        }
-                    }
-                }
+        for slice in 0..ARGON2_SYNC_POINTS {
+            for lane in 0..parallelism {
+                self.fill_segment(memory, pass, slice, lane, lane_length);
             }
         }
-        // XOR the final block of each lane.
+    }
+
+    /// Fills a single segment (one lane of one slice in one pass).
+    fn fill_segment(
+        &self,
+        memory: &mut [[u64; 128]],
+        pass: usize,
+        slice: usize,
+        lane: usize,
+        lane_length: usize,
+    ) {
+        let segment_length: usize = lane_length / ARGON2_SYNC_POINTS;
+        let memory_blocks: usize = memory.len();
+        let data_independent: bool = self.is_data_independent(pass, slice);
+        let starting_index: usize = if pass == 0 && slice == 0 { 2 } else { 0 };
+        let lane_base: usize = lane * lane_length;
+
+        let mut address_block: [u64; 128] = [0; 128];
+        let mut address_counter: u64 = 0;
+        let mut new_block: [u64; 128] = [0; 128];
+
+        for index in starting_index..segment_length {
+            let needs_address_block: bool = index == starting_index || (index % 128 == 0);
+            if data_independent && needs_address_block {
+                address_counter += 1;
+                self.compute_address_block(
+                    pass,
+                    lane,
+                    slice,
+                    memory_blocks,
+                    address_counter,
+                    &mut address_block,
+                );
+            }
+            let current_offset: usize = (slice * segment_length) + index;
+            let previous_offset: usize = current_offset.checked_sub(1).unwrap_or(lane_length - 1);
+            let previous_memory_index: usize = lane_base + previous_offset;
+
+            let pseudo_random: u64 = if data_independent {
+                address_block[index % 128]
+            } else {
+                memory[previous_memory_index][0]
+            };
+            let reference_memory_index: usize = self.compute_reference_memory_index(
+                pass,
+                slice,
+                lane,
+                index,
+                lane_length,
+                pseudo_random,
+            );
+            let current_memory_index: usize = lane_base + current_offset;
+
+            Self::compress_block(
+                &memory[previous_memory_index],
+                &memory[reference_memory_index],
+                &mut new_block,
+            );
+            Self::store_block(&mut memory[current_memory_index], &new_block, pass == 0);
+        }
+    }
+
+    /// XORs the final block of every lane and derives the output key via `H'`.
+    fn finalize_key(
+        memory: &[[u64; 128]],
+        lane_length: usize,
+        parallelism: usize,
+        key: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
         let last_block_index: usize = lane_length - 1;
         let mut final_block: [u64; 128] = memory[last_block_index];
+
         for lane in 1..parallelism {
             let last_index: usize = (lane * lane_length) + last_block_index;
-            for word_index in 0..128 {
-                final_block[word_index] ^= memory[last_index][word_index];
-            }
+            Self::xor_block(&mut final_block, &memory[last_index]);
         }
         let mut final_block_bytes: [u8; 1024] = [0; 1024];
-        for word_index in 0..128 {
+        for (word_index, word) in final_block.iter().enumerate() {
             let byte_offset: usize = word_index * 8;
             let byte_end_offset: usize = byte_offset + 8;
-            final_block_bytes[byte_offset..byte_end_offset]
-                .copy_from_slice(&final_block[word_index].to_le_bytes());
+            final_block_bytes[byte_offset..byte_end_offset].copy_from_slice(&word.to_le_bytes());
         }
         match Self::blake2b_long(&final_block_bytes, key) {
             Ok(_) => Ok(()),
@@ -515,6 +486,72 @@ impl Argon2Context {
         value_b = (value_b ^ value_c).rotate_right(63);
 
         (value_a, value_b, value_c, value_d)
+    }
+
+    /// Initializes a single starting block of a lane from its 72-byte seed.
+    fn initialize_lane_block(
+        block_seed: &mut [u8; 72],
+        block_bytes: &mut [u8; 1024],
+        block_index: u32,
+        block: &mut [u64; 128],
+    ) -> Result<(), ErrorTrace> {
+        let block_index_bytes: [u8; 4] = block_index.to_le_bytes();
+        block_seed[64..68].copy_from_slice(&block_index_bytes);
+
+        match Self::blake2b_long(block_seed, block_bytes) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to initialize Argon2 memory block"
+                );
+                return Err(error);
+            }
+        }
+        Self::read_block_from_bytes(block_bytes, block);
+        Ok(())
+    }
+
+    /// Initializes the first two blocks of each lane.
+    fn initialize_memory(
+        &self,
+        initial_hash: &[u8; 64],
+        lane_length: usize,
+        memory: &mut [[u64; 128]],
+    ) -> Result<(), ErrorTrace> {
+        let parallelism: usize = self.parallelism as usize;
+        let mut block_seed: [u8; 72] = [0; 72];
+        block_seed[0..64].copy_from_slice(initial_hash);
+        let mut block_bytes: [u8; 1024] = [0; 1024];
+
+        for lane in 0..parallelism {
+            let lane_bytes: [u8; 4] = (lane as u32).to_le_bytes();
+            block_seed[68..72].copy_from_slice(&lane_bytes);
+
+            let lane_base: usize = lane * lane_length;
+            Self::initialize_lane_block(
+                &mut block_seed,
+                &mut block_bytes,
+                0,
+                &mut memory[lane_base],
+            )?;
+            Self::initialize_lane_block(
+                &mut block_seed,
+                &mut block_bytes,
+                1,
+                &mut memory[lane_base + 1],
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Determines whether the given pass and slice use data-independent indexing.
+    fn is_data_independent(&self, pass: usize, slice: usize) -> bool {
+        match self.argon2_type {
+            Argon2Type::Argon2d => false,
+            Argon2Type::Argon2i => true,
+            Argon2Type::Argon2id => pass == 0 && slice < 2,
+        }
     }
 
     /// Applies the Argon2 permutation `P` to 16 indexed words of a 128-word block.
@@ -563,6 +600,71 @@ impl Argon2Context {
         block[indices[13]] = value13;
         block[indices[14]] = value14;
         block[indices[15]] = value15;
+    }
+
+    /// Decodes a 1024-byte block into 128 little-endian 64-bit words.
+    fn read_block_from_bytes(block_bytes: &[u8; 1024], block: &mut [u64; 128]) {
+        for (word_index, word) in block.iter_mut().enumerate() {
+            let byte_offset: usize = word_index * 8;
+            *word = bytes_to_u64_le!(block_bytes, byte_offset);
+        }
+    }
+
+    /// Sets the optional associated data.
+    pub fn set_associated_data(&mut self, associated_data: &[u8]) {
+        self.associated_data = associated_data.to_vec();
+    }
+
+    /// Sets the optional secret value.
+    pub fn set_secret(&mut self, secret: &[u8]) {
+        self.secret = secret.to_vec();
+    }
+
+    /// Stores a compressed block into memory, overwriting on pass 0 or XORing on later passes.
+    fn store_block(target: &mut [u64; 128], source: &[u64; 128], overwrite: bool) {
+        if overwrite {
+            *target = *source;
+        } else {
+            Self::xor_block(target, source);
+        }
+    }
+
+    /// Validates the context parameters and requested key size.
+    fn validate_parameters(&self, key_size: usize) -> Result<(), ErrorTrace> {
+        if key_size < 4 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid key size - value too small"
+            ));
+        }
+        if self.salt.len() < 8 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid salt size - value too small"
+            ));
+        }
+        if self.number_of_iterations == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - number of iterations value out of bounds"
+            ));
+        }
+        if self.parallelism == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - parallelism value out of bounds"
+            ));
+        }
+        let minimum_memory: u32 = self.parallelism.saturating_mul(8);
+        if self.memory_size_kib < minimum_memory {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - memory size value out of bounds"
+            ));
+        }
+        Ok(())
+    }
+
+    /// XORs a source block into a target block in place.
+    fn xor_block(target: &mut [u64; 128], source: &[u64; 128]) {
+        for word_index in 0..128 {
+            target[word_index] ^= source[word_index];
+        }
     }
 }
 
