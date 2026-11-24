@@ -426,11 +426,32 @@ mod tests {
         ]
     }
 
+    #[cfg(feature = "debug-trace")]
+    #[test]
+    fn test_debug_read_data() {
+        let test_data: Vec<u8> = get_test_data();
+        let debug_string: String = LuksVolumeHeaderV2::debug_read_data(&test_data);
+        assert!(!debug_string.is_empty());
+    }
+
+    #[test]
+    fn test_read_backup_data() -> Result<(), ErrorTrace> {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[0..6].copy_from_slice(LUKS_BACKUP_VOLUME_HEADER_SIGNATURE);
+
+        let mut test_struct: LuksVolumeHeaderV2 = LuksVolumeHeaderV2::new();
+        test_struct.read_backup_data(&test_data)?;
+
+        assert_eq!(test_struct.metadata_area_size, 16384);
+        assert_eq!(test_struct.sequence_identifier, 3);
+        Ok(())
+    }
+
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = LuksVolumeHeaderV2::new();
+        let mut test_struct: LuksVolumeHeaderV2 = LuksVolumeHeaderV2::new();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.metadata_area_size, 16384);
@@ -454,24 +475,11 @@ mod tests {
     }
 
     #[test]
-    fn test_read_backup_data() -> Result<(), ErrorTrace> {
-        let mut test_data: Vec<u8> = get_test_data();
-        test_data[0..6].copy_from_slice(LUKS_BACKUP_VOLUME_HEADER_SIGNATURE);
-
-        let mut test_struct: LuksVolumeHeaderV2 = LuksVolumeHeaderV2::new();
-        test_struct.read_backup_data(&test_data)?;
-
-        assert_eq!(test_struct.metadata_area_size, 16384);
-        assert_eq!(test_struct.sequence_identifier, 3);
-        Ok(())
-    }
-
-    #[test]
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = LuksVolumeHeaderV2::new();
-        let result = test_struct.read_data(&test_data[0..4091]);
+        let mut test_struct: LuksVolumeHeaderV2 = LuksVolumeHeaderV2::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&test_data[0..4091]);
         assert!(result.is_err());
     }
 
@@ -480,8 +488,8 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
-        let mut test_struct = LuksVolumeHeaderV2::new();
-        let result = test_struct.read_data(&test_data);
+        let mut test_struct: LuksVolumeHeaderV2 = LuksVolumeHeaderV2::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
 
@@ -490,8 +498,8 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[6] = 0xff;
 
-        let mut test_struct = LuksVolumeHeaderV2::new();
-        let result = test_struct.read_data(&test_data);
+        let mut test_struct: LuksVolumeHeaderV2 = LuksVolumeHeaderV2::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
 }

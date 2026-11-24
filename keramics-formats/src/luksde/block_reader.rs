@@ -177,3 +177,72 @@ impl BlockReader for LuksBlockReader {
         Ok(data_offset)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::open_fake_data_stream;
+
+    use super::super::encryption::LuksEncryption;
+    use super::super::encryption_type::LuksEncryptionType;
+
+    fn get_encryption_context() -> Result<Arc<LuksEncryptionContext>, ErrorTrace> {
+        let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
+        encryption_type.set_encryption_string("aes-cbc-plain64");
+        encryption_type.key_size = 16;
+
+        let key: [u8; 16] = [0x11; 16];
+        let context: LuksEncryptionContext =
+            LuksEncryption::get_encryption_context(&encryption_type, &key)?.unwrap();
+        Ok(Arc::new(context))
+    }
+
+    #[test]
+    fn test_get_size_and_read_data_from_blocks() -> Result<(), ErrorTrace> {
+        let encryption_context: Arc<LuksEncryptionContext> = get_encryption_context()?;
+        let raw_data: Vec<u8> = vec![0x22; 1536];
+        let data_stream: DataStreamReference = open_fake_data_stream(&raw_data);
+
+        let mut block_reader: LuksBlockReader =
+            LuksBlockReader::new(&data_stream, 512, 512, &encryption_context, 4, 1024);
+
+        let size: u64 = block_reader.get_size();
+        assert_eq!(size, 1024);
+
+        // Test with read spanning two sectors (and non-zero tweak).
+        let mut buffer: [u8; 64] = [0; 64];
+        let read_count: usize = block_reader.read_data_from_blocks(&mut buffer, 480)?;
+        assert_eq!(read_count, 64);
+
+        // Test with cached sector hit.
+        let mut cached_buffer: [u8; 32] = [0; 32];
+        let cached_read_count: usize =
+            block_reader.read_data_from_blocks(&mut cached_buffer, 480)?;
+        assert_eq!(cached_read_count, 32);
+        assert_eq!(&cached_buffer, &buffer[0..32]);
+
+        // Test with read crossing end of volume.
+        let mut tail_buffer: [u8; 32] = [0; 32];
+        let tail_read_count: usize = block_reader.read_data_from_blocks(&mut tail_buffer, 1008)?;
+        assert_eq!(tail_read_count, 16);
+
+        // Test with read at or past end of volume.
+        let eof_read_count: usize = block_reader.read_data_from_blocks(&mut tail_buffer, 1024)?;
+        assert_eq!(eof_read_count, 0);
+
+        // Test with empty output buffer.
+        let mut empty_buffer: [u8; 0] = [];
+        let empty_read_count: usize = block_reader.read_data_from_blocks(&mut empty_buffer, 0)?;
+        assert_eq!(empty_read_count, 0);
+
+        // Test with truncated underlying data stream.
+        let short_stream: DataStreamReference = open_fake_data_stream(&[0; 128]);
+        let mut short_reader: LuksBlockReader =
+            LuksBlockReader::new(&short_stream, 512, 512, &encryption_context, 0, 1024);
+        let result: Result<usize, ErrorTrace> = short_reader.read_data_from_blocks(&mut buffer, 0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+}

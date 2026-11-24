@@ -71,3 +71,23 @@ fn read_encrypted_volume() -> Result<(), ErrorTrace> {
 
     Ok(())
 }
+
+#[test]
+fn read_encrypted_volume_v2() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/luksde/luks2.raw");
+    let mut encrypted_volume: LuksEncryptedVolume = open_encrypted_volume(&path_buf)?;
+
+    let credentials: Vec<LuksCredential> = vec![LuksCredential::Passphrase(b"KeRaMiCs".to_vec())];
+    let unlocked: bool = encrypted_volume.unlock(&credentials)?;
+    assert!(unlocked);
+
+    let data_stream: DataStreamReference = encrypted_volume.get_data_stream().unwrap();
+
+    let (volume_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
+
+    assert_eq!(volume_offset, encrypted_volume.get_volume_size());
+    assert_eq!(volume_offset, 3899392);
+    assert_eq!(md5_hash.len(), 32);
+
+    Ok(())
+}

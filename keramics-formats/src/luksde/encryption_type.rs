@@ -166,5 +166,12 @@ mod tests {
         assert_eq!(encryption_type.chaining_mode, "ecb");
         assert_eq!(encryption_type.initialization_vector_mode, None);
         assert_eq!(encryption_type.initialization_vector_options, None);
+
+        // Test with encryption string without a mode separator.
+        encryption_type.set_encryption_string("AES");
+        assert_eq!(encryption_type.encryption_method, "aes");
+        assert_eq!(encryption_type.chaining_mode, "");
+        assert_eq!(encryption_type.initialization_vector_mode, None);
+        assert_eq!(encryption_type.initialization_vector_options, None);
     }
 }

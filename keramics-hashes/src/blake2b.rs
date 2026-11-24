@@ -317,6 +317,18 @@ mod tests {
     use keramics_core::formatters::format_as_string;
 
     #[test]
+    fn test_increment_counter_with_overflow() {
+        let mut test_context: Blake2bContext = Blake2bContext::new();
+        test_context.hash_count_low = u64::MAX - 10;
+        test_context.hash_count_high = 0;
+
+        test_context.increment_counter(20);
+
+        assert_eq!(test_context.hash_count_low, 9);
+        assert_eq!(test_context.hash_count_high, 1);
+    }
+
+    #[test]
     fn test_new_with_unsupported_digest_size() {
         let result: Result<Blake2bContext, ErrorTrace> = Blake2bContext::new_with_digest_size(0);
         assert!(result.is_err());

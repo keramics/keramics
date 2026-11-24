@@ -11,13 +11,17 @@
  * under the License.
  */
 
+#[cfg(test)]
 use std::io::SeekFrom;
+use std::str::Chars;
 
 use pest::Parser;
 use pest::iterators::{Pair, Pairs};
 use pest_derive::Parser;
 
-use keramics_core::{DataStreamReference, ErrorTrace};
+#[cfg(test)]
+use keramics_core::DataStreamReference;
+use keramics_core::ErrorTrace;
 use keramics_encodings::Base64Context;
 
 /// Maximum LUKS2 JSON metadata area size (4092 KiB).
@@ -1602,6 +1606,8 @@ impl LuksMetadata {
     }
 
     /// Reads the metadata from a specific position in a data stream.
+    #[cfg(test)]
+    // Used for testing.
     pub fn read_at_position(
         &mut self,
         data_stream: &DataStreamReference,
@@ -1638,6 +1644,13 @@ impl LuksMetadata {
 
     /// Reads the metadata from a byte buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        let data_size: u64 = data.len() as u64;
+        if data_size == 0 || data_size > LUKS2_MAXIMUM_JSON_METADATA_SIZE {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported metadata size: {} value out of bounds",
+                data_size
+            )));
+        }
         let string: &str = match str::from_utf8(data) {
             Ok(string) => string,
             Err(error) => {
@@ -1662,7 +1675,7 @@ impl LuksMetadata {
             return value.to_string();
         }
         let mut result: String = String::with_capacity(value.len());
-        let mut chars: std::str::Chars = value.chars();
+        let mut chars: Chars = value.chars();
 
         while let Some(character) = chars.next() {
             if character == '\\' {
@@ -1804,68 +1817,15 @@ mod tests {
         let digest: &LuksMetadataDigest = &metadata.digests[0];
         assert_eq!(digest.identifier, "0");
         assert_eq!(digest.digest_type, "pbkdf2");
-        assert_eq!(digest.keyslots, vec!["0"]);
-        assert_eq!(digest.segments, vec!["0"]);
+        let expected_identifiers: [String; 1] = [String::from("0")];
+        assert_eq!(digest.keyslots, expected_identifiers);
+        assert_eq!(digest.segments, expected_identifiers);
         assert_eq!(digest.hashing_method, "sha1");
         assert_eq!(digest.number_of_iterations, 723155);
         let digest_salt_size: usize = digest.salt.len();
         assert_eq!(digest_salt_size, 32);
         let digest_size: usize = digest.digest.len();
         assert_eq!(digest_size, 20);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_read_at_position_and_errors() -> Result<(), ErrorTrace> {
-        let json_bytes: &[u8] = b"{\"keyslots\":{},\"tokens\":{},\"segments\":{},\"digests\":{},\"config\":{\"json_size\":\"12288\",\"keyslots_size\":\"262144\"}}\0\0";
-        let data_stream: DataStreamReference = open_fake_data_stream(json_bytes);
-        let mut metadata: LuksMetadata = LuksMetadata::new();
-        metadata.read_at_position(&data_stream, json_bytes.len() as u64, SeekFrom::Start(0))?;
-
-        assert_eq!(metadata.config.json_size, 12288);
-        assert_eq!(metadata.config.keyslots_size, 262144);
-
-        // Test unsupported data sizes (0 and > LUKS2_MAXIMUM_JSON_METADATA_SIZE).
-        let result: Result<(), ErrorTrace> =
-            metadata.read_at_position(&data_stream, 0, SeekFrom::Start(0));
-        assert!(result.is_err());
-
-        let result: Result<(), ErrorTrace> = metadata.read_at_position(
-            &data_stream,
-            LUKS2_MAXIMUM_JSON_METADATA_SIZE + 1,
-            SeekFrom::Start(0),
-        );
-        assert!(result.is_err());
-
-        // Test non-UTF-8 metadata.
-        let invalid_utf8: DataStreamReference = open_fake_data_stream(&[0xff, 0xfe]);
-        let result: Result<(), ErrorTrace> =
-            metadata.read_at_position(&invalid_utf8, 2, SeekFrom::Start(0));
-        assert!(result.is_err());
-
-        // Test non-ASCII UTF-8 metadata.
-        let non_ascii_stream: DataStreamReference = open_fake_data_stream(b"{\"a\":\"\xc3\xa9\"}");
-        let result: Result<(), ErrorTrace> =
-            metadata.read_at_position(&non_ascii_stream, 9, SeekFrom::Start(0));
-        assert!(result.is_err());
-
-        // Test invalid JSON syntax.
-        let result: Result<(), ErrorTrace> = metadata.parse("{invalid");
-        assert!(result.is_err());
-
-        // Test non-numeric keyslot, digest, and segment identifiers.
-        let result: Result<(), ErrorTrace> =
-            metadata.parse("{\"keyslots\": {\"abc\": {}}, \"config\": {}}");
-        assert!(result.is_err());
-
-        let result: Result<(), ErrorTrace> =
-            metadata.parse("{\"digests\": {\"abc\": {}}, \"config\": {}}");
-        assert!(result.is_err());
-
-        let result: Result<(), ErrorTrace> =
-            metadata.parse("{\"segments\": {\"abc\": {}}, \"config\": {}}");
-        assert!(result.is_err());
 
         Ok(())
     }
@@ -1900,22 +1860,22 @@ mod tests {
         let number_of_key_slots: usize = metadata.key_slots.len();
         assert_eq!(number_of_key_slots, 1);
 
-        // Test invalid JSON syntax.
+        // Test with invalid JSON syntax.
         let mut metadata: LuksMetadata = LuksMetadata::new();
         let result: Result<(), ErrorTrace> = metadata.parse("{ invalid }");
         assert!(result.is_err());
 
-        // Test non-integer keyslot identifier.
+        // Test with non-integer keyslot identifier.
         let result: Result<(), ErrorTrace> =
             metadata.parse("{ \"keyslots\": { \"abc\": { \"type\": \"luks2\" } } }");
         assert!(result.is_err());
 
-        // Test non-integer segment identifier.
+        // Test with non-integer segment identifier.
         let result: Result<(), ErrorTrace> =
             metadata.parse("{ \"segments\": { \"abc\": { \"type\": \"crypt\" } } }");
         assert!(result.is_err());
 
-        // Test non-integer digest identifier.
+        // Test with non-integer digest identifier.
         let result: Result<(), ErrorTrace> =
             metadata.parse("{ \"digests\": { \"abc\": { \"type\": \"pbkdf2\" } } }");
         assert!(result.is_err());
@@ -1925,44 +1885,214 @@ mod tests {
 
     #[test]
     fn test_read_at_position() -> Result<(), ErrorTrace> {
-        let mut data: Vec<u8> = b"{ \"tokens\": {} }".to_vec();
-        data.extend_from_slice(&[0; 16]);
-        let data_stream: DataStreamReference = open_fake_data_stream(&data);
-
+        let json_bytes: &[u8] = b"{\"keyslots\":{},\"tokens\":{},\"segments\":{},\"digests\":{},\"config\":{\"json_size\":\"12288\",\"keyslots_size\":\"262144\"}}\0\0";
+        let data_stream: DataStreamReference = open_fake_data_stream(json_bytes);
+        let data_size: u64 = json_bytes.len() as u64;
         let mut metadata: LuksMetadata = LuksMetadata::new();
-        metadata.read_at_position(&data_stream, data.len() as u64, SeekFrom::Start(0))?;
+        metadata.read_at_position(&data_stream, data_size, SeekFrom::Start(0))?;
 
-        // Test unsupported data sizes (0 and > 65536).
+        assert_eq!(metadata.config.json_size, 12288);
+        assert_eq!(metadata.config.keyslots_size, 262144);
+
+        // Test with unsupported data sizes (0 and > LUKS2_MAXIMUM_JSON_METADATA_SIZE).
         let result: Result<(), ErrorTrace> =
             metadata.read_at_position(&data_stream, 0, SeekFrom::Start(0));
         assert!(result.is_err());
 
-        let result: Result<(), ErrorTrace> =
-            metadata.read_at_position(&data_stream, 65537, SeekFrom::Start(0));
+        let result: Result<(), ErrorTrace> = metadata.read_at_position(
+            &data_stream,
+            LUKS2_MAXIMUM_JSON_METADATA_SIZE + 1,
+            SeekFrom::Start(0),
+        );
         assert!(result.is_err());
 
-        // Test invalid UTF-8 bytes.
+        // Test with invalid UTF-8 bytes.
         let invalid_utf8_stream: DataStreamReference = open_fake_data_stream(&[0xff, 0xfe, 0xfd]);
         let result: Result<(), ErrorTrace> =
             metadata.read_at_position(&invalid_utf8_stream, 3, SeekFrom::Start(0));
         assert!(result.is_err());
 
-        // Test non-ASCII UTF-8 metadata.
+        // Test with non-ASCII UTF-8 metadata.
         let non_ascii_bytes: &[u8] = b"{ \"extra\": \"\xc3\xa9\" }";
+        let non_ascii_size: u64 = non_ascii_bytes.len() as u64;
         let non_ascii_stream: DataStreamReference = open_fake_data_stream(non_ascii_bytes);
-        let result: Result<(), ErrorTrace> = metadata.read_at_position(
-            &non_ascii_stream,
-            non_ascii_bytes.len() as u64,
-            SeekFrom::Start(0),
-        );
+        let result: Result<(), ErrorTrace> =
+            metadata.read_at_position(&non_ascii_stream, non_ascii_size, SeekFrom::Start(0));
         assert!(result.is_err());
 
-        // Test invalid JSON in stream.
+        // Test with invalid JSON in stream.
         let invalid_json_stream: DataStreamReference = open_fake_data_stream(b"not json");
         let result: Result<(), ErrorTrace> =
             metadata.read_at_position(&invalid_json_stream, 8, SeekFrom::Start(0));
         assert!(result.is_err());
 
         Ok(())
+    }
+
+    #[test]
+    fn test_read_data_with_unsupported_data_size() {
+        let mut metadata: LuksMetadata = LuksMetadata::new();
+
+        // Test with empty metadata slice.
+        let result: Result<(), ErrorTrace> = metadata.read_data(&[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_unescape_json_string() {
+        let plain: String = LuksMetadata::unescape_json_string("plain_value");
+        assert_eq!(plain, "plain_value");
+
+        let escaped: String =
+            LuksMetadata::unescape_json_string("a\\\"b\\\\c\\/d\\be\\ff\\ng\\rh\\ti\\x");
+        assert_eq!(escaped, "a\"b\\c/d\u{0008}e\u{000c}f\ng\rh\ti\\x");
+    }
+
+    #[test]
+    fn test_parse_with_config_flags_and_fixed_segment_size() -> Result<(), ErrorTrace> {
+        let test_data: &str = concat!(
+            "{",
+            "  \"config\": {",
+            "    \"json_size\": \"12288\",",
+            "    \"keyslots_size\": \"262144\",",
+            "    \"flags\": [\"allow-discards\", \"submit-from-crypt-cpus\"],",
+            "    \"unknown_config\": 1",
+            "  },",
+            "  \"segments\": {",
+            "    \"0\": {",
+            "      \"type\": \"crypt\",",
+            "      \"offset\": \"32768\",",
+            "      \"size\": \"65536\",",
+            "      \"iv_tweak\": \"4\",",
+            "      \"encryption\": \"aes-xts-plain64\",",
+            "      \"sector_size\": 512,",
+            "      \"unknown_segment\": true",
+            "    }",
+            "  },",
+            "  \"keyslots\": {",
+            "    \"0\": {",
+            "      \"type\": \"luks2\",",
+            "      \"key_size\": 32,",
+            "      \"af\": {",
+            "        \"type\": \"luks1\",",
+            "        \"stripes\": 4000,",
+            "        \"hash\": \"sha256\",",
+            "        \"unknown_af\": 0",
+            "      },",
+            "      \"area\": {",
+            "        \"type\": \"raw\",",
+            "        \"offset\": \"32768\",",
+            "        \"size\": \"131072\",",
+            "        \"encryption\": \"aes-xts-plain64\",",
+            "        \"key_size\": 32,",
+            "        \"unknown_area\": null",
+            "      },",
+            "      \"kdf\": {",
+            "        \"type\": \"pbkdf2\",",
+            "        \"hash\": \"sha256\",",
+            "        \"iterations\": 1000,",
+            "        \"salt\": \"AAAAAAAAAAAAAAAAAAAAAA==\",",
+            "        \"unknown_kdf\": false",
+            "      }",
+            "    }",
+            "  },",
+            "  \"digests\": {",
+            "    \"0\": {",
+            "      \"type\": \"pbkdf2\",",
+            "      \"keyslots\": [\"0\"],",
+            "      \"segments\": [\"0\"],",
+            "      \"hash\": \"sha256\",",
+            "      \"iterations\": 1000,",
+            "      \"salt\": \"AAAAAAAAAAAAAAAAAAAAAA==\",",
+            "      \"digest\": \"AAAAAAAAAAAAAAAAAAAAAA==\",",
+            "      \"unknown_digest\": []",
+            "    }",
+            "  }",
+            "}",
+        );
+        let mut metadata: LuksMetadata = LuksMetadata::new();
+        metadata.parse(test_data)?;
+
+        let expected_flags: [String; 2] = [
+            String::from("allow-discards"),
+            String::from("submit-from-crypt-cpus"),
+        ];
+        assert_eq!(metadata.config.flags, expected_flags);
+        assert_eq!(metadata.segments[0].size, Some(65536));
+        assert_eq!(metadata.segments[0].initialization_vector_tweak, 4);
+        assert_eq!(metadata.key_slots[0].kdf_hashing_method, "sha256");
+        assert_eq!(metadata.key_slots[0].kdf_number_of_iterations, 1000);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_with_invalid_property_values() {
+        let invalid_cases: [&str; 38] = [
+            // Invalid config properties.
+            "{\"config\":{\"flags\":123}}",
+            "{\"config\":{\"flags\":[123]}}",
+            "{\"config\":{\"json_size\":12288}}",
+            "{\"config\":{\"json_size\":\"not_a_number\"}}",
+            "{\"config\":{\"keyslots_size\":\"not_a_number\"}}",
+            // Invalid keyslot properties.
+            "{\"keyslots\":{\"0\":{\"key_size\":\"32\"}}}",
+            "{\"keyslots\":{\"0\":{\"key_size\":-1}}}",
+            "{\"keyslots\":{\"0\":{\"priority\":\"1\"}}}",
+            "{\"keyslots\":{\"0\":{\"priority\":999999999999999999999}}}",
+            "{\"keyslots\":{\"0\":{\"type\":123}}}",
+            // Invalid af properties.
+            "{\"keyslots\":{\"0\":{\"af\":{\"hash\":123}}}}",
+            "{\"keyslots\":{\"0\":{\"af\":{\"stripes\":\"4000\"}}}}",
+            "{\"keyslots\":{\"0\":{\"af\":{\"stripes\":-1}}}}",
+            "{\"keyslots\":{\"0\":{\"af\":{\"type\":123}}}}",
+            // Invalid area properties.
+            "{\"keyslots\":{\"0\":{\"area\":{\"encryption\":123}}}}",
+            "{\"keyslots\":{\"0\":{\"area\":{\"key_size\":\"32\"}}}}",
+            "{\"keyslots\":{\"0\":{\"area\":{\"offset\":\"bad\"}}}}",
+            "{\"keyslots\":{\"0\":{\"area\":{\"size\":\"bad\"}}}}",
+            "{\"keyslots\":{\"0\":{\"area\":{\"type\":123}}}}",
+            // Invalid kdf properties.
+            "{\"keyslots\":{\"0\":{\"kdf\":{\"cpus\":\"4\"}}}}",
+            "{\"keyslots\":{\"0\":{\"kdf\":{\"hash\":123}}}}",
+            "{\"keyslots\":{\"0\":{\"kdf\":{\"iterations\":\"1000\"}}}}",
+            "{\"keyslots\":{\"0\":{\"kdf\":{\"memory\":\"64\"}}}}",
+            "{\"keyslots\":{\"0\":{\"kdf\":{\"salt\":123}}}}",
+            "{\"keyslots\":{\"0\":{\"kdf\":{\"salt\":\"!!!invalid_base64!!!\"}}}}",
+            "{\"keyslots\":{\"0\":{\"kdf\":{\"time\":\"1\"}}}}",
+            "{\"keyslots\":{\"0\":{\"kdf\":{\"type\":123}}}}",
+            // Invalid segment properties.
+            "{\"segments\":{\"0\":{\"encryption\":123}}}",
+            "{\"segments\":{\"0\":{\"iv_tweak\":\"bad\"}}}",
+            "{\"segments\":{\"0\":{\"offset\":\"bad\"}}}",
+            "{\"segments\":{\"0\":{\"sector_size\":\"512\"}}}",
+            "{\"segments\":{\"0\":{\"sector_size\":99999}}}",
+            "{\"segments\":{\"0\":{\"size\":4096}}}",
+            "{\"segments\":{\"0\":{\"size\":\"bad\"}}}",
+            "{\"segments\":{\"0\":{\"type\":123}}}",
+            // Invalid digest properties.
+            "{\"digests\":{\"0\":{\"digest\":\"!!!invalid_base64!!!\"}}}",
+            "{\"digests\":{\"0\":{\"salt\":\"!!!invalid_base64!!!\"}}}",
+            "{\"digests\":{\"0\":{\"type\":123,\"hash\":123,\"iterations\":\"1\",\"keyslots\":1,\"segments\":1,\"digest\":1,\"salt\":1}}}",
+        ];
+        for case in invalid_cases {
+            let mut metadata: LuksMetadata = LuksMetadata::new();
+            let result: Result<(), ErrorTrace> = metadata.parse(case);
+            assert!(result.is_err(), "Expected error for case: {}", case);
+        }
+        // Test remaining individual digest property type errors.
+        let digest_cases: [&str; 6] = [
+            "{\"digests\":{\"0\":{\"digest\":123}}}",
+            "{\"digests\":{\"0\":{\"hash\":123}}}",
+            "{\"digests\":{\"0\":{\"iterations\":\"10\"}}}",
+            "{\"digests\":{\"0\":{\"keyslots\":123}}}",
+            "{\"digests\":{\"0\":{\"salt\":123}}}",
+            "{\"digests\":{\"0\":{\"segments\":123}}}",
+        ];
+        for case in digest_cases {
+            let mut metadata: LuksMetadata = LuksMetadata::new();
+            let result: Result<(), ErrorTrace> = metadata.parse(case);
+            assert!(result.is_err(), "Expected error for digest case: {}", case);
+        }
     }
 }

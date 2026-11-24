@@ -19,8 +19,8 @@ Formats flow through the workspace in layers supported by dedicated utility crat
 | `keramics-datetime` | `DateTime` and format-specific timestamp types (`PosixTime32`, `PosixTime64Ns`, `Filetime`, `HfsTime`, `ApfsTime`, `FatTimeDate`, etc.) |
 | `keramics-checksums` | Checksum algorithms (Adler-32, CRC-32, CRC-32C / `ReversedCrc32Context`, Fletcher-64, etc.) |
 | `keramics-compression` | Pure-Rust decompression contexts (DEFLATE, zlib, bzip2, LZFSE, LZVN, LZNT1, LZXPRESS) |
-| `keramics-encryption` | Cipher and KDF primitives (AES-CBC/XTS/ECB, PBKDF2, key unwrap, etc.) |
-| `keramics-hashes` | Cryptographic digest primitives (MD5, SHA-1, SHA-256, SHA-512, HMAC) |
+| `keramics-encryption` | Cipher and KDF primitives (AES-CBC/XTS/ECB, Argon2, PBKDF2, key unwrap, etc.) |
+| `keramics-hashes` | Cryptographic digest primitives (BLAKE2b, MD5, SHA-1, SHA-256, SHA-512, HMAC) |
 | `keramics-sigscan` | Byte-pattern signature scanner (`Scanner`, `Signature`, `PatternType`) |
 | `keramics-layout-map` | `#[derive(LayoutMap)]` proc macro generating debug-trace and stream-reading methods |
 | `keramics-formats` | Read-only format parsers, `FormatIdentifier`, and `FormatScanner` |

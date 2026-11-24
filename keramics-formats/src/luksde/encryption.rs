@@ -371,8 +371,27 @@ mod tests {
     use keramics_types::ByteString;
 
     #[test]
+    fn test_get_argon2_key_derivation_context() -> Result<(), ErrorTrace> {
+        let salt: [u8; 16] = [0x02; 16];
+
+        for kdf_type in ["argon2i", "argon2id"] {
+            let mut context: LuksKeyDerivationContext =
+                LuksEncryption::get_argon2_key_derivation_context(kdf_type, &salt, 1, 32, 1)
+                    .unwrap();
+            let mut derived_key: [u8; 16] = [0; 16];
+            context.derive_key(b"password", &mut derived_key)?;
+            assert_ne!(derived_key, [0; 16]);
+        }
+        let unknown: Option<LuksKeyDerivationContext> =
+            LuksEncryption::get_argon2_key_derivation_context("unknown", &salt, 1, 32, 1);
+        assert!(unknown.is_none());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_diffuser_context_and_merge() {
-        for hashing_method in ["sha1", "sha224", "sha256", "sha512"] {
+        for hashing_method in ["sha1", "sha224", "sha256", "sha384", "sha512"] {
             let mut diffuser: LuksDiffuserContext =
                 LuksEncryption::get_diffuser_context(hashing_method).unwrap();
             let split_data: Vec<u8> = vec![0xaa; 32];
@@ -389,7 +408,7 @@ mod tests {
     fn test_get_key_derivation_context_and_derive_key() -> Result<(), ErrorTrace> {
         let salt: [u8; 8] = [0x01; 8];
 
-        for hashing_method in ["sha1", "sha224", "sha256", "sha512"] {
+        for hashing_method in ["sha1", "sha224", "sha256", "sha384", "sha512"] {
             let mut context: LuksKeyDerivationContext =
                 LuksEncryption::get_key_derivation_context(hashing_method, &salt, 1)?.unwrap();
             let mut derived_key: [u8; 16] = [0; 16];
@@ -478,11 +497,13 @@ mod tests {
 
         // Test unsupported cipher, chaining mode, initialization vector modes,
         // and invalid initialization vector options returning None.
-        let unsupported_modes: [(&str, &str, &[u8]); 10] = [
+        let unsupported_modes: [(&str, &str, &[u8]); 12] = [
             ("twofish", "cbc-plain", &key16),
             ("aes", "ctr-plain", &key16),
             ("aes", "cbc-benbi:opt", &key16),
             ("aes", "xts-essiv:sha256", &key32),
+            ("aes", "cbc-essiv:sha384", &key16),
+            ("aes", "cbc-essiv:sha512", &key16),
             ("aes", "cbc-essiv:unknown", &key16),
             ("aes", "cbc-essiv", &key16),
             ("aes", "cbc-null:opt", &key16),

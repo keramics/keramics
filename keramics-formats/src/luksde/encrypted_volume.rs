@@ -764,7 +764,7 @@ impl LuksEncryptedVolume {
         header_offset: u64,
         is_backup: bool,
     ) -> Result<(LuksVolumeHeaderV2, Vec<u8>), ErrorTrace> {
-        if header_offset + 4096 > data_stream_size {
+        if header_offset.saturating_add(4096) > data_stream_size {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported header offset - value out of bounds"
             ));
@@ -807,7 +807,7 @@ impl LuksEncryptedVolume {
         if volume_header.metadata_area_size < 16384
             || volume_header.metadata_area_size > 4194304
             || !volume_header.metadata_area_size.is_power_of_two()
-            || header_offset + volume_header.metadata_area_size > data_stream_size
+            || header_offset.saturating_add(volume_header.metadata_area_size) > data_stream_size
         {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported metadata area size - value out of bounds"
@@ -1531,6 +1531,459 @@ mod tests {
         let unlocked: bool = encrypted_volume.unlock(&credentials)?;
         assert!(unlocked);
         assert!(!encrypted_volume.is_locked);
+
+        // Test with unlock called on an already unlocked volume.
+        let already_unlocked: bool = encrypted_volume.unlock(&[])?;
+        assert!(already_unlocked);
+
+        Ok(())
+    }
+
+    /// Writes a checksummed LUKS2 metadata area (header + JSON) into `image` at `header_offset`.
+    fn write_synthetic_v2_metadata_area(
+        image: &mut [u8],
+        header_offset: usize,
+        is_backup: bool,
+        metadata_area_size: u64,
+        sequence_identifier: u64,
+        label: &[u8],
+        checksum_method: &[u8],
+        uuid: &[u8],
+        json_string: &str,
+    ) {
+        let mut header: [u8; 4096] = [0; 4096];
+        let signature: &[u8] = if is_backup {
+            LUKS_BACKUP_VOLUME_HEADER_SIGNATURE
+        } else {
+            LUKS_VOLUME_HEADER_SIGNATURE
+        };
+        header[0..6].copy_from_slice(signature);
+        header[6..8].copy_from_slice(&2_u16.to_be_bytes());
+        header[8..16].copy_from_slice(&metadata_area_size.to_be_bytes());
+        header[16..24].copy_from_slice(&sequence_identifier.to_be_bytes());
+        header[24..24 + label.len()].copy_from_slice(label);
+        header[72..72 + checksum_method.len()].copy_from_slice(checksum_method);
+        header[168..168 + uuid.len()].copy_from_slice(uuid);
+        header[256..264].copy_from_slice(&(header_offset as u64).to_be_bytes());
+
+        let json_area_offset: usize = header_offset + 4096;
+        let json_area_end_offset: usize = header_offset + (metadata_area_size as usize);
+        image[json_area_offset..json_area_end_offset].fill(0);
+        let json_bytes: &[u8] = json_string.as_bytes();
+        let json_end_offset: usize = json_area_offset + json_bytes.len();
+        image[json_area_offset..json_end_offset].copy_from_slice(json_bytes);
+
+        let mut sha256_context: Sha256Context = Sha256Context::new();
+        sha256_context.update(&header);
+        sha256_context.update(&image[json_area_offset..json_area_end_offset]);
+        let checksum: Vec<u8> = sha256_context.finalize();
+        header[448..480].copy_from_slice(&checksum);
+
+        let header_end_offset: usize = header_offset + 4096;
+        image[header_offset..header_end_offset].copy_from_slice(&header);
+    }
+
+    #[test]
+    fn test_read_data_stream_v2_with_backup_sequence_preference() -> Result<(), ErrorTrace> {
+        let valid_json: &str = concat!(
+            "{\"keyslots\":{\"0\":{\"type\":\"luks2\",\"key_size\":16}},",
+            "\"tokens\":{},",
+            "\"segments\":{\"1\":{\"type\":\"crypt\",\"offset\":\"32768\",",
+            "\"size\":\"4096\",\"iv_tweak\":\"0\",\"encryption\":\"aes-ecb\",",
+            "\"sector_size\":512}},",
+            "\"digests\":{},\"config\":{\"json_size\":\"12288\",\"keyslots_size\":\"4096\"}}"
+        );
+        let mut image: Vec<u8> = vec![0; 65536];
+        write_synthetic_v2_metadata_area(
+            &mut image,
+            0,
+            false,
+            16384,
+            1,
+            b"old_label",
+            b"sha256",
+            b"11111111-2222-3333-4444-555555555555",
+            valid_json,
+        );
+        write_synthetic_v2_metadata_area(
+            &mut image,
+            16384,
+            true,
+            16384,
+            5,
+            b"newer_backup",
+            b"sha256",
+            b"11111111-2222-3333-4444-555555555555",
+            valid_json,
+        );
+        // Test with backup header having higher sequence identifier than valid primary.
+        let data_stream: DataStreamReference = open_fake_data_stream(&image);
+        let mut volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+        volume.read_data_stream(&data_stream)?;
+
+        let expected_label: ByteString = ByteString::from("newer_backup");
+        assert_eq!(volume.get_volume_label(), Some(&expected_label));
+        // Also verifies non-"0" crypt segment fallback and key_size fallback without digest.
+        assert_eq!(volume.key_size, 16);
+        assert_eq!(volume.segment_identifier, "1");
+
+        // Test with get_data_stream returning None while locked or unopened.
+        let locked_stream: Option<DataStreamReference> = volume.get_data_stream();
+        assert!(locked_stream.is_none());
+        let unopened_volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+        let unopened_stream: Option<DataStreamReference> = unopened_volume.get_data_stream();
+        assert!(unopened_stream.is_none());
+
+        // Test with corrupt primary and two valid backups at 16384 and 32768 selecting higher epoch.
+        image[448] ^= 0xff;
+        write_synthetic_v2_metadata_area(
+            &mut image,
+            32768,
+            true,
+            16384,
+            9,
+            b"newest_backup",
+            b"sha256",
+            b"11111111-2222-3333-4444-555555555555",
+            valid_json,
+        );
+        let multi_backup_stream: DataStreamReference = open_fake_data_stream(&image);
+        let mut recovered_volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+        recovered_volume.read_data_stream(&multi_backup_stream)?;
+
+        let expected_newest_label: ByteString = ByteString::from("newest_backup");
+        assert_eq!(
+            recovered_volume.get_volume_label(),
+            Some(&expected_newest_label)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_stream_errors() {
+        // Test with unsupported signature.
+        let bad_sig_stream: DataStreamReference = open_fake_data_stream(&vec![0; 4096]);
+        let mut volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+        let result: Result<(), ErrorTrace> = volume.read_data_stream(&bad_sig_stream);
+        assert!(result.is_err());
+
+        // Test with unsupported format version.
+        let mut bad_version: Vec<u8> = vec![0; 4096];
+        bad_version[0..6].copy_from_slice(LUKS_VOLUME_HEADER_SIGNATURE);
+        bad_version[6..8].copy_from_slice(&3_u16.to_be_bytes());
+        let bad_version_stream: DataStreamReference = open_fake_data_stream(&bad_version);
+        let mut volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+        let result: Result<(), ErrorTrace> = volume.read_data_stream(&bad_version_stream);
+        assert!(result.is_err());
+
+        // Test with LUKS1 encrypted data offset out of bounds.
+        let mut bad_v1: Vec<u8> = vec![0; 4096];
+        bad_v1[0..6].copy_from_slice(LUKS_VOLUME_HEADER_SIGNATURE);
+        bad_v1[6..8].copy_from_slice(&1_u16.to_be_bytes());
+        bad_v1[104..108].copy_from_slice(&9999_u32.to_be_bytes());
+        bad_v1[168..204].copy_from_slice(b"11111111-2222-3333-4444-555555555555");
+        let bad_v1_stream: DataStreamReference = open_fake_data_stream(&bad_v1);
+        let mut volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+        let result: Result<(), ErrorTrace> = volume.read_data_stream(&bad_v1_stream);
+        assert!(result.is_err());
+
+        // Test with LUKS2 validation errors via synthetic metadata areas.
+        let valid_json: &str = concat!(
+            "{\"keyslots\":{},\"tokens\":{},",
+            "\"segments\":{\"0\":{\"type\":\"crypt\",\"offset\":\"16384\",",
+            "\"size\":\"4096\",\"iv_tweak\":\"0\",\"encryption\":\"aes-ecb\",",
+            "\"sector_size\":512}},",
+            "\"digests\":{},\"config\":{}}"
+        );
+        let bad_jsons: [&str; 6] = [
+            // Invalid JSON syntax.
+            "{invalid",
+            // Missing segment.
+            "{\"keyslots\":{},\"tokens\":{},\"segments\":{},\"digests\":{},\"config\":{}}",
+            // Unsupported segment type.
+            "{\"segments\":{\"0\":{\"type\":\"linear\",\"offset\":\"16384\",\"size\":\"4096\",\"sector_size\":512}}}",
+            // Unsupported sector size.
+            "{\"segments\":{\"0\":{\"type\":\"crypt\",\"offset\":\"16384\",\"size\":\"4096\",\"sector_size\":256}}}",
+            // Offset out of bounds.
+            "{\"segments\":{\"0\":{\"type\":\"crypt\",\"offset\":\"999999\",\"size\":\"4096\",\"sector_size\":512}}}",
+            // Segment size out of bounds.
+            "{\"segments\":{\"0\":{\"type\":\"crypt\",\"offset\":\"16384\",\"size\":\"999999\",\"sector_size\":512}}}",
+        ];
+        for bad_json in bad_jsons {
+            let mut image: Vec<u8> = vec![0; 24576];
+            write_synthetic_v2_metadata_area(
+                &mut image,
+                0,
+                false,
+                16384,
+                1,
+                b"",
+                b"sha256",
+                b"11111111-2222-3333-4444-555555555555",
+                bad_json,
+            );
+            let stream: DataStreamReference = open_fake_data_stream(&image);
+            let mut volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+            let result: Result<(), ErrorTrace> = volume.read_data_stream(&stream);
+            assert!(result.is_err());
+        }
+        // Test with invalid UUID string.
+        let mut bad_uuid_image: Vec<u8> = vec![0; 24576];
+        write_synthetic_v2_metadata_area(
+            &mut bad_uuid_image,
+            0,
+            false,
+            16384,
+            1,
+            b"",
+            b"sha256",
+            b"not-a-valid-uuid",
+            valid_json,
+        );
+        let stream: DataStreamReference = open_fake_data_stream(&bad_uuid_image);
+        let mut volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+        let result: Result<(), ErrorTrace> = volume.read_data_stream(&stream);
+        assert!(result.is_err());
+
+        // Test with unsupported metadata checksum method.
+        let mut bad_hash_image: Vec<u8> = vec![0; 24576];
+        write_synthetic_v2_metadata_area(
+            &mut bad_hash_image,
+            0,
+            false,
+            16384,
+            1,
+            b"",
+            b"md5",
+            b"11111111-2222-3333-4444-555555555555",
+            valid_json,
+        );
+        let stream: DataStreamReference = open_fake_data_stream(&bad_hash_image);
+        let mut volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+        let result: Result<(), ErrorTrace> = volume.read_data_stream(&stream);
+        assert!(result.is_err());
+
+        // Test with mismatched header_offset and unsupported metadata_area_size.
+        let mut bad_offset_image: Vec<u8> = vec![0; 24576];
+        write_synthetic_v2_metadata_area(
+            &mut bad_offset_image,
+            0,
+            false,
+            16384,
+            1,
+            b"",
+            b"sha256",
+            b"11111111-2222-3333-4444-555555555555",
+            valid_json,
+        );
+        bad_offset_image[256..264].copy_from_slice(&4096_u64.to_be_bytes());
+        let stream: DataStreamReference = open_fake_data_stream(&bad_offset_image);
+        let mut volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+        let result: Result<(), ErrorTrace> = volume.read_data_stream(&stream);
+        assert!(result.is_err());
+
+        let mut bad_area_size_image: Vec<u8> = vec![0; 24576];
+        bad_area_size_image[0..6].copy_from_slice(LUKS_VOLUME_HEADER_SIGNATURE);
+        bad_area_size_image[6..8].copy_from_slice(&2_u16.to_be_bytes());
+        bad_area_size_image[8..16].copy_from_slice(&12288_u64.to_be_bytes());
+        let stream: DataStreamReference = open_fake_data_stream(&bad_area_size_image);
+        let mut volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+        let result: Result<(), ErrorTrace> = volume.read_data_stream(&stream);
+        assert!(result.is_err());
+
+        // Test with header_offset out of bounds directly.
+        let small_stream: DataStreamReference = open_fake_data_stream(&[0; 128]);
+        let result: Result<(LuksVolumeHeaderV2, Vec<u8>), ErrorTrace> =
+            LuksEncryptedVolume::read_v2_metadata_area(&small_stream, 128, 0, false);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_unlock_and_key_derivation_error_paths() -> Result<(), ErrorTrace> {
+        let mut volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+        volume.format_version = 2;
+        volume.key_size = 16;
+        volume.volume_identifier = Uuid::from_string("11111111-2222-3333-4444-555555555555")?;
+        volume.segment_identifier = String::from("0");
+        volume
+            .encryption_type
+            .set_encryption_string("twofish-cbc-plain");
+        volume.encryption_type.key_size = 16;
+
+        // Test KeyData credential with invalid identifier length and mismatched UUID.
+        let wrong_id_len: LuksCredential = LuksCredential::KeyData {
+            identifier: vec![0; 4],
+            data: vec![0; 16],
+        };
+        let wrong_uuid: LuksCredential = LuksCredential::KeyData {
+            identifier: vec![0xff; 16],
+            data: vec![0; 16],
+        };
+        let unlocked: bool = volume.unlock(&[wrong_id_len, wrong_uuid])?;
+        assert!(!unlocked);
+
+        // Test KeyData matching UUID but unsupported volume encryption type.
+        let matching_key: LuksCredential = LuksCredential::KeyData {
+            identifier: vec![
+                0x11, 0x11, 0x11, 0x11, 0x22, 0x22, 0x33, 0x33, 0x44, 0x44, 0x55, 0x55, 0x55, 0x55,
+                0x55, 0x55,
+            ],
+            data: vec![0; 16],
+        };
+        let result: Result<bool, ErrorTrace> = volume.unlock(&[matching_key]);
+        assert!(result.is_err());
+
+        // Test validate_master_key_v2 error branches.
+        let mut bad_digest: LuksMetadataDigest = LuksMetadataDigest::new(String::from("0"));
+        bad_digest.digest_type = String::from("unknown");
+        let result: Result<bool, ErrorTrace> =
+            LuksEncryptedVolume::validate_master_key_v2(&bad_digest, &[0; 16]);
+        assert!(result.is_err());
+
+        bad_digest.digest_type = String::from("pbkdf2");
+        let result: Result<bool, ErrorTrace> =
+            LuksEncryptedVolume::validate_master_key_v2(&bad_digest, &[0; 16]);
+        assert!(result.is_err());
+
+        bad_digest.digest = vec![1; 32];
+        bad_digest.hashing_method = String::from("unknown");
+        let result: Result<bool, ErrorTrace> =
+            LuksEncryptedVolume::validate_master_key_v2(&bad_digest, &[0; 16]);
+        assert!(result.is_err());
+
+        // Test derive_user_key_v2 error branches.
+        let mut key_slot: LuksMetadataKeySlot = LuksMetadataKeySlot::new(String::from("0"));
+        let mut user_key: [u8; 16] = [0; 16];
+        key_slot.kdf_type = String::from("unknown");
+        let result: Result<(), ErrorTrace> =
+            volume.derive_user_key_v2(&key_slot, b"pass", &mut user_key);
+        assert!(result.is_err());
+
+        key_slot.kdf_type = String::from("pbkdf2");
+        key_slot.kdf_hashing_method = String::from("unknown");
+        let result: Result<(), ErrorTrace> =
+            volume.derive_user_key_v2(&key_slot, b"pass", &mut user_key);
+        assert!(result.is_err());
+
+        key_slot.kdf_type = String::from("argon2id");
+        key_slot.kdf_time = 0;
+        let result: Result<(), ErrorTrace> =
+            volume.derive_user_key_v2(&key_slot, b"pass", &mut user_key);
+        assert!(result.is_err());
+
+        // Test derive_master_key_v2 error branches.
+        let mut master_key: [u8; 16] = [0; 16];
+        key_slot.af_type = String::from("unknown");
+        let result: Result<(), ErrorTrace> =
+            volume.derive_master_key_v2(&key_slot, &user_key, &mut master_key);
+        assert!(result.is_err());
+
+        key_slot.af_type = String::from("luks1");
+        key_slot.af_number_of_stripes = 0;
+        let result: Result<(), ErrorTrace> =
+            volume.derive_master_key_v2(&key_slot, &user_key, &mut master_key);
+        assert!(result.is_err());
+
+        key_slot.af_number_of_stripes = 32;
+        key_slot.area_type = String::from("journal");
+        let result: Result<(), ErrorTrace> =
+            volume.derive_master_key_v2(&key_slot, &user_key, &mut master_key);
+        assert!(result.is_err());
+
+        key_slot.area_type = String::from("raw");
+        key_slot.key_size = 16;
+        key_slot.area_size = 100;
+        let result: Result<(), ErrorTrace> =
+            volume.derive_master_key_v2(&key_slot, &user_key, &mut master_key);
+        assert!(result.is_err());
+
+        key_slot.area_size = 4096;
+        key_slot.af_number_of_stripes = 3;
+        let result: Result<(), ErrorTrace> =
+            volume.derive_master_key_v2(&key_slot, &user_key, &mut master_key);
+        assert!(result.is_err());
+
+        key_slot.af_number_of_stripes = 32;
+        // Missing data stream.
+        let result: Result<(), ErrorTrace> =
+            volume.derive_master_key_v2(&key_slot, &user_key, &mut master_key);
+        assert!(result.is_err());
+
+        // Attach fake data stream and test unsupported area encryption & AF hashing method.
+        let raw_data: Vec<u8> = vec![0; 4096];
+        volume.data_stream = Some(open_fake_data_stream(&raw_data));
+        key_slot.area_encryption = String::from("twofish-cbc-plain");
+        key_slot.area_key_size = 16;
+        let result: Result<(), ErrorTrace> =
+            volume.derive_master_key_v2(&key_slot, &user_key, &mut master_key);
+        assert!(result.is_err());
+
+        key_slot.area_encryption = String::from("aes-ecb");
+        key_slot.af_hashing_method = String::from("unknown");
+        let result: Result<(), ErrorTrace> =
+            volume.derive_master_key_v2(&key_slot, &user_key, &mut master_key);
+        assert!(result.is_err());
+
+        // Test priority sorting with multiple keyslots and skipping keyslot without digest.
+        let mut low_priority_slot: LuksMetadataKeySlot =
+            LuksMetadataKeySlot::new(String::from("0"));
+        low_priority_slot.keyslot_type = String::from("luks2");
+        low_priority_slot.priority = Some(0);
+        let mut high_priority_slot: LuksMetadataKeySlot =
+            LuksMetadataKeySlot::new(String::from("1"));
+        high_priority_slot.keyslot_type = String::from("luks2");
+        high_priority_slot.priority = Some(2);
+        volume.metadata_key_slots = vec![low_priority_slot, high_priority_slot];
+        volume.metadata_digests = Vec::new();
+        let pass_creds: Vec<LuksCredential> = vec![LuksCredential::Passphrase(b"pass".to_vec())];
+        let unlocked: bool = volume.unlock(&pass_creds)?;
+        assert!(!unlocked);
+
+        // Test LUKS1 derive_master_key / derive_user_key / unlock error branches.
+        let mut v1_volume: LuksEncryptedVolume = LuksEncryptedVolume::new();
+        v1_volume.format_version = 1;
+        v1_volume.bytes_per_sector = 512;
+        v1_volume.key_size = 16;
+        v1_volume.hashing_method = String::from("unknown");
+        let mut v1_slot: LuksKeySlot = LuksKeySlot::new();
+        v1_slot.number_of_stripes = 0;
+        let zero_stripe_slot: LuksKeySlot = LuksKeySlot::new();
+        v1_volume.key_slots = vec![zero_stripe_slot];
+        let result: Result<bool, ErrorTrace> = v1_volume.unlock(&pass_creds);
+        assert!(result.is_err());
+
+        let result: Result<(), ErrorTrace> =
+            v1_volume.derive_user_key(&v1_slot, b"pass", &mut user_key);
+        assert!(result.is_err());
+
+        v1_slot.number_of_stripes = 4001;
+        let result: Result<(), ErrorTrace> =
+            v1_volume.derive_master_key(&v1_slot, &user_key, &mut master_key);
+        assert!(result.is_err());
+
+        v1_slot.number_of_stripes = 3;
+        let result: Result<(), ErrorTrace> =
+            v1_volume.derive_master_key(&v1_slot, &user_key, &mut master_key);
+        assert!(result.is_err());
+
+        v1_slot.number_of_stripes = 32;
+        // Missing data stream.
+        let result: Result<(), ErrorTrace> =
+            v1_volume.derive_master_key(&v1_slot, &user_key, &mut master_key);
+        assert!(result.is_err());
+
+        v1_volume.data_stream = Some(open_fake_data_stream(&raw_data));
+        v1_volume
+            .encryption_type
+            .set_encryption_string("twofish-cbc-plain");
+        let result: Result<(), ErrorTrace> =
+            v1_volume.derive_master_key(&v1_slot, &user_key, &mut master_key);
+        assert!(result.is_err());
+
+        v1_volume.encryption_type.set_encryption_string("aes-ecb");
+        let result: Result<(), ErrorTrace> =
+            v1_volume.derive_master_key(&v1_slot, &user_key, &mut master_key);
+        assert!(result.is_err());
 
         Ok(())
     }

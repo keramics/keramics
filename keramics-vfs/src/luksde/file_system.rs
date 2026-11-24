@@ -296,6 +296,12 @@ mod tests {
 
         luks_file_system.open(Some(&os_file_system), &os_vfs_location)?;
 
+        let mut luks2_file_system: LuksFileSystem = LuksFileSystem::new();
+        let path_string: String = get_test_data_path("luksde/luks2.raw");
+        let os_vfs_location: VfsLocation = VfsLocation::from(&path_string);
+
+        luks2_file_system.open(Some(&os_file_system), &os_vfs_location)?;
+
         Ok(())
     }
 

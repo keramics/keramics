@@ -135,12 +135,7 @@ impl Argon2Context {
     }
 
     /// Computes the Argon2 compression function `G(X, Y)`.
-    fn compress_block(
-        block_x: &[u64; 128],
-        block_y: &[u64; 128],
-        output_block: &mut [u64; 128],
-        xor_output: bool,
-    ) {
+    fn compress_block(block_x: &[u64; 128], block_y: &[u64; 128], output_block: &mut [u64; 128]) {
         let mut block_r: [u64; 128] = [0; 128];
         for index in 0..128 {
             block_r[index] = block_x[index] ^ block_y[index];
@@ -197,14 +192,8 @@ impl Argon2Context {
                 ],
             );
         }
-        if xor_output {
-            for index in 0..128 {
-                output_block[index] ^= block_q[index] ^ block_r[index];
-            }
-        } else {
-            for index in 0..128 {
-                output_block[index] = block_q[index] ^ block_r[index];
-            }
+        for index in 0..128 {
+            output_block[index] = block_q[index] ^ block_r[index];
         }
     }
 
@@ -230,8 +219,8 @@ impl Argon2Context {
         input_block[6] = counter;
 
         let mut intermediate_block: [u64; 128] = [0; 128];
-        Self::compress_block(&zero_block, &input_block, &mut intermediate_block, false);
-        Self::compress_block(&zero_block, &intermediate_block, address_block, false);
+        Self::compress_block(&zero_block, &input_block, &mut intermediate_block);
+        Self::compress_block(&zero_block, &intermediate_block, address_block);
     }
 
     /// Derives a key from the password.
@@ -432,21 +421,14 @@ impl Argon2Context {
                             (reference_lane * lane_length) + reference_offset;
                         let current_memory_index: usize = lane_base + current_offset;
 
+                        Self::compress_block(
+                            &memory[previous_memory_index],
+                            &memory[reference_memory_index],
+                            &mut new_block,
+                        );
                         if pass == 0 {
-                            Self::compress_block(
-                                &memory[previous_memory_index],
-                                &memory[reference_memory_index],
-                                &mut new_block,
-                                false,
-                            );
                             memory[current_memory_index] = new_block;
                         } else {
-                            Self::compress_block(
-                                &memory[previous_memory_index],
-                                &memory[reference_memory_index],
-                                &mut new_block,
-                                false,
-                            );
                             for word_index in 0..128 {
                                 memory[current_memory_index][word_index] ^= new_block[word_index];
                             }
@@ -571,7 +553,7 @@ mod tests {
     use keramics_core::formatters::format_as_string;
 
     #[test]
-    fn test_derive_key_argon2d() -> Result<(), ErrorTrace> {
+    fn test_derive_key_with_argon2d() -> Result<(), ErrorTrace> {
         let password: [u8; 32] = [0x01; 32];
         let salt: [u8; 16] = [0x02; 16];
 
@@ -588,7 +570,7 @@ mod tests {
     }
 
     #[test]
-    fn test_derive_key_argon2i() -> Result<(), ErrorTrace> {
+    fn test_derive_key_with_argon2i() -> Result<(), ErrorTrace> {
         let password: [u8; 32] = [0x01; 32];
         let salt: [u8; 16] = [0x02; 16];
 
@@ -605,7 +587,7 @@ mod tests {
     }
 
     #[test]
-    fn test_derive_key_argon2id() -> Result<(), ErrorTrace> {
+    fn test_derive_key_with_argon2id() -> Result<(), ErrorTrace> {
         let password: [u8; 32] = [0x01; 32];
         let salt: [u8; 16] = [0x02; 16];
 
@@ -622,32 +604,52 @@ mod tests {
     }
 
     #[test]
+    fn test_derive_key_with_large_segment_and_long_output() -> Result<(), ErrorTrace> {
+        let salt: [u8; 16] = [0x03; 16];
+
+        // Segment length > 2 exercises the pass == 0, slice == 0 indexing loop;
+        // output length > 64 exercises the multi-block blake2b_long path.
+        let context: Argon2Context = Argon2Context::new(Argon2Type::Argon2id, &salt, 2, 64, 1);
+        let mut long_key: [u8; 96] = [0; 96];
+        context.derive_key(b"password", &mut long_key)?;
+        assert_ne!(long_key, [0; 96]);
+
+        // Test with zero-length output buffer on blake2b_long directly.
+        let mut empty_output: [u8; 0] = [];
+        let result: Result<(), ErrorTrace> =
+            Argon2Context::blake2b_long(b"input", &mut empty_output);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_derive_key_with_invalid_parameters() {
         let salt: [u8; 16] = [0x02; 16];
         let mut key: [u8; 32] = [0; 32];
 
-        // Test key size too small.
+        // Test with key size too small.
         let context: Argon2Context = Argon2Context::new(Argon2Type::Argon2id, &salt, 1, 32, 1);
         let mut short_key: [u8; 3] = [0; 3];
         let result: Result<(), ErrorTrace> = context.derive_key(b"password", &mut short_key);
         assert!(result.is_err());
 
-        // Test salt size too small.
+        // Test with salt size too small.
         let context: Argon2Context = Argon2Context::new(Argon2Type::Argon2id, &[0; 4], 1, 32, 1);
         let result: Result<(), ErrorTrace> = context.derive_key(b"password", &mut key);
         assert!(result.is_err());
 
-        // Test zero iterations.
+        // Test with zero iterations.
         let context: Argon2Context = Argon2Context::new(Argon2Type::Argon2id, &salt, 0, 32, 1);
         let result: Result<(), ErrorTrace> = context.derive_key(b"password", &mut key);
         assert!(result.is_err());
 
-        // Test zero parallelism.
+        // Test with zero parallelism.
         let context: Argon2Context = Argon2Context::new(Argon2Type::Argon2id, &salt, 1, 32, 0);
         let result: Result<(), ErrorTrace> = context.derive_key(b"password", &mut key);
         assert!(result.is_err());
 
-        // Test memory size smaller than 8 * parallelism.
+        // Test with memory size smaller than 8 * parallelism.
         let context: Argon2Context = Argon2Context::new(Argon2Type::Argon2id, &salt, 1, 16, 4);
         let result: Result<(), ErrorTrace> = context.derive_key(b"password", &mut key);
         assert!(result.is_err());
