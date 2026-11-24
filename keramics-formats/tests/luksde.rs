@@ -77,17 +77,28 @@ fn read_encrypted_volume_v2() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/luksde/luks2.raw");
     let mut encrypted_volume: LuksEncryptedVolume = open_encrypted_volume(&path_buf)?;
 
-    let credentials: Vec<LuksCredential> = vec![LuksCredential::Passphrase(b"KeRaMiCs".to_vec())];
-    let unlocked: bool = encrypted_volume.unlock(&credentials)?;
-    assert!(unlocked);
+    // Using the key data to bypass key derivation.
+    let credentials: Vec<LuksCredential> = vec![LuksCredential::KeyData {
+        identifier: vec![
+            0xa2, 0xb7, 0xa8, 0xe6, 0xce, 0x85, 0x42, 0xea, 0x84, 0x79, 0x74, 0x97, 0xa2, 0x2f,
+            0x95, 0x5c,
+        ],
+        data: vec![
+            0xe9, 0x19, 0xf1, 0x3f, 0x0d, 0x3f, 0x9e, 0x97, 0x5f, 0x51, 0x95, 0xbe, 0x91, 0x51,
+            0xa2, 0xac, 0xa9, 0xc7, 0x05, 0xba, 0xd7, 0x34, 0xc8, 0xc0, 0xd9, 0xa2, 0x25, 0xc9,
+            0xbd, 0x22, 0x2b, 0x30, 0x27, 0xbf, 0xeb, 0xf7, 0x44, 0x81, 0x91, 0x6e, 0xec, 0x05,
+            0x76, 0x41, 0xb8, 0x9a, 0x85, 0x9c, 0xe9, 0xa7, 0xec, 0x9f, 0x56, 0xf0, 0xe7, 0xfc,
+            0xf5, 0x36, 0x5b, 0x3a, 0x50, 0x5c, 0x95, 0xcc,
+        ],
+    }];
+    encrypted_volume.unlock(&credentials)?;
 
     let data_stream: DataStreamReference = encrypted_volume.get_data_stream().unwrap();
 
     let (volume_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
 
     assert_eq!(volume_offset, encrypted_volume.get_volume_size());
-    assert_eq!(volume_offset, 3899392);
-    assert_eq!(md5_hash.len(), 32);
+    assert_eq!(md5_hash.as_str(), "4cc9d325e508304d47a326db1b2aac95");
 
     Ok(())
 }
