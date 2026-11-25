@@ -42,11 +42,29 @@ pub struct LuksVolumeHeaderV2 {
     /// Metadata area size.
     pub metadata_area_size: u64,
 
+    /// Sequence identifier (epoch).
+    pub sequence_identifier: u64,
+
     /// Volume label.
     pub volume_label: ByteString,
 
+    /// Metadata checksum method.
+    pub metadata_checksum_method: ByteString,
+
+    /// Salt.
+    pub salt: Vec<u8>,
+
     /// Volume identifier.
     pub volume_identifier: ByteString,
+
+    /// Subsystem.
+    pub subsystem: ByteString,
+
+    /// Header offset.
+    pub header_offset: u64,
+
+    /// Metadata checksum.
+    pub metadata_checksum: Vec<u8>,
 }
 
 impl LuksVolumeHeaderV2 {
@@ -54,17 +72,37 @@ impl LuksVolumeHeaderV2 {
     pub fn new() -> Self {
         Self {
             metadata_area_size: 0,
+            sequence_identifier: 0,
             volume_label: ByteString::new(),
+            metadata_checksum_method: ByteString::new(),
+            salt: Vec::new(),
             volume_identifier: ByteString::new(),
+            subsystem: ByteString::new(),
+            header_offset: 0,
+            metadata_checksum: Vec::new(),
         }
     }
 
-    /// Reads the volume header from a buffer.
+    /// Reads the backup volume header from a buffer.
+    pub fn read_backup_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        self.read_data_with_signature(data, LUKS_BACKUP_VOLUME_HEADER_SIGNATURE)
+    }
+
+    /// Reads the primary volume header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        self.read_data_with_signature(data, LUKS_VOLUME_HEADER_SIGNATURE)
+    }
+
+    /// Reads the volume header from a buffer using the expected signature.
+    fn read_data_with_signature(
+        &mut self,
+        data: &[u8],
+        expected_signature: &[u8],
+    ) -> Result<(), ErrorTrace> {
         if data.len() < 4096 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        if &data[0..6] != LUKS_VOLUME_HEADER_SIGNATURE {
+        if &data[0..6] != expected_signature {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         if data[6..8] != [0x00, 0x02] {
@@ -73,8 +111,14 @@ impl LuksVolumeHeaderV2 {
             ));
         }
         self.metadata_area_size = bytes_to_u64_be!(data, 8);
+        self.sequence_identifier = bytes_to_u64_be!(data, 16);
         self.volume_label.read_data(&data[24..72]);
+        self.metadata_checksum_method.read_data(&data[72..104]);
+        self.salt = data[104..168].to_vec();
         self.volume_identifier.read_data(&data[168..208]);
+        self.subsystem.read_data(&data[208..256]);
+        self.header_offset = bytes_to_u64_be!(data, 256);
+        self.metadata_checksum = data[448..512].to_vec();
 
         Ok(())
     }
@@ -382,19 +426,51 @@ mod tests {
         ]
     }
 
+    #[cfg(feature = "debug-trace")]
+    #[test]
+    fn test_debug_read_data() {
+        let test_data: Vec<u8> = get_test_data();
+        let debug_string: String = LuksVolumeHeaderV2::debug_read_data(&test_data);
+        assert!(!debug_string.is_empty());
+    }
+
+    #[test]
+    fn test_read_backup_data() -> Result<(), ErrorTrace> {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[0..6].copy_from_slice(LUKS_BACKUP_VOLUME_HEADER_SIGNATURE);
+
+        let mut test_struct: LuksVolumeHeaderV2 = LuksVolumeHeaderV2::new();
+        test_struct.read_backup_data(&test_data)?;
+
+        assert_eq!(test_struct.metadata_area_size, 16384);
+        assert_eq!(test_struct.sequence_identifier, 3);
+        Ok(())
+    }
+
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = LuksVolumeHeaderV2::new();
+        let mut test_struct: LuksVolumeHeaderV2 = LuksVolumeHeaderV2::new();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.metadata_area_size, 16384);
-        assert_eq!(test_struct.volume_label, ByteString::from(""));
+        assert_eq!(test_struct.sequence_identifier, 3);
+        let expected_label: ByteString = ByteString::from("");
+        assert_eq!(test_struct.volume_label, expected_label);
+        let expected_checksum_method: ByteString = ByteString::from("sha256");
         assert_eq!(
-            test_struct.volume_identifier,
-            ByteString::from("3ab7e58d-2a75-4dda-ad27-e3bc85262bf4")
+            test_struct.metadata_checksum_method,
+            expected_checksum_method
         );
+        assert_eq!(test_struct.salt, &test_data[104..168]);
+        let expected_identifier: ByteString =
+            ByteString::from("3ab7e58d-2a75-4dda-ad27-e3bc85262bf4");
+        assert_eq!(test_struct.volume_identifier, expected_identifier);
+        let expected_subsystem: ByteString = ByteString::from("");
+        assert_eq!(test_struct.subsystem, expected_subsystem);
+        assert_eq!(test_struct.header_offset, 0);
+        assert_eq!(test_struct.metadata_checksum, &test_data[448..512]);
         Ok(())
     }
 
@@ -402,8 +478,8 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = LuksVolumeHeaderV2::new();
-        let result = test_struct.read_data(&test_data[0..4091]);
+        let mut test_struct: LuksVolumeHeaderV2 = LuksVolumeHeaderV2::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&test_data[0..4091]);
         assert!(result.is_err());
     }
 
@@ -412,8 +488,8 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
-        let mut test_struct = LuksVolumeHeaderV2::new();
-        let result = test_struct.read_data(&test_data);
+        let mut test_struct: LuksVolumeHeaderV2 = LuksVolumeHeaderV2::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
 
@@ -422,8 +498,8 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[6] = 0xff;
 
-        let mut test_struct = LuksVolumeHeaderV2::new();
-        let result = test_struct.read_data(&test_data);
+        let mut test_struct: LuksVolumeHeaderV2 = LuksVolumeHeaderV2::new();
+        let result: Result<(), ErrorTrace> = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
 }

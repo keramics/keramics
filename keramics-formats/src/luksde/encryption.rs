@@ -13,11 +13,12 @@
 
 use keramics_core::ErrorTrace;
 use keramics_encryption::{
-    AesContext, AesXtsContext, CryptContext, CryptEcb, Pbkdf2HmacSha1Context,
-    Pbkdf2HmacSha224Context, Pbkdf2HmacSha256Context, Pbkdf2HmacSha512Context,
+    AesContext, AesXtsContext, Argon2Context, Argon2Type, CryptContext, CryptEcb,
+    Pbkdf2HmacSha1Context, Pbkdf2HmacSha224Context, Pbkdf2HmacSha256Context,
+    Pbkdf2HmacSha384Context, Pbkdf2HmacSha512Context,
 };
 use keramics_hashes::{
-    DigestHashContext, Sha1Context, Sha224Context, Sha256Context, Sha512Context,
+    DigestHashContext, Sha1Context, Sha224Context, Sha256Context, Sha384Context, Sha512Context,
 };
 
 use super::cipher_context::LuksCipherContext;
@@ -30,6 +31,7 @@ pub enum LuksDiffuserContext {
     Sha1(LuksDiffuser<Sha1Context, 20>),
     Sha224(LuksDiffuser<Sha224Context, 28>),
     Sha256(LuksDiffuser<Sha256Context, 32>),
+    Sha384(LuksDiffuser<Sha384Context, 48>),
     Sha512(LuksDiffuser<Sha512Context, 64>),
 }
 
@@ -44,6 +46,9 @@ impl LuksDiffuserContext {
                 diffuser.merge(number_of_stripes, split_data, data)
             }
             LuksDiffuserContext::Sha256(diffuser) => {
+                diffuser.merge(number_of_stripes, split_data, data)
+            }
+            LuksDiffuserContext::Sha384(diffuser) => {
                 diffuser.merge(number_of_stripes, split_data, data)
             }
             LuksDiffuserContext::Sha512(diffuser) => {
@@ -107,9 +112,11 @@ impl LuksInitializationVectorContext {
 
 /// Linux Unified Key Setup (LUKS) Disk Encryption key derivation context.
 pub enum LuksKeyDerivationContext {
+    Argon2(Argon2Context),
     Pbkdf2HmacSha1(Pbkdf2HmacSha1Context),
     Pbkdf2HmacSha224(Pbkdf2HmacSha224Context),
     Pbkdf2HmacSha256(Pbkdf2HmacSha256Context),
+    Pbkdf2HmacSha384(Pbkdf2HmacSha384Context),
     Pbkdf2HmacSha512(Pbkdf2HmacSha512Context),
 }
 
@@ -117,11 +124,15 @@ impl LuksKeyDerivationContext {
     /// Derives a key from the password.
     pub fn derive_key(&mut self, password: &[u8], key: &mut [u8]) -> Result<(), ErrorTrace> {
         match self {
+            LuksKeyDerivationContext::Argon2(context) => context.derive_key(password, key),
             LuksKeyDerivationContext::Pbkdf2HmacSha1(context) => context.derive_key(password, key),
             LuksKeyDerivationContext::Pbkdf2HmacSha224(context) => {
                 context.derive_key(password, key)
             }
             LuksKeyDerivationContext::Pbkdf2HmacSha256(context) => {
+                context.derive_key(password, key)
+            }
+            LuksKeyDerivationContext::Pbkdf2HmacSha384(context) => {
                 context.derive_key(password, key)
             }
             LuksKeyDerivationContext::Pbkdf2HmacSha512(context) => {
@@ -135,17 +146,27 @@ impl LuksKeyDerivationContext {
 pub struct LuksEncryption {}
 
 impl LuksEncryption {
-    /// Retrieves a digest hash context.
-    fn get_digest_hash_context(hashing_method: &str) -> Option<Box<dyn DigestHashContext>> {
-        // TODO: ripemd160
-        // TODO: wd256
-        match hashing_method {
-            "sha1" => Some(Box::new(Sha1Context::new())),
-            "sha224" => Some(Box::new(Sha224Context::new())),
-            "sha256" => Some(Box::new(Sha256Context::new())),
-            "sha512" => Some(Box::new(Sha512Context::new())),
-            _ => None,
-        }
+    /// Retrieves an Argon2 key derivation context.
+    pub fn get_argon2_key_derivation_context(
+        key_derivation_type: &str,
+        salt: &[u8],
+        number_of_iterations: u32,
+        memory_size_kib: u32,
+        parallelism: u32,
+    ) -> Option<LuksKeyDerivationContext> {
+        let argon2_type: Argon2Type = match key_derivation_type {
+            "argon2i" => Argon2Type::Argon2i,
+            "argon2id" => Argon2Type::Argon2id,
+            _ => return None,
+        };
+        let context: Argon2Context = Argon2Context::new(
+            argon2_type,
+            salt,
+            number_of_iterations,
+            memory_size_kib,
+            parallelism,
+        );
+        Some(LuksKeyDerivationContext::Argon2(context))
     }
 
     /// Retrieves a diffuser context.
@@ -162,9 +183,28 @@ impl LuksEncryption {
             "sha256" => Some(LuksDiffuserContext::Sha256(
                 LuksDiffuser::<Sha256Context, 32>::new(),
             )),
+            "sha384" => Some(LuksDiffuserContext::Sha384(
+                LuksDiffuser::<Sha384Context, 48>::new(),
+            )),
             "sha512" => Some(LuksDiffuserContext::Sha512(
                 LuksDiffuser::<Sha512Context, 64>::new(),
             )),
+            _ => None,
+        }
+    }
+
+    /// Retrieves a digest hash context.
+    pub(super) fn get_digest_hash_context(
+        hashing_method: &str,
+    ) -> Option<Box<dyn DigestHashContext>> {
+        // TODO: ripemd160
+        // TODO: wd256
+        match hashing_method {
+            "sha1" => Some(Box::new(Sha1Context::new())),
+            "sha224" => Some(Box::new(Sha224Context::new())),
+            "sha256" => Some(Box::new(Sha256Context::new())),
+            "sha384" => Some(Box::new(Sha384Context::new())),
+            "sha512" => Some(Box::new(Sha512Context::new())),
             _ => None,
         }
     }
@@ -217,6 +257,49 @@ impl LuksEncryption {
         }))
     }
 
+    /// Retrieves an ESSIV initialization vector context.
+    fn get_essiv_initialization_vector_context(
+        encryption_type: &LuksEncryptionType,
+        key: &[u8],
+    ) -> Result<Option<LuksInitializationVectorContext>, ErrorTrace> {
+        if encryption_type.encryption_method.as_str() != "aes"
+            || (encryption_type.chaining_mode.as_str() != "cbc"
+                && encryption_type.chaining_mode.as_str() != "ecb")
+        {
+            return Ok(None);
+        }
+        let hashing_method: &str = match encryption_type.initialization_vector_options.as_deref() {
+            Some(method) => method,
+            None => return Ok(None),
+        };
+        let mut digest_context: Box<dyn DigestHashContext> =
+            match Self::get_digest_hash_context(hashing_method) {
+                Some(context) => context,
+                None => return Ok(None),
+            };
+        digest_context.update(key);
+
+        let digest_hash: Vec<u8> = digest_context.finalize();
+        let digest_hash_size: usize = digest_hash.len();
+
+        if digest_hash_size > 32 {
+            return Ok(None);
+        }
+        let mut essiv_key: [u8; 32] = [0; 32];
+        essiv_key[0..digest_hash_size].copy_from_slice(&digest_hash);
+
+        let mut essiv_context: AesContext = AesContext::new();
+
+        match essiv_context.set_key(&essiv_key) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to set key in ESSIV context");
+                return Err(error);
+            }
+        }
+        Ok(Some(LuksInitializationVectorContext::Essiv(essiv_context)))
+    }
+
     /// Retrieves an initialization vector context.
     fn get_initialization_vector_context(
         encryption_type: &LuksEncryptionType,
@@ -224,70 +307,21 @@ impl LuksEncryption {
     ) -> Result<Option<LuksInitializationVectorContext>, ErrorTrace> {
         // TODO: lmk
         // TODO: plumb
-        match encryption_type.initialization_vector_mode.as_deref() {
-            Some("benbi") => {
-                if encryption_type.initialization_vector_options.is_some() {
-                    return Ok(None);
-                }
-                Ok(Some(LuksInitializationVectorContext::Benbi))
-            }
-            Some("essiv") => {
-                if encryption_type.encryption_method.as_str() != "aes"
-                    || (encryption_type.chaining_mode.as_str() != "cbc"
-                        && encryption_type.chaining_mode.as_str() != "ecb")
-                {
-                    return Ok(None);
-                }
-                let mut digest_context: Box<dyn DigestHashContext> = match &encryption_type
-                    .initialization_vector_options
-                {
-                    Some(hashing_method) => match Self::get_digest_hash_context(hashing_method) {
-                        Some(context) => context,
-                        None => return Ok(None),
-                    },
-                    None => return Ok(None),
-                };
-                digest_context.update(key);
-
-                let digest_hash: Vec<u8> = digest_context.finalize();
-                let digest_hash_size: usize = digest_hash.len();
-
-                let mut essiv_key: [u8; 32] = [0; 32];
-                essiv_key[0..digest_hash_size].copy_from_slice(&digest_hash);
-
-                let mut essiv_context: AesContext = AesContext::new();
-
-                match essiv_context.set_key(&essiv_key) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to set key in ESSIV context"
-                        );
-                        return Err(error);
-                    }
-                }
-                Ok(Some(LuksInitializationVectorContext::Essiv(essiv_context)))
-            }
-            Some("null") => {
-                if encryption_type.initialization_vector_options.is_some() {
-                    return Ok(None);
-                }
-                Ok(Some(LuksInitializationVectorContext::Null))
-            }
-            Some("plain") => {
-                if encryption_type.initialization_vector_options.is_some() {
-                    return Ok(None);
-                }
-                Ok(Some(LuksInitializationVectorContext::Plain32))
-            }
-            Some("plain64") => {
-                if encryption_type.initialization_vector_options.is_some() {
-                    return Ok(None);
-                }
-                Ok(Some(LuksInitializationVectorContext::Plain64))
-            }
-            None => Ok(Some(LuksInitializationVectorContext::Null)),
+        let mode: &str = match encryption_type.initialization_vector_mode.as_deref() {
+            Some(mode) => mode,
+            None => return Ok(Some(LuksInitializationVectorContext::Null)),
+        };
+        if mode == "essiv" {
+            return Self::get_essiv_initialization_vector_context(encryption_type, key);
+        }
+        if encryption_type.initialization_vector_options.is_some() {
+            return Ok(None);
+        }
+        match mode {
+            "benbi" => Ok(Some(LuksInitializationVectorContext::Benbi)),
+            "null" => Ok(Some(LuksInitializationVectorContext::Null)),
+            "plain" => Ok(Some(LuksInitializationVectorContext::Plain32)),
+            "plain64" => Ok(Some(LuksInitializationVectorContext::Plain64)),
             _ => Ok(None),
         }
     }
@@ -310,6 +344,9 @@ impl LuksEncryption {
             "sha256" => Ok(Some(LuksKeyDerivationContext::Pbkdf2HmacSha256(
                 Pbkdf2HmacSha256Context::new(salt, number_of_iterations),
             ))),
+            "sha384" => Ok(Some(LuksKeyDerivationContext::Pbkdf2HmacSha384(
+                Pbkdf2HmacSha384Context::new(salt, number_of_iterations),
+            ))),
             "sha512" => Ok(Some(LuksKeyDerivationContext::Pbkdf2HmacSha512(
                 Pbkdf2HmacSha512Context::new(salt, number_of_iterations),
             ))),
@@ -325,8 +362,33 @@ mod tests {
     use keramics_types::ByteString;
 
     #[test]
+    fn test_get_argon2_key_derivation_context() -> Result<(), ErrorTrace> {
+        let salt: [u8; 16] = [0x02; 16];
+
+        for key_derivation_type in ["argon2i", "argon2id"] {
+            let mut context: LuksKeyDerivationContext =
+                LuksEncryption::get_argon2_key_derivation_context(
+                    key_derivation_type,
+                    &salt,
+                    1,
+                    32,
+                    1,
+                )
+                .unwrap();
+            let mut derived_key: [u8; 16] = [0; 16];
+            context.derive_key(b"password", &mut derived_key)?;
+            assert_ne!(derived_key, [0; 16]);
+        }
+        let unknown: Option<LuksKeyDerivationContext> =
+            LuksEncryption::get_argon2_key_derivation_context("unknown", &salt, 1, 32, 1);
+        assert!(unknown.is_none());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_diffuser_context_and_merge() {
-        for hashing_method in ["sha1", "sha224", "sha256", "sha512"] {
+        for hashing_method in ["sha1", "sha224", "sha256", "sha384", "sha512"] {
             let mut diffuser: LuksDiffuserContext =
                 LuksEncryption::get_diffuser_context(hashing_method).unwrap();
             let split_data: Vec<u8> = vec![0xaa; 32];
@@ -343,7 +405,7 @@ mod tests {
     fn test_get_key_derivation_context_and_derive_key() -> Result<(), ErrorTrace> {
         let salt: [u8; 8] = [0x01; 8];
 
-        for hashing_method in ["sha1", "sha224", "sha256", "sha512"] {
+        for hashing_method in ["sha1", "sha224", "sha256", "sha384", "sha512"] {
             let mut context: LuksKeyDerivationContext =
                 LuksEncryption::get_key_derivation_context(hashing_method, &salt, 1)?.unwrap();
             let mut derived_key: [u8; 16] = [0; 16];
@@ -391,7 +453,7 @@ mod tests {
         essiv_context.derive_initialization_vector(1, &mut initialization_vector)?;
         assert_ne!(initialization_vector, [0; 16]);
 
-        // Test ESSIV with invalid short initialization vector output buffer.
+        // Test with ESSIV and invalid short initialization vector output buffer.
         let mut short_initialization_vector: [u8; 8] = [0; 8];
         let result: Result<(), ErrorTrace> =
             essiv_context.derive_initialization_vector(1, &mut short_initialization_vector);
@@ -405,7 +467,7 @@ mod tests {
         let key16: [u8; 16] = [0x11; 16];
         let key32: [u8; 32] = [0x22; 32];
 
-        // Test all supported cipher, chaining, and initialization vector combinations.
+        // Test with all supported cipher, chaining, and initialization vector combinations.
         let valid_modes: [(&str, &str, &[u8]); 11] = [
             ("aes", "cbc-benbi", &key16),
             ("aes", "cbc-essiv:sha1", &key16),
@@ -430,13 +492,15 @@ mod tests {
             assert!(context.is_some());
         }
 
-        // Test unsupported cipher, chaining mode, initialization vector modes,
+        // Test with unsupported cipher, chaining mode, initialization vector modes,
         // and invalid initialization vector options returning None.
-        let unsupported_modes: [(&str, &str, &[u8]); 10] = [
+        let unsupported_modes: [(&str, &str, &[u8]); 12] = [
             ("twofish", "cbc-plain", &key16),
             ("aes", "ctr-plain", &key16),
             ("aes", "cbc-benbi:opt", &key16),
             ("aes", "xts-essiv:sha256", &key32),
+            ("aes", "cbc-essiv:sha384", &key16),
+            ("aes", "cbc-essiv:sha512", &key16),
             ("aes", "cbc-essiv:unknown", &key16),
             ("aes", "cbc-essiv", &key16),
             ("aes", "cbc-null:opt", &key16),
@@ -455,7 +519,7 @@ mod tests {
             assert!(context.is_none());
         }
 
-        // Test invalid key length returning error.
+        // Test with invalid key length returning error.
         let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
         let encryption_method: ByteString = ByteString::from("aes");
         let encryption_mode: ByteString = ByteString::from("cbc-plain");

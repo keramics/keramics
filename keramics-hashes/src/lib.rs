@@ -11,6 +11,7 @@
  * under the License.
  */
 
+mod blake2b;
 mod internal_sha256;
 mod internal_sha512;
 mod md5;
@@ -21,6 +22,7 @@ mod sha384;
 mod sha512;
 mod traits;
 
+pub use blake2b::Blake2bContext;
 pub use md5::Md5Context;
 pub use sha1::Sha1Context;
 pub use sha224::Sha224Context;

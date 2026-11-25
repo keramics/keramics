@@ -52,8 +52,9 @@ To encrypt storage media LUKS Disk Encryption uses different kind of keys.
 ### Master Key (MK)
 
 The Master Key (MK) is derived from the Split Master Key (SMK). The size of the MK is dependent on
-the master key size value in the volume header. Commonly the MK is 128-bit or 256-bit of size. The
-MK is used to de/encrypt the encrypted (volume) data.
+the master key size value in the volume header (format version 1) or keyslot metadata (format
+version 2). Commonly the MK is 128-bit, 256-bit, or 512-bit (for XTS mode) in size. The MK is used
+to de/encrypt the encrypted (volume) data.
 
 ### Split Master Key (SMK)
 
@@ -61,15 +62,23 @@ The Split Master Key (SMK) is stored encrypted with a specific user key (UK) in 
 key material. The size of the key material and hence the SMK is the size of the Master Key (MK)
 times the number of stripes.
 
+In format version 2, the raw keyslot area is always encrypted in 512-byte sectors (independent of
+the data segment sector size), using the cipher specified in the keyslot "area.encryption" property
+and sector numbers starting at 0.
+
 The MK is determined from the SMK using the anti-forensic (AF) diffuser using the hashing method.
 
-The resulting MK can be validated with the master key validation hash stored in the volume header.
-The validation hash can be calculated using the PBKDF2 algorithm with:
+The resulting MK can be validated with the master key validation hash stored in the volume header
+(format version 1, fixed 20 bytes) or a JSON [digest object](#metadata_digests_object) (format
+version 2, variable size matching the hashing method). The validation hash can be calculated using
+the PBKDF2 algorithm with:
 
-* The [hashing method](#hashing_method) stored in the volume header (format version 1) or metadata
+* The [hashing method](#hashing_method) stored in the volume header (format version 1) or digest
+  object (format version 2).
+* The number of iterations as stored in the volume header (format version 1) or digest object
   (format version 2).
-* The number of iterations as stored in the volume header.
-* A salt, as stored in the volume header.
+* A salt, as stored in the volume header (format version 1) or Base64-encoded in the digest object
+  (format version 2).
 * The master key as the input data.
 
 ### User Key (UK)
@@ -77,14 +86,17 @@ The validation hash can be calculated using the PBKDF2 algorithm with:
 The User Key (UK) is derived from the user password. The UK is used to de/encrypt the corresponding
 split master key material.
 
-The user key is calculated using the PBKDF2 algorithm with:
+In format version 1, the user key is calculated using the PBKDF2 algorithm with:
 
-* The [hashing method](#hashing_method) stored in the volume header (format version 1) or metadata
-  (format version 2).
+* The [hashing method](#hashing_method) stored in the volume header.
 * The number of iterations as stored in the corresponding key slot.
 * A salt, as stored in the corresponding key slot.
 * The password string as the input data (bytes).
-* A (output) key size that is the same as that of the Master Key (MK).
+* An output key size that is the same as that of the Master Key (MK).
+
+In format version 2, each keyslot specifies its own key derivation function in the
+[key derivation object](#metadata_keyslot_kdf_object), which can be PBKDF2, Argon2i, or Argon2id
+(RFC 9106, version 0x13), with an output key size defined by the keyslot "area.key_size" property.
 
 ## Encryption methods
 
@@ -108,7 +120,7 @@ header.
 
 #### The encrypted sector-salt initialization vector (ESSIV) mode
 
-Int the encrypted sector-salt initialization vector (ESSIV) mode the initialization vector (IV) is
+In the encrypted sector-salt initialization vector (ESSIV) mode the initialization vector (IV) is
 determined by:
 
 1. hashing the encryption key with hashing method defined in the initialization vector mode options.
@@ -130,7 +142,7 @@ header.
 The cipher block-count is calculated as:
 
 ```python
-cipher_block_count = (sector_number << (log2(bytes_per_sectory) - log2(iv_size))) + 1
+cipher_block_count = (sector_number << (log2(bytes_per_sector) - log2(iv_size))) + 1
 ```
 
 Benbi is presumably the abbreviation of big-endian numeric block index, or equivalent.
@@ -159,9 +171,15 @@ Decryption uses:
 
 ### AES-XTS
 
-TODO: complete section
+Decryption uses:
 
-* The initialization vector is 16 bytes in size.
+* AES-XTS (XEX-based tweaked-codebook mode with ciphertext stealing) with the Master Key (MK) split
+  into two equal halves: the first half is the data encryption key and the second half is the tweak
+  encryption key (for example, a 64-byte MK provides two 256-bit AES keys, displayed as
+  AES-512-XTS).
+* The 16-byte initialization vector (tweak) is derived from the sector number using the configured
+  initialization vector mode (commonly "plain64").
+* AES-XTS is the default encryption mode in LUKS version 2.
 
 ### Anubis
 
@@ -250,6 +268,16 @@ The volume header - format version 2 (or binary header) is 4096 bytes in size an
 | 448 | 64 | | Metadata area checksum |
 | 512 | 7 x 512 = 3584 | | Unknown (padding), which according to "LUKS2 On-Disk Format Specification" this must be filled with 0-byte values |
 
+The metadata area checksum is calculated over the entire metadata area (the 4096-byte binary header
+with the 64-byte checksum field at offset 448 filled with 0-byte values, followed by the JSON area
+of `metadata_area_size - 4096` bytes) using the hashing algorithm specified in the metadata area
+checksum method field. The resulting digest is stored in the first bytes of the 64-byte checksum
+field, with the remaining bytes filled with 0-byte values.
+
+When both the primary and backup metadata areas are valid, the metadata area with the higher epoch
+(sequence identifier) is active. If the primary metadata area fails validation, readers fall back
+to the backup metadata area.
+
 ## JSON area {#json_area}
 
 The JSON area is stored directly after the volume header and must be 4096-byte aligned. The JSON
@@ -329,125 +357,123 @@ area is of variable size and consists of:
 | "config" | [Config object](#metadata_config_object) |
 | "digests" | One or more [digests object](#metadata_digests_object) |
 | "keyslots" | One or more [keyslots object](#metadata_keyslots_object) |
-| "segments" | One ore more [segments object](#metadata_segments_object) |
+| "segments" | One or more [segments object](#metadata_segments_object) |
 | "tokens" | Zero or more [tokens object](#metadata_tokens_object) |
 
 ### Config object {#metadata_config_object}
 
 | Value | Description |
 | --- | --- |
-| "flags" | List of strings |
-| "json_size" | String containing an integer |
-| "keyslots_size" | String containing an integer |
-| "requirements" | |
+| "flags" | Optional list of persistent configuration flag strings |
+| "json_size" | String containing the JSON area size in bytes (excluding the 4096-byte binary header) |
+| "keyslots_size" | String containing the binary keyslots area size in bytes |
+| "requirements" | Optional object containing a "mandatory" list of required feature strings |
 
 ### Digests object {#metadata_digests_object}
 
-TODO: complete section
+Maps numeric string identifiers (such as "0") to digest objects that verify the derived Master Key
+(MK) for specific keyslots and data segments.
 
 | Value | Description |
 | --- | --- |
-| "digest" | |
-| "hash" | type "pbkdf2" |
-| "iterations" | type "pbkdf2" |
-| "keyslots" | |
-| "salt" | |
-| "segments" | |
-| "type" | |
+| "digest" | Base64-encoded expected validation digest |
+| "hash" | [Hashing method](#hashing_method) used by PBKDF2 (present when "type" is "pbkdf2") |
+| "iterations" | Number of PBKDF2 iterations (present when "type" is "pbkdf2") |
+| "keyslots" | List of numeric keyslot identifier strings validated by this digest |
+| "salt" | Base64-encoded salt |
+| "segments" | List of numeric segment identifier strings whose volume key is validated by this digest |
+| "type" | Digest type, such as "pbkdf2" |
 
 ### Keyslots object {#metadata_keyslots_object}
 
-Contains zero or more [keyslot object](#metadata_keyslot_object).
+Maps numeric string identifiers (such as "0") to zero or more
+[keyslot objects](#metadata_keyslot_object).
 
 ### Keyslot object {#metadata_keyslot_object}
 
-TODO: complete section
-
 | Value | Description |
 | --- | --- |
-| "af" | [Anti-forensics (diffuser) object](#metadata_keyslot_af_object), which should only be present in type "luks2" |
+| "af" | [Anti-forensics (diffuser) object](#metadata_keyslot_af_object), present when "type" is "luks2" |
 | "area" | [Key slot area object](#metadata_keyslot_area_object) |
-| "direction" | Re-encryption direction, which should only be present in type "reencrypt" |
-| "kdf" | [Key derivation object](#metadata_keyslot_kdf_object), which should only be present in type "luks2" |
-| "key_size" | Key size, in number of bytes |
-| "mode" | Re-encryption mode, which should only be present in type "reencrypt" |
-| "priority" | Priority, where 0 represents "ignore", 1 "normal" and 2 "high" |
+| "direction" | Re-encryption direction ("forward" or "backward"), present when "type" is "reencrypt" |
+| "kdf" | [Key derivation object](#metadata_keyslot_kdf_object), present when "type" is "luks2" |
+| "key_size" | Master key size in bytes |
+| "mode" | Re-encryption mode ("reencrypt", "encrypt", or "decrypt"), present when "type" is "reencrypt" |
+| "priority" | Optional unlock priority, where 0 represents "ignore", 1 "normal" (default), and 2 "high" |
 | "type" | Keyslot type, which can be "luks2" or "reencrypt" |
 
 #### Anti-forensics (diffuser) object {#metadata_keyslot_af_object}
 
-TODO: complete section
-
 | Value | Description |
 | --- | --- |
-| "hash" | type "luks1" |
-| "stripes" | type "luks1" |
+| "hash" | [Hashing method](#hashing_method) used by the anti-forensic diffuser (for type "luks1") |
+| "stripes" | Number of anti-forensic stripes (typically 4000, for type "luks1") |
 | "type" | Anti-forensics type, which can be "luks1" |
 
 #### Keyslot area object {#metadata_keyslot_area_object}
 
-TODO: complete section
+For "raw" keyslot areas, the split key material occupies `key_size * af.stripes` bytes starting at
+"offset" and is always encrypted in 512-byte sectors using "encryption" and a user key of length
+"key_size".
 
 | Value | Description |
 | --- | --- |
-| "encryption" | type "raw" |
-| "hash" | types "checksum" and "datashift-checksum" |
-| "key_size" | type "raw" |
-| "offset" | |
-| "sector_size" | types "checksum" and "datashift-checksum" |
-| "shift_size" | types "datashift", "datashift-checksum" and "datashift-journal" |
-| "size" | |
-| "type" | Area type, which can be "raw", "checksum", "none", "journal" |
+| "encryption" | Combined encryption method and mode string (such as "aes-xts-plain64"), for type "raw" |
+| "hash" | Hashing method, for types "checksum" and "datashift-checksum" |
+| "key_size" | User key size in bytes used to encrypt the keyslot area, for type "raw" |
+| "offset" | String containing the byte offset of the keyslot area from the start of the volume |
+| "sector_size" | Sector size in bytes, for types "checksum" and "datashift-checksum" |
+| "shift_size" | Shift size in bytes, for types "datashift", "datashift-checksum", and "datashift-journal" |
+| "size" | String containing the reserved size of the keyslot area in bytes |
+| "type" | Area type, which can be "raw", "checksum", "none", "journal", "datashift", "datashift-checksum", or "datashift-journal" |
 
 #### Key derivation object {#metadata_keyslot_kdf_object}
 
-TODO: complete section
-
 | Value | Description |
 | --- | --- |
-| "cpus" | types "argon2i" and "argon2id" |
-| "hash" | type "pbkdf2" |
-| "iterations" | type "pbkdf2" |
-| "memory" | types "argon2i" and "argon2id" |
-| "salt" | |
-| "time" | types "argon2i" and "argon2id" |
-| "type" | The PBKDF type, which can be "pbkdf2", "argon2i" and "argon2id" |
+| "cpus" | Parallelism (number of threads/lanes), for types "argon2i" and "argon2id" |
+| "hash" | [Hashing method](#hashing_method), for type "pbkdf2" |
+| "iterations" | Number of PBKDF2 iterations, for type "pbkdf2" |
+| "memory" | Memory cost in KiB, for types "argon2i" and "argon2id" |
+| "salt" | Base64-encoded salt |
+| "time" | Time cost (number of passes/iterations), for types "argon2i" and "argon2id" |
+| "type" | Key derivation function type, which can be "pbkdf2", "argon2i", or "argon2id" |
 
 ### Segments object {#metadata_segments_object}
 
-TODO: complete section
+Maps numeric string identifiers (such as "0") to segment objects describing the encrypted or
+unencrypted data regions of the volume.
 
 | Value | Description |
 | --- | --- |
-| "encryption" | type "crypt" |
-| "flags" | |
-| "integrity" | type "crypt" |
-| "iv_tweak" | type "crypt" |
-| "offset" | |
-| "sector_size" | type "crypt" |
-| "size" | |
+| "encryption" | Combined encryption method and mode string (such as "aes-xts-plain64"), for type "crypt" |
+| "flags" | Optional list of segment flag strings |
+| "integrity" | Optional [segment integrity object](#metadata_segment_integrity_object), for type "crypt" |
+| "iv_tweak" | String containing the starting 64-bit sector number tweak added to each sector's IV, for type "crypt" |
+| "offset" | String containing the byte offset of the segment from the start of the volume |
+| "sector_size" | Encryption sector size in bytes (512, 1024, 2048, or 4096), for type "crypt" |
+| "size" | String containing the segment size in bytes, or "dynamic" to extend to the end of the volume |
 | "type" | Segment type, which can be "linear" or "crypt" |
 
-#### Segment integrity object
-
-TODO: complete section
+#### Segment integrity object {#metadata_segment_integrity_object}
 
 | Value | Description |
 | --- | --- |
-| "journal_encryption" | |
-| "journal_integrity" | |
-| "key_size" | |
-| "type" | |
+| "journal_encryption" | Journal encryption algorithm (or "none") |
+| "journal_integrity" | Journal integrity algorithm (or "none") |
+| "key_size" | Integrity key size in bytes |
+| "type" | Authenticated encryption / integrity algorithm (such as "hmac(sha256)") |
 
 ### Tokens object {#metadata_tokens_object}
 
-TODO: complete section
+Maps numeric string identifiers (such as "0") to optional token objects that describe external key
+retrieval mechanisms (for example, kernel keyring or hardware tokens).
 
 | Value | Description |
 | --- | --- |
-| "key_description" | type "luks2-keyring" |
-| "keyslots" | |
-| "type" | |
+| "key_description" | Kernel keyring key description, for type "luks2-keyring" |
+| "keyslots" | List of numeric keyslot identifier strings associated with this token |
+| "type" | Token type, such as "luks2-keyring" |
 
 ## Backup metadata area
 
@@ -552,6 +578,7 @@ Known values of hashing method are:
 | sha1 | SHA-1 |
 | sha224 | SHA-224 |
 | sha256 | SHA-256 |
+| sha384 | SHA-384 |
 | sha512 | SHA-512 |
 | wd256 | Unknown |
 

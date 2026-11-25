@@ -23,6 +23,10 @@ mod encryption_context;
 mod encryption_type;
 mod key_slot;
 mod metadata;
+mod metadata_configuration;
+mod metadata_digest;
+mod metadata_key_slot;
+mod metadata_segment;
 mod volume_header_v1;
 mod volume_header_v2;
 
