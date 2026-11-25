@@ -27,13 +27,13 @@ pub struct LuksMetadataKeySlot {
     pub priority: Option<i64>,
 
     /// Anti-forensic diffuser type (for example, "luks1").
-    pub af_type: String,
+    pub anti_forensic_type: String,
 
     /// Anti-forensic diffuser hashing method.
-    pub af_hashing_method: String,
+    pub anti_forensic_hashing_method: String,
 
     /// Anti-forensic diffuser number of stripes.
-    pub af_number_of_stripes: u32,
+    pub anti_forensic_number_of_stripes: u32,
 
     /// Keyslot area type (for example, "raw").
     pub area_type: String,
@@ -51,25 +51,25 @@ pub struct LuksMetadataKeySlot {
     pub area_key_size: usize,
 
     /// Key derivation function type (for example, "pbkdf2", "argon2i", "argon2id").
-    pub kdf_type: String,
+    pub key_derivation_type: String,
 
     /// PBKDF2 hashing method.
-    pub kdf_hashing_method: String,
+    pub key_derivation_hashing_method: String,
 
     /// PBKDF2 number of iterations.
-    pub kdf_number_of_iterations: u32,
+    pub key_derivation_number_of_iterations: u32,
 
     /// Argon2 time cost (number of iterations).
-    pub kdf_time: u32,
+    pub key_derivation_time: u32,
 
     /// Argon2 memory cost in KiB.
-    pub kdf_memory: u32,
+    pub key_derivation_memory: u32,
 
     /// Argon2 parallelism (number of threads/lanes).
-    pub kdf_cpus: u32,
+    pub key_derivation_parallelism: u32,
 
     /// Key derivation salt.
-    pub kdf_salt: Vec<u8>,
+    pub key_derivation_salt: Vec<u8>,
 }
 
 impl LuksMetadataKeySlot {
@@ -80,21 +80,21 @@ impl LuksMetadataKeySlot {
             keyslot_type: String::new(),
             key_size: 0,
             priority: None,
-            af_type: String::new(),
-            af_hashing_method: String::new(),
-            af_number_of_stripes: 0,
+            anti_forensic_type: String::new(),
+            anti_forensic_hashing_method: String::new(),
+            anti_forensic_number_of_stripes: 0,
             area_type: String::new(),
             area_offset: 0,
             area_size: 0,
             area_encryption: String::new(),
             area_key_size: 0,
-            kdf_type: String::new(),
-            kdf_hashing_method: String::new(),
-            kdf_number_of_iterations: 0,
-            kdf_time: 0,
-            kdf_memory: 0,
-            kdf_cpus: 0,
-            kdf_salt: Vec::new(),
+            key_derivation_type: String::new(),
+            key_derivation_hashing_method: String::new(),
+            key_derivation_number_of_iterations: 0,
+            key_derivation_time: 0,
+            key_derivation_memory: 0,
+            key_derivation_parallelism: 0,
+            key_derivation_salt: Vec::new(),
         }
     }
 }
@@ -105,26 +105,30 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let key_slot: LuksMetadataKeySlot = LuksMetadataKeySlot::new(String::from("0"));
+        let identifier: String = String::from("0");
+        let key_slot: LuksMetadataKeySlot = LuksMetadataKeySlot::new(identifier);
 
-        assert_eq!(key_slot.identifier, "0");
-        assert!(key_slot.keyslot_type.is_empty());
-        assert_eq!(key_slot.key_size, 0);
-        assert_eq!(key_slot.priority, None);
-        assert!(key_slot.af_type.is_empty());
-        assert!(key_slot.af_hashing_method.is_empty());
-        assert_eq!(key_slot.af_number_of_stripes, 0);
-        assert!(key_slot.area_type.is_empty());
-        assert_eq!(key_slot.area_offset, 0);
-        assert_eq!(key_slot.area_size, 0);
-        assert!(key_slot.area_encryption.is_empty());
-        assert_eq!(key_slot.area_key_size, 0);
-        assert!(key_slot.kdf_type.is_empty());
-        assert!(key_slot.kdf_hashing_method.is_empty());
-        assert_eq!(key_slot.kdf_number_of_iterations, 0);
-        assert_eq!(key_slot.kdf_time, 0);
-        assert_eq!(key_slot.kdf_memory, 0);
-        assert_eq!(key_slot.kdf_cpus, 0);
-        assert!(key_slot.kdf_salt.is_empty());
+        let expected_key_slot: LuksMetadataKeySlot = LuksMetadataKeySlot {
+            identifier: String::from("0"),
+            keyslot_type: String::new(),
+            key_size: 0,
+            priority: None,
+            anti_forensic_type: String::new(),
+            anti_forensic_hashing_method: String::new(),
+            anti_forensic_number_of_stripes: 0,
+            area_type: String::new(),
+            area_offset: 0,
+            area_size: 0,
+            area_encryption: String::new(),
+            area_key_size: 0,
+            key_derivation_type: String::new(),
+            key_derivation_hashing_method: String::new(),
+            key_derivation_number_of_iterations: 0,
+            key_derivation_time: 0,
+            key_derivation_memory: 0,
+            key_derivation_parallelism: 0,
+            key_derivation_salt: Vec::new(),
+        };
+        assert_eq!(key_slot, expected_key_slot);
     }
 }

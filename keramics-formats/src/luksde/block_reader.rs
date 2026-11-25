@@ -111,7 +111,7 @@ impl LuksBlockReader {
             SeekFrom::Start(sector_data_offset)
         );
         let mut sector_data: Vec<u8> = vec![0; self.bytes_per_sector as usize];
-        // dm-crypt counts IV sector offsets in 512-byte sectors even for larger sector sizes.
+        // dm-crypt counts initialization vector sector offsets in 512-byte sectors even for larger sector sizes.
         let initialization_vector_sector_number: u64 = self
             .initialization_vector_tweak
             .wrapping_add(sector_number * ((self.bytes_per_sector as u64) / 512));
@@ -165,7 +165,16 @@ impl BlockReader for LuksBlockReader {
             if range_read_size == 0 {
                 break;
             }
-            let range_data: &[u8] = self.get_sector_data(sector_number, sector_offset)?;
+            let range_data: &[u8] = match self.get_sector_data(sector_number, sector_offset) {
+                Ok(data) => data,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve sector: {} data", sector_number)
+                    );
+                    return Err(error);
+                }
+            };
 
             let data_end_offset: usize = data_offset + range_read_size;
             let range_data_offset: usize = range_relative_offset as usize;
@@ -242,7 +251,7 @@ mod tests {
         let empty_read_count: usize = block_reader.read_data_from_blocks(&mut empty_buffer, 0)?;
         assert_eq!(empty_read_count, 0);
 
-        // Test 4096-byte sectors use 512-byte IV sector offsets (sector 1 -> IV offset 8).
+        // Test with 4096-byte sectors using 512-byte initialization vector sector offsets.
         let large_sector_raw: Vec<u8> = vec![0x33; 8192];
         let large_sector_stream: DataStreamReference = open_fake_data_stream(&large_sector_raw);
         let mut large_sector_reader: LuksBlockReader =

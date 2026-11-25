@@ -148,13 +148,13 @@ pub struct LuksEncryption {}
 impl LuksEncryption {
     /// Retrieves an Argon2 key derivation context.
     pub fn get_argon2_key_derivation_context(
-        kdf_type: &str,
+        key_derivation_type: &str,
         salt: &[u8],
         number_of_iterations: u32,
         memory_size_kib: u32,
         parallelism: u32,
     ) -> Option<LuksKeyDerivationContext> {
-        let argon2_type: Argon2Type = match kdf_type {
+        let argon2_type: Argon2Type = match key_derivation_type {
             "argon2i" => Argon2Type::Argon2i,
             "argon2id" => Argon2Type::Argon2id,
             _ => return None,
@@ -365,10 +365,16 @@ mod tests {
     fn test_get_argon2_key_derivation_context() -> Result<(), ErrorTrace> {
         let salt: [u8; 16] = [0x02; 16];
 
-        for kdf_type in ["argon2i", "argon2id"] {
+        for key_derivation_type in ["argon2i", "argon2id"] {
             let mut context: LuksKeyDerivationContext =
-                LuksEncryption::get_argon2_key_derivation_context(kdf_type, &salt, 1, 32, 1)
-                    .unwrap();
+                LuksEncryption::get_argon2_key_derivation_context(
+                    key_derivation_type,
+                    &salt,
+                    1,
+                    32,
+                    1,
+                )
+                .unwrap();
             let mut derived_key: [u8; 16] = [0; 16];
             context.derive_key(b"password", &mut derived_key)?;
             assert_ne!(derived_key, [0; 16]);
@@ -447,7 +453,7 @@ mod tests {
         essiv_context.derive_initialization_vector(1, &mut initialization_vector)?;
         assert_ne!(initialization_vector, [0; 16]);
 
-        // Test ESSIV with invalid short initialization vector output buffer.
+        // Test with ESSIV and invalid short initialization vector output buffer.
         let mut short_initialization_vector: [u8; 8] = [0; 8];
         let result: Result<(), ErrorTrace> =
             essiv_context.derive_initialization_vector(1, &mut short_initialization_vector);
@@ -461,7 +467,7 @@ mod tests {
         let key16: [u8; 16] = [0x11; 16];
         let key32: [u8; 32] = [0x22; 32];
 
-        // Test all supported cipher, chaining, and initialization vector combinations.
+        // Test with all supported cipher, chaining, and initialization vector combinations.
         let valid_modes: [(&str, &str, &[u8]); 11] = [
             ("aes", "cbc-benbi", &key16),
             ("aes", "cbc-essiv:sha1", &key16),
@@ -486,7 +492,7 @@ mod tests {
             assert!(context.is_some());
         }
 
-        // Test unsupported cipher, chaining mode, initialization vector modes,
+        // Test with unsupported cipher, chaining mode, initialization vector modes,
         // and invalid initialization vector options returning None.
         let unsupported_modes: [(&str, &str, &[u8]); 12] = [
             ("twofish", "cbc-plain", &key16),
@@ -513,7 +519,7 @@ mod tests {
             assert!(context.is_none());
         }
 
-        // Test invalid key length returning error.
+        // Test with invalid key length returning error.
         let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
         let encryption_method: ByteString = ByteString::from("aes");
         let encryption_mode: ByteString = ByteString::from("cbc-plain");

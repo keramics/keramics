@@ -97,8 +97,9 @@ fn read_encrypted_volume_v2() -> Result<(), ErrorTrace> {
 
     let (volume_offset, md5_hash): (u64, String) = read_data_stream(&data_stream)?;
 
-    assert_eq!(volume_offset, encrypted_volume.get_volume_size());
-    assert_eq!(md5_hash.as_str(), "4cc9d325e508304d47a326db1b2aac95");
+    let volume_size: u64 = encrypted_volume.get_volume_size();
+    assert_eq!(volume_offset, volume_size);
+    assert_eq!(md5_hash, "4cc9d325e508304d47a326db1b2aac95");
 
     Ok(())
 }

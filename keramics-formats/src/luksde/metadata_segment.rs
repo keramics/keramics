@@ -57,7 +57,8 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let segment: LuksMetadataSegment = LuksMetadataSegment::new(String::from("0"));
+        let identifier: String = String::from("0");
+        let segment: LuksMetadataSegment = LuksMetadataSegment::new(identifier);
 
         assert_eq!(segment.identifier, "0");
         assert!(segment.segment_type.is_empty());

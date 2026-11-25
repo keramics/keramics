@@ -335,8 +335,16 @@ impl Argon2Context {
     /// Derives a key from the password.
     pub fn derive_key(&self, password: &[u8], key: &mut [u8]) -> Result<(), ErrorTrace> {
         let key_size: usize = key.len();
-        self.validate_parameters(key_size)?;
-
+        match self.validate_parameters(key_size) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to validate Argon2 parameters"
+                );
+                return Err(error);
+            }
+        }
         let parallelism: usize = self.parallelism as usize;
         let lane_length: usize = ((self.memory_size_kib as usize)
             / (ARGON2_SYNC_POINTS * parallelism))
@@ -345,8 +353,13 @@ impl Argon2Context {
 
         let initial_hash: [u8; 64] = self.compute_initial_hash(password, key_size);
         let mut memory: Vec<[u64; 128]> = vec![[0; 128]; memory_blocks];
-        self.initialize_memory(&initial_hash, lane_length, &mut memory)?;
-
+        match self.initialize_memory(&initial_hash, lane_length, &mut memory) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to initialize Argon2 memory");
+                return Err(error);
+            }
+        }
         for pass in 0..(self.number_of_iterations as usize) {
             self.fill_pass(&mut memory, pass, lane_length);
         }
@@ -401,7 +414,8 @@ impl Argon2Context {
             let previous_memory_index: usize = lane_base + previous_offset;
 
             let pseudo_random: u64 = if data_independent {
-                address_block[index % 128]
+                let address_index: usize = index % 128;
+                address_block[address_index]
             } else {
                 memory[previous_memory_index][0]
             };
@@ -529,23 +543,42 @@ impl Argon2Context {
             block_seed[68..72].copy_from_slice(&lane_bytes);
 
             let lane_base: usize = lane * lane_length;
-            Self::initialize_lane_block(
+            match Self::initialize_lane_block(
                 &mut block_seed,
                 &mut block_bytes,
                 0,
                 &mut memory[lane_base],
-            )?;
-            Self::initialize_lane_block(
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to initialize lane: {} block: 0", lane)
+                    );
+                    return Err(error);
+                }
+            }
+            let second_block_index: usize = lane_base + 1;
+            match Self::initialize_lane_block(
                 &mut block_seed,
                 &mut block_bytes,
                 1,
-                &mut memory[lane_base + 1],
-            )?;
+                &mut memory[second_block_index],
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to initialize lane: {} block: 1", lane)
+                    );
+                    return Err(error);
+                }
+            }
         }
         Ok(())
     }
 
-    /// Determines whether the given pass and slice use data-independent indexing.
+    /// Determines if the given pass and slice use data-independent indexing.
     fn is_data_independent(&self, pass: usize, slice: usize) -> bool {
         match self.argon2_type {
             Argon2Type::Argon2d => false,

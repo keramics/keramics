@@ -14,6 +14,7 @@
 use keramics_core::ErrorTrace;
 use keramics_hashes::{Blake2bContext, DigestHashContext};
 
+/// BLAKE2b test vector.
 struct TestVector {
     /// Data.
     data: &'static [u8],

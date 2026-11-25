@@ -61,7 +61,8 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let digest: LuksMetadataDigest = LuksMetadataDigest::new(String::from("0"));
+        let identifier: String = String::from("0");
+        let digest: LuksMetadataDigest = LuksMetadataDigest::new(identifier);
 
         assert_eq!(digest.identifier, "0");
         assert!(digest.digest_type.is_empty());

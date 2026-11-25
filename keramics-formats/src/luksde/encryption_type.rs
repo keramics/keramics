@@ -102,7 +102,7 @@ impl LuksEncryptionType {
 }
 
 impl fmt::Display for LuksEncryptionType {
-    /// Formats encryption type for display.
+    /// Formats the encryption type for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         if self.encryption_method.is_empty() {
             write!(formatter, "N/A (not set)")
@@ -123,35 +123,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_set_encryption_string_and_fmt() {
+    fn test_fmt() {
         let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
         let string: String = encryption_type.to_string();
         assert_eq!(string, "N/A (not set)");
 
         encryption_type.set_encryption_string("aes-xts-plain64");
         encryption_type.key_size = 64;
-        assert_eq!(encryption_type.encryption_method, "aes");
-        assert_eq!(encryption_type.chaining_mode, "xts");
-        let initialization_vector_mode: Option<&str> =
-            encryption_type.initialization_vector_mode.as_deref();
-        assert_eq!(initialization_vector_mode, Some("plain64"));
-        assert_eq!(encryption_type.initialization_vector_options, None);
         let string: String = encryption_type.to_string();
         assert_eq!(string, "AES-512-XTS");
 
         encryption_type.set_encryption_string("aes-cbc-essiv:sha256");
         encryption_type.key_size = 32;
-        assert_eq!(encryption_type.encryption_method, "aes");
-        assert_eq!(encryption_type.chaining_mode, "cbc");
-
-        let initialization_vector_mode: Option<&str> =
-            encryption_type.initialization_vector_mode.as_deref();
-        assert_eq!(initialization_vector_mode, Some("essiv"));
-        let initialization_vector_options: Option<&str> =
-            encryption_type.initialization_vector_options.as_deref();
-        assert_eq!(initialization_vector_options, Some("sha256"));
         let string: String = encryption_type.to_string();
         assert_eq!(string, "AES-256-CBC");
+    }
+
+    #[test]
+    fn test_set_encryption_mode() {
+        let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
 
         let encryption_mode: ByteString = ByteString::from("XTS-PLAIN64");
         encryption_type.set_encryption_mode(&encryption_mode);
@@ -166,6 +156,29 @@ mod tests {
         assert_eq!(encryption_type.chaining_mode, "ecb");
         assert_eq!(encryption_type.initialization_vector_mode, None);
         assert_eq!(encryption_type.initialization_vector_options, None);
+    }
+
+    #[test]
+    fn test_set_encryption_string() {
+        let mut encryption_type: LuksEncryptionType = LuksEncryptionType::new();
+
+        encryption_type.set_encryption_string("aes-xts-plain64");
+        assert_eq!(encryption_type.encryption_method, "aes");
+        assert_eq!(encryption_type.chaining_mode, "xts");
+        let initialization_vector_mode: Option<&str> =
+            encryption_type.initialization_vector_mode.as_deref();
+        assert_eq!(initialization_vector_mode, Some("plain64"));
+        assert_eq!(encryption_type.initialization_vector_options, None);
+
+        encryption_type.set_encryption_string("aes-cbc-essiv:sha256");
+        assert_eq!(encryption_type.encryption_method, "aes");
+        assert_eq!(encryption_type.chaining_mode, "cbc");
+        let initialization_vector_mode: Option<&str> =
+            encryption_type.initialization_vector_mode.as_deref();
+        assert_eq!(initialization_vector_mode, Some("essiv"));
+        let initialization_vector_options: Option<&str> =
+            encryption_type.initialization_vector_options.as_deref();
+        assert_eq!(initialization_vector_options, Some("sha256"));
 
         // Test with encryption string without a mode separator.
         encryption_type.set_encryption_string("AES");

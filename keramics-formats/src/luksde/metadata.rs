@@ -64,8 +64,7 @@ impl LuksMetadata {
 
     /// Decodes a Base64-encoded JSON string value.
     fn decode_base64_string(value: &str) -> Result<Vec<u8>, ErrorTrace> {
-        let unescaped: String = Self::unescape_json_string(value);
-        let encoded_bytes: &[u8] = unescaped.as_bytes();
+        let encoded_bytes: &[u8] = value.as_bytes();
         let buffer_size: usize = ((encoded_bytes.len() / 4) * 3) + 3;
         let mut buffer: Vec<u8> = vec![0; buffer_size];
 
@@ -106,10 +105,10 @@ impl LuksMetadata {
             match rule {
                 Rule::EOI => {}
                 Rule::top_level_property => {
-                    Self::with_error_frame(
-                        self.parse_top_level_property(token_pair.into_inner()),
-                        "Unable to parse top level property",
-                    )?;
+                    let property_pairs: Pairs<Rule> = token_pair.into_inner();
+                    let result: Result<(), ErrorTrace> =
+                        self.parse_top_level_property(property_pairs);
+                    Self::with_error_frame(result, "Unable to parse top level property")?;
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -123,7 +122,7 @@ impl LuksMetadata {
     }
 
     /// Parses an anti-forensic (diffuser) object.
-    fn parse_af_object(
+    fn parse_anti_forensic_object(
         &mut self,
         inner_pairs: Pairs<Rule>,
         key_slot: &mut LuksMetadataKeySlot,
@@ -132,34 +131,42 @@ impl LuksMetadata {
             let rule: Rule = token_pair.as_rule();
             if rule != Rule::json_property {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported af object rule: {:?}",
+                    "Unsupported anti-forensic object rule: {:?}",
                     rule
                 )));
             }
+            let property_pairs: Pairs<Rule> = token_pair.into_inner();
+            let property_result: Result<(&str, Pair<Rule>), ErrorTrace> =
+                Self::parse_json_property_pair(property_pairs);
             let (identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
-                Self::parse_json_property_pair(token_pair.into_inner()),
+                property_result,
                 "Unable to parse anti-forensic JSON property",
             )?;
             match identifier {
                 "hash" => {
+                    let value_result: Result<String, ErrorTrace> =
+                        Self::parse_json_string_pair(value_pair);
                     let hash_string: String = Self::with_error_frame(
-                        Self::parse_json_string_pair(value_pair),
+                        value_result,
                         "Unable to parse anti-forensic hash property",
                     )?;
-                    key_slot.af_hashing_method = hash_string.to_lowercase();
+                    key_slot.anti_forensic_hashing_method = hash_string.to_lowercase();
                 }
                 "stripes" => {
-                    key_slot.af_number_of_stripes = Self::with_error_frame(
-                        Self::parse_u32_pair(value_pair),
+                    let value_result: Result<u32, ErrorTrace> = Self::parse_u32_pair(value_pair);
+                    key_slot.anti_forensic_number_of_stripes = Self::with_error_frame(
+                        value_result,
                         "Unable to parse anti-forensic stripes property",
                     )?;
                 }
                 "type" => {
+                    let value_result: Result<String, ErrorTrace> =
+                        Self::parse_json_string_pair(value_pair);
                     let type_string: String = Self::with_error_frame(
-                        Self::parse_json_string_pair(value_pair),
+                        value_result,
                         "Unable to parse anti-forensic type property",
                     )?;
-                    key_slot.af_type = type_string.to_lowercase();
+                    key_slot.anti_forensic_type = type_string.to_lowercase();
                 }
                 _ => {}
             }
@@ -181,41 +188,48 @@ impl LuksMetadata {
                     rule
                 )));
             }
-            let (identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
-                Self::parse_json_property_pair(token_pair.into_inner()),
-                "Unable to parse area JSON property",
-            )?;
+            let property_pairs: Pairs<Rule> = token_pair.into_inner();
+            let property_result: Result<(&str, Pair<Rule>), ErrorTrace> =
+                Self::parse_json_property_pair(property_pairs);
+            let (identifier, value_pair): (&str, Pair<Rule>) =
+                Self::with_error_frame(property_result, "Unable to parse area JSON property")?;
             match identifier {
                 "encryption" => {
+                    let value_result: Result<String, ErrorTrace> =
+                        Self::parse_json_string_pair(value_pair);
                     let encryption: String = Self::with_error_frame(
-                        Self::parse_json_string_pair(value_pair),
+                        value_result,
                         "Unable to parse area encryption property",
                     )?;
                     key_slot.area_encryption = encryption.to_lowercase();
                 }
                 "key_size" => {
+                    let value_result: Result<usize, ErrorTrace> =
+                        Self::parse_usize_pair(value_pair);
                     key_slot.area_key_size = Self::with_error_frame(
-                        Self::parse_usize_pair(value_pair),
+                        value_result,
                         "Unable to parse area key size property",
                     )?;
                 }
                 "offset" => {
+                    let value_result: Result<u64, ErrorTrace> =
+                        Self::parse_u64_string_pair(value_pair);
                     key_slot.area_offset = Self::with_error_frame(
-                        Self::parse_u64_string_pair(value_pair),
+                        value_result,
                         "Unable to parse area offset property",
                     )?;
                 }
                 "size" => {
-                    key_slot.area_size = Self::with_error_frame(
-                        Self::parse_u64_string_pair(value_pair),
-                        "Unable to parse area size property",
-                    )?;
+                    let value_result: Result<u64, ErrorTrace> =
+                        Self::parse_u64_string_pair(value_pair);
+                    key_slot.area_size =
+                        Self::with_error_frame(value_result, "Unable to parse area size property")?;
                 }
                 "type" => {
-                    let area_type: String = Self::with_error_frame(
-                        Self::parse_json_string_pair(value_pair),
-                        "Unable to parse area type property",
-                    )?;
+                    let value_result: Result<String, ErrorTrace> =
+                        Self::parse_json_string_pair(value_pair);
+                    let area_type: String =
+                        Self::with_error_frame(value_result, "Unable to parse area type property")?;
                     key_slot.area_type = area_type.to_lowercase();
                 }
                 _ => {}
@@ -234,26 +248,35 @@ impl LuksMetadata {
                     rule
                 )));
             }
+            let property_pairs: Pairs<Rule> = token_pair.into_inner();
+            let property_result: Result<(&str, Pair<Rule>), ErrorTrace> =
+                Self::parse_json_property_pair(property_pairs);
             let (identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
-                Self::parse_json_property_pair(token_pair.into_inner()),
+                property_result,
                 "Unable to parse configuration JSON property",
             )?;
             match identifier {
                 "flags" => {
+                    let value_result: Result<Vec<String>, ErrorTrace> =
+                        Self::parse_string_array_pair(value_pair);
                     self.configuration.flags = Self::with_error_frame(
-                        Self::parse_string_array_pair(value_pair),
+                        value_result,
                         "Unable to parse configuration flags property",
                     )?;
                 }
                 "json_size" => {
+                    let value_result: Result<u64, ErrorTrace> =
+                        Self::parse_u64_string_pair(value_pair);
                     self.configuration.json_size = Self::with_error_frame(
-                        Self::parse_u64_string_pair(value_pair),
+                        value_result,
                         "Unable to parse configuration JSON size property",
                     )?;
                 }
                 "keyslots_size" => {
+                    let value_result: Result<u64, ErrorTrace> =
+                        Self::parse_u64_string_pair(value_pair);
                     self.configuration.keyslots_size = Self::with_error_frame(
-                        Self::parse_u64_string_pair(value_pair),
+                        value_result,
                         "Unable to parse configuration keyslots size property",
                     )?;
                 }
@@ -279,59 +302,73 @@ impl LuksMetadata {
                     rule
                 )));
             }
-            let (property_identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
-                Self::parse_json_property_pair(token_pair.into_inner()),
-                "Unable to parse digest JSON property",
-            )?;
+            let property_pairs: Pairs<Rule> = token_pair.into_inner();
+            let property_result: Result<(&str, Pair<Rule>), ErrorTrace> =
+                Self::parse_json_property_pair(property_pairs);
+            let (property_identifier, value_pair): (&str, Pair<Rule>) =
+                Self::with_error_frame(property_result, "Unable to parse digest JSON property")?;
             match property_identifier {
                 "digest" => {
+                    let value_result: Result<String, ErrorTrace> =
+                        Self::parse_json_string_pair(value_pair);
                     let encoded: String = Self::with_error_frame(
-                        Self::parse_json_string_pair(value_pair),
+                        value_result,
                         "Unable to parse digest value property",
                     )?;
-                    digest.digest = Self::with_error_frame(
-                        Self::decode_base64_string(encoded.as_str()),
-                        "Unable to decode digest value",
-                    )?;
+                    let decode_result: Result<Vec<u8>, ErrorTrace> =
+                        Self::decode_base64_string(encoded.as_str());
+                    digest.digest =
+                        Self::with_error_frame(decode_result, "Unable to decode digest value")?;
                 }
                 "hash" => {
+                    let value_result: Result<String, ErrorTrace> =
+                        Self::parse_json_string_pair(value_pair);
                     let hash_string: String = Self::with_error_frame(
-                        Self::parse_json_string_pair(value_pair),
+                        value_result,
                         "Unable to parse digest hash property",
                     )?;
                     digest.hashing_method = hash_string.to_lowercase();
                 }
                 "iterations" => {
+                    let value_result: Result<u32, ErrorTrace> = Self::parse_u32_pair(value_pair);
                     digest.number_of_iterations = Self::with_error_frame(
-                        Self::parse_u32_pair(value_pair),
+                        value_result,
                         "Unable to parse digest iterations property",
                     )?;
                 }
                 "keyslots" => {
+                    let value_result: Result<Vec<String>, ErrorTrace> =
+                        Self::parse_string_array_pair(value_pair);
                     digest.keyslots = Self::with_error_frame(
-                        Self::parse_string_array_pair(value_pair),
+                        value_result,
                         "Unable to parse digest keyslots property",
                     )?;
                 }
                 "salt" => {
+                    let value_result: Result<String, ErrorTrace> =
+                        Self::parse_json_string_pair(value_pair);
                     let encoded: String = Self::with_error_frame(
-                        Self::parse_json_string_pair(value_pair),
+                        value_result,
                         "Unable to parse digest salt property",
                     )?;
-                    digest.salt = Self::with_error_frame(
-                        Self::decode_base64_string(encoded.as_str()),
-                        "Unable to decode digest salt",
-                    )?;
+                    let decode_result: Result<Vec<u8>, ErrorTrace> =
+                        Self::decode_base64_string(encoded.as_str());
+                    digest.salt =
+                        Self::with_error_frame(decode_result, "Unable to decode digest salt")?;
                 }
                 "segments" => {
+                    let value_result: Result<Vec<String>, ErrorTrace> =
+                        Self::parse_string_array_pair(value_pair);
                     digest.segments = Self::with_error_frame(
-                        Self::parse_string_array_pair(value_pair),
+                        value_result,
                         "Unable to parse digest segments property",
                     )?;
                 }
                 "type" => {
+                    let value_result: Result<String, ErrorTrace> =
+                        Self::parse_json_string_pair(value_pair);
                     let digest_type: String = Self::with_error_frame(
-                        Self::parse_json_string_pair(value_pair),
+                        value_result,
                         "Unable to parse digest type property",
                     )?;
                     digest.digest_type = digest_type.to_lowercase();
@@ -349,10 +386,10 @@ impl LuksMetadata {
 
             match rule {
                 Rule::digests_property => {
-                    Self::with_error_frame(
-                        self.parse_digests_property(token_pair.into_inner()),
-                        "Unable to parse digests property",
-                    )?;
+                    let property_pairs: Pairs<Rule> = token_pair.into_inner();
+                    let result: Result<(), ErrorTrace> =
+                        self.parse_digests_property(property_pairs);
+                    Self::with_error_frame(result, "Unable to parse digests property")?;
                 }
                 Rule::json_property => {}
                 _ => {
@@ -474,7 +511,7 @@ impl LuksMetadata {
     }
 
     /// Parses a key derivation object.
-    fn parse_kdf_object(
+    fn parse_key_derivation_object(
         &mut self,
         inner_pairs: Pairs<Rule>,
         key_slot: &mut LuksMetadataKeySlot,
@@ -483,62 +520,77 @@ impl LuksMetadata {
             let rule: Rule = token_pair.as_rule();
             if rule != Rule::json_property {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported kdf object rule: {:?}",
+                    "Unsupported key derivation object rule: {:?}",
                     rule
                 )));
             }
+            let property_pairs: Pairs<Rule> = token_pair.into_inner();
+            let property_result: Result<(&str, Pair<Rule>), ErrorTrace> =
+                Self::parse_json_property_pair(property_pairs);
             let (identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
-                Self::parse_json_property_pair(token_pair.into_inner()),
-                "Unable to parse kdf JSON property",
+                property_result,
+                "Unable to parse key derivation JSON property",
             )?;
             match identifier {
                 "cpus" => {
-                    key_slot.kdf_cpus = Self::with_error_frame(
-                        Self::parse_u32_pair(value_pair),
-                        "Unable to parse kdf cpus property",
+                    let value_result: Result<u32, ErrorTrace> = Self::parse_u32_pair(value_pair);
+                    key_slot.key_derivation_parallelism = Self::with_error_frame(
+                        value_result,
+                        "Unable to parse key derivation parallelism property",
                     )?;
                 }
                 "hash" => {
+                    let value_result: Result<String, ErrorTrace> =
+                        Self::parse_json_string_pair(value_pair);
                     let hash_string: String = Self::with_error_frame(
-                        Self::parse_json_string_pair(value_pair),
-                        "Unable to parse kdf hash property",
+                        value_result,
+                        "Unable to parse key derivation hash property",
                     )?;
-                    key_slot.kdf_hashing_method = hash_string.to_lowercase();
+                    key_slot.key_derivation_hashing_method = hash_string.to_lowercase();
                 }
                 "iterations" => {
-                    key_slot.kdf_number_of_iterations = Self::with_error_frame(
-                        Self::parse_u32_pair(value_pair),
-                        "Unable to parse kdf iterations property",
+                    let value_result: Result<u32, ErrorTrace> = Self::parse_u32_pair(value_pair);
+                    key_slot.key_derivation_number_of_iterations = Self::with_error_frame(
+                        value_result,
+                        "Unable to parse key derivation iterations property",
                     )?;
                 }
                 "memory" => {
-                    key_slot.kdf_memory = Self::with_error_frame(
-                        Self::parse_u32_pair(value_pair),
-                        "Unable to parse kdf memory property",
+                    let value_result: Result<u32, ErrorTrace> = Self::parse_u32_pair(value_pair);
+                    key_slot.key_derivation_memory = Self::with_error_frame(
+                        value_result,
+                        "Unable to parse key derivation memory property",
                     )?;
                 }
                 "salt" => {
+                    let value_result: Result<String, ErrorTrace> =
+                        Self::parse_json_string_pair(value_pair);
                     let encoded: String = Self::with_error_frame(
-                        Self::parse_json_string_pair(value_pair),
-                        "Unable to parse kdf salt property",
+                        value_result,
+                        "Unable to parse key derivation salt property",
                     )?;
-                    key_slot.kdf_salt = Self::with_error_frame(
-                        Self::decode_base64_string(encoded.as_str()),
-                        "Unable to decode kdf salt",
+                    let decode_result: Result<Vec<u8>, ErrorTrace> =
+                        Self::decode_base64_string(encoded.as_str());
+                    key_slot.key_derivation_salt = Self::with_error_frame(
+                        decode_result,
+                        "Unable to decode key derivation salt",
                     )?;
                 }
                 "time" => {
-                    key_slot.kdf_time = Self::with_error_frame(
-                        Self::parse_u32_pair(value_pair),
-                        "Unable to parse kdf time property",
+                    let value_result: Result<u32, ErrorTrace> = Self::parse_u32_pair(value_pair);
+                    key_slot.key_derivation_time = Self::with_error_frame(
+                        value_result,
+                        "Unable to parse key derivation time property",
                     )?;
                 }
                 "type" => {
-                    let kdf_type: String = Self::with_error_frame(
-                        Self::parse_json_string_pair(value_pair),
-                        "Unable to parse kdf type property",
+                    let value_result: Result<String, ErrorTrace> =
+                        Self::parse_json_string_pair(value_pair);
+                    let key_derivation_type: String = Self::with_error_frame(
+                        value_result,
+                        "Unable to parse key derivation type property",
                     )?;
-                    key_slot.kdf_type = kdf_type.to_lowercase();
+                    key_slot.key_derivation_type = key_derivation_type.to_lowercase();
                 }
                 _ => {}
             }
@@ -559,10 +611,10 @@ impl LuksMetadata {
 
             match rule {
                 Rule::keyslot_property => {
-                    Self::with_error_frame(
-                        self.parse_keyslot_property(token_pair.into_inner(), &mut key_slot),
-                        "Unable to parse keyslot property",
-                    )?;
+                    let property_pairs: Pairs<Rule> = token_pair.into_inner();
+                    let result: Result<(), ErrorTrace> =
+                        self.parse_keyslot_property(property_pairs, &mut key_slot);
+                    Self::with_error_frame(result, "Unable to parse keyslot property")?;
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -591,39 +643,45 @@ impl LuksMetadata {
 
         match rule {
             Rule::af_object => {
-                Self::with_error_frame(
-                    self.parse_af_object(token_pair.into_inner(), key_slot),
-                    "Unable to parse anti-forensic object",
-                )?;
+                let object_pairs: Pairs<Rule> = token_pair.into_inner();
+                let result: Result<(), ErrorTrace> =
+                    self.parse_anti_forensic_object(object_pairs, key_slot);
+                Self::with_error_frame(result, "Unable to parse anti-forensic object")?;
             }
             Rule::area_object => {
-                Self::with_error_frame(
-                    self.parse_area_object(token_pair.into_inner(), key_slot),
-                    "Unable to parse area object",
-                )?;
+                let object_pairs: Pairs<Rule> = token_pair.into_inner();
+                let result: Result<(), ErrorTrace> = self.parse_area_object(object_pairs, key_slot);
+                Self::with_error_frame(result, "Unable to parse area object")?;
             }
             Rule::json_property => {
-                let (identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
-                    Self::parse_json_property_pair(token_pair.into_inner()),
-                    "Unable to parse JSON property",
-                )?;
+                let property_pairs: Pairs<Rule> = token_pair.into_inner();
+                let property_result: Result<(&str, Pair<Rule>), ErrorTrace> =
+                    Self::parse_json_property_pair(property_pairs);
+                let (identifier, value_pair): (&str, Pair<Rule>) =
+                    Self::with_error_frame(property_result, "Unable to parse JSON property")?;
                 match identifier {
                     "key_size" => {
+                        let value_result: Result<usize, ErrorTrace> =
+                            Self::parse_usize_pair(value_pair);
                         key_slot.key_size = Self::with_error_frame(
-                            Self::parse_usize_pair(value_pair),
+                            value_result,
                             "Unable to parse keyslot key size property",
                         )?;
                     }
                     "priority" => {
+                        let value_result: Result<i64, ErrorTrace> =
+                            Self::parse_i64_pair(value_pair);
                         let priority: i64 = Self::with_error_frame(
-                            Self::parse_i64_pair(value_pair),
+                            value_result,
                             "Unable to parse keyslot priority property",
                         )?;
                         key_slot.priority = Some(priority);
                     }
                     "type" => {
+                        let value_result: Result<String, ErrorTrace> =
+                            Self::parse_json_string_pair(value_pair);
                         let keyslot_type: String = Self::with_error_frame(
-                            Self::parse_json_string_pair(value_pair),
+                            value_result,
                             "Unable to parse keyslot type property",
                         )?;
                         key_slot.keyslot_type = keyslot_type.to_lowercase();
@@ -632,10 +690,10 @@ impl LuksMetadata {
                 }
             }
             Rule::kdf_object => {
-                Self::with_error_frame(
-                    self.parse_kdf_object(token_pair.into_inner(), key_slot),
-                    "Unable to parse kdf object",
-                )?;
+                let object_pairs: Pairs<Rule> = token_pair.into_inner();
+                let result: Result<(), ErrorTrace> =
+                    self.parse_key_derivation_object(object_pairs, key_slot);
+                Self::with_error_frame(result, "Unable to parse key derivation object")?;
             }
             _ => {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -654,10 +712,10 @@ impl LuksMetadata {
 
             match rule {
                 Rule::keyslots_property => {
-                    Self::with_error_frame(
-                        self.parse_keyslots_property(token_pair.into_inner()),
-                        "Unable to parse keyslots property",
-                    )?;
+                    let property_pairs: Pairs<Rule> = token_pair.into_inner();
+                    let result: Result<(), ErrorTrace> =
+                        self.parse_keyslots_property(property_pairs);
+                    Self::with_error_frame(result, "Unable to parse keyslots property")?;
                 }
                 Rule::json_property => {}
                 _ => {
@@ -743,42 +801,57 @@ impl LuksMetadata {
                     rule
                 )));
             }
-            let (property_identifier, value_pair): (&str, Pair<Rule>) = Self::with_error_frame(
-                Self::parse_json_property_pair(token_pair.into_inner()),
-                "Unable to parse segment JSON property",
-            )?;
+            let property_pairs: Pairs<Rule> = token_pair.into_inner();
+            let property_result: Result<(&str, Pair<Rule>), ErrorTrace> =
+                Self::parse_json_property_pair(property_pairs);
+            let (property_identifier, value_pair): (&str, Pair<Rule>) =
+                Self::with_error_frame(property_result, "Unable to parse segment JSON property")?;
             match property_identifier {
                 "encryption" => {
+                    let value_result: Result<String, ErrorTrace> =
+                        Self::parse_json_string_pair(value_pair);
                     let encryption: String = Self::with_error_frame(
-                        Self::parse_json_string_pair(value_pair),
+                        value_result,
                         "Unable to parse segment encryption property",
                     )?;
                     segment.encryption = encryption.to_lowercase();
                 }
                 "iv_tweak" => {
+                    let value_result: Result<u64, ErrorTrace> =
+                        Self::parse_u64_string_pair(value_pair);
                     segment.initialization_vector_tweak = Self::with_error_frame(
-                        Self::parse_u64_string_pair(value_pair),
+                        value_result,
                         "Unable to parse segment initialization vector tweak property",
                     )?;
                 }
                 "offset" => {
+                    let value_result: Result<u64, ErrorTrace> =
+                        Self::parse_u64_string_pair(value_pair);
                     segment.offset = Self::with_error_frame(
-                        Self::parse_u64_string_pair(value_pair),
+                        value_result,
                         "Unable to parse segment offset property",
                     )?;
                 }
                 "sector_size" => {
+                    let value_result: Result<u16, ErrorTrace> = Self::parse_u16_pair(value_pair);
                     segment.sector_size = Self::with_error_frame(
-                        Self::parse_u16_pair(value_pair),
+                        value_result,
                         "Unable to parse segment sector size property",
                     )?;
                 }
                 "size" => {
-                    segment.size = Self::parse_segment_size(value_pair)?;
+                    let value_result: Result<Option<u64>, ErrorTrace> =
+                        Self::parse_segment_size(value_pair);
+                    segment.size = Self::with_error_frame(
+                        value_result,
+                        "Unable to parse segment size property",
+                    )?;
                 }
                 "type" => {
+                    let value_result: Result<String, ErrorTrace> =
+                        Self::parse_json_string_pair(value_pair);
                     let segment_type: String = Self::with_error_frame(
-                        Self::parse_json_string_pair(value_pair),
+                        value_result,
                         "Unable to parse segment type property",
                     )?;
                     segment.segment_type = segment_type.to_lowercase();
@@ -791,10 +864,9 @@ impl LuksMetadata {
 
     /// Parses a segment size property (`"dynamic"` or a u64 byte count).
     fn parse_segment_size(value_pair: Pair<Rule>) -> Result<Option<u64>, ErrorTrace> {
-        let size_string: String = Self::with_error_frame(
-            Self::parse_json_string_pair(value_pair),
-            "Unable to parse segment size property",
-        )?;
+        let value_result: Result<String, ErrorTrace> = Self::parse_json_string_pair(value_pair);
+        let size_string: String =
+            Self::with_error_frame(value_result, "Unable to parse segment size string")?;
         if size_string == "dynamic" {
             return Ok(None);
         }
@@ -814,10 +886,10 @@ impl LuksMetadata {
 
             match rule {
                 Rule::segments_property => {
-                    Self::with_error_frame(
-                        self.parse_segments_property(token_pair.into_inner()),
-                        "Unable to parse segments property",
-                    )?;
+                    let property_pairs: Pairs<Rule> = token_pair.into_inner();
+                    let result: Result<(), ErrorTrace> =
+                        self.parse_segments_property(property_pairs);
+                    Self::with_error_frame(result, "Unable to parse segments property")?;
                 }
                 Rule::json_property => {}
                 _ => {
@@ -925,34 +997,30 @@ impl LuksMetadata {
             match rule {
                 Rule::EOI => {}
                 Rule::config_object => {
-                    Self::with_error_frame(
-                        self.parse_configuration_object(token_pair.into_inner()),
-                        "Unable to parse configuration object",
-                    )?;
+                    let object_pairs: Pairs<Rule> = token_pair.into_inner();
+                    let result: Result<(), ErrorTrace> =
+                        self.parse_configuration_object(object_pairs);
+                    Self::with_error_frame(result, "Unable to parse configuration object")?;
                 }
                 Rule::digests_object => {
-                    Self::with_error_frame(
-                        self.parse_digests_object(token_pair.into_inner()),
-                        "Unable to parse digests object",
-                    )?;
+                    let object_pairs: Pairs<Rule> = token_pair.into_inner();
+                    let result: Result<(), ErrorTrace> = self.parse_digests_object(object_pairs);
+                    Self::with_error_frame(result, "Unable to parse digests object")?;
                 }
                 Rule::keyslots_object => {
-                    Self::with_error_frame(
-                        self.parse_keyslots_object(token_pair.into_inner()),
-                        "Unable to parse keyslots object",
-                    )?;
+                    let object_pairs: Pairs<Rule> = token_pair.into_inner();
+                    let result: Result<(), ErrorTrace> = self.parse_keyslots_object(object_pairs);
+                    Self::with_error_frame(result, "Unable to parse keyslots object")?;
                 }
                 Rule::segments_object => {
-                    Self::with_error_frame(
-                        self.parse_segments_object(token_pair.into_inner()),
-                        "Unable to parse segments object",
-                    )?;
+                    let object_pairs: Pairs<Rule> = token_pair.into_inner();
+                    let result: Result<(), ErrorTrace> = self.parse_segments_object(object_pairs);
+                    Self::with_error_frame(result, "Unable to parse segments object")?;
                 }
                 Rule::tokens_object => {
-                    Self::with_error_frame(
-                        self.parse_tokens_object(token_pair.into_inner()),
-                        "Unable to parse tokens object",
-                    )?;
+                    let object_pairs: Pairs<Rule> = token_pair.into_inner();
+                    let result: Result<(), ErrorTrace> = self.parse_tokens_object(object_pairs);
+                    Self::with_error_frame(result, "Unable to parse tokens object")?;
                 }
                 Rule::json_property => {}
                 _ => {
@@ -1158,9 +1226,8 @@ mod tests {
 
     use keramics_core::open_fake_data_stream;
 
-    #[test]
-    fn test_read_text() -> Result<(), ErrorTrace> {
-        let test_data: &str = concat!(
+    fn get_test_metadata_text() -> &'static str {
+        concat!(
             "{",
             "  \"keyslots\": {",
             "    \"0\": {",
@@ -1221,60 +1288,88 @@ mod tests {
             "  }",
             "}",
             "\n",
-        );
+        )
+    }
+
+    #[test]
+    fn test_parse_key_slots() -> Result<(), ErrorTrace> {
+        let test_data: &str = get_test_metadata_text();
+        let mut metadata: LuksMetadata = LuksMetadata::new();
+        metadata.parse(test_data)?;
+
+        let number_of_key_slots: usize = metadata.key_slots.len();
+        assert_eq!(number_of_key_slots, 1);
+
+        let key_slot: &LuksMetadataKeySlot = &metadata.key_slots[0];
+        let key_slot_salt_size: usize = key_slot.key_derivation_salt.len();
+        assert_eq!(key_slot_salt_size, 32);
+
+        let expected_key_slot: LuksMetadataKeySlot = LuksMetadataKeySlot {
+            identifier: String::from("0"),
+            keyslot_type: String::from("luks2"),
+            key_size: 32,
+            priority: Some(1),
+            anti_forensic_type: String::from("luks1"),
+            anti_forensic_hashing_method: String::from("sha1"),
+            anti_forensic_number_of_stripes: 4000,
+            area_type: String::from("raw"),
+            area_offset: 32768,
+            area_size: 131072,
+            area_encryption: String::from("aes-cbc-plain"),
+            area_key_size: 32,
+            key_derivation_type: String::from("argon2id"),
+            key_derivation_hashing_method: String::new(),
+            key_derivation_number_of_iterations: 0,
+            key_derivation_time: 10,
+            key_derivation_memory: 1048576,
+            key_derivation_parallelism: 4,
+            key_derivation_salt: key_slot.key_derivation_salt.clone(),
+        };
+        assert_eq!(key_slot, &expected_key_slot);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_text() -> Result<(), ErrorTrace> {
+        let test_data: &str = get_test_metadata_text();
         let mut metadata: LuksMetadata = LuksMetadata::new();
         metadata.parse(test_data)?;
 
         assert_eq!(metadata.configuration.json_size, 12288);
         assert_eq!(metadata.configuration.keyslots_size, 262144);
 
-        let number_of_key_slots: usize = metadata.key_slots.len();
-        assert_eq!(number_of_key_slots, 1);
-        let key_slot: &LuksMetadataKeySlot = &metadata.key_slots[0];
-        assert_eq!(key_slot.identifier, "0");
-        assert_eq!(key_slot.keyslot_type, "luks2");
-        assert_eq!(key_slot.key_size, 32);
-        assert_eq!(key_slot.priority, Some(1));
-        assert_eq!(key_slot.af_type, "luks1");
-        assert_eq!(key_slot.af_number_of_stripes, 4000);
-        assert_eq!(key_slot.af_hashing_method, "sha1");
-        assert_eq!(key_slot.area_type, "raw");
-        assert_eq!(key_slot.area_offset, 32768);
-        assert_eq!(key_slot.area_size, 131072);
-        assert_eq!(key_slot.area_encryption, "aes-cbc-plain");
-        assert_eq!(key_slot.area_key_size, 32);
-        assert_eq!(key_slot.kdf_type, "argon2id");
-        assert_eq!(key_slot.kdf_time, 10);
-        assert_eq!(key_slot.kdf_memory, 1048576);
-        assert_eq!(key_slot.kdf_cpus, 4);
-        let key_slot_salt_size: usize = key_slot.kdf_salt.len();
-        assert_eq!(key_slot_salt_size, 32);
-
         let number_of_segments: usize = metadata.segments.len();
         assert_eq!(number_of_segments, 1);
-        let segment: &LuksMetadataSegment = &metadata.segments[0];
-        assert_eq!(segment.identifier, "0");
-        assert_eq!(segment.segment_type, "crypt");
-        assert_eq!(segment.offset, 294912);
-        assert_eq!(segment.size, None);
-        assert_eq!(segment.initialization_vector_tweak, 0);
-        assert_eq!(segment.encryption, "aes-cbc-plain");
-        assert_eq!(segment.sector_size, 4096);
+        let expected_segment: LuksMetadataSegment = LuksMetadataSegment {
+            identifier: String::from("0"),
+            segment_type: String::from("crypt"),
+            offset: 294912,
+            size: None,
+            initialization_vector_tweak: 0,
+            encryption: String::from("aes-cbc-plain"),
+            sector_size: 4096,
+        };
+        assert_eq!(metadata.segments[0], expected_segment);
 
         let number_of_digests: usize = metadata.digests.len();
         assert_eq!(number_of_digests, 1);
         let digest: &LuksMetadataDigest = &metadata.digests[0];
-        assert_eq!(digest.identifier, "0");
-        assert_eq!(digest.digest_type, "pbkdf2");
-        let expected_identifiers: [String; 1] = [String::from("0")];
-        assert_eq!(digest.keyslots, expected_identifiers);
-        assert_eq!(digest.segments, expected_identifiers);
-        assert_eq!(digest.hashing_method, "sha1");
-        assert_eq!(digest.number_of_iterations, 723155);
         let digest_salt_size: usize = digest.salt.len();
         assert_eq!(digest_salt_size, 32);
         let digest_size: usize = digest.digest.len();
         assert_eq!(digest_size, 20);
+        let expected_digest: LuksMetadataDigest = LuksMetadataDigest {
+            identifier: String::from("0"),
+            digest_type: String::from("pbkdf2"),
+            keyslots: vec![String::from("0")],
+            segments: vec![String::from("0")],
+            hashing_method: String::from("sha1"),
+            number_of_iterations: 723155,
+            salt: digest.salt.clone(),
+            digest: digest.digest.clone(),
+        };
+        assert_eq!(digest, &expected_digest);
 
         Ok(())
     }
@@ -1469,8 +1564,14 @@ mod tests {
         assert_eq!(metadata.configuration.flags, expected_flags);
         assert_eq!(metadata.segments[0].size, Some(65536));
         assert_eq!(metadata.segments[0].initialization_vector_tweak, 4);
-        assert_eq!(metadata.key_slots[0].kdf_hashing_method, "sha256");
-        assert_eq!(metadata.key_slots[0].kdf_number_of_iterations, 1000);
+        assert_eq!(
+            metadata.key_slots[0].key_derivation_hashing_method,
+            "sha256"
+        );
+        assert_eq!(
+            metadata.key_slots[0].key_derivation_number_of_iterations,
+            1000
+        );
 
         Ok(())
     }
